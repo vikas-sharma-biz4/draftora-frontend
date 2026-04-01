@@ -52,4 +52,4 @@ out/
 
 # Gatsby files
 .cache/
-public/
+# Note: public/ is intentionally NOT ignored — Next.js uses it for static assets
