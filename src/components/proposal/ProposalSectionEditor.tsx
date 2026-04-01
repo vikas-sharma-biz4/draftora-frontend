@@ -155,6 +155,10 @@ export default function ProposalSectionEditor({
           content={editorContent}
           onChange={handleEditorChange}
           placeholder={`Write the ${label} section here…`}
+          onRegenerateSelection={(selectedText) => {
+            setRegenInstructions(`Rewrite this selection: ${selectedText}`);
+            setShowRegenInput(true);
+          }}
         />
       ) : (
         <div className="cursor-text" onClick={() => setIsEditing(true)}>

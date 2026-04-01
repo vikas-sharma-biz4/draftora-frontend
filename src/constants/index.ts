@@ -1,3 +1,20 @@
+export const AI_MODEL_OPTIONS = [
+  {
+    value: "gpt-4o",
+    label: "GPT-4o",
+    provider: "OpenAI",
+    description: "Fast, highly capable model. Best for most proposals.",
+  },
+  {
+    value: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    provider: "Anthropic",
+    description: "Exceptional writing quality and nuanced language.",
+  },
+] as const;
+
+export const AI_MODEL_DEFAULT = "gpt-4o";
+
 export const WIZARD_STEPS = [
   { step: 1, label: "Define Scope", path: "/" },
   { step: 2, label: "Knowledge Base", path: "/knowledge-base" },

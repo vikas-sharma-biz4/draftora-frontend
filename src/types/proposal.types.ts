@@ -20,6 +20,7 @@ export interface ProposalData {
   tone: string;
   lengthPreference: string;
   language: string;
+  aiModel: string;
   selectedSections: string[];
   sectionDisplayNames: Record<string, string>;
   customSections: CustomSection[];

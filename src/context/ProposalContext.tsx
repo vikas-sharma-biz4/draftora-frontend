@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-import { DEFAULT_SELECTED_SECTIONS } from "@/constants";
+import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
 import type { ProposalData, WizardStep } from "@/types/proposal.types";
 
 interface ProposalContextType {
@@ -33,6 +33,7 @@ const defaultProposalData: ProposalData = {
   tone: "professional",
   lengthPreference: "balanced",
   language: "English - US",
+  aiModel: AI_MODEL_DEFAULT,
   selectedSections: [...DEFAULT_SELECTED_SECTIONS],
   sectionDisplayNames: {},
   customSections: [],

@@ -1455,8 +1455,8 @@ body {
 /* content-subheading: sub-section headings inside rendered proposal content */
 .content-subheading {
   font-size: 13px;
-  font-weight: 700;
-  color: #2f5496;
+  font-weight: 700 !important;
+  color: #2f5496 !important;
   margin: 20px 0 8px;
   letter-spacing: 0.01em;
 }
@@ -1472,8 +1472,8 @@ body {
 }
 
 .content-table th {
-  background: #2f5496;
-  color: #ffffff;
+  background: #2f5496 !important;
+  color: #ffffff !important;
   font-weight: 700;
   text-align: left;
   padding: 10px 14px;
@@ -1602,12 +1602,14 @@ body {
 
 .rte-content .ProseMirror p {
   margin-bottom: 0.75em;
+  text-align: justify;
 }
 
 .rte-content .ProseMirror h1,
 .rte-content .ProseMirror h2,
-.rte-content .ProseMirror h3 {
-  font-weight: 700;
+.rte-content .ProseMirror h3,
+.rte-content .ProseMirror h4 {
+  font-weight: 700 !important;
   line-height: 1.3;
   margin-bottom: 0.5em;
   margin-top: 1em;
@@ -1615,7 +1617,18 @@ body {
 
 .rte-content .ProseMirror h1 { font-size: 1.5em; }
 .rte-content .ProseMirror h2 { font-size: 1.25em; }
-.rte-content .ProseMirror h3 { font-size: 1.1em; }
+
+/* Section headings — must stay #2f5496 at all times (overrides browser selection tint) */
+.rte-content .ProseMirror h3 {
+  font-size: 1.1em;
+  color: #2f5496 !important;
+}
+
+/* Sub-headings */
+.rte-content .ProseMirror h4 {
+  font-size: 1em;
+  color: #2f5496 !important;
+}
 
 .rte-content .ProseMirror ul,
 .rte-content .ProseMirror ol {
@@ -1654,9 +1667,9 @@ body {
 }
 
 .rte-content .ProseMirror th {
-  background: var(--color-primary-light);
+  background: #2f5496 !important;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #ffffff !important;
   text-align: left;
 }
 
@@ -1676,6 +1689,71 @@ body {
   color: var(--color-text-light);
   pointer-events: none;
   height: 0;
+}
+
+/* ── TipTap BubbleMenu (floating toolbar on text select) ─────────────────── */
+.bubble-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #1e1b4b;
+  border-radius: var(--radius-md);
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+}
+
+.bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e0e7ff;
+  font-family: var(--font-sans);
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.bubble-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.bubble-btn.active {
+  background: rgba(99, 102, 241, 0.4);
+  color: #ffffff;
+}
+
+.bubble-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Regenerate button — accent color */
+.bubble-btn-regen {
+  color: #a5f3fc;
+  letter-spacing: 0.01em;
+}
+
+.bubble-btn-regen:hover {
+  background: rgba(165, 243, 252, 0.15);
+  color: #ffffff;
+}
+
+.bubble-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 3px;
+  flex-shrink: 0;
 }
 
 /* Enhanced proposal sidebar with section actions */
