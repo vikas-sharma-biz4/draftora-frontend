@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/extension-bubble-menu";
+import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Color } from "@tiptap/extension-color";
