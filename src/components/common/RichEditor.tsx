@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/extension-bubble-menu";
 import StarterKit from "@tiptap/starter-kit";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Color } from "@tiptap/extension-color";
@@ -17,13 +18,18 @@ interface RichEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** Called when user clicks "Regenerate" in the bubble menu with the selected text. */
+  onRegenerateSelection?: (selectedText: string) => void;
 }
 
 export default function RichEditor({
   content,
   onChange,
   placeholder = "Start writing…",
+  onRegenerateSelection,
 }: RichEditorProps): JSX.Element {
+  const [regenLoading, setRegenLoading] = useState<boolean>(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -81,11 +87,100 @@ export default function RichEditor({
       .run();
   }, [editor]);
 
+  const handleRegenerateSelection = useCallback(async (): Promise<void> => {
+    if (!editor || !onRegenerateSelection) return;
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+    const selectedText = editor.state.doc.textBetween(from, to, " ");
+    if (!selectedText.trim()) return;
+    setRegenLoading(true);
+    onRegenerateSelection(selectedText);
+    setRegenLoading(false);
+  }, [editor, onRegenerateSelection]);
+
   if (!editor) return <div className="rte-content" />;
 
   return (
     <div>
-      {/* Toolbar */}
+      {/* ── Floating bubble menu on text selection ────────────────────── */}
+      <BubbleMenu
+        editor={editor}
+        tippyOptions={{ duration: 120, placement: "top" }}
+        className="bubble-menu"
+      >
+        <button
+          type="button"
+          className={`bubble-btn${editor.isActive("bold") ? " active" : ""}`}
+          title="Bold"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            editor.chain().focus().toggleBold().run();
+          }}
+        >
+          <strong>B</strong>
+        </button>
+        <button
+          type="button"
+          className={`bubble-btn${editor.isActive("italic") ? " active" : ""}`}
+          title="Italic"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            editor.chain().focus().toggleItalic().run();
+          }}
+        >
+          <em>I</em>
+        </button>
+        <button
+          type="button"
+          className={`bubble-btn${editor.isActive("heading", { level: 3 }) ? " active" : ""}`}
+          title="Heading 3"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            editor.chain().focus().toggleHeading({ level: 3 }).run();
+          }}
+        >
+          H3
+        </button>
+        <button
+          type="button"
+          className={`bubble-btn${editor.isActive("heading", { level: 4 }) ? " active" : ""}`}
+          title="Sub-heading (H4)"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            editor.chain().focus().toggleHeading({ level: 4 }).run();
+          }}
+        >
+          H4
+        </button>
+        <button
+          type="button"
+          className={`bubble-btn${editor.isActive("bulletList") ? " active" : ""}`}
+          title="Bullet list"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            editor.chain().focus().toggleBulletList().run();
+          }}
+        >
+          • List
+        </button>
+        <div className="bubble-separator" />
+        {onRegenerateSelection && (
+          <button
+            type="button"
+            className="bubble-btn bubble-btn-regen"
+            title="Regenerate selected text with AI"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleRegenerateSelection();
+            }}
+            disabled={regenLoading}
+          >
+            {regenLoading ? "…" : "↻ Regenerate"}
+          </button>
+        )}
+      </BubbleMenu>
+
+      {/* ── Fixed toolbar ───────────────────────────────────────────────── */}
       <div className="rte-toolbar" role="toolbar" aria-label="Formatting toolbar">
         {/* Text style */}
         <button
@@ -115,26 +210,26 @@ export default function RichEditor({
 
         <div className="rte-toolbar-separator" />
 
-        {/* Headings */}
+        {/* Headings — H3 for section heading, H4 for sub-heading */}
         <button
           type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 1 }) ? " active" : ""}`}
-          title="Heading 1"
+          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 3 }) ? " active" : ""}`}
+          title="Heading (H3)"
           onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
           }
         >
-          H1
+          H3
         </button>
         <button
           type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 2 }) ? " active" : ""}`}
-          title="Heading 2"
+          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 4 }) ? " active" : ""}`}
+          title="Sub-heading (H4)"
           onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
+            editor.chain().focus().toggleHeading({ level: 4 }).run()
           }
         >
-          H2
+          H4
         </button>
 
         <div className="rte-toolbar-separator" />
