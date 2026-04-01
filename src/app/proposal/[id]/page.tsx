@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useProposal } from "@/context/ProposalContext";
 import { Pencil, X, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +39,7 @@ function resolveSectionLabel(
 export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
+  const { resetProposal } = useProposal();
   const proposalId = Number(params.id);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -246,7 +248,7 @@ export default function ProposalOutputPage(): JSX.Element {
           )}
           <button
             className="btn btn-primary btn-sm"
-            onClick={() => router.push("/")}
+            onClick={() => { resetProposal(); router.push("/"); }}
           >
             + New Proposal
           </button>
@@ -417,7 +419,7 @@ export default function ProposalOutputPage(): JSX.Element {
                 </p>
                 <button
                   className="btn btn-primary mt-16"
-                  onClick={() => router.push("/")}
+                  onClick={() => { resetProposal(); router.push("/"); }}
                 >
                   Start Over
                 </button>
