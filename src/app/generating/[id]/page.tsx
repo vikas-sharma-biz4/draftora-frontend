@@ -101,9 +101,9 @@ export default function GeneratingPage(): JSX.Element {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       // Auto-cancel backend generation when the user navigates away
       // (browser back, closing tab, etc.) before it completes.
-      if (!completedRef.current) {
-        cancelProposal(proposalId).catch(() => undefined);
-      }
+      // if (!completedRef.current) {
+      //   cancelProposal(proposalId).catch(() => undefined);
+      // }
     };
   }, [fetchAndPoll, proposalId]);
 
