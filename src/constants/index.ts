@@ -112,6 +112,7 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   implementation_plan: "Implementation Plan",
   timeline: "Timeline",
   conclusion: "Conclusion",
+  similar_projects: "Similar Projects Developed By Biz4Group Experts",
 };
 
 export const PROPOSAL_TEMPLATES = [
