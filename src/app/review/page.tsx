@@ -34,6 +34,7 @@ export default function ReviewPage(): JSX.Element {
     setErrorMessage("");
     try {
       const result = await generateProposal(proposalData);
+      console.log("Generate result================>", result);
       setGeneratedProposalId(result.id);
       router.push(`/generating/${result.id}`);
     } catch (err: unknown) {

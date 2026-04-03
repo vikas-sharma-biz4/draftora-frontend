@@ -175,6 +175,17 @@ export function getDownloadUrl(id: number): string {
   return `${API_BASE_URL}/proposals/${id}/download/`;
 }
 
+export async function cancelProposal(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${id}/cancel/`, {
+    method: "POST",
+    headers: BASE_HEADERS,
+  });
+  // Ignore 400 (already completed/failed) — cancellation is best-effort
+  if (!res.ok && res.status !== 400) {
+    await handleResponse<null>(res);
+  }
+}
+
 // ── Section Management ─────────────────────────────────────────────────────────
 
 export interface AddSectionPayload {

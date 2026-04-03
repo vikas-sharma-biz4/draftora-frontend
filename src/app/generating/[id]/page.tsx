@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getProposal } from "@/api/proposalApi";
+import { cancelProposal, getProposal } from "@/api/proposalApi";
 import { GENERATION_STEPS } from "@/constants";
 import { MAX_POLL_ATTEMPTS, POLLING_INTERVAL_MS } from "@/config/config";
 import { useProposal } from "@/context/ProposalContext";
@@ -21,6 +21,9 @@ export default function GeneratingPage(): JSX.Element {
   const [completedSections, setCompletedSections] = useState<number>(0);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCountRef = useRef<number>(0);
+  // Tracks whether the proposal finished normally — prevents cancel call on
+  // the successful redirect to the proposal page.
+  const completedRef = useRef<boolean>(false);
 
   // Derive visible progress from poll count
   const activeStepIndex = Math.min(
@@ -43,7 +46,16 @@ export default function GeneratingPage(): JSX.Element {
 
       if (data.status === "completed") {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        completedRef.current = true;
         router.push(`/proposal/${proposalId}`);
+        return;
+      }
+
+      if (data.status === "cancelled") {
+        if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+        completedRef.current = true;
+        setIsGenerating(false);
+        router.push("/review");
         return;
       }
 
@@ -87,10 +99,17 @@ export default function GeneratingPage(): JSX.Element {
     fetchAndPoll();
     return () => {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      // Auto-cancel backend generation when the user navigates away
+      // (browser back, closing tab, etc.) before it completes.
+      // if (!completedRef.current) {
+      //   cancelProposal(proposalId).catch(() => undefined);
+      // }
     };
-  }, [fetchAndPoll]);
+  }, [fetchAndPoll, proposalId]);
 
   if (errorMessage) {
+    // Generation already stopped (failed/timeout) — no need to cancel on unmount
+    completedRef.current = true;
     return (
       <div className="generating-page">
         <div className="generating-orb generating-orb-1" />
@@ -214,7 +233,10 @@ export default function GeneratingPage(): JSX.Element {
         {/* Cancel */}
         <button
           className="generating-cancel"
-          onClick={() => {
+          onClick={async () => {
+            completedRef.current = true;
+            if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+            await cancelProposal(proposalId).catch(() => undefined);
             setIsGenerating(false);
             router.push("/review");
           }}
