@@ -1,10 +1,19 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { plainTextToHtml } from "@/utils/contentParser";
+import { plainTextToHtml, isHtmlContent, detectContentType } from "@/utils/contentParser";
 import ContentRenderer from "./ContentRenderer";
+import BulletRenderer from "./renderers/BulletRenderer";
+import ParagraphRenderer from "./renderers/ParagraphRenderer";
+import TableRenderer from "./renderers/TableRenderer";
+
+/**
+ * DEBUG FLAG — set to false to show only the new ReactMarkdown output.
+ * Set to true to show BOTH old and new outputs for comparison.
+ */
+const DEBUG_MARKDOWN_AI = false;
 
 const RichEditor = dynamic(() => import("@/components/common/RichEditor"), {
   ssr: false,
@@ -82,7 +91,14 @@ export default function ProposalSectionEditor({
   }
 
   /** Convert content to HTML before opening TipTap so it receives valid markup. */
-  const editorContent = plainTextToHtml(localContent);
+  const editorContent = useMemo(() => {
+    // If content is already HTML, use it directly to preserve formatting
+    if (isHtmlContent(localContent)) {
+      return localContent;
+    }
+    // Otherwise convert plain text to HTML
+    return plainTextToHtml(localContent);
+  }, [localContent]);
 
   return (
     <div className="proposal-page" id={`section-${sectionKey}`}>
@@ -162,11 +178,30 @@ export default function ProposalSectionEditor({
         />
       ) : (
         <div className="cursor-text" onClick={() => setIsEditing(true)}>
+          {/* PRIMARY: ContentRenderer now routes AI content → AIMarkdownRenderer
+              and HTML content → legacy renderers. Always rendered. */}
           <ContentRenderer
             sectionKey={sectionKey}
             content={localContent}
             mermaidCode={mermaidCode}
           />
+
+          {/* DEBUG: legacy comparison — only visible when DEBUG_MARKDOWN_AI = true */}
+          {DEBUG_MARKDOWN_AI && !isHtmlContent(localContent) && (
+            <div className="ai-md-debug-wrapper">
+              <div className="ai-md-debug-label">
+                🔍 Legacy Renderer (Debug Comparison — Old Output)
+              </div>
+              <div className="ai-md-debug-legacy">
+                {(() => {
+                  const legacyType = detectContentType(sectionKey, localContent);
+                  if (legacyType === "table") return <TableRenderer content={localContent} />;
+                  if (legacyType === "bullets") return <BulletRenderer content={localContent} />;
+                  return <ParagraphRenderer content={localContent} />;
+                })()}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
