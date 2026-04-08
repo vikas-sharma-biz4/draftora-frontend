@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { cancelProposal, getProposal } from "@/api/proposalApi";
+import { cancelProposal, getProposal, getProposalStatus } from "@/api/proposalApi";
 import { GENERATION_STEPS } from "@/constants";
 import { MAX_POLL_ATTEMPTS, POLLING_INTERVAL_MS } from "@/config/config";
 import { useProposal } from "@/context/ProposalContext";
@@ -42,11 +42,14 @@ export default function GeneratingPage(): JSX.Element {
 
   const fetchAndPoll = useCallback(async (): Promise<void> => {
     try {
-      const data = await getProposal(proposalId);
+      // Use the lightweight /status/ endpoint during polling — no section content
+      const data = await getProposalStatus(proposalId);
 
       if (data.status === "completed") {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
         completedRef.current = true;
+        // Only fetch the full proposal once, when generation is done
+        await getProposal(proposalId).catch(() => undefined);
         router.push(`/proposal/${proposalId}`);
         return;
       }
@@ -67,11 +70,9 @@ export default function GeneratingPage(): JSX.Element {
       }
 
       // Update live section progress
-      if (data.generatingSection !== undefined) {
-        setGeneratingSection(data.generatingSection ?? null);
-      }
+      setGeneratingSection(data.generatingSection ?? null);
       const total = data.selectedSections?.length ?? 0;
-      const completed = Object.keys(data.sections ?? {}).length;
+      const completed = data.completedSections.length;
       setTotalSections(total);
       setCompletedSections(completed);
 
