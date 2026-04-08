@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { BubbleMenuPlugin } from "@tiptap/extension-bubble-menu";
 import StarterKit from "@tiptap/starter-kit";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Color } from "@tiptap/extension-color";
@@ -97,162 +99,202 @@ export default function RichEditor({
     setRegenLoading(false);
   }, [editor, onRegenerateSelection]);
 
+  const bubbleElRef = useRef<HTMLDivElement | null>(null);
+  const [bubbleReady, setBubbleReady] = useState(false);
+
+  useEffect(() => {
+    if (!editor) return;
+    const el = document.createElement("div");
+    el.className = "rte-bubble-mount";
+    document.body.appendChild(el);
+    bubbleElRef.current = el;
+    const plugin = BubbleMenuPlugin({
+      pluginKey: "rteToolbar",
+      editor,
+      element: el,
+      options: { placement: "top" },
+    });
+    editor.registerPlugin(plugin);
+    setBubbleReady(true);
+    return () => {
+      editor.unregisterPlugin("rteToolbar");
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+      bubbleElRef.current = null;
+      setBubbleReady(false);
+    };
+  }, [editor]);
+
   if (!editor) return <div className="rte-content" />;
 
+  const toolbar = (
+    <div className="rte-toolbar" role="toolbar" aria-label="Formatting toolbar">
+          {/* Text style */}
+          <button
+            type="button"
+            className={`rte-btn${editor.isActive("bold") ? " active" : ""}`}
+            title="Bold (Ctrl+B)"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+          >
+            <strong>B</strong>
+          </button>
+          <button
+            type="button"
+            className={`rte-btn${editor.isActive("italic") ? " active" : ""}`}
+            title="Italic (Ctrl+I)"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+          >
+            <em>I</em>
+          </button>
+          <button
+            type="button"
+            className={`rte-btn rte-strike-btn${editor.isActive("strike") ? " active" : ""}`}
+            title="Strikethrough"
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+          >
+            <s>S</s>
+          </button>
+
+          <div className="rte-toolbar-separator" />
+
+          {/* Headings */}
+          <button
+            type="button"
+            className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 3 }) ? " active" : ""}`}
+            title="Heading (H3)"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          >
+            H3
+          </button>
+          <button
+            type="button"
+            className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 4 }) ? " active" : ""}`}
+            title="Sub-heading (H4)"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}
+          >
+            H4
+          </button>
+
+          <div className="rte-toolbar-separator" />
+
+          {/* Lists */}
+          <button
+            type="button"
+            className={`rte-btn rte-btn-wide${editor.isActive("bulletList") ? " active" : ""}`}
+            title="Bullet list"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+          >
+            • List
+          </button>
+          <button
+            type="button"
+            className={`rte-btn rte-btn-wide${editor.isActive("orderedList") ? " active" : ""}`}
+            title="Numbered list"
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          >
+            1. List
+          </button>
+
+          <div className="rte-toolbar-separator" />
+
+          {/* Highlight swatches */}
+          <span className="rte-toolbar-label">HL</span>
+          {EDITOR_HIGHLIGHT_COLORS.map((color) => (
+            <button
+              key={color || "none"}
+              type="button"
+              className="rte-color-btn"
+              title={color ? `Highlight: ${color}` : "Remove highlight"}
+              onClick={() => setHighlight(color)}
+            >
+              <div
+                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
+                style={color ? { background: color } : undefined}
+              />
+            </button>
+          ))}
+
+          <div className="rte-toolbar-separator" />
+
+          {/* Text color swatches */}
+          <span className="rte-toolbar-label">A</span>
+          {EDITOR_TEXT_COLORS.map((color) => (
+            <button
+              key={color || "none"}
+              type="button"
+              className="rte-color-btn"
+              title={color ? `Color: ${color}` : "Default color"}
+              onClick={() => setColor(color)}
+            >
+              <div
+                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
+                style={color ? { background: color } : undefined}
+              />
+            </button>
+          ))}
+
+          <div className="rte-toolbar-separator" />
+
+          {/* Table */}
+          <button
+            type="button"
+            className="rte-btn rte-btn-wide"
+            title="Insert table"
+            onClick={insertTable}
+          >
+            ⊞ Table
+          </button>
+          {editor.isActive("table") && (
+            <>
+              <button
+                type="button"
+                className="rte-btn rte-btn-wide"
+                title="Add column"
+                onClick={() => editor.chain().focus().addColumnAfter().run()}
+              >
+                +Col
+              </button>
+              <button
+                type="button"
+                className="rte-btn rte-btn-wide"
+                title="Add row"
+                onClick={() => editor.chain().focus().addRowAfter().run()}
+              >
+                +Row
+              </button>
+              <button
+                type="button"
+                className="rte-btn rte-btn-wide"
+                title="Delete table"
+                onClick={() => editor.chain().focus().deleteTable().run()}
+              >
+                Del
+              </button>
+            </>
+          )}
+
+          {/* Regenerate selection */}
+          {onRegenerateSelection && (
+            <>
+              <div className="rte-toolbar-separator" />
+              <button
+                type="button"
+                className="rte-btn rte-btn-wide"
+                title="Regenerate selection with AI"
+                disabled={regenLoading}
+                onClick={handleRegenerateSelection}
+              >
+                {regenLoading ? "…" : "✦ Regen"}
+              </button>
+            </>
+          )}
+        </div>
+  );
+
   return (
-    <div>
-      {/* ── Fixed toolbar ───────────────────────────────────────────────── */}
-      <div className="rte-toolbar" role="toolbar" aria-label="Formatting toolbar">
-        {/* Text style */}
-        <button
-          type="button"
-          className={`rte-btn${editor.isActive("bold") ? " active" : ""}`}
-          title="Bold (Ctrl+B)"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-        >
-          <strong>B</strong>
-        </button>
-        <button
-          type="button"
-          className={`rte-btn${editor.isActive("italic") ? " active" : ""}`}
-          title="Italic (Ctrl+I)"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-        >
-          <em>I</em>
-        </button>
-        <button
-          type="button"
-          className={`rte-btn rte-strike-btn${editor.isActive("strike") ? " active" : ""}`}
-          title="Strikethrough"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
-        >
-          <s>S</s>
-        </button>
-
-        <div className="rte-toolbar-separator" />
-
-        {/* Headings — H3 for section heading, H4 for sub-heading */}
-        <button
-          type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 3 }) ? " active" : ""}`}
-          title="Heading (H3)"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }
-        >
-          H3
-        </button>
-        <button
-          type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("heading", { level: 4 }) ? " active" : ""}`}
-          title="Sub-heading (H4)"
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level: 4 }).run()
-          }
-        >
-          H4
-        </button>
-
-        <div className="rte-toolbar-separator" />
-
-        {/* Lists */}
-        <button
-          type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("bulletList") ? " active" : ""}`}
-          title="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-        >
-          • List
-        </button>
-        <button
-          type="button"
-          className={`rte-btn rte-btn-wide${editor.isActive("orderedList") ? " active" : ""}`}
-          title="Numbered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        >
-          1. List
-        </button>
-
-        <div className="rte-toolbar-separator" />
-
-        {/* Highlight swatches */}
-        <span className="rte-toolbar-label">HL</span>
-        {EDITOR_HIGHLIGHT_COLORS.map((color) => (
-          <button
-            key={color || "none"}
-            type="button"
-            className="rte-color-btn"
-            title={color ? `Highlight: ${color}` : "Remove highlight"}
-            onClick={() => setHighlight(color)}
-          >
-            <div
-              className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-              style={color ? { background: color } : undefined}
-            />
-          </button>
-        ))}
-
-        <div className="rte-toolbar-separator" />
-
-        {/* Text color swatches */}
-        <span className="rte-toolbar-label">A</span>
-        {EDITOR_TEXT_COLORS.map((color) => (
-          <button
-            key={color || "none"}
-            type="button"
-            className="rte-color-btn"
-            title={color ? `Color: ${color}` : "Default color"}
-            onClick={() => setColor(color)}
-          >
-            <div
-              className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-              style={color ? { background: color } : undefined}
-            />
-          </button>
-        ))}
-
-        <div className="rte-toolbar-separator" />
-
-        {/* Table */}
-        <button
-          type="button"
-          className="rte-btn rte-btn-wide"
-          title="Insert table"
-          onClick={insertTable}
-        >
-          ⊞ Table
-        </button>
-        {editor.isActive("table") && (
-          <>
-            <button
-              type="button"
-              className="rte-btn rte-btn-wide"
-              title="Add column"
-              onClick={() =>
-                editor.chain().focus().addColumnAfter().run()
-              }
-            >
-              +Col
-            </button>
-            <button
-              type="button"
-              className="rte-btn rte-btn-wide"
-              title="Add row"
-              onClick={() => editor.chain().focus().addRowAfter().run()}
-            >
-              +Row
-            </button>
-            <button
-              type="button"
-              className="rte-btn rte-btn-wide"
-              title="Delete table"
-              onClick={() => editor.chain().focus().deleteTable().run()}
-            >
-              Del
-            </button>
-          </>
-        )}
-      </div>
+    <div className="rte-wrapper">
+      {bubbleReady && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
 
       {/* Editor content */}
       <div className="rte-content">

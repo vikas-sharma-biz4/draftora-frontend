@@ -83,6 +83,33 @@ export async function generateProposal(
   return handleResponse<CreateProposalResponse>(res);
 }
 
+export interface ProposalStatus {
+  id: number;
+  status: string;
+  generatingSection: string | null;
+  completedSections: string[];
+  selectedSections: string[] | null;
+}
+
+export async function getProposalStatus(id: number): Promise<ProposalStatus> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${id}/status/`, {
+    cache: "no-store",
+    headers: BASE_HEADERS,
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json?.error?.message ?? "Failed to fetch proposal status");
+  }
+  const d = json.data;
+  return {
+    id: d.id,
+    status: d.status,
+    generatingSection: d.generating_section ?? null,
+    completedSections: d.completed_sections ?? [],
+    selectedSections: d.selected_sections ?? null,
+  };
+}
+
 export async function getProposal(id: number): Promise<ProposalData> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/`, {
     cache: "no-store",
