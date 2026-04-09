@@ -131,6 +131,8 @@ export const PROPOSAL_TEMPLATES = [
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",
+      "system_architecture",
+      "user_flow",
       "milestone_timeline",
       "risks_assumptions",
       "client_dependencies",
