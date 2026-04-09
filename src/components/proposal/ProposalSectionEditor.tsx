@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { plainTextToHtml, isHtmlContent, detectContentType } from "@/utils/contentParser";
 import ContentRenderer from "./ContentRenderer";
@@ -61,26 +61,17 @@ export default function ProposalSectionEditor({
   const [showRegenInput, setShowRegenInput] = useState<boolean>(false);
   const [regenInstructions, setRegenInstructions] = useState<string>("");
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUnsavedChanges = useRef<boolean>(false);
 
   useEffect(() => {
     setLocalContent(rawContent);
   }, [rawContent]);
 
-  const handleSave = useCallback(async (): Promise<void> => {
-    if (!hasUnsavedChanges.current) return;
-    
+  async function handleSave(): Promise<void> {
     setIsSaving(true);
-    try {
-      await onSave(sectionKey, localContent);
-      hasUnsavedChanges.current = false;
-    } catch (error) {
-      console.error("Save failed:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [sectionKey, localContent, onSave]);
+    await onSave(sectionKey, localContent);
+    setIsSaving(false);
+    setIsEditing(false);
+  }
 
   async function handleRegenerate(): Promise<void> {
     setIsRegenerating(true);
@@ -94,45 +85,10 @@ export default function ProposalSectionEditor({
     setIsRegenerating(false);
   }
 
-  const handleEditorChange = useCallback((html: string): void => {
+  function handleEditorChange(html: string): void {
     setLocalContent(html);
     onContentChange(sectionKey, html);
-    hasUnsavedChanges.current = true;
-
-    // Debounced auto-save: clear previous timeout and set new one
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    saveTimeoutRef.current = setTimeout(() => {
-      handleSave();
-    }, 500); // 500ms debounce
-  }, [sectionKey, onContentChange, handleSave]);
-
-  const handleBlur = useCallback((): void => {
-    // Clear debounce timeout and save immediately on blur
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = null;
-    }
-    if (hasUnsavedChanges.current) {
-      handleSave();
-    }
-  }, [handleSave]);
-
-  const handleSectionClick = useCallback((): void => {
-    if (!isEditing) {
-      setIsEditing(true);
-    }
-  }, [isEditing]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
+  }
 
   /** Convert content to HTML before opening TipTap so it receives valid markup. */
   const editorContent = useMemo(() => {
@@ -160,10 +116,25 @@ export default function ProposalSectionEditor({
               "↻ Regenerate"
             )}
           </button>
-          {isSaving && (
-            <span className="text-sm text-muted" style={{ marginLeft: '8px' }}>
-              Saving...
-            </span>
+          {isEditing ? (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <span className="spinner spinner-white spinner-sm" />
+              ) : (
+                "Save"
+              )}
+            </button>
+          ) : (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </button>
           )}
         </div>
       </div>
@@ -196,24 +167,17 @@ export default function ProposalSectionEditor({
       )}
 
       {isEditing ? (
-        <div onBlur={handleBlur}>
-          <RichEditor
-            content={editorContent}
-            onChange={handleEditorChange}
-            placeholder={`Write the ${label} section here…`}
-            onRegenerateSelection={(selectedText) => {
-              setRegenInstructions(`Rewrite this selection: ${selectedText}`);
-              setShowRegenInput(true);
-            }}
-          />
-        </div>
+        <RichEditor
+          content={editorContent}
+          onChange={handleEditorChange}
+          placeholder={`Write the ${label} section here…`}
+          onRegenerateSelection={(selectedText) => {
+            setRegenInstructions(`Rewrite this selection: ${selectedText}`);
+            setShowRegenInput(true);
+          }}
+        />
       ) : (
-        <div 
-          className="section-view-mode" 
-          onClick={handleSectionClick}
-          style={{ cursor: 'pointer', minHeight: '100px' }}
-          title="Click to edit"
-        >
+        <div className="cursor-text" onClick={() => setIsEditing(true)}>
           {/* PRIMARY: ContentRenderer now routes AI content → AIMarkdownRenderer
               and HTML content → legacy renderers. Always rendered. */}
           <ContentRenderer
