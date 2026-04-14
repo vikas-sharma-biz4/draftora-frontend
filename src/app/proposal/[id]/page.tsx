@@ -102,23 +102,23 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleContentChange(key: string, html: string): void {
+  const handleContentChange = useCallback((key: string, html: string): void => {
     setProposal((prev) => {
       if (!prev) return prev;
       return { ...prev, sections: { ...(prev.sections ?? {}), [key]: html } };
     });
-  }
+  }, []);
 
-  async function handleSaveSection(key: string, content: string): Promise<void> {
+  const handleSaveSection = useCallback(async (key: string, content: string): Promise<void> => {
     try {
       await updateSection(proposalId, key, content);
       toast.success("Section saved.");
     } catch {
       toast.error("Failed to save section.");
     }
-  }
+  }, [proposalId]);
 
-  async function handleRegenerate(key: string, instructions?: string): Promise<string | null> {
+  const handleRegenerate = useCallback(async (key: string, instructions?: string): Promise<string | null> => {
     try {
       const newContent = await regenerateSection(proposalId, key, instructions);
       handleContentChange(key, newContent);
@@ -128,7 +128,7 @@ export default function ProposalOutputPage(): JSX.Element {
       toast.error("Regeneration failed.");
       return null;
     }
-  }
+  }, [proposalId, handleContentChange]);
 
   // ── Sidebar actions ──────────────────────────────────────────────────────────
 

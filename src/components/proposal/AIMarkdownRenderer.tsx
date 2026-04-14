@@ -69,7 +69,7 @@ const AIMarkdownRenderer = memo(function AIMarkdownRenderer({
   content,
 }: AIMarkdownRendererProps): JSX.Element {
   return (
-    <div className="markdown-output">
+    <div className="markdown-output" suppressHydrationWarning>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeSanitize]}
