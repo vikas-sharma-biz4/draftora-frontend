@@ -121,7 +121,7 @@ export default function Sidebar(): JSX.Element {
       <div className="sidebar-logo">
         <span className="sidebar-logo-text">
           <span className="sidebar-logo-dot" />
-          Proposely
+          Draftora
         </span>
       </div>
 
