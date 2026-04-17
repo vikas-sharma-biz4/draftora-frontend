@@ -135,6 +135,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
     contextualInstructions: d.contextual_instructions ?? "",
     webReferences: d.web_references ?? [],
     files: [],
+    filesMeta: [],
     templateId: null,
     templateType: "scratch" as const,
     status: d.status,
