@@ -10,7 +10,7 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch";
+export type TemplateType = "predefined" | "custom" | "scratch" | "mvp" | "poc" | "design" | "brd" | "frd" | "architecture";
 
 export interface ProposalData {
   id?: number;
@@ -35,9 +35,11 @@ export interface ProposalData {
   /** Maps section_key → content type: "table" | "bullets" | "diagram" | "paragraph" */
   sectionTypes?: Record<string, string>;
   generatingSection?: string | null;
-  mermaidDiagram?: string;
+  mermaidDiagram?: string | undefined;
   createdAt?: string;
   updatedAt?: string;
+  // Approval status for follow-up document workflow
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 export type ToneOption = "professional" | "persuasive" | "technical" | "creative";

@@ -11,11 +11,11 @@ import { useProposal } from "@/context/ProposalContext";
 export default function GeneratingPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
-  const proposalId = Number(params.id);
+  const proposalId = params.id ? Number(params.id) : NaN;
   const { setIsGenerating, resetProposal } = useProposal();
 
   const [pollCount, setPollCount] = useState<number>(0);
-  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>(isNaN(proposalId) ? "Invalid proposal ID. Please check the URL." : "");
   const [generatingSection, setGeneratingSection] = useState<string | null>(null);
   const [totalSections, setTotalSections] = useState<number>(0);
   const [completedSections, setCompletedSections] = useState<number>(0);
@@ -38,6 +38,11 @@ export default function GeneratingPage(): JSX.Element {
     circumference - (progressPercent / 100) * circumference;
 
   const fetchAndPoll = useCallback(async (): Promise<void> => {
+    if (isNaN(proposalId)) {
+      setErrorMessage("Invalid proposal ID. Please check the URL.");
+      return;
+    }
+
     try {
       const data = await getProposal(proposalId);
 

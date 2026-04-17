@@ -1718,13 +1718,9 @@ body {
 }
 
 .proposal-sidebar-section-actions {
-  display: none;
+  display: flex;
   gap: 2px;
   flex-shrink: 0;
-}
-
-.proposal-sidebar-section-row:hover .proposal-sidebar-section-actions {
-  display: flex;
 }
 
 .proposal-sidebar-icon-btn {
@@ -2886,6 +2882,10 @@ body {
 
 .template-card-preview-gradient-5 {
   background: linear-gradient(135deg, #eff6ff 0%, #93c5fd 100%);
+}
+
+.template-card-preview-gradient-6 {
+  background: linear-gradient(135deg, #f0fdfa 0%, #5eead4 60%, #0d9488 100%);
 }
 
 .template-card-preview-lines {

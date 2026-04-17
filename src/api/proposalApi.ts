@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/config/config";
-import type { ProposalData, ProposalListItem } from "@/types/proposal.types";
+import type { ProposalData, ProposalListItem, TemplateType } from "@/types/proposal.types";
 
 interface CreateProposalResponse {
   id: number;
@@ -16,6 +16,12 @@ async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok || !json.success) {
     const message: string =
       json?.error?.message ?? `Request failed with status ${res.status}`;
+    console.error("API Error Details:", {
+      status: res.status,
+      statusText: res.statusText,
+      json,
+      error: json?.error
+    });
     throw new Error(message);
   }
   return json.data as T;
@@ -76,6 +82,9 @@ export async function generateProposal(
 }
 
 export async function getProposal(id: number): Promise<ProposalData> {
+  if (isNaN(id)) {
+    throw new Error("Invalid proposal ID");
+  }
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/`, {
     cache: "no-store",
   });
@@ -98,8 +107,8 @@ export async function getProposal(id: number): Promise<ProposalData> {
     contextualInstructions: d.contextual_instructions ?? "",
     webReferences: d.web_references ?? [],
     files: [],
-    templateId: null,
-    templateType: "scratch" as const,
+    templateId: d.template_id ?? null,
+    templateType: (d.template_type ?? "scratch") as TemplateType,
     status: d.status,
     sections: d.sections ?? {},
     sectionTypes: (d.section_types ?? {}) as Record<string, string>,
@@ -107,6 +116,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
     mermaidDiagram: d.mermaid_diagram ?? undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
+    approvalStatus: (d.approval_status ?? "pending") as "pending" | "approved" | "rejected",
   };
 }
 
@@ -346,4 +356,57 @@ export async function getSupportedParseFormats(): Promise<string[]> {
   });
   const json = await res.json();
   return (json?.data?.extensions ?? []) as string[];
+}
+
+// ── Follow-up Document Generation (BRD/FRD/Architecture) ─────────────────────
+
+export interface GenerateFollowUpDocumentPayload {
+  document_type: "brd" | "frd" | "architecture";
+  additional_instructions?: string;
+}
+
+export interface GenerateFollowUpDocumentResponse {
+  id?: number;
+  status?: string;
+  document_content?: string;
+  document_type?: string;
+}
+
+/**
+ * Generate a follow-up document (BRD, FRD, or Architecture) from an existing proposal.
+ * BRD is generated from pre-sale proposal.
+ * FRD is generated from BRD.
+ * Architecture is generated from FRD.
+ */
+export async function generateFollowUpDocument(
+  sourceProposalId: number,
+  payload: GenerateFollowUpDocumentPayload
+): Promise<GenerateFollowUpDocumentResponse> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${sourceProposalId}/generate-follow-up/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<GenerateFollowUpDocumentResponse>(res);
+}
+
+// ── Approval Status Management ─────────────────────────────────────────────
+
+export interface UpdateApprovalStatusPayload {
+  approval_status: "pending" | "approved" | "rejected";
+}
+
+/**
+ * Update the approval status of a proposal (for BRD/FRD workflow).
+ */
+export async function updateApprovalStatus(
+  id: number,
+  payload: UpdateApprovalStatusPayload
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${id}/approval-status/`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  await handleResponse<null>(res);
 }

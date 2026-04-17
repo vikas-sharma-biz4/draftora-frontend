@@ -40,6 +40,17 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Skills
+skills-lock.json
+
 # Optional npm cache directory
 .npm
 
@@ -74,7 +85,7 @@ dist/
 
 # Gatsby files
 .cache/
-public/
+# public/
 
 # Vuepress build output
 .vuepress/dist

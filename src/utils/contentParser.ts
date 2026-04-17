@@ -16,6 +16,24 @@ export const DIAGRAM_SECTION_KEYS: string[] = [
   "system_architecture",
   "proposed_technology_stack",
   "high_level_scope",
+  // BRD diagram sections
+  "brd_business_process_flows",
+  "brd_integration_requirements",
+  // FRD diagram sections
+  "frd_functional_requirements",
+  "frd_integrations",
+  "frd_data_management",
+  // Architecture diagram sections
+  "arch_context",
+  "arch_container",
+  "arch_component",
+  "arch_data",
+  "arch_api",
+  "arch_integration",
+  "arch_infrastructure",
+  "arch_security",
+  "arch_performance",
+  "arch_observability",
 ];
 
 export type SectionContentType = "table" | "bullets" | "diagram" | "paragraph";
