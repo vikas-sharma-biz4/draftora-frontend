@@ -8,7 +8,7 @@ build/
 dist/
 
 # Markdown files
-*.md
+# *.md
 
 # Environment variables
 .env
