@@ -44,16 +44,26 @@ export default function RichEditor({
     ],
     content,
     immediatelyRender: false,
-    onUpdate: ({ editor: e }) => {
-      onChange(e.getHTML());
-    },
     editorProps: {
       attributes: {
         class: "ProseMirror",
         "data-placeholder": placeholder,
       },
     },
+    onUpdate: ({ editor: e }) => {
+      onChange(e.getHTML());
+    },
+    onCreate: ({ editor: e }) => {
+      e.commands.focus("end");
+    },
   });
+
+  // Update content when it changes externally without re-creating the editor
+  useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [content, editor]);
 
   const setColor = useCallback(
     (color: string): void => {
