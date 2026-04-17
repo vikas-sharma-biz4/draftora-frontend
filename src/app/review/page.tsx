@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import styles from "./page.module.scss";
 
@@ -24,6 +24,12 @@ export default function ReviewPage(): JSX.Element {
   const handleSaveDraft = useSaveDraft();
   const [errorMessage, setErrorMessage] = useState<string>("");
 
+  // Reset isGenerating whenever the user lands on the review page
+  // (covers the case where they navigate back from the proposal view page)
+  useEffect(() => {
+    setIsGenerating(false);
+  }, [setIsGenerating]);
+
   function handleEditStep(step: number, path: string): void {
     setCurrentStep(step as 1 | 2 | 3 | 4 | 5);
     router.push(path);
@@ -34,7 +40,6 @@ export default function ReviewPage(): JSX.Element {
     setErrorMessage("");
     try {
       const result = await generateProposal(proposalData);
-      console.log("Generate result================>", result);
       setGeneratedProposalId(result.id);
       router.push(`/generating/${result.id}`);
     } catch (err: unknown) {
@@ -62,6 +67,7 @@ export default function ReviewPage(): JSX.Element {
   return (
     <div className="app-container">
       <Sidebar />
+
       <main className="main-content">
         <div className="page-badge">Phase 05</div>
         <h1 className="page-title">Final Review</h1>
@@ -122,9 +128,9 @@ export default function ReviewPage(): JSX.Element {
                     Edit
                   </button>
                 </div>
-                {proposalData.files.length > 0 ? (
+                {proposalData.filesMeta.length > 0 ? (
                   <ul className={styles.fileList}>
-                    {proposalData.files.map((f, i) => (
+                    {proposalData.filesMeta.map((f, i) => (
                       <li key={i} className={styles.fileItem}>
                         <span className={styles.fileItemName}>{f.name}</span>
                         <span className={styles.fileItemSize}>
@@ -209,12 +215,7 @@ export default function ReviewPage(): JSX.Element {
             <button
               className="launch-btn"
               onClick={handleGenerate}
-              disabled={
-                isGenerating ||
-                !proposalData.title ||
-                !proposalData.clientName ||
-                proposalData.selectedSections.length === 0
-              }
+              disabled={isGenerating || proposalData.selectedSections.length === 0}
             >
               {isGenerating ? (
                 <>
@@ -243,8 +244,8 @@ export default function ReviewPage(): JSX.Element {
               <div className="launch-stat-item">
                 <span className="launch-stat-label">Data Sources</span>
                 <span className="launch-stat-value">
-                  {proposalData.files.length} File
-                  {proposalData.files.length !== 1 ? "s" : ""}
+                  {proposalData.filesMeta.length} File
+                  {proposalData.filesMeta.length !== 1 ? "s" : ""}
                 </span>
               </div>
               <div className="launch-stat-item">

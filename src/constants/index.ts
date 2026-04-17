@@ -199,7 +199,7 @@ export const PROPOSAL_TEMPLATES = [
   },
 ] as const;
 
-export const CUSTOM_TEMPLATES_STORAGE_KEY = "proposely_custom_templates_v1";
+export const CUSTOM_TEMPLATES_STORAGE_KEY = "draftora_custom_templates_v1";
 
 // ── Static sections ──────────────────────────────────────────────────────────
 // These are automatically appended at the end of every proposal. Their content
@@ -222,7 +222,7 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
 };
 
 // Drafts storage key
-export const DRAFTS_STORAGE_KEY = "proposely_drafts_v1";
+export const DRAFTS_STORAGE_KEY = "draftora_drafts_v1";
 
 // ── RichEditor toolbar colors ─────────────────────────────────────────────────
 // Empty string represents "remove highlight / default color" action.

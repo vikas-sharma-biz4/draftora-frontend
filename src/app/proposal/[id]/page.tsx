@@ -225,7 +225,7 @@ export default function ProposalOutputPage(): JSX.Element {
       {/* Header */}
       <header className="proposal-header">
         <div className="proposal-header-left">
-          <span className="proposal-header-logo">Proposely</span>
+          <span className="proposal-header-logo">Draftora</span>
           {proposal && (
             <>
               <span className="text-light">›</span>
@@ -237,6 +237,12 @@ export default function ProposalOutputPage(): JSX.Element {
           )}
         </div>
         <div className="proposal-header-right">
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => router.push("/review")}
+          >
+            ← Back
+          </button>
           {proposal && (
             <a
               href={getDownloadUrl(proposalId)}
