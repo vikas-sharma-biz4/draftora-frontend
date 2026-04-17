@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -29,6 +29,13 @@ export default function KnowledgeBasePage(): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [webRefInput, setWebRefInput] = useState<string>("");
+
+  // Auto-clear orphaned filesMeta when files are empty (after page refresh)
+  useEffect(() => {
+    if (proposalData.files.length === 0 && proposalData.filesMeta.length > 0) {
+      updateProposalData({ filesMeta: [] });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault();
@@ -68,7 +75,10 @@ export default function KnowledgeBasePage(): JSX.Element {
       (f, idx, arr) =>
         arr.findIndex((x) => x.name === f.name && x.size === f.size) === idx
     );
-    updateProposalData({ files: unique });
+    updateProposalData({
+      files: unique,
+      filesMeta: unique.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    });
 
     if (validSize.length > 0) {
       toast.success(
@@ -79,7 +89,20 @@ export default function KnowledgeBasePage(): JSX.Element {
 
   function removeFile(index: number): void {
     const updated = proposalData.files.filter((_, i) => i !== index);
-    updateProposalData({ files: updated });
+    updateProposalData({
+      files: updated,
+      filesMeta: updated.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    });
+  }
+
+  function removeAllFiles(): void {
+    updateProposalData({ files: [], filesMeta: [] });
+    toast.success("All documents removed.");
+  }
+
+  function removeMetaFile(index: number): void {
+    const updated = proposalData.filesMeta.filter((_, i) => i !== index);
+    updateProposalData({ filesMeta: updated });
   }
 
   function addWebRef(): void {
@@ -154,11 +177,27 @@ export default function KnowledgeBasePage(): JSX.Element {
               />
             </div>
 
-            {/* File list */}
+            {/* Active file list */}
             {proposalData.files.length > 0 && (
               <div className={styles.fileListSection}>
-                <div className={`form-label ${styles.fileListLabel}`}>
-                  Active Assets
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 6,
+                  }}
+                >
+                  <div className={`form-label ${styles.fileListLabel}`} style={{ marginBottom: 0 }}>
+                    Active Assets ({proposalData.files.length})
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={removeAllFiles}
+                    style={{ color: "#ef4444", fontSize: 12 }}
+                  >
+                    ✕ Remove All
+                  </button>
                 </div>
                 <ul className="file-list">
                   {proposalData.files.map((file, idx) => (
@@ -186,6 +225,7 @@ export default function KnowledgeBasePage(): JSX.Element {
                 </ul>
               </div>
             )}
+
 
             {/* Web references */}
             <div className={styles.webRefSection}>

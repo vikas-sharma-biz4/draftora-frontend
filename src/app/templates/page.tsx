@@ -36,6 +36,7 @@ export default function TemplatesPage(): JSX.Element {
   // Upload / parsing state
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [parseProgress, setParseProgress] = useState<number>(0);
   const [extractedSections, setExtractedSections] = useState<
     ExtractedTemplateSection[]
   >(
@@ -83,22 +84,35 @@ export default function TemplatesPage(): JSX.Element {
 
     setUploadedFileName(file.name);
     setIsParsing(true);
+    setParseProgress(5);
     setSelectionMode("upload");
     setSelectedTemplateId(null);
     setExtractedSections([]);
 
+    // Simulate incremental progress while waiting for the server
+    const progressInterval = setInterval(() => {
+      setParseProgress((prev) => {
+        if (prev >= 88) { clearInterval(progressInterval); return 88; }
+        return prev + Math.floor(Math.random() * 8) + 3;
+      });
+    }, 600);
+
     try {
       const result = await parseCustomTemplate(file);
+      clearInterval(progressInterval);
+      setParseProgress(100);
       setExtractedSections(result.sections);
       toast.success(
         `Extracted ${result.sections.length} sections from "${file.name}".`
       );
     } catch (err) {
+      clearInterval(progressInterval);
       const message =
         err instanceof Error ? err.message : "Failed to parse template file.";
       toast.error(message);
       setSelectionMode(null);
       setUploadedFileName("");
+      setParseProgress(0);
     } finally {
       setIsParsing(false);
     }
@@ -305,14 +319,29 @@ export default function TemplatesPage(): JSX.Element {
           />
         </div>
 
-        {/* ── Parsing spinner ── */}
+        {/* ── Parsing spinner with progress ── */}
         {isParsing && (
-          <div className="tmpl-processing-pill">
-            <div className="tmpl-spinner" aria-hidden="true" />
-            <span>
-              Parsing <strong>{uploadedFileName}</strong> — extracting section
-              structure…
-            </span>
+          <div className="tmpl-processing-pill" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <div className="tmpl-spinner" aria-hidden="true" />
+              <span>
+                Parsing <strong>{uploadedFileName}</strong> — scanning first 3 pages for section structure…
+              </span>
+              <span style={{ marginLeft: "auto", fontWeight: 700, fontSize: 13 }}>
+                {parseProgress}%
+              </span>
+            </div>
+            <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${parseProgress}%`,
+                  background: "var(--color-primary)",
+                  borderRadius: 3,
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
           </div>
         )}
 

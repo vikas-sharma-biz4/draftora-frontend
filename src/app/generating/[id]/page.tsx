@@ -25,15 +25,17 @@ export default function GeneratingPage(): JSX.Element {
   // the successful redirect to the proposal page.
   const completedRef = useRef<boolean>(false);
 
-  // Derive visible progress from poll count
-  const activeStepIndex = Math.min(
-    Math.floor((pollCount / MAX_POLL_ATTEMPTS) * GENERATION_STEPS.length),
-    GENERATION_STEPS.length - 1
-  );
-  const progressPercent = Math.min(
-    Math.round((pollCount / MAX_POLL_ATTEMPTS) * 92),
-    92
-  );
+  // Drive progress from real backend section completion ratio
+  const sectionRatio = totalSections > 0 ? completedSections / totalSections : 0;
+  const progressPercent = Math.min(Math.round(sectionRatio * 90) + 5, 90);
+
+  // Map section ratio to a step index so steps light up as backend progresses
+  const activeStepIndex =
+    sectionRatio < 0.05 ? 0
+    : sectionRatio < 0.20 ? 1
+    : sectionRatio < 0.85 ? 2
+    : sectionRatio < 0.97 ? 3
+    : GENERATION_STEPS.length - 1;
 
   const radius = 88;
   const circumference = 2 * Math.PI * radius;
@@ -48,6 +50,7 @@ export default function GeneratingPage(): JSX.Element {
       if (data.status === "completed") {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
         completedRef.current = true;
+        setIsGenerating(false); // reset so review page button is clean if user goes back
         // Only fetch the full proposal once, when generation is done
         await getProposal(proposalId).catch(() => undefined);
         router.push(`/proposal/${proposalId}`);
@@ -99,12 +102,10 @@ export default function GeneratingPage(): JSX.Element {
   useEffect(() => {
     fetchAndPoll();
     return () => {
+      // Only stop the polling timer on unmount.
+      // Do NOT auto-cancel — backend generation continues if user navigates away.
+      // Cancel only happens via the explicit "Cancel Generation" button.
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-      // Auto-cancel backend generation when the user navigates away
-      // (browser back, closing tab, etc.) before it completes.
-      // if (!completedRef.current) {
-      //   cancelProposal(proposalId).catch(() => undefined);
-      // }
     };
   }, [fetchAndPoll, proposalId]);
 

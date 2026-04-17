@@ -89,6 +89,13 @@ export default function ParametersPage(): JSX.Element {
     }
   }, [proposalData.title, proposalData.description, proposalData.templateType, proposalData.contextualInstructions, updateProposalData]);
 
+  // Sync local sections state with proposalData (e.g., after localStorage rehydration)
+  useEffect(() => {
+    setSections(
+      buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
+    );
+  }, [proposalData.selectedSections, proposalData.sectionDisplayNames]);
+
   // Auto-suggest when coming from scratch with no sections
   useEffect(() => {
     if (

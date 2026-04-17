@@ -109,10 +109,22 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   project_understanding: "Project Understanding",
   proposed_solution: "Proposed Solution",
   system_architecture: "System Architecture",
+  user_flow: "User Flow Diagram",
   implementation_plan: "Implementation Plan",
   timeline: "Timeline",
   conclusion: "Conclusion",
   similar_projects: "Similar Projects Developed By Biz4Group Experts",
+  introduction: "Introduction",
+  purpose: "Purpose",
+  high_level_scope: "High-Level Scope of the Project",
+  high_level_feature_list: "High-Level Feature List — MVP",
+  non_functional_requirements: "Non-Functional Requirements (NFRs)",
+  proposed_technology_stack: "Proposed Technology Stack",
+  milestone_timeline: "Milestone and Timeline Estimations (MVP)",
+  risks_assumptions: "Risks/Assumptions and Mitigations",
+  client_dependencies: "Client Dependencies",
+  communication_client_cadence: "Communication & Client Cadence",
+  our_approach_methodology: "Our Approach & Methodology",
 };
 
 export const PROPOSAL_TEMPLATES = [
@@ -187,7 +199,7 @@ export const PROPOSAL_TEMPLATES = [
   },
 ] as const;
 
-export const CUSTOM_TEMPLATES_STORAGE_KEY = "proposely_custom_templates_v1";
+export const CUSTOM_TEMPLATES_STORAGE_KEY = "draftora_custom_templates_v1";
 
 // ── Static sections ──────────────────────────────────────────────────────────
 // These are automatically appended at the end of every proposal. Their content
@@ -210,7 +222,7 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
 };
 
 // Drafts storage key
-export const DRAFTS_STORAGE_KEY = "proposely_drafts_v1";
+export const DRAFTS_STORAGE_KEY = "draftora_drafts_v1";
 
 // ── RichEditor toolbar colors ─────────────────────────────────────────────────
 // Empty string represents "remove highlight / default color" action.

@@ -12,6 +12,12 @@ export interface CustomSection {
 
 export type TemplateType = "predefined" | "custom" | "scratch";
 
+export interface FileMeta {
+  name: string;
+  size: number;
+  type: string;
+}
+
 export interface ProposalData {
   id?: number;
   title: string;
@@ -27,6 +33,7 @@ export interface ProposalData {
   contextualInstructions: string;
   webReferences: string[];
   files: File[];
+  filesMeta: FileMeta[];
   // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;
