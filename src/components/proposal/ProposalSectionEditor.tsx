@@ -116,6 +116,7 @@ export default function ProposalSectionEditor({
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => setIsEditing(true)}
+              disabled={isRegenerating}
             >
               Edit
             </button>
@@ -133,6 +134,7 @@ export default function ProposalSectionEditor({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleRegenerate();
             }}
+            disabled={isRegenerating}
           />
           <button
             className="btn btn-primary btn-sm"
@@ -143,9 +145,13 @@ export default function ProposalSectionEditor({
           </button>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => setShowRegenInput(false)}
+            onClick={() => {
+              setShowRegenInput(false);
+              setRegenInstructions("");
+            }}
+            disabled={isRegenerating}
           >
-            ✕
+            Cancel
           </button>
         </div>
       )}

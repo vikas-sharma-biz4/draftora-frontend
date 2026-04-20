@@ -131,15 +131,39 @@ export default function ProposalOutputPage(): JSX.Element {
   }
 
   async function handleRegenerate(key: string, instructions?: string): Promise<string | null> {
-    try {
-      const newContent = await regenerateSection(proposalId, key, instructions);
-      handleContentChange(key, newContent);
-      toast.success("Section regenerated.");
-      return newContent;
-    } catch {
-      toast.error("Regeneration failed.");
-      return null;
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+    
+    console.log("Regenerating section:", key, "with instructions:", instructions);
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const newContent = await regenerateSection(proposalId, key, instructions);
+        console.log("Regenerated content for section", key, ":", newContent.substring(0, 100));
+        handleContentChange(key, newContent);
+        toast.success("Section regenerated.");
+        return newContent;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Regeneration failed.");
+        console.error(`Regeneration error for section ${key} (attempt ${attempt}/${maxRetries}):`, error);
+        
+        // Check if it's a network error - don't retry network errors
+        if (lastError.message.includes("Failed to fetch") || lastError.message.includes("NetworkError")) {
+          toast.error("Network error. Please check your connection and try again.");
+          return null;
+        }
+        
+        if (attempt < maxRetries) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        }
+      }
     }
+    
+    // All retries failed
+    const errorMessage = lastError?.message || "Regeneration failed after multiple attempts.";
+    toast.error(errorMessage);
+    return null;
   }
 
   // ── Sidebar actions ──────────────────────────────────────────────────────────
@@ -269,6 +293,13 @@ export default function ProposalOutputPage(): JSX.Element {
       if (result.document_content) {
         // Create a new proposal from the generated content
         try {
+          const selectedSections = getSectionsForDocumentType(documentType);
+          const sectionDisplayNames = getSectionDisplayNamesForDocumentType(documentType);
+          
+          console.log("Creating proposal for document type:", documentType);
+          console.log("Selected sections:", selectedSections);
+          console.log("Section display names:", sectionDisplayNames);
+          
           const newProposalData: ProposalData = {
             title: `${documentType.toUpperCase()} - ${proposal.title}`,
             clientName: proposal.clientName,
@@ -276,8 +307,8 @@ export default function ProposalOutputPage(): JSX.Element {
             tone: proposal.tone,
             lengthPreference: proposal.lengthPreference,
             language: proposal.language,
-            selectedSections: getSectionsForDocumentType(documentType),
-            sectionDisplayNames: {},
+            selectedSections: selectedSections,
+            sectionDisplayNames: sectionDisplayNames,
             customSections: [],
             contextualInstructions: "",
             webReferences: [],
@@ -337,7 +368,6 @@ export default function ProposalOutputPage(): JSX.Element {
           "brd_future_state",
           "brd_scope_definition",
           "brd_business_requirements",
-          "brd_business_kpis",
           "brd_user_roles",
           "brd_business_process_flows",
           "brd_data_requirements",
@@ -345,7 +375,6 @@ export default function ProposalOutputPage(): JSX.Element {
           "brd_compliance",
           "brd_assumptions_constraints",
           "brd_acceptance_criteria",
-          "brd_risk_mitigation",
           "brd_glossary",
           "brd_open_issues",
         ];
@@ -390,6 +419,72 @@ export default function ProposalOutputPage(): JSX.Element {
       default:
         return [];
     }
+  }
+
+  function getSectionDisplayNamesForDocumentType(documentType: string): Record<string, string> {
+    const SECTION_DISPLAY_NAMES = {
+      // BRD sections
+      brd_document_control: "Document Control",
+      brd_executive_overview: "Executive Overview",
+      brd_business_objectives: "Business Objectives",
+      brd_stakeholder_register: "Stakeholder Register",
+      brd_current_state: "Current State Analysis (AS-IS)",
+      brd_future_state: "Future State Vision (TO-BE)",
+      brd_scope_definition: "Scope Definition",
+      brd_business_requirements: "Business Requirements",
+      brd_user_roles: "User Roles & Personas",
+      brd_business_process_flows: "Business Process Flows",
+      brd_data_requirements: "Data Requirements",
+      brd_integration_requirements: "Integration Requirements",
+      brd_compliance: "Compliance & Regulatory Requirements",
+      brd_assumptions_constraints: "Assumptions & Constraints",
+      brd_acceptance_criteria: "Acceptance Criteria (High Level)",
+      brd_glossary: "Glossary",
+      brd_open_issues: "Open Issues & Decisions Log",
+      // FRD sections
+      frd_document_control: "Document Control & Traceability",
+      frd_system_overview: "System Overview",
+      frd_system_modules: "System Modules / Feature Areas",
+      frd_functional_requirements: "Detailed Functional Requirements",
+      frd_auth_authz: "User Authentication & Authorization",
+      frd_integrations: "Integration Specifications",
+      frd_data_management: "Data Management Requirements",
+      frd_reporting: "Reporting & Dashboard Requirements",
+      frd_search_filter: "Search & Filter Requirements",
+      frd_file_handling: "File/Document Handling",
+      frd_error_handling: "Error Handling & System Messages",
+      frd_non_functional: "Non-Functional Requirements",
+      frd_constraints: "Constraints & Dependencies",
+      frd_traceability: "Functional Traceability Matrix",
+      frd_open_items: "Open Items",
+      // Architecture sections
+      arch_document_control: "Document Control",
+      arch_overview: "Architecture Overview",
+      arch_context: "System Context (C4 Level 1)",
+      arch_container: "Container Architecture (C4 Level 2)",
+      arch_component: "Component Architecture (C4 Level 3)",
+      arch_data: "Data Architecture",
+      arch_api: "API Architecture",
+      arch_auth_authz: "Authentication & Authorization Architecture",
+      arch_integration: "Integration Architecture",
+      arch_infrastructure: "Infrastructure Architecture",
+      arch_security: "Security Architecture",
+      arch_performance: "Performance Architecture",
+      arch_observability: "Observability Architecture",
+      arch_cicd: "CI/CD Architecture",
+      arch_disaster_recovery: "Disaster Recovery & Business Continuity",
+      arch_adr: "Architectural Decision Records (ADR)",
+      arch_technical_debt: "Technical Debt & Known Limitations",
+    };
+
+    const sections = getSectionsForDocumentType(documentType);
+    const displayNames: Record<string, string> = {};
+    for (const section of sections) {
+      if (SECTION_DISPLAY_NAMES[section as keyof typeof SECTION_DISPLAY_NAMES]) {
+        displayNames[section] = SECTION_DISPLAY_NAMES[section as keyof typeof SECTION_DISPLAY_NAMES];
+      }
+    }
+    return displayNames;
   }
 
   function parseMarkdownToSections(markdown: string, documentType: string): Record<string, string> {
@@ -612,22 +707,22 @@ export default function ProposalOutputPage(): JSX.Element {
                   {proposal.approvalStatus === "approved" && (
                     <>
                       <span className="badge badge-success">Approved</span>
-                      {isBRD && canGenerateFRD && (
+                      {isBRD && canGenerateFRD && !generatingDocument && (
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleGenerateFollowUp("frd")}
                           disabled={generatingDocument !== null}
                         >
-                          {generatingDocument === "frd" ? "Generating FRD..." : "Generate FRD"}
+                          Generate FRD
                         </button>
                       )}
-                      {isFRD && canGenerateArchitecture && (
+                      {isFRD && canGenerateArchitecture && !generatingDocument && (
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleGenerateFollowUp("architecture")}
                           disabled={generatingDocument !== null}
                         >
-                          {generatingDocument === "architecture" ? "Generating Architecture..." : "Generate Architecture"}
+                          Generate Architecture
                         </button>
                       )}
                     </>
@@ -646,16 +741,16 @@ export default function ProposalOutputPage(): JSX.Element {
                   )}
                 </>
               )}
-              {canGenerateBRD && !isBRD && !isFRD && !isArchitecture && proposal.approvalStatus !== "rejected" && (
+              {canGenerateBRD && !isBRD && !isFRD && !isArchitecture && proposal?.approvalStatus !== "rejected" && !generatingDocument && (
                 <button
                   className="btn btn-secondary btn-sm"
                   onClick={() => handleGenerateFollowUp("brd")}
                   disabled={generatingDocument !== null}
                 >
-                  {generatingDocument === "brd" ? "Generating BRD..." : "Generate BRD"}
+                  Generate BRD
                 </button>
               )}
-              {generatingDocument && (
+              {generatingDocument && proposal?.approvalStatus !== "rejected" && (
                 <div className="flex flex-col items-center gap-2 mt-2">
                   <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-blue-600 animate-pulse w-full" />
@@ -815,6 +910,11 @@ export default function ProposalOutputPage(): JSX.Element {
 
         {/* Main content */}
         <div className="proposal-content">
+          {/* Header Image - hide during generation or rejection */}
+          {!generatingDocument && proposal?.approvalStatus !== "rejected" && (
+            <img src="/images/letter head.png" alt="Letter Head" className="proposal-header-image" />
+          )}
+          
           {errorMessage && (
             <div className="alert-error">
               {errorMessage}
@@ -855,6 +955,11 @@ export default function ProposalOutputPage(): JSX.Element {
                 </button>
               </div>
             )}
+          
+          {/* Footer Image - hide during generation or rejection */}
+          {!generatingDocument && proposal?.approvalStatus !== "rejected" && (
+            <img src="/images/Footer.jpg" alt="Footer" className="proposal-footer-image" />
+          )}
         </div>
       </div>
     </div>

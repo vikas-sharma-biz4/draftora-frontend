@@ -29,6 +29,7 @@ export default function KnowledgeBasePage(): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [webRefInput, setWebRefInput] = useState<string>("");
+  const [webRefError, setWebRefError] = useState<string>("");
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault();
@@ -82,13 +83,35 @@ export default function KnowledgeBasePage(): JSX.Element {
     updateProposalData({ files: updated });
   }
 
+  function isValidUrl(string: string): boolean {
+    try {
+      const url = new URL(string);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch (_) {
+      return false;
+    }
+  }
+
   function addWebRef(): void {
     const trimmed = webRefInput.trim();
     if (!trimmed) return;
+    
+    // Validate URL
+    if (!isValidUrl(trimmed)) {
+      setWebRefError("Please enter a valid URL (e.g., https://example.com)");
+      return;
+    }
+    
+    // Clear error if valid
+    setWebRefError("");
+    
     if (!proposalData.webReferences.includes(trimmed)) {
       updateProposalData({
         webReferences: [...proposalData.webReferences, trimmed],
       });
+    } else {
+      setWebRefError("This URL is already added.");
+      return;
     }
     setWebRefInput("");
   }
@@ -198,7 +221,10 @@ export default function KnowledgeBasePage(): JSX.Element {
                   type="url"
                   placeholder="https://docs.example.com/requirements"
                   value={webRefInput}
-                  onChange={(e) => setWebRefInput(e.target.value)}
+                  onChange={(e) => {
+                    setWebRefInput(e.target.value);
+                    setWebRefError("");
+                  }}
                   onKeyDown={(e) => { if (e.key === "Enter") addWebRef(); }}
                 />
                 <button
@@ -208,6 +234,11 @@ export default function KnowledgeBasePage(): JSX.Element {
                   Add Link
                 </button>
               </div>
+              {webRefError && (
+                <div className="text-error text-small mt-8">
+                  {webRefError}
+                </div>
+              )}
               {proposalData.webReferences.length > 0 && (
                 <ul className="web-ref-list">
                   {proposalData.webReferences.map((ref) => (

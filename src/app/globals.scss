@@ -1289,6 +1289,24 @@ body {
   flex: 1;
   padding: 40px 48px;
   max-width: 860px;
+  display: flex;
+  flex-direction: column;
+}
+
+.proposal-header-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-bottom: 24px;
+  align-self: flex-start;
+}
+
+.proposal-footer-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin-top: 24px;
+  align-self: flex-start;
 }
 
 /* ============================================================
