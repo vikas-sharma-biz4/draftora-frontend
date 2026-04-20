@@ -7,6 +7,9 @@ node_modules/
 build/
 dist/
 
+# Markdown files
+# *.md
+
 # Environment variables
 .env
 .env.local

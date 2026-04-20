@@ -18,6 +18,34 @@ export const DIAGRAM_SECTION_KEYS: string[] = [
   "high_level_scope",
 ];
 
+/**
+ * Prefix marker stored in section content when it contains one or more
+ * AI-generated image URLs (Eraser architecture diagram or user-flow chunks).
+ * Mirrors the backend IMAGE_SECTION_URL_PREFIX constant.
+ */
+export const IMAGE_SECTION_URL_PREFIX = "GENERATED_IMAGE::";
+
+/**
+ * Return true when the content string holds one or more AI-generated image
+ * URLs produced by the Eraser.io or OpenAI image pipeline.
+ */
+export function isGeneratedImageContent(content: string): boolean {
+  return content.startsWith(IMAGE_SECTION_URL_PREFIX);
+}
+
+/**
+ * Parse a GENERATED_IMAGE:: content string into an ordered list of URLs.
+ * Supports pipe-separated multi-image user-flow chunks.
+ */
+export function parseGeneratedImageUrls(content: string): string[] {
+  if (!isGeneratedImageContent(content)) return [];
+  return content
+    .slice(IMAGE_SECTION_URL_PREFIX.length)
+    .split("|")
+    .map((u) => u.trim())
+    .filter(Boolean);
+}
+
 export type SectionContentType = "table" | "bullets" | "diagram" | "paragraph";
 
 /**

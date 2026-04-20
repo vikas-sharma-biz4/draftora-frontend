@@ -5,7 +5,7 @@ import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import ToastProvider from "@/components/shared/ToastProvider";
 
 export const metadata: Metadata = {
-  title: "Proposely — AI Proposal Generator",
+  title: "Draftora — AI Proposal Generator",
   description: "Generate professional proposals powered by AI in minutes.",
 };
 
