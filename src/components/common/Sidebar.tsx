@@ -19,7 +19,7 @@ function getStepFromPath(pathname: string): WizardStep {
 }
 
 export default function Sidebar(): JSX.Element {
-  const { currentStep, setCurrentStep, proposalData, updateProposalData, hydrated } = useProposal();
+  const { currentStep, setCurrentStep, proposalData, updateProposalData, hydrated, editMode, maxStepReached, setMaxStepReached } = useProposal();
   const router = useRouter();
   const pathname = usePathname();
   const saveDraft = useSaveDraft();
@@ -44,14 +44,18 @@ export default function Sidebar(): JSX.Element {
     return () => window.removeEventListener("focus", readDrafts);
   }, [hydrated]);
 
-  // Sync currentStep from URL so refreshing on any page shows the correct active step
+  // Sync currentStep from URL and track max step reached
   useEffect(() => {
     if (!hydrated) return;
     const stepFromPath = getStepFromPath(pathname);
     if (stepFromPath !== currentStep) {
       setCurrentStep(stepFromPath);
     }
-  }, [pathname, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Track the highest step user has reached
+    if (stepFromPath > maxStepReached) {
+      setMaxStepReached(stepFromPath);
+    }
+  }, [pathname, hydrated, currentStep, maxStepReached, setCurrentStep, setMaxStepReached]);
 
   // After saveDraft resets and navigates away, re-read drafts list
   function handleSaveDraft(): void {
@@ -69,7 +73,9 @@ export default function Sidebar(): JSX.Element {
   }
 
   function handleStepClick(step: number, path: string): void {
-    if (step <= currentStep) {
+    // Allow navigation to all steps up to the maximum step reached
+    // This enables free navigation once user has progressed through the workflow
+    if (step <= maxStepReached) {
       setCurrentStep(step as WizardStep);
       router.push(path);
     }
@@ -78,7 +84,8 @@ export default function Sidebar(): JSX.Element {
   function getStepState(step: number): "active" | "completed" | "upcoming" {
     const active = getStepFromPath(pathname);
     if (step === active) return "active";
-    if (step < active) return "completed";
+    // Mark all steps up to maxStepReached as completed (clickable)
+    if (step < maxStepReached) return "completed";
     return "upcoming";
   }
 

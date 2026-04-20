@@ -22,6 +22,10 @@ interface ProposalContextType {
   setGeneratedProposalId: (id: number | null) => void;
   resetProposal: () => void;
   hydrated: boolean;
+  editMode: boolean;
+  setEditMode: (val: boolean) => void;
+  maxStepReached: WizardStep;
+  setMaxStepReached: (step: WizardStep) => void;
 }
 
 const STORAGE_KEY = "draftora_wizard_v1";
@@ -62,6 +66,8 @@ export function ProposalProvider({
     null
   );
   const [hydrated, setHydrated] = useState<boolean>(false);
+  const [editMode, setEditMode] = useState<boolean>(false);
+  const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
 
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -126,6 +132,8 @@ export function ProposalProvider({
     setCurrentStep(1);
     setIsGenerating(false);
     setGeneratedProposalId(null);
+    setEditMode(false);
+    setMaxStepReached(1);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -146,6 +154,10 @@ export function ProposalProvider({
         setGeneratedProposalId,
         resetProposal,
         hydrated,
+        editMode,
+        setEditMode,
+        maxStepReached,
+        setMaxStepReached,
       }}
     >
       {children}

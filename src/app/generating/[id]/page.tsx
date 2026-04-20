@@ -19,6 +19,7 @@ export default function GeneratingPage(): JSX.Element {
   const [generatingSection, setGeneratingSection] = useState<string | null>(null);
   const [totalSections, setTotalSections] = useState<number>(0);
   const [completedSections, setCompletedSections] = useState<number>(0);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollCountRef = useRef<number>(0);
   // Tracks whether the proposal finished normally — prevents cancel call on
@@ -29,13 +30,36 @@ export default function GeneratingPage(): JSX.Element {
   const sectionRatio = totalSections > 0 ? completedSections / totalSections : 0;
   const progressPercent = Math.min(Math.round(sectionRatio * 90) + 5, 90);
 
-  // Map section ratio to a step index so steps light up as backend progresses
-  const activeStepIndex =
-    sectionRatio < 0.05 ? 0
-    : sectionRatio < 0.20 ? 1
-    : sectionRatio < 0.85 ? 2
-    : sectionRatio < 0.97 ? 3
-    : GENERATION_STEPS.length - 1;
+  // Map current stage to step index for accurate progress display
+  const getActiveStepIndex = (): number => {
+    if (!currentStage) {
+      // Fallback to section ratio if no stage is set
+      if (sectionRatio < 0.05) return 0;
+      if (sectionRatio < 0.20) return 1;
+      if (sectionRatio < 0.85) return 2;
+      if (sectionRatio < 0.97) return 3;
+      return GENERATION_STEPS.length - 1;
+    }
+    
+    // Map backend stage to frontend step index
+    switch (currentStage) {
+      case "parsing":
+        return 0;
+      case "validating":
+        return 1;
+      case "generating":
+        // During generation, use section progress for more granular tracking
+        if (sectionRatio < 0.33) return 2;
+        if (sectionRatio < 0.90) return 3;
+        return 4;
+      case "finalizing":
+        return 5;
+      default:
+        return 0;
+    }
+  };
+  
+  const activeStepIndex = getActiveStepIndex();
 
   const radius = 88;
   const circumference = 2 * Math.PI * radius;
@@ -72,8 +96,9 @@ export default function GeneratingPage(): JSX.Element {
         return;
       }
 
-      // Update live section progress
+      // Update live section progress and current stage
       setGeneratingSection(data.generatingSection ?? null);
+      setCurrentStage(data.currentStage ?? null);
       const total = data.selectedSections?.length ?? 0;
       const completed = data.completedSections.length;
       setTotalSections(total);
@@ -198,7 +223,11 @@ export default function GeneratingPage(): JSX.Element {
           <span className="generating-title-accent">proposal...</span>
         </h1>
         <p className="generating-subtitle">
-          {generatingSection
+          {currentStage === "parsing"
+            ? "Parsing and extracting text from uploaded documents..."
+            : currentStage === "validating"
+            ? "Validating knowledge base and preparing context..."
+            : generatingSection
             ? `Writing section: "${generatingSection.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}"${totalSections > 0 ? ` (${completedSections + 1} of ${totalSections})` : ""}`
             : "Our AI engine is synthesizing your inputs and structuring the document. This usually takes 30–60 seconds."}
         </p>

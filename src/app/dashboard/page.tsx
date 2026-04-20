@@ -1,14 +1,29 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import Header from "@/components/common/Header";
-import ProposalCard from "@/components/proposal/ProposalCard";
-import EmptyState from "@/components/shared/EmptyState";
-import { SkeletonCard } from "@/components/shared/Skeleton";
 import { listProposals } from "@/api/proposalApi";
 import type { ProposalListItem } from "@/types/proposal.types";
+
+const Header = dynamic(() => import("@/components/common/Header"), {
+  ssr: false,
+  loading: () => <div className="header-skeleton" />,
+});
+
+const ProposalCard = dynamic(() => import("@/components/proposal/ProposalCard"), {
+  ssr: false,
+});
+
+const EmptyState = dynamic(() => import("@/components/shared/EmptyState"), {
+  ssr: false,
+});
+
+const SkeletonCard = dynamic(
+  () => import("@/components/shared/Skeleton").then((mod) => ({ default: mod.SkeletonCard })),
+  { ssr: false }
+);
 
 export default function DashboardPage(): JSX.Element {
   const [proposals, setProposals] = useState<ProposalListItem[]>([]);

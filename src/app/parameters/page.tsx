@@ -335,23 +335,35 @@ export default function ParametersPage(): JSX.Element {
           </div>
         </div>
 
-        {/* ── Length (display only) + Language ── */}
+        {/* ── Length Selection + Language ── */}
         <div className="grid-2 mb-32">
           <div className="card">
-            <div className="form-label mb-10">
+            <div className="form-label mb-14">
               Proposal Length
             </div>
-            <div className="length-display-row">
-              <span className="length-display-badge">
-                {currentLengthOption?.label ?? proposalData.lengthPreference}
-              </span>
-              <span className="font-12 text-muted">
-                {currentLengthOption?.description ?? ""}
-              </span>
+            <div className="flex-col gap-8">
+              {LENGTH_OPTIONS.map(({ value, label, description }) => {
+                const isSelected = proposalData.lengthPreference === value;
+                return (
+                  <div
+                    key={value}
+                    className={`length-option${isSelected ? " selected" : ""}`}
+                    onClick={() => updateProposalData({ lengthPreference: value })}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") updateProposalData({ lengthPreference: value });
+                    }}
+                  >
+                    <div className="flex-between">
+                      <span className="length-option-label">{label}</span>
+                      {isSelected && <span className="tone-check">✓</span>}
+                    </div>
+                    <span className="length-option-desc">{description}</span>
+                  </div>
+                );
+              })}
             </div>
-            <p className="font-11 text-light mt-10 text-italic">
-              Set in Step 1 — change there to adjust word count per section.
-            </p>
           </div>
 
           <div className="card">
