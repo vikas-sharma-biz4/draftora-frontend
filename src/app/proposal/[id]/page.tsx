@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProposal } from "@/context/ProposalContext";
@@ -16,9 +17,17 @@ import {
 } from "@/api/proposalApi";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
-import ProposalSectionEditor from "@/components/proposal/ProposalSectionEditor";
-import ProposalSkeleton from "@/components/proposal/ProposalSkeleton";
 import type { ProposalData } from "@/types/proposal.types";
+
+const ProposalSectionEditor = dynamic(
+  () => import("@/components/proposal/ProposalSectionEditor"),
+  { ssr: false }
+);
+
+const ProposalSkeleton = dynamic(
+  () => import("@/components/proposal/ProposalSkeleton"),
+  { ssr: false }
+);
 
 interface SectionMeta {
   key: string;

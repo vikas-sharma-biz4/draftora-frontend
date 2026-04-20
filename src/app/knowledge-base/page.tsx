@@ -1,15 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import Sidebar from "@/components/common/Sidebar";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { formatBytes } from "@/utils/formatBytes";
+
+const Sidebar = dynamic(() => import("@/components/common/Sidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
 
 const MAX_FILE_SIZE_MB = 10;
 const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg"];
@@ -30,12 +35,7 @@ export default function KnowledgeBasePage(): JSX.Element {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [webRefInput, setWebRefInput] = useState<string>("");
 
-  // Auto-clear orphaned filesMeta when files are empty (after page refresh)
-  useEffect(() => {
-    if (proposalData.files.length === 0 && proposalData.filesMeta.length > 0) {
-      updateProposalData({ filesMeta: [] });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // filesMeta persists after refresh (files are cleared but metadata remains)
 
   function handleFileDrop(e: React.DragEvent<HTMLDivElement>): void {
     e.preventDefault();
@@ -75,9 +75,22 @@ export default function KnowledgeBasePage(): JSX.Element {
       (f, idx, arr) =>
         arr.findIndex((x) => x.name === f.name && x.size === f.size) === idx
     );
+    
+    const newMeta = unique.map((f) => ({ name: f.name, size: f.size, type: f.type }));
+    const mergedMeta = [...proposalData.filesMeta];
+    
+    newMeta.forEach((meta) => {
+      const exists = mergedMeta.some(
+        (m) => m.name === meta.name && m.size === meta.size
+      );
+      if (!exists) {
+        mergedMeta.push(meta);
+      }
+    });
+    
     updateProposalData({
       files: unique,
-      filesMeta: unique.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+      filesMeta: mergedMeta,
     });
 
     if (validSize.length > 0) {
@@ -89,10 +102,7 @@ export default function KnowledgeBasePage(): JSX.Element {
 
   function removeFile(index: number): void {
     const updated = proposalData.files.filter((_, i) => i !== index);
-    updateProposalData({
-      files: updated,
-      filesMeta: updated.map((f) => ({ name: f.name, size: f.size, type: f.type })),
-    });
+    updateProposalData({ files: updated });
   }
 
   function removeAllFiles(): void {
@@ -101,8 +111,18 @@ export default function KnowledgeBasePage(): JSX.Element {
   }
 
   function removeMetaFile(index: number): void {
-    const updated = proposalData.filesMeta.filter((_, i) => i !== index);
-    updateProposalData({ filesMeta: updated });
+    const metaToRemove = proposalData.filesMeta[index];
+    const updatedMeta = proposalData.filesMeta.filter((_, i) => i !== index);
+    
+    // Also remove the corresponding file from the files array
+    const updatedFiles = proposalData.files.filter(
+      (f) => !(f.name === metaToRemove.name && f.size === metaToRemove.size)
+    );
+    
+    updateProposalData({ 
+      filesMeta: updatedMeta,
+      files: updatedFiles 
+    });
   }
 
   function addWebRef(): void {
@@ -177,8 +197,8 @@ export default function KnowledgeBasePage(): JSX.Element {
               />
             </div>
 
-            {/* Active file list */}
-            {proposalData.files.length > 0 && (
+            {/* Active file list - shows filesMeta (persists after refresh) */}
+            {proposalData.filesMeta.length > 0 && (
               <div className={styles.fileListSection}>
                 <div
                   style={{
@@ -189,7 +209,7 @@ export default function KnowledgeBasePage(): JSX.Element {
                   }}
                 >
                   <div className={`form-label ${styles.fileListLabel}`} style={{ marginBottom: 0 }}>
-                    Active Assets ({proposalData.files.length})
+                    Active Assets ({proposalData.filesMeta.length})
                   </div>
                   <button
                     className="btn btn-ghost btn-sm"
@@ -200,35 +220,42 @@ export default function KnowledgeBasePage(): JSX.Element {
                   </button>
                 </div>
                 <ul className="file-list">
-                  {proposalData.files.map((file, idx) => (
-                    <li key={`${file.name}-${idx}`} className="file-item">
-                      <div className="file-item-info">
-                        <span className="file-item-icon">
-                          {getFileIcon(file.name)}
-                        </span>
-                        <span className="file-item-name">{file.name}</span>
-                        <span className="file-item-size">
-                          {formatBytes(file.size)}
-                        </span>
-                        <span className="badge badge-success">Queued</span>
-                      </div>
-                      <div className="file-item-actions">
-                        <button
-                          className={`btn btn-ghost btn-sm ${styles.removeDangerBtn}`}
-                          onClick={() => removeFile(idx)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                  {proposalData.filesMeta.map((fileMeta, idx) => {
+                    const isActiveFile = proposalData.files.some(
+                      (f) => f.name === fileMeta.name && f.size === fileMeta.size
+                    );
+                    return (
+                      <li key={`${fileMeta.name}-${idx}`} className="file-item">
+                        <div className="file-item-info">
+                          <span className="file-item-icon">
+                            {getFileIcon(fileMeta.name)}
+                          </span>
+                          <span className="file-item-name">{fileMeta.name}</span>
+                          <span className="file-item-size">
+                            {formatBytes(fileMeta.size)}
+                          </span>
+                          <span className={`badge ${isActiveFile ? "badge-success" : "badge-info"}`}>
+                            {isActiveFile ? "Queued" : "Saved"}
+                          </span>
+                        </div>
+                        <div className="file-item-actions">
+                          <button
+                            className={`btn btn-ghost btn-sm ${styles.removeDangerBtn}`}
+                            onClick={() => removeMetaFile(idx)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
 
 
-            {/* Web references */}
-            <div className={styles.webRefSection}>
+            {/* Web references - DISABLED: Uncomment to re-enable */}
+            {/* <div className={styles.webRefSection}>
               <div className={`form-label ${styles.webRefLabel}`}>
                 Add Web References
               </div>
@@ -263,7 +290,7 @@ export default function KnowledgeBasePage(): JSX.Element {
                   ))}
                 </ul>
               )}
-            </div>
+            </div> */}
           </div>
 
           {/* Right column — Contextual Instructions */}

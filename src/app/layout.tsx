@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import "./globals.scss";
 import { ProposalProvider } from "@/context/ProposalContext";
-import ErrorBoundary from "@/components/shared/ErrorBoundary";
-import ToastProvider from "@/components/shared/ToastProvider";
+
+// Lazy load heavy components to reduce initial bundle size
+const ErrorBoundary = dynamic(() => import("@/components/shared/ErrorBoundary"), {
+  ssr: true,
+});
+
+const ToastProvider = dynamic(() => import("@/components/shared/ToastProvider"), {
+  ssr: false,
+});
 
 export const metadata: Metadata = {
   title: "Draftora — AI Proposal Generator",

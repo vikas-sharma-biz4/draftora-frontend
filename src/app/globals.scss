@@ -656,6 +656,27 @@ body {
   background: #0f172a;
 }
 
+.link-plain {
+  background: var(--color-text);
+  color: white !important;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+  text-decoration: none;
+}
+
+.link-plain:hover {
+  background: #0f172a;
+  color: white !important;
+}
+
 /* ============================================================
    BADGES / TAGS
    ============================================================ */
@@ -4273,4 +4294,41 @@ body {
   height: 20px;
   background: rgba(255, 255, 255, 0.2);
   margin: 0 4px;
+}
+
+/* ============================================================
+   LENGTH OPTION SELECTOR (Vertical Layout)
+   ============================================================ */
+
+.length-option {
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--color-white);
+  transition: all 0.15s;
+}
+
+.length-option:hover:not(.selected) {
+  border-color: var(--color-primary-medium);
+  background: var(--color-primary-light);
+}
+
+.length-option.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.length-option-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.length-option-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  display: block;
+  line-height: 1.4;
 }

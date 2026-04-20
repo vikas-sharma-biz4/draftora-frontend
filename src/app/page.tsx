@@ -1,12 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 
 import styles from "./page.module.scss";
 
-import Sidebar from "@/components/common/Sidebar";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
+
+const Sidebar = dynamic(() => import("@/components/common/Sidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
 
 export default function StepOnePage(): JSX.Element {
   const { proposalData, updateProposalData, setCurrentStep } = useProposal();

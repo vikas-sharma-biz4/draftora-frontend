@@ -1,16 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import Sidebar from "@/components/common/Sidebar";
 import { generateProposal } from "@/api/proposalApi";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { formatBytes } from "@/utils/formatBytes";
+
+const Sidebar = dynamic(() => import("@/components/common/Sidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
 
 export default function ReviewPage(): JSX.Element {
   const {
@@ -24,8 +30,7 @@ export default function ReviewPage(): JSX.Element {
   const handleSaveDraft = useSaveDraft();
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Reset isGenerating whenever the user lands on the review page
-  // (covers the case where they navigate back from the proposal view page)
+  // Reset isGenerating when landing on review page
   useEffect(() => {
     setIsGenerating(false);
   }, [setIsGenerating]);
@@ -38,15 +43,22 @@ export default function ReviewPage(): JSX.Element {
   async function handleGenerate(): Promise<void> {
     setIsGenerating(true);
     setErrorMessage("");
+    
+    // Show immediate feedback to user
+    toast.info("Starting proposal generation...");
+    
     try {
       const result = await generateProposal(proposalData);
       setGeneratedProposalId(result.id);
+      
+      // Navigate to progress screen immediately
       router.push(`/generating/${result.id}`);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to generate proposal.";
       setErrorMessage(message);
       setIsGenerating(false);
+      toast.error(message);
     }
   }
 
@@ -252,14 +264,6 @@ export default function ReviewPage(): JSX.Element {
                 <span className="launch-stat-label">Sections</span>
                 <span className="launch-stat-value">
                   {proposalData.selectedSections.length} Selected
-                </span>
-              </div>
-              <div className="launch-stat-item">
-                <span className="launch-stat-label">Architecture Diagram</span>
-                <span className="launch-stat-value">
-                  {proposalData.selectedSections.includes("system_architecture")
-                    ? "Included"
-                    : "Not included"}
                 </span>
               </div>
             </div>

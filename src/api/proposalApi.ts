@@ -89,6 +89,7 @@ export interface ProposalStatus {
   generatingSection: string | null;
   completedSections: string[];
   selectedSections: string[] | null;
+  currentStage: string | null;
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
@@ -107,6 +108,7 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
     generatingSection: d.generating_section ?? null,
     completedSections: d.completed_sections ?? [],
     selectedSections: d.selected_sections ?? null,
+    currentStage: d.current_stage ?? null,
   };
 }
 

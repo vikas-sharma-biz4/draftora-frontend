@@ -17,7 +17,7 @@ export default function Header({ activeNav }: HeaderProps): JSX.Element {
     <header className={styles.header}>
       <div className={styles.left}>
         <Link href="/dashboard" className={styles.logo}>
-          Proposely<span className={styles.logoDot}>.</span>
+          Draftora
         </Link>
         <nav className={styles.nav}>
           {navItems.map(({ key, label, href }) => (

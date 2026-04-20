@@ -244,9 +244,10 @@ export const EDITOR_TEXT_COLORS: string[] = [
 ];
 
 export const GENERATION_STEPS = [
-  { id: "validate", label: "Validating Knowledge Base" },
-  { id: "synthesize", label: "Synthesizing Strategic Context" },
-  { id: "structure", label: "Structuring Proposal Outline" },
-  { id: "generate", label: "Generating Section Content" },
-  { id: "finalize", label: "Finalizing Document" },
+  { id: "parsing", label: "Parsing Uploaded Documents" },
+  { id: "validating", label: "Validating Knowledge Base" },
+  { id: "synthesizing", label: "Synthesizing Strategic Context" },
+  { id: "structuring", label: "Structuring Proposal Outline" },
+  { id: "generating", label: "Generating Section Content" },
+  { id: "finalizing", label: "Finalizing Document" },
 ] as const;
