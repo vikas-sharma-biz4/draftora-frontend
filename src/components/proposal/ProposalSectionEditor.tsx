@@ -41,8 +41,7 @@
 
 "use client";
 
-import { memo, useEffect, useState, useRef, useCallback } from "react";
-import SectionViewMode from "./SectionViewMode";
+import { memo, useEffect, useState, useCallback } from "react";
 import SectionEditMode from "./SectionEditMode";
 
 
@@ -103,26 +102,13 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
   onRegenerate,
 }: ProposalSectionEditorProps): JSX.Element {
   const [localContent, setLocalContent] = useState<string>(rawContent);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
   const [showRegenInput, setShowRegenInput] = useState<boolean>(false);
   const [regenInstructions, setRegenInstructions] = useState<string>("");
-  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   useEffect(() => {
     setLocalContent(rawContent);
   }, [rawContent]);
-
-  const handleExitEdit = useCallback(async (): Promise<void> => {
-    setIsSaving(true);
-    await onSave(sectionKey, localContent);
-    setIsSaving(false);
-    setIsEditing(false);
-  }, [sectionKey, localContent, onSave]);
-
-  const handleEnterEdit = useCallback((): void => {
-    setIsEditing(true);
-  }, []);
 
   async function handleRegenerate(): Promise<void> {
     setIsRegenerating(true);
@@ -131,7 +117,6 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
       setLocalContent(result);
       setShowRegenInput(false);
       setRegenInstructions("");
-      setIsEditing(false);
     }
     setIsRegenerating(false);
   }
@@ -168,26 +153,6 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
               "↻ Regenerate"
             )}
           </button>
-          {isEditing ? (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleExitEdit}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <span className="spinner spinner-white spinner-sm" />
-              ) : (
-                "Done Editing"
-              )}
-            </button>
-          ) : (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={handleEnterEdit}
-            >
-              Edit
-            </button>
-          )}
         </div>
       </div>
 
@@ -218,22 +183,14 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
         </div>
       )}
 
-      {isEditing ? (
-        <SectionEditMode
-          sectionKey={sectionKey}
-          content={localContent}
-          onContentChange={handleContentChange}
-          onSave={onSave}
-          onRegenerateSelection={handleRegenerateSelection}
-          placeholder={`Write the ${label} section here…`}
-        />
-      ) : (
-        <SectionViewMode
-          sectionKey={sectionKey}
-          content={localContent}
-          mermaidCode={mermaidCode}
-        />
-      )}
+      <SectionEditMode
+        sectionKey={sectionKey}
+        content={localContent}
+        onContentChange={handleContentChange}
+        onSave={onSave}
+        onRegenerateSelection={handleRegenerateSelection}
+        placeholder={`Write the ${label} section here…`}
+      />
     </div>
   );
 }, (prevProps, nextProps) => {

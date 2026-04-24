@@ -1,16 +1,21 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import Sidebar from "@/components/common/Sidebar";
 import { PROPOSAL_TEMPLATES, SECTION_DISPLAY_NAMES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { parseCustomTemplate } from "@/api/proposalApi";
 import type { ExtractedTemplateSection } from "@/api/proposalApi";
+
+const Sidebar = dynamic(() => import("@/components/common/Sidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
 
 type SelectionMode = "predefined" | "scratch" | "upload";
 
@@ -264,9 +269,6 @@ export default function TemplatesPage(): JSX.Element {
               </div>
             )}
             <div className="tmpl-scratch-inner">
-              <div className="tmpl-scratch-icon" aria-hidden="true">
-                ✦
-              </div>
               <div className="tmpl-scratch-label">Start from Scratch</div>
               <div className="tmpl-scratch-hint">
                 Use your current section selection or let AI suggest sections
@@ -292,9 +294,6 @@ export default function TemplatesPage(): JSX.Element {
               </div>
             )}
             <div className="tmpl-upload-inner">
-              <div className="tmpl-upload-icon" aria-hidden="true">
-                ⬆
-              </div>
               <div className="tmpl-upload-label">
                 {isUploadSelected && uploadedFileName
                   ? uploadedFileName

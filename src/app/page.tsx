@@ -1,193 +1,366 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { useState, useRef } from "react";
+import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import Sidebar from "@/components/common/Sidebar";
+import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
-import { useSaveDraft } from "@/hooks/useSaveDraft";
+import { parseCustomTemplate } from "@/api/proposalApi";
+import type { ExtractedTemplateSection } from "@/api/proposalApi";
+import DynamicPipeline from "@/components/common/DynamicPipeline";
 
-export default function StepOnePage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep } = useProposal();
+const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
+
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+  ssr: false,
+});
+
+const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"), {
+  ssr: false,
+});
+
+type SelectionMode = "template" | "scratch" | "upload";
+
+export default function HomePage(): JSX.Element {
+  const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps } = useProposal();
   const router = useRouter();
-  const handleSaveDraft = useSaveDraft();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function handleNext(): void {
-    if (!proposalData.title.trim() || !proposalData.clientName.trim()) {
-      alert("Please provide a Proposal Title and Client Name before continuing.");
-      return;
-    }
-    setCurrentStep(2);
-    router.push("/knowledge-base");
+  const [selectionMode, setSelectionMode] = useState<SelectionMode | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [parseProgress, setParseProgress] = useState<number>(0);
+  const [extractedSections, setExtractedSections] = useState<ExtractedTemplateSection[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
+  const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+
+  const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
+
+  function handleSelectTemplate(id: string): void {
+    setSelectedTemplateId(id);
+    setShowTemplateModal(true);
   }
 
-  const descriptionTags = extractTags(proposalData.description);
+  function handleCloseTemplateModal(): void {
+    setShowTemplateModal(false);
+    setSelectedTemplateId(null);
+  }
+
+  function handleNewClientFromModal(): void {
+    setShowTemplateModal(false);
+    setShowNewClientModal(true);
+  }
+
+  function handleClientCreated(): void {
+    setShowNewClientModal(false);
+    if (selectedTemplateId) {
+      setShowTemplateModal(true);
+    }
+  }
+
+  function handleSelectScratch(): void {
+    setSelectionMode("scratch");
+    setSelectedTemplateId(null);
+    setExtractedSections([]);
+  }
+
+  function handleUploadClick(): void {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = e.target.files?.[0];
+    if (!e.target.files) return;
+    e.target.value = "";
+    if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext !== "docx" && ext !== "pdf") {
+      toast.error("Only DOCX and PDF files are supported for template upload.");
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    setIsParsing(true);
+    setParseProgress(5);
+    setSelectionMode("upload");
+    setSelectedTemplateId(null);
+    setExtractedSections([]);
+
+    const progressInterval = setInterval(() => {
+      setParseProgress((prev) => {
+        if (prev >= 88) {
+          clearInterval(progressInterval);
+          return 88;
+        }
+        return prev + Math.floor(Math.random() * 8) + 3;
+      });
+    }, 600);
+
+    try {
+      const result = await parseCustomTemplate(file);
+      clearInterval(progressInterval);
+      setParseProgress(100);
+      setExtractedSections(result.sections);
+      toast.success(`Extracted ${result.sections.length} sections from "${file.name}".`);
+    } catch (err) {
+      clearInterval(progressInterval);
+      const message = err instanceof Error ? err.message : "Failed to parse template file.";
+      toast.error(message);
+      setSelectionMode(null);
+      setUploadedFileName("");
+      setParseProgress(0);
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
+  function handleContinue(): void {
+    if (selectionMode === "template" && selectedTemplateId) {
+      const template = PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId);
+      if (template) {
+        updateProposalData({
+          selectedSections: [...template.sections],
+          sectionDisplayNames: {},
+          templateId: selectedTemplateId,
+          templateType: "predefined",
+        });
+      }
+      setCurrentStep(1);
+      router.push("/wizard");
+    } else if (selectionMode === "upload" && extractedSections.length > 0) {
+      const sectionKeys = extractedSections.map((s) => s.key);
+      const displayNames: Record<string, string> = {};
+      for (const s of extractedSections) {
+        displayNames[s.key] = s.label;
+      }
+      updateProposalData({
+        selectedSections: sectionKeys,
+        sectionDisplayNames: displayNames,
+        templateId: null,
+        templateType: "custom",
+      });
+      setCurrentStep(1);
+      router.push("/wizard");
+    } else if (selectionMode === "scratch") {
+      updateProposalData({
+        templateId: null,
+        templateType: "scratch",
+        sectionDisplayNames: {},
+      });
+      setCurrentStep(1);
+      router.push("/wizard");
+    }
+  }
+
+  const isUploadSelected = selectionMode === "upload";
+  const isScratchSelected = selectionMode === "scratch";
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <MainSidebar />
       <main className="main-content">
-        <div className="page-badge">Creation Workflow</div>
-        <h1 className="page-title">Step 1: Core Objectives &amp; Context</h1>
+        <DynamicPipeline 
+          currentStage={draftStage}
+          completedSteps={completedSteps}
+          visible={showPipeline}
+        />
+        
+        <h1 className="page-title">Choose Your Proposal Type</h1>
         <p className="page-subtitle">
-          Define the proposal title, target client, and the strategic objective.
-          The richer your prompt, the more accurate and tailored your AI-generated
-          proposal will be.
+          Select a template that matches your project needs, or start from scratch with AI-powered guidance.
         </p>
 
-        <div className="grid-2 mb-24">
-          <div className="form-group">
-            <label className="form-label">Proposal Title</label>
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Enterprise Solution for Nexus Corp"
-              value={proposalData.title}
-              onChange={(e) =>
-                updateProposalData({ title: e.target.value })
-              }
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Client Name</label>
-            <input
-              className="form-input"
-              type="text"
-              placeholder="Nexus Corp"
-              value={proposalData.clientName}
-              onChange={(e) =>
-                updateProposalData({ clientName: e.target.value })
-              }
-            />
-          </div>
+        <div className="template-bento-row">
+          {PROPOSAL_TEMPLATES.map((template) => {
+            const isSelected = selectionMode === "template" && selectedTemplateId === template.id;
+            return (
+              <article
+                key={template.id}
+                className={`tmpl-card${isSelected ? " tmpl-selected" : ""}`}
+                onClick={() => handleSelectTemplate(template.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") handleSelectTemplate(template.id);
+                }}
+                aria-pressed={isSelected}
+              >
+                {isSelected && (
+                  <div className="tmpl-selected-badge" aria-hidden="true">
+                    ✓
+                  </div>
+                )}
+
+                <div className={`tmpl-preview ${template.gradientClass}`}>
+                  <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
+                    <div className="tmpl-preview-line" />
+                    <div className="tmpl-preview-line" />
+                    <div className="tmpl-preview-line" />
+                    <div className="tmpl-preview-line" />
+                  </div>
+                  <span className="tmpl-preview-icon" aria-hidden="true">
+                    {template.icon}
+                  </span>
+                </div>
+
+                <div className="tmpl-body">
+                  <div className="tmpl-name">{template.name}</div>
+                  <div className="tmpl-desc">{template.description}</div>
+                  <div className="tmpl-sections-preview">
+                    {template.sections.slice(0, 3).map((key) => (
+                      <span key={key} className="badge badge-muted">
+                        {SECTION_DISPLAY_NAMES[key] ?? key}
+                      </span>
+                    ))}
+                    {template.sections.length > 3 && (
+                      <span className="badge badge-muted">
+                        +{template.sections.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
-        <div className="card mb-24">
-          <div className="flex-between mb-8">
-            <label className="form-label mb-0">
-              The Strategic Prompt
-            </label>
-            <span className="form-label form-label-tip">
-              Be specific — mention tech stack, goals, pain points, timelines
-            </span>
-          </div>
-          <textarea
-            className="form-textarea min-h-textarea"
-            placeholder={
-              "Describe the project scope, client's core challenge, desired outcomes, technical constraints, and any specific requirements...\n\nExample: We need to build a HIPAA-compliant patient management portal for a mid-sized hospital network. The solution must integrate with their existing EHR system, support 500+ concurrent users, and be deployed on AWS with 99.9% SLA."
-            }
-            value={proposalData.description}
-            onChange={(e) =>
-              updateProposalData({ description: e.target.value })
-            }
+        <div className="template-bento-row-secondary">
+          <article
+            className={`tmpl-card tmpl-scratch${isScratchSelected ? " tmpl-selected" : ""}`}
+            onClick={handleSelectScratch}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") handleSelectScratch();
+            }}
+            aria-pressed={isScratchSelected}
+          >
+            {isScratchSelected && (
+              <div className="tmpl-selected-badge" aria-hidden="true">
+                ✓
+              </div>
+            )}
+            <div className="tmpl-scratch-inner">
+              <div className="tmpl-scratch-icon">{SPECIAL_CARDS.START_FROM_SCRATCH.icon}</div>
+              <div className="tmpl-scratch-label">{SPECIAL_CARDS.START_FROM_SCRATCH.name}</div>
+              <div className="tmpl-scratch-hint">{SPECIAL_CARDS.START_FROM_SCRATCH.description}</div>
+            </div>
+          </article>
+
+          <article
+            className={`tmpl-card tmpl-upload${isUploadSelected ? " tmpl-selected" : ""}`}
+            onClick={handleUploadClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") handleUploadClick();
+            }}
+            aria-label="Upload a custom DOCX or PDF template"
+          >
+            {isUploadSelected && !isParsing && (
+              <div className="tmpl-selected-badge" aria-hidden="true">
+                ✓
+              </div>
+            )}
+            <div className="tmpl-upload-inner">
+              <div className="tmpl-upload-icon">{SPECIAL_CARDS.CUSTOM_TEMPLATE.icon}</div>
+              <div className="tmpl-upload-label">
+                {isUploadSelected && uploadedFileName ? uploadedFileName : SPECIAL_CARDS.CUSTOM_TEMPLATE.name}
+              </div>
+              <div className="tmpl-upload-hint">
+                {isParsing ? "Extracting sections…" : SPECIAL_CARDS.CUSTOM_TEMPLATE.description}
+              </div>
+            </div>
+          </article>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".docx,.pdf"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+            aria-hidden="true"
           />
-          {descriptionTags.length > 0 && (
-            <div className="flex-row mt-12 flex-wrap gap-6">
-              {descriptionTags.map((tag) => (
-                <span key={tag} className="badge badge-muted">
-                  #{tag}
-                </span>
-              ))}
-              <button className="btn btn-dark btn-sm ml-auto">
-                ✦ AI Assist
+        </div>
+
+        {isParsing && (
+          <div className="tmpl-processing-pill" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <div className="tmpl-spinner" aria-hidden="true" />
+              <span>
+                Parsing <strong>{uploadedFileName}</strong> — scanning for section structure…
+              </span>
+              <span style={{ marginLeft: "auto", fontWeight: 700, fontSize: 13 }}>
+                {parseProgress}%
+              </span>
+            </div>
+            <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${parseProgress}%`,
+                  background: "var(--color-primary)",
+                  borderRadius: 3,
+                  transition: "width 0.4s ease",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {!isParsing && isUploadSelected && extractedSections.length > 0 && (
+          <div className="tmpl-extracted-panel">
+            <div className="tmpl-extracted-header">
+              <div>
+                <div className={styles.extractedTitle}>Sections extracted from your template</div>
+                <div className="tmpl-extracted-meta">
+                  {uploadedFileName} · {extractedSections.length} sections identified
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={handleUploadClick}>
+                Replace file
               </button>
             </div>
-          )}
-          {descriptionTags.length === 0 && (
-            <div className={`flex-row mt-12 ${styles.aiAssistRow}`}>
-              <button className="btn btn-dark btn-sm">✦ AI Assist</button>
-            </div>
-          )}
-        </div>
+            <ul className="tmpl-extracted-sections-list" role="list">
+              {extractedSections.map((s) => (
+                <li key={s.key} className="tmpl-extracted-section-row">
+                  <span className="tmpl-extracted-check" aria-hidden="true">
+                    ✓
+                  </span>
+                  {s.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-        <div className="grid-3">
-          <div
-            className="card feature-placeholder"
-          >
-            <div className="feature-placeholder-icon">📎</div>
-            <div className="form-label text-muted">
-              Add Case Study
-            </div>
-          </div>
-          <div
-            className="card feature-placeholder"
-          >
-            <div className="feature-placeholder-icon">📊</div>
-            <div className="form-label text-muted">
-              Core Metrics
-            </div>
-          </div>
-          <div
-            className="card feature-placeholder"
-          >
-            <div className="feature-placeholder-icon">🛡️</div>
-            <div className="form-label text-muted">
-              Compliance Focus
-            </div>
-          </div>
-        </div>
+        {showTemplateModal && selectedTemplateId && (
+          <TemplateSelectionModal
+            templateId={selectedTemplateId}
+            templateName={
+              PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name || ""
+            }
+            onClose={handleCloseTemplateModal}
+            onNewClient={handleNewClientFromModal}
+          />
+        )}
 
-        <div className="page-footer">
-          <div className="page-footer-left" />
-          <div className="page-footer-right">
-            <button
-              className="btn btn-secondary"
-              onClick={handleSaveDraft}
-            >
-              Save Draft
-            </button>
-            <button className="btn btn-primary" onClick={handleNext}>
-              Next: Knowledge Base →
-            </button>
-          </div>
-        </div>
+        {showNewClientModal && (
+          <NewClientModal
+            onClose={() => setShowNewClientModal(false)}
+            onClientCreated={handleClientCreated}
+          />
+        )}
       </main>
     </div>
   );
-}
-
-function extractTags(text: string): string[] {
-  if (!text || text.length < 20) return [];
-  const techKeywords = [
-    "React",
-    "Next.js",
-    "NextJS",
-    "Vue",
-    "Angular",
-    "Node.js",
-    "Python",
-    "FastAPI",
-    "Django",
-    "Flask",
-    "AWS",
-    "Azure",
-    "GCP",
-    "Docker",
-    "Kubernetes",
-    "PostgreSQL",
-    "MySQL",
-    "MongoDB",
-    "Redis",
-    "TypeScript",
-    "JavaScript",
-    "Java",
-    "Go",
-    "Rust",
-    "Security",
-    "HIPAA",
-    "GDPR",
-    "API",
-    "REST",
-    "GraphQL",
-    "Microservices",
-    "Serverless",
-    "Mobile",
-    "iOS",
-    "Android",
-    "CI/CD",
-  ];
-  return techKeywords
-    .filter((kw) => text.toLowerCase().includes(kw.toLowerCase()))
-    .slice(0, 5);
 }
