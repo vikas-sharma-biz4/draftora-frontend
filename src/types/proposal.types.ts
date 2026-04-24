@@ -22,6 +22,7 @@ export interface ProposalData {
   id?: number;
   title: string;
   clientName: string;
+  clientId?: string;
   description: string;
   tone: string;
   lengthPreference: string;
@@ -34,6 +35,7 @@ export interface ProposalData {
   webReferences: string[];
   files: File[];
   filesMeta: FileMeta[];
+  selectedDocumentIds?: string[];
   // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;

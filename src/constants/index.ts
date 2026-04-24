@@ -135,7 +135,6 @@ export const PROPOSAL_TEMPLATES = [
     category: "Popular" as const,
     description:
       "Fast-track proposal for minimum viable product delivery with core feature scope, lean implementation, and rapid go-to-market strategy.",
-    // Dynamic sections (AI-generated based on project context)
     sections: [
       "introduction",
       "purpose",
@@ -152,13 +151,13 @@ export const PROPOSAL_TEMPLATES = [
       "similar_projects",
       "our_approach_methodology",
     ],
-    gradientClass: "template-card-preview-gradient-1",
+    gradientClass: "tmpl-preview-gradient-1",
     icon: "▲",
   },
   {
     id: "poc-discovery",
     templateType: "poc",
-    name: "POC and Discovery",
+    name: "POC & Discovery",
     category: "Technical" as const,
     description:
       "Structured discovery and proof-of-concept framework covering technical feasibility, risk assessment, and architecture validation.",
@@ -174,7 +173,7 @@ export const PROPOSAL_TEMPLATES = [
       "future_vision",
       "our_approach_methodology",
     ],
-    gradientClass: "template-card-preview-gradient-2",
+    gradientClass: "tmpl-preview-gradient-2",
     icon: "⊞",
   },
   {
@@ -194,8 +193,102 @@ export const PROPOSAL_TEMPLATES = [
       "prototypes_developed",
       "our_approach_methodology",
     ],
-    gradientClass: "template-card-preview-gradient-3",
+    gradientClass: "tmpl-preview-gradient-3",
     icon: "✦",
+  },
+  {
+    id: "brd",
+    templateType: "brd",
+    name: "BRD",
+    category: "Documentation" as const,
+    description:
+      "Business Requirements Document outlining business objectives, stakeholder needs, and high-level functional requirements.",
+    sections: [
+      "executive_summary",
+      "business_objectives",
+      "stakeholder_analysis",
+      "functional_requirements",
+      "non_functional_requirements",
+      "assumptions_constraints",
+      "success_criteria",
+    ],
+    gradientClass: "tmpl-preview-gradient-1",
+    icon: "◆",
+  },
+  {
+    id: "frd",
+    templateType: "frd",
+    name: "FRD",
+    category: "Documentation" as const,
+    description:
+      "Functional Requirements Document detailing system features, user interactions, and detailed functional specifications.",
+    sections: [
+      "introduction",
+      "system_overview",
+      "functional_requirements",
+      "user_stories",
+      "use_cases",
+      "data_requirements",
+      "interface_requirements",
+    ],
+    gradientClass: "tmpl-preview-gradient-2",
+    icon: "◈",
+  },
+  {
+    id: "srs",
+    templateType: "srs",
+    name: "SRS",
+    category: "Documentation" as const,
+    description:
+      "Software Requirements Specification with comprehensive technical requirements, system constraints, and acceptance criteria.",
+    sections: [
+      "introduction",
+      "overall_description",
+      "system_features",
+      "external_interface_requirements",
+      "non_functional_requirements",
+      "other_requirements",
+    ],
+    gradientClass: "tmpl-preview-gradient-3",
+    icon: "⬡",
+  },
+  {
+    id: "architecture",
+    templateType: "architecture",
+    name: "Architecture",
+    category: "Technical" as const,
+    description:
+      "System architecture document covering technical design, infrastructure, scalability, and integration patterns.",
+    sections: [
+      "architecture_overview",
+      "system_components",
+      "technology_stack",
+      "data_architecture",
+      "security_architecture",
+      "deployment_architecture",
+      "scalability_performance",
+    ],
+    gradientClass: "tmpl-preview-gradient-1",
+    icon: "⬢",
+  },
+  {
+    id: "sow",
+    templateType: "sow",
+    name: "SOW",
+    category: "Popular" as const,
+    description:
+      "Statement of Work defining project scope, deliverables, timeline, responsibilities, and terms of engagement.",
+    sections: [
+      "project_overview",
+      "scope_of_work",
+      "deliverables",
+      "timeline_milestones",
+      "roles_responsibilities",
+      "payment_terms",
+      "acceptance_criteria",
+    ],
+    gradientClass: "tmpl-preview-gradient-2",
+    icon: "◉",
   },
 ] as const;
 
@@ -244,9 +337,63 @@ export const EDITOR_TEXT_COLORS: string[] = [
 ];
 
 export const GENERATION_STEPS = [
-  { id: "validate", label: "Validating Knowledge Base" },
-  { id: "synthesize", label: "Synthesizing Strategic Context" },
-  { id: "structure", label: "Structuring Proposal Outline" },
-  { id: "generate", label: "Generating Section Content" },
-  { id: "finalize", label: "Finalizing Document" },
+  { id: "parsing", label: "Parsing Uploaded Documents" },
+  { id: "validating", label: "Validating Knowledge Base" },
+  { id: "synthesizing", label: "Synthesizing Strategic Context" },
+  { id: "structuring", label: "Structuring Proposal Outline" },
+  { id: "generating", label: "Generating Section Content" },
+  { id: "finalizing", label: "Finalizing Document" },
 ] as const;
+
+export const MAIN_NAV_ITEMS = [
+  { id: "home", label: "Home", path: "/", icon: "◆" },
+  { id: "clients", label: "Clients", path: "/clients", icon: "◈" },
+  { id: "drafts", label: "Drafts", path: "/drafts", icon: "◉" },
+  { id: "history", label: "History", path: "/history", icon: "◎" },
+] as const;
+
+export const SPECIAL_CARDS = {
+  START_FROM_SCRATCH: {
+    id: "start-from-scratch",
+    name: "Start From Scratch",
+    description: "Build your proposal from the ground up with AI-powered section suggestions tailored to your project needs.",
+    icon: "✎",
+  },
+  CUSTOM_TEMPLATE: {
+    id: "custom-template",
+    name: "Custom Template",
+    description: "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
+    icon: "⇪",
+  },
+} as const;
+
+export const INDUSTRIES = [
+  "Financial Services",
+  "Healthcare",
+  "Technology",
+  "Manufacturing",
+  "Retail",
+  "Education",
+  "Real Estate",
+  "Consulting",
+  "Other",
+] as const;
+
+export const PIPELINE_STAGES = [
+  "Discovery",
+  "Qualification",
+  "Proposal",
+  "Negotiation",
+  "Closed Won",
+  "Closed Lost",
+] as const;
+
+export const CLIENT_TIERS = [
+  "Enterprise",
+  "Mid-Market",
+  "Small Business",
+] as const;
+
+export const CLIENTS_STORAGE_KEY = "draftora_clients_v1";
+
+export const HISTORY_STORAGE_KEY = "draftora_history_v1";

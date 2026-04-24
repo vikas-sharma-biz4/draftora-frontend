@@ -6,11 +6,19 @@ import { useRouter } from "next/navigation";
 import { Briefcase, Target, Code, Palette, Check, X, Plus, Sparkles, Lock } from "lucide-react";
 import { toast } from "sonner";
 
-import Sidebar from "@/components/common/Sidebar";
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { suggestSections } from "@/api/proposalApi";
 import type { SectionItem } from "@/components/common/SortableSectionList";
+
+const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
+
+const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
+  ssr: false,
+});
 
 // Heavy DnD libraries — load only when sections exist
 const SortableSectionList = dynamic(
@@ -46,7 +54,7 @@ function buildSectionItems(
 }
 
 export default function ParametersPage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep } = useProposal();
+  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
   const router = useRouter();
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
@@ -174,6 +182,8 @@ export default function ParametersPage(): JSX.Element {
       sectionDisplayNames: displayNames,
       customSections: [],
     });
+    markStepCompleted(1);
+    setDraftStage("parameters_complete");
     setCurrentStep(5);
     router.push("/review");
   }
@@ -189,8 +199,13 @@ export default function ParametersPage(): JSX.Element {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <MainSidebar />
       <main className="main-content">
+        <DynamicPipeline 
+          currentStage="wizard_in_progress"
+          completedSteps={[]}
+          visible={true}
+        />
         <div className="page-badge">Phase 04</div>
         <h1 className="page-title">Step 4: Section Structure &amp; Tone</h1>
         <p className="page-subtitle">
@@ -335,23 +350,35 @@ export default function ParametersPage(): JSX.Element {
           </div>
         </div>
 
-        {/* ── Length (display only) + Language ── */}
+        {/* ── Length Selection + Language ── */}
         <div className="grid-2 mb-32">
           <div className="card">
-            <div className="form-label mb-10">
+            <div className="form-label mb-14">
               Proposal Length
             </div>
-            <div className="length-display-row">
-              <span className="length-display-badge">
-                {currentLengthOption?.label ?? proposalData.lengthPreference}
-              </span>
-              <span className="font-12 text-muted">
-                {currentLengthOption?.description ?? ""}
-              </span>
+            <div className="flex-col gap-8">
+              {LENGTH_OPTIONS.map(({ value, label, description }) => {
+                const isSelected = proposalData.lengthPreference === value;
+                return (
+                  <div
+                    key={value}
+                    className={`length-option${isSelected ? " selected" : ""}`}
+                    onClick={() => updateProposalData({ lengthPreference: value })}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") updateProposalData({ lengthPreference: value });
+                    }}
+                  >
+                    <div className="flex-between">
+                      <span className="length-option-label">{label}</span>
+                      {isSelected && <span className="tone-check">✓</span>}
+                    </div>
+                    <span className="length-option-desc">{description}</span>
+                  </div>
+                );
+              })}
             </div>
-            <p className="font-11 text-light mt-10 text-italic">
-              Set in Step 1 — change there to adjust word count per section.
-            </p>
           </div>
 
           <div className="card">
