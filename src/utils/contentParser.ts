@@ -200,13 +200,75 @@ export function parseMarkdownTable(content: string): ParsedTable | null {
 // ---------------------------------------------------------------------------
 
 /**
+ * Convert inline Markdown syntax to HTML.
+ * Handles: **bold**, *italic*, `code`, [links](url), ![images](url), ~~strikethrough~~
+ * 
+ * IMPORTANT: This preserves formatting when loading Markdown content into TipTap.
+ * Without this, **bold** would display literally instead of as <strong>bold</strong>.
+ * 
+ * Order matters: Process in order of precedence to avoid conflicts.
+ */
+function convertInlineMarkdownToHtml(text: string): string {
+  if (!text) return text;
+  
+  let result = text;
+  
+  // 0. Remove escaped backslashes (\\text\\ → text)
+  result = result.replace(/\\\\([^\\]+)\\\\/g, '$1');
+  result = result.replace(/\\\\/g, '');
+  
+  // 1. Code blocks first (highest priority - don't process markdown inside code)
+  result = result.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // 2. Images (before links - images use ![alt](url) syntax)
+  // Only match complete image markdown syntax
+  result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+    // Ensure URL is valid (not empty and looks like a URL or path)
+    if (url && url.trim()) {
+      return `<img src="${url.trim()}" alt="${alt || ''}" style="max-width: 600px; height: auto; display: block; margin: 1rem 0;" />`;
+    }
+    return match; // Return original if invalid
+  });
+  
+  // 3. Links (before bold/italic to avoid conflicts with brackets)
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  
+  // 4. Bold (before italic to handle *** correctly)
+  result = result.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  
+  // 5. Italic (after bold)
+  result = result.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+  
+  // 6. Strikethrough
+  result = result.replace(/~~([^~]+?)~~/g, '<s>$1</s>');
+  
+  return result;
+}
+
+/**
  * Convert AI-generated plain-text (markdown-style) content to HTML.
  * Used to pre-process content before loading into the rich text editor.
  * If the content is already HTML, it is returned unchanged.
  */
 export function plainTextToHtml(content: string): string {
   if (!content.trim()) return "<p></p>";
-  if (isHtmlContent(content)) return content;
+  
+  // Handle GENERATED_IMAGE:: prefix (architecture diagrams)
+  if (isGeneratedImageContent(content)) {
+    const urls = parseGeneratedImageUrls(content);
+    const images = urls.map(url => 
+      `<img src="${url}" alt="Generated diagram" style="max-width: 600px; height: auto; display: block; margin: 1rem 0; cursor: pointer;" />`
+    ).join('');
+    return images || "<p>Image not available</p>";
+  }
+  
+  // If content is already HTML, return it unchanged
+  // CRITICAL: Do NOT process markdown on HTML - it destroys the formatted content
+  // The backend normalizes content to Markdown, so HTML here means it was
+  // intentionally formatted (e.g., from TipTap editor or legacy content)
+  if (isHtmlContent(content)) {
+    return content;
+  }
 
   const lines = content.split("\n");
   const parts: string[] = [];
@@ -219,9 +281,10 @@ export function plainTextToHtml(content: string): string {
     if (tableLines.length === 0) return;
     const parsed = parseMarkdownTable(tableLines.join("\n"));
     if (parsed) {
-      const ths = parsed.headers.map((h) => `<th>${h}</th>`).join("");
+      // Convert Markdown syntax in table headers and cells
+      const ths = parsed.headers.map((h) => `<th>${convertInlineMarkdownToHtml(h)}</th>`).join("");
       const trs = parsed.rows
-        .map((row) => `<tr>${row.map((c) => `<td>${c}</td>`).join("")}</tr>`)
+        .map((row) => `<tr>${row.map((c) => `<td>${convertInlineMarkdownToHtml(c)}</td>`).join("")}</tr>`)
         .join("");
       parts.push(
         `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`
@@ -234,7 +297,8 @@ export function plainTextToHtml(content: string): string {
   function flushBullets(): void {
     if (bulletItems.length === 0) return;
     const tag = isOrdered ? "ol" : "ul";
-    const lis = bulletItems.map((item) => `<li>${item}</li>`).join("");
+    // Convert Markdown syntax in list items
+    const lis = bulletItems.map((item) => `<li>${convertInlineMarkdownToHtml(item)}</li>`).join("");
     parts.push(`<${tag}>${lis}</${tag}>`);
     bulletItems = [];
   }
@@ -279,13 +343,24 @@ export function plainTextToHtml(content: string): string {
 
     flushBullets();
 
-    if (trimmed.endsWith(":") && trimmed.length <= 80 && !trimmed.includes(".")) {
-      parts.push(`<h3>${trimmed}</h3>`);
+    // Check for Markdown headings (### Heading)
+    const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = convertInlineMarkdownToHtml(headingMatch[2]);
+      parts.push(`<h${level}>${headingText}</h${level}>`);
       continue;
     }
 
-    const clean = trimmed.replace(/\*\*/g, "").replace(/\*/g, "");
-    parts.push(`<p>${clean}</p>`);
+    // Check for colon-based headings (legacy format)
+    if (trimmed.endsWith(":") && trimmed.length <= 80 && !trimmed.includes(".")) {
+      parts.push(`<h3>${convertInlineMarkdownToHtml(trimmed)}</h3>`);
+      continue;
+    }
+
+    // Convert Markdown syntax to HTML instead of stripping it
+    const htmlContent = convertInlineMarkdownToHtml(trimmed);
+    parts.push(`<p>${htmlContent}</p>`);
   }
 
   flushTable();

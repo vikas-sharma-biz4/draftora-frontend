@@ -6,11 +6,19 @@ import { useRouter } from "next/navigation";
 import { Briefcase, Target, Code, Palette, Check, X, Plus, Sparkles, Lock } from "lucide-react";
 import { toast } from "sonner";
 
-import Sidebar from "@/components/common/Sidebar";
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { suggestSections } from "@/api/proposalApi";
 import type { SectionItem } from "@/components/common/SortableSectionList";
+
+const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
+
+const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
+  ssr: false,
+});
 
 // Heavy DnD libraries — load only when sections exist
 const SortableSectionList = dynamic(
@@ -46,7 +54,7 @@ function buildSectionItems(
 }
 
 export default function ParametersPage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep } = useProposal();
+  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
   const router = useRouter();
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
@@ -174,6 +182,8 @@ export default function ParametersPage(): JSX.Element {
       sectionDisplayNames: displayNames,
       customSections: [],
     });
+    markStepCompleted(1);
+    setDraftStage("parameters_complete");
     setCurrentStep(5);
     router.push("/review");
   }
@@ -189,8 +199,13 @@ export default function ParametersPage(): JSX.Element {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <MainSidebar />
       <main className="main-content">
+        <DynamicPipeline 
+          currentStage="wizard_in_progress"
+          completedSteps={[]}
+          visible={true}
+        />
         <div className="page-badge">Phase 04</div>
         <h1 className="page-title">Step 4: Section Structure &amp; Tone</h1>
         <p className="page-subtitle">
