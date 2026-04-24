@@ -10,7 +10,13 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch" | "mvp" | "poc" | "design" | "brd" | "frd" | "architecture";
+export type TemplateType = "predefined" | "custom" | "scratch" | "mvp" | "poc" | "design" | "sow" | "brd" | "frd" | "architecture";
+
+export interface FileMeta {
+  name: string;
+  size: number;
+  type: string;
+}
 
 export interface ProposalData {
   id?: number;
@@ -20,12 +26,14 @@ export interface ProposalData {
   tone: string;
   lengthPreference: string;
   language: string;
+  aiModel: string;
   selectedSections: string[];
   sectionDisplayNames: Record<string, string>;
   customSections: CustomSection[];
   contextualInstructions: string;
   webReferences: string[];
   files: File[];
+  filesMeta: FileMeta[];
   // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;

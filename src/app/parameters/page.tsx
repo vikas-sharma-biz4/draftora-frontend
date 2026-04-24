@@ -7,7 +7,7 @@ import { Briefcase, Target, Code, Palette, Check, X, Plus, Sparkles, Lock } from
 import { toast } from "sonner";
 
 import Sidebar from "@/components/common/Sidebar";
-import { LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
+import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { suggestSections } from "@/api/proposalApi";
 import type { SectionItem } from "@/components/common/SortableSectionList";
@@ -88,6 +88,13 @@ export default function ParametersPage(): JSX.Element {
       setIsSuggestingAI(false);
     }
   }, [proposalData.title, proposalData.description, proposalData.templateType, proposalData.contextualInstructions, updateProposalData]);
+
+  // Sync local sections state with proposalData (e.g., after localStorage rehydration)
+  useEffect(() => {
+    setSections(
+      buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
+    );
+  }, [proposalData.selectedSections, proposalData.sectionDisplayNames]);
 
   // Auto-suggest when coming from scratch with no sections
   useEffect(() => {
@@ -362,6 +369,34 @@ export default function ParametersPage(): JSX.Element {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+
+        {/* ── AI Model selector ── */}
+        <div className="card mb-32">
+          <div className="form-label mb-14">
+            AI Model
+          </div>
+          <div className="grid-2">
+            {AI_MODEL_OPTIONS.map(({ value, label, provider, description }) => {
+              const isSelected = (proposalData.aiModel ?? "gpt-4o") === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`tone-card${isSelected ? " selected" : ""}`}
+                  onClick={() => updateProposalData({ aiModel: value })}
+                >
+                  <div className="tone-card-icon">✦</div>
+                  <div className="tone-card-label">
+                    {label}
+                    <span className="font-11 text-muted ml-6">({provider})</span>
+                    {isSelected && <span className="tone-check">✓</span>}
+                  </div>
+                  <div className="tone-card-desc">{description}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

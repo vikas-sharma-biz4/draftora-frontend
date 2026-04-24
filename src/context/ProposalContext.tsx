@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-import { DEFAULT_SELECTED_SECTIONS } from "@/constants";
+import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
 import type { ProposalData, WizardStep } from "@/types/proposal.types";
 
 interface ProposalContextType {
@@ -24,7 +24,7 @@ interface ProposalContextType {
   hydrated: boolean;
 }
 
-const STORAGE_KEY = "proposely_wizard_v1";
+const STORAGE_KEY = "draftora_wizard_v1";
 
 const defaultProposalData: ProposalData = {
   title: "",
@@ -33,12 +33,14 @@ const defaultProposalData: ProposalData = {
   tone: "professional",
   lengthPreference: "balanced",
   language: "English - US",
+  aiModel: AI_MODEL_DEFAULT,
   selectedSections: [...DEFAULT_SELECTED_SECTIONS],
   sectionDisplayNames: {},
   customSections: [],
   contextualInstructions: "",
   webReferences: [],
   files: [],
+  filesMeta: [],
   templateId: null,
   templateType: "scratch",
 };
@@ -64,6 +66,16 @@ export function ProposalProvider({
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
     try {
+      // Migrate data from old branding key if new key is not yet populated
+      const OLD_STORAGE_KEY = "proposely_wizard_v1";
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
+        if (oldRaw) {
+          localStorage.setItem(STORAGE_KEY, oldRaw);
+          localStorage.removeItem(OLD_STORAGE_KEY);
+        }
+      }
+
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const saved = JSON.parse(raw) as {
@@ -75,6 +87,7 @@ export function ProposalProvider({
             ...defaultProposalData,
             ...saved.proposalData,
             files: [], // File objects can't be serialized — cleared on refresh
+            filesMeta: saved.proposalData.filesMeta ?? [], // metadata IS serializable
           });
         }
         if (saved.currentStep) {
@@ -92,7 +105,7 @@ export function ProposalProvider({
     if (!hydrated) return;
     try {
       const toSave = {
-        proposalData: { ...proposalData, files: [] },
+        proposalData: { ...proposalData, files: [] }, // filesMeta is kept (serializable)
         currentStep,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));

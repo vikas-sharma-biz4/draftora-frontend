@@ -1,6 +1,12 @@
 import { API_BASE_URL } from "@/config/config";
 import type { ProposalData, ProposalListItem, TemplateType } from "@/types/proposal.types";
 
+// ngrok free tier shows an HTML interstitial page for browser fetch requests.
+// This header bypasses it so API calls get JSON responses instead of HTML.
+const BASE_HEADERS: Record<string, string> = {
+  "ngrok-skip-browser-warning": "1",
+};
+
 interface CreateProposalResponse {
   id: number;
   status: string;
@@ -61,6 +67,7 @@ export async function generateProposal(
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
+    ai_model: data.aiModel ?? "gpt-4o",
     selected_sections: allSections,
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
     contextual_instructions: contextual || null,
@@ -75,10 +82,38 @@ export async function generateProposal(
 
   const res = await fetch(`${API_BASE_URL}/proposals/`, {
     method: "POST",
+    headers: BASE_HEADERS,
     body: formData,
   });
 
   return handleResponse<CreateProposalResponse>(res);
+}
+
+export interface ProposalStatus {
+  id: number;
+  status: string;
+  generatingSection: string | null;
+  completedSections: string[];
+  selectedSections: string[] | null;
+}
+
+export async function getProposalStatus(id: number): Promise<ProposalStatus> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${id}/status/`, {
+    cache: "no-store",
+    headers: BASE_HEADERS,
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json?.error?.message ?? "Failed to fetch proposal status");
+  }
+  const d = json.data;
+  return {
+    id: d.id,
+    status: d.status,
+    generatingSection: d.generating_section ?? null,
+    completedSections: d.completed_sections ?? [],
+    selectedSections: d.selected_sections ?? null,
+  };
 }
 
 export async function getProposal(id: number): Promise<ProposalData> {
@@ -87,6 +122,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
   }
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/`, {
     cache: "no-store",
+    headers: BASE_HEADERS,
   });
   const json = await res.json();
   if (!res.ok || !json.success) {
@@ -101,6 +137,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
     tone: d.tone,
     lengthPreference: d.length_preference,
     language: d.language,
+    aiModel: d.ai_model ?? "gpt-4o",
     selectedSections: d.selected_sections ?? [],
     sectionDisplayNames: (d.section_display_names ?? {}) as Record<string, string>,
     customSections: [],
@@ -129,7 +166,7 @@ export async function updateSection(
     `${API_BASE_URL}/proposals/${id}/sections/${sectionKey}/`,
     {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     }
   );
@@ -143,7 +180,7 @@ export async function regenerateSection(
 ): Promise<string> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/regenerate/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify({
       section_key: sectionKey,
       additional_instructions: instructions ?? null,
@@ -154,7 +191,7 @@ export async function regenerateSection(
 }
 
 export async function listProposals(): Promise<ProposalListItem[]> {
-  const res = await fetch(`${API_BASE_URL}/proposals/`, { cache: "no-store" });
+  const res = await fetch(`${API_BASE_URL}/proposals/`, { cache: "no-store", headers: BASE_HEADERS });
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json?.error?.message ?? "Failed to list proposals");
@@ -173,6 +210,17 @@ export async function listProposals(): Promise<ProposalListItem[]> {
 
 export function getDownloadUrl(id: number): string {
   return `${API_BASE_URL}/proposals/${id}/download/`;
+}
+
+export async function cancelProposal(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/proposals/${id}/cancel/`, {
+    method: "POST",
+    headers: BASE_HEADERS,
+  });
+  // Ignore 400 (already completed/failed) — cancellation is best-effort
+  if (!res.ok && res.status !== 400) {
+    await handleResponse<null>(res);
+  }
 }
 
 // ── Section Management ─────────────────────────────────────────────────────────
@@ -194,7 +242,7 @@ export async function addProposalSection(
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/sections/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   await handleResponse<null>(res);
@@ -206,7 +254,7 @@ export async function removeProposalSection(
 ): Promise<void> {
   const res = await fetch(
     `${API_BASE_URL}/proposals/${id}/sections/${sectionKey}/`,
-    { method: "DELETE" }
+    { method: "DELETE", headers: BASE_HEADERS }
   );
   await handleResponse<null>(res);
 }
@@ -217,7 +265,7 @@ export async function reorderProposalSections(
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/sections/reorder/`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   await handleResponse<null>(res);
@@ -243,7 +291,7 @@ export async function suggestSections(
 ): Promise<SuggestedSection[]> {
   const res = await fetch(`${API_BASE_URL}/proposals/suggest-sections/`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await handleResponse<{ sections: SuggestedSection[] }>(res);
@@ -272,6 +320,7 @@ export async function parseCustomTemplate(
 
   const res = await fetch(`${API_BASE_URL}/templates/parse/`, {
     method: "POST",
+    headers: BASE_HEADERS,
     body: formData,
   });
   const data = await handleResponse<{
@@ -319,6 +368,7 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
 
   const res = await fetch(`${API_BASE_URL}/parse/`, {
     method: "POST",
+    headers: BASE_HEADERS,
     body: formData,
   });
 
@@ -353,6 +403,7 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
 export async function getSupportedParseFormats(): Promise<string[]> {
   const res = await fetch(`${API_BASE_URL}/parse/supported-formats/`, {
     cache: "no-store",
+    headers: BASE_HEADERS,
   });
   const json = await res.json();
   return (json?.data?.extensions ?? []) as string[];

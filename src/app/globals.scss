@@ -1259,7 +1259,7 @@ body {
   font-size: 13px;
   color: var(--color-text-muted);
   cursor: pointer;
-  border-left: 2px solid transparent;
+  box-shadow: inset 2px 0 0 transparent;
   transition: all 0.15s;
   text-decoration: none;
 }
@@ -1267,14 +1267,14 @@ body {
 .proposal-sidebar-link:hover {
   background: var(--color-primary-light);
   color: var(--color-primary);
-  border-left-color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
 .proposal-sidebar-link.active {
   background: var(--color-primary-light);
   color: var(--color-primary);
   font-weight: 600;
-  border-left-color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
 .proposal-sidebar-dot {
@@ -1405,15 +1405,53 @@ body {
   gap: 6px;
 }
 
+.auto-save-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+
+.auto-save-indicator .spinner {
+  width: 14px;
+  height: 14px;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+/* ── Proposal view mode wrapper ────── */
+.proposal-view-mode {
+  transition: background 0.15s ease;
+  border-radius: var(--radius-sm);
+}
+
+.proposal-view-mode:hover {
+  background: rgba(55, 48, 163, 0.02);
+  outline: 1px solid rgba(55, 48, 163, 0.08);
+  outline-offset: -1px;
+}
+
+.proposal-view-mode:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ── Proposal section content (rendered HTML view mode) ────── */
 .proposal-section-content {
-  padding: 24px 32px;
+  padding: 28px 32px; /* Match rte-content padding */
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.75; /* Match rte-content line-height */
   color: var(--color-text);
   min-height: 80px;
 }
-.proposal-section-content p { margin-bottom: 12px; }
+.proposal-section-content p { 
+  margin-bottom: 12px; /* Keep consistent spacing */
+  text-align: justify; /* Match rte-content text alignment */
+}
 .proposal-section-content h3 {
   font-size: 13px;
   font-weight: 700;
@@ -1421,13 +1459,36 @@ body {
   margin: 20px 0 8px;
   letter-spacing: 0.01em;
 }
+.proposal-section-content h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2f5496;
+  margin: 16px 0 6px;
+  letter-spacing: 0.01em;
+}
 .proposal-section-content ul,
 .proposal-section-content ol {
   padding-left: 24px;
-  margin-bottom: 14px;
+  margin-bottom: 12px; /* Match rte-content spacing */
 }
 .proposal-section-content li { margin-bottom: 6px; }
-.proposal-section-content strong { font-weight: 600; }
+.proposal-section-content strong { font-weight: 700; } /* Match rte-content weight */
+.proposal-section-content em { font-style: italic; } /* Add italic support */
+
+/* Preserve custom styling from rich text editor */
+.proposal-section-content [style] {
+  /* Ensure any inline styles from the editor are preserved */
+  font-style: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background-color: inherit;
+}
+
+.proposal-section-content mark {
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+  background-color: yellow;
+}
 .proposal-section-content a {
   color: #1d4ed8;
   text-decoration: underline;
@@ -1453,6 +1514,9 @@ body {
   border: 1px solid #dee2e6;
   vertical-align: top;
 }
+.proposal-section-content table td:first-child {
+  font-weight: 700;
+}
 .proposal-section-content table tr:nth-child(even) td {
   background: #fafbfc;
 }
@@ -1473,8 +1537,8 @@ body {
 /* content-subheading: sub-section headings inside rendered proposal content */
 .content-subheading {
   font-size: 13px;
-  font-weight: 700;
-  color: #2f5496;
+  font-weight: 700 !important;
+  color: #2f5496 !important;
   margin: 20px 0 8px;
   letter-spacing: 0.01em;
 }
@@ -1490,8 +1554,8 @@ body {
 }
 
 .content-table th {
-  background: #2f5496;
-  color: #ffffff;
+  background: #2f5496 !important;
+  color: #ffffff !important;
   font-weight: 700;
   text-align: left;
   padding: 10px 14px;
@@ -1508,6 +1572,10 @@ body {
   line-height: 1.5;
 }
 
+.content-table td:first-child {
+  font-weight: 700;
+}
+
 .content-table tbody tr:nth-child(even) td {
   background: #fafbfc;
 }
@@ -1517,15 +1585,28 @@ body {
   transition: background 0.1s;
 }
 
-/* Toolbar */
+/* Editor wrapper */
+.rte-wrapper {
+  position: relative;
+}
+
+/* Bubble mount point — managed by BubbleMenuPlugin (floating-ui) */
+.rte-bubble-mount {
+  z-index: 100;
+}
+
+/* Floating toolbar — rendered inside bubble mount, floats above content */
 .rte-toolbar {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 6px 10px;
   background: var(--color-bg);
-  flex-wrap: wrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .rte-toolbar-separator {
@@ -1620,12 +1701,14 @@ body {
 
 .rte-content .ProseMirror p {
   margin-bottom: 0.75em;
+  text-align: justify;
 }
 
 .rte-content .ProseMirror h1,
 .rte-content .ProseMirror h2,
-.rte-content .ProseMirror h3 {
-  font-weight: 700;
+.rte-content .ProseMirror h3,
+.rte-content .ProseMirror h4 {
+  font-weight: 700 !important;
   line-height: 1.3;
   margin-bottom: 0.5em;
   margin-top: 1em;
@@ -1633,7 +1716,18 @@ body {
 
 .rte-content .ProseMirror h1 { font-size: 1.5em; }
 .rte-content .ProseMirror h2 { font-size: 1.25em; }
-.rte-content .ProseMirror h3 { font-size: 1.1em; }
+
+/* Section headings — must stay #2f5496 at all times (overrides browser selection tint) */
+.rte-content .ProseMirror h3 {
+  font-size: 1.1em;
+  color: #2f5496 !important;
+}
+
+/* Sub-headings */
+.rte-content .ProseMirror h4 {
+  font-size: 1em;
+  color: #2f5496 !important;
+}
 
 .rte-content .ProseMirror ul,
 .rte-content .ProseMirror ol {
@@ -1672,10 +1766,14 @@ body {
 }
 
 .rte-content .ProseMirror th {
-  background: var(--color-primary-light);
+  background: #2f5496 !important;
   font-weight: 700;
-  color: var(--color-primary);
+  color: #ffffff !important;
   text-align: left;
+}
+
+.rte-content .ProseMirror td:first-child {
+  font-weight: 700;
 }
 
 .rte-content .ProseMirror .selectedCell::after {
@@ -1696,25 +1794,90 @@ body {
   height: 0;
 }
 
+/* ── TipTap BubbleMenu (floating toolbar on text select) ─────────────────── */
+.bubble-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #1e1b4b;
+  border-radius: var(--radius-md);
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+}
+
+.bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e0e7ff;
+  font-family: var(--font-sans);
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.bubble-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.bubble-btn.active {
+  background: rgba(99, 102, 241, 0.4);
+  color: #ffffff;
+}
+
+.bubble-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Regenerate button — accent color */
+.bubble-btn-regen {
+  color: #a5f3fc;
+  letter-spacing: 0.01em;
+}
+
+.bubble-btn-regen:hover {
+  background: rgba(165, 243, 252, 0.15);
+  color: #ffffff;
+}
+
+.bubble-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
 /* Enhanced proposal sidebar with section actions */
 .proposal-sidebar-section-row {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 7px 12px 7px 16px;
-  border-left: 2px solid transparent;
+  box-shadow: inset 2px 0 0 transparent;
   transition: all 0.15s;
   cursor: pointer;
 }
 
 .proposal-sidebar-section-row:hover {
   background: var(--color-primary-light);
-  border-left-color: var(--color-primary-medium);
+  box-shadow: inset 2px 0 0 var(--color-primary-medium);
 }
 
 .proposal-sidebar-section-row.active {
   background: var(--color-primary-light);
-  border-left-color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
 .proposal-sidebar-section-name {
@@ -1863,6 +2026,12 @@ body {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   display: inline-block;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 
 .spinner-white {
@@ -2798,7 +2967,7 @@ body {
   color: var(--color-text-muted);
   background: transparent;
   border: none;
-  border-left: 2px solid transparent;
+  box-shadow: inset 2px 0 0 transparent;
   cursor: pointer;
   font-family: var(--font-sans);
   text-align: left;
@@ -2814,7 +2983,7 @@ body {
   color: var(--color-primary);
   background: var(--color-primary-light);
   font-weight: 600;
-  border-left-color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
 }
 
 .template-library-sidebar-cta {
@@ -3780,4 +3949,345 @@ body {
   .template-bento-row-secondary {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── AI Markdown Renderer — debug comparison styles ────────────────────── */
+
+.ai-md-debug-wrapper {
+  margin-top: 24px;
+  border-top: 2px dashed #f59e0b;
+  padding-top: 16px;
+}
+
+.ai-md-debug-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f59e0b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+/* ── .markdown-output — primary AI markdown render target ───────────────── */
+
+.markdown-output {
+  padding: 24px 32px;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+  min-height: 80px;
+}
+
+/* Headings — all levels use #2f5496 consistently */
+.markdown-output h1,
+.markdown-output h2,
+.markdown-output h3,
+.markdown-output h4,
+.markdown-output h5,
+.markdown-output h6 {
+  color: #2f5496 !important;
+  font-weight: 700;
+}
+
+.markdown-output h1 {
+  font-size: 16px;
+  margin: 20px 0 10px;
+}
+
+.markdown-output h2 {
+  font-size: 14px;
+  margin: 18px 0 8px;
+}
+
+.markdown-output h3 {
+  font-size: 13px;
+  margin: 16px 0 6px;
+  letter-spacing: 0.01em;
+}
+
+/* Paragraphs */
+.markdown-output p { margin-bottom: 12px; }
+
+/* Bold — !important overrides any global font-weight reset */
+.markdown-output strong,
+.markdown-output b {
+  font-weight: 700 !important;
+  color: inherit;
+}
+
+/* Bold inside list items and paragraphs */
+.markdown-output p strong,
+.markdown-output li strong,
+.markdown-output td strong,
+.markdown-output th strong {
+  font-weight: 700 !important;
+}
+
+/* Lists */
+.markdown-output ul,
+.markdown-output ol {
+  padding-left: 24px;
+  margin-bottom: 14px;
+}
+
+.markdown-output li { margin-bottom: 6px; }
+
+/* Tables — use direct element selectors so styles apply regardless
+   of the classname on the rendered elements */
+.markdown-output table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 16px 0;
+  overflow-x: auto;
+  display: table;
+}
+
+.markdown-output thead {
+  background: #2f5496;
+}
+
+.markdown-output th {
+  background: #2f5496 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid #1e3d72;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.markdown-output td {
+  padding: 10px 14px;
+  border: 1px solid #dee2e6;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.markdown-output td:first-child {
+  font-weight: 700;
+}
+
+.markdown-output tbody tr:nth-child(even) td {
+  background: #fafbfc;
+}
+
+/* Typography */
+.markdown-output .ai-md-h1,
+.markdown-output .ai-md-h2,
+.markdown-output .ai-md-h3 {
+  font-weight: 700;
+  color: #2f5496;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.markdown-output .ai-md-h1 { font-size: 1.5em; }
+.markdown-output .ai-md-h2 { font-size: 1.25em; }
+.markdown-output .ai-md-h3 { font-size: 1.1em; }
+
+.markdown-output .ai-md-p {
+  margin-bottom: 12px;
+  text-align: justify;
+  line-height: 1.75;
+}
+
+.markdown-output .ai-md-strong {
+  font-weight: 700;
+}
+
+.markdown-output .ai-md-em {
+  font-style: italic;
+}
+
+.markdown-output .ai-md-ul,
+.markdown-output .ai-md-ol {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+.markdown-output .ai-md-li {
+  margin-bottom: 6px;
+}
+
+/* Table wrapper for horizontal scroll */
+.markdown-output .ai-md-table-wrapper {
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+/* Links */
+.markdown-output a,
+.markdown-output .ai-md-link {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.markdown-output a:hover,
+.markdown-output .ai-md-link:hover { color: #1e40af; }
+
+/* Blockquote */
+.markdown-output blockquote,
+.markdown-output .ai-md-blockquote {
+  border-left: 3px solid #2f5496;
+  padding: 8px 16px;
+  margin: 12px 0;
+  color: #6b7280;
+  font-style: italic;
+  background: #f8fafc;
+}
+
+/* Inline code */
+.markdown-output code,
+.markdown-output .ai-md-code {
+  background: #f1f5f9;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #1e293b;
+}
+
+/* Divider */
+.markdown-output hr,
+.markdown-output .ai-md-hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 20px 0;
+}
+
+/* Images */
+.markdown-output img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: block;
+}
+
+/* ── Debug comparison wrapper ───────────────────────────────────────────── */
+
+.ai-md-debug-legacy {
+  opacity: 0.75;
+  filter: grayscale(0.2);
+}
+
+/* ============================================================
+   EDITABLE MARKDOWN RENDERER
+   ============================================================ */
+
+.editable-markdown-container {
+  position: relative;
+  cursor: text;
+  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.editable-markdown-container:hover {
+  outline: 1px solid var(--color-border-dark);
+}
+
+.editable-markdown-container.editing {
+  outline: 2px solid var(--color-primary);
+  background: var(--color-white);
+}
+
+.editable-markdown-container:focus {
+  outline: 2px solid var(--color-primary);
+}
+
+.editable-markdown-container[contenteditable="true"]:focus {
+  outline: 2px solid var(--color-primary);
+}
+
+.editable-markdown-container strong {
+  font-weight: 700;
+}
+
+.editable-markdown-container em {
+  font-style: italic;
+}
+
+/* ============================================================
+   FORMATTING TOOLBAR
+   ============================================================ */
+
+.formatting-toolbar {
+  animation: toolbarFadeIn 0.15s ease-out;
+  pointer-events: all;
+}
+
+@keyframes toolbarFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.formatting-toolbar-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.toolbar-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(0.95);
+}
+
+.toolbar-btn-regenerate {
+  width: auto;
+  padding: 0 12px;
+  gap: 6px;
+  background: var(--color-primary);
+}
+
+.toolbar-btn-regenerate:hover {
+  background: var(--color-primary-hover);
+}
+
+.toolbar-btn-regenerate span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
 }

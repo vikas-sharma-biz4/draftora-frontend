@@ -1,3 +1,20 @@
+export const AI_MODEL_OPTIONS = [
+  {
+    value: "gpt-4o",
+    label: "GPT-4o",
+    provider: "OpenAI",
+    description: "Fast, highly capable model. Best for most proposals.",
+  },
+  {
+    value: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    provider: "Anthropic",
+    description: "Exceptional writing quality and nuanced language.",
+  },
+] as const;
+
+export const AI_MODEL_DEFAULT = "gpt-4o";
+
 export const WIZARD_STEPS = [
   { step: 1, label: "Define Scope", path: "/" },
   { step: 2, label: "Knowledge Base", path: "/knowledge-base" },
@@ -92,6 +109,7 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   project_understanding: "Project Understanding",
   proposed_solution: "Proposed Solution",
   system_architecture: "System Architecture",
+  user_flow: "User Flow Diagram",
   implementation_plan: "Implementation Plan",
   timeline: "Timeline",
   conclusion: "Conclusion",
@@ -165,6 +183,8 @@ export const PROPOSAL_TEMPLATES = [
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",
+      "system_architecture",
+      "user_flow",
       "milestone_timeline",
       "risks_assumptions",
       "client_dependencies",
@@ -219,7 +239,7 @@ export const PROPOSAL_TEMPLATES = [
   },
 ] as const;
 
-export const CUSTOM_TEMPLATES_STORAGE_KEY = "proposely_custom_templates_v1";
+export const CUSTOM_TEMPLATES_STORAGE_KEY = "draftora_custom_templates_v1";
 
 // ── Static sections ──────────────────────────────────────────────────────────
 // These are automatically appended at the end of every proposal. Their content
@@ -242,7 +262,7 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
 };
 
 // Drafts storage key
-export const DRAFTS_STORAGE_KEY = "proposely_drafts_v1";
+export const DRAFTS_STORAGE_KEY = "draftora_drafts_v1";
 
 // ── RichEditor toolbar colors ─────────────────────────────────────────────────
 // Empty string represents "remove highlight / default color" action.
