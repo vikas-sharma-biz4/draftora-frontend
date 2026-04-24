@@ -1,0 +1,128 @@
+.pipelineContainer {
+  width: 100%;
+  padding: 32px 0;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pipelineSteps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  transition: all 0.2s ease;
+
+  &.clickable {
+    cursor: pointer;
+
+    &:hover .stepCircle {
+      transform: scale(1.1);
+      box-shadow: 0 4px 12px rgba(55, 48, 163, 0.2);
+    }
+
+    &:hover .stepLabel {
+      color: var(--color-primary);
+    }
+  }
+
+  &:not(.clickable) {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.stepCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  border: 2px solid var(--color-border);
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--color-text-muted);
+
+  .step.active & {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(55, 48, 163, 0.3);
+  }
+
+  .step.completed & {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+  }
+}
+
+.stepNumber {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.checkIcon {
+  color: white;
+}
+
+.stepLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+
+  .step.active & {
+    color: var(--color-primary);
+  }
+
+  .step.completed & {
+    color: var(--color-text);
+  }
+}
+
+.connector {
+  width: 120px;
+  height: 2px;
+  background: var(--color-border);
+  margin: 0 -8px;
+  margin-bottom: 36px;
+  transition: background 0.3s ease;
+
+  &.completed {
+    background: var(--color-success);
+  }
+}
+
+@media (max-width: 768px) {
+  .pipelineSteps {
+    gap: 8px;
+  }
+
+  .connector {
+    width: 60px;
+  }
+
+  .stepLabel {
+    font-size: 11px;
+  }
+
+  .stepCircle {
+    width: 40px;
+    height: 40px;
+  }
+}

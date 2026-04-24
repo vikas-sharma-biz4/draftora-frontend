@@ -3,12 +3,16 @@ node_modules/
 .pnp
 .pnp.js
 
+
+# claude
+.claude/
+
 # Production build
 build/
 dist/
 
 # Markdown files
-# *.md
+*.md
 
 # Environment variables
 .env
