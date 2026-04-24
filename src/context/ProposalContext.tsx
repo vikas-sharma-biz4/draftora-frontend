@@ -2,14 +2,16 @@
 
 import React, {
   createContext,
-  useCallback,
   useContext,
-  useEffect,
   useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
 } from "react";
 
-import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
 import type { ProposalData, WizardStep } from "@/types/proposal.types";
+import type { DraftStage } from "@/types/draft.types";
+import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
 
 interface ProposalContextType {
   proposalData: ProposalData;
@@ -26,6 +28,11 @@ interface ProposalContextType {
   setEditMode: (val: boolean) => void;
   maxStepReached: WizardStep;
   setMaxStepReached: (step: WizardStep) => void;
+  draftStage: DraftStage;
+  setDraftStage: (stage: DraftStage) => void;
+  completedSteps: number[];
+  setCompletedSteps: (steps: number[]) => void;
+  markStepCompleted: (stepId: number) => void;
 }
 
 const STORAGE_KEY = "draftora_wizard_v1";
@@ -68,6 +75,8 @@ export function ProposalProvider({
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
+  const [draftStage, setDraftStage] = useState<DraftStage>("template_selection");
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -127,6 +136,13 @@ export function ProposalProvider({
     []
   );
 
+  const markStepCompleted = useCallback((stepId: number): void => {
+    setCompletedSteps((prev) => {
+      if (prev.includes(stepId)) return prev;
+      return [...prev, stepId];
+    });
+  }, []);
+
   const resetProposal = useCallback((): void => {
     setProposalData(defaultProposalData);
     setCurrentStep(1);
@@ -134,6 +150,8 @@ export function ProposalProvider({
     setGeneratedProposalId(null);
     setEditMode(false);
     setMaxStepReached(1);
+    setDraftStage("template_selection");
+    setCompletedSteps([]);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -158,6 +176,11 @@ export function ProposalProvider({
         setEditMode,
         maxStepReached,
         setMaxStepReached,
+        draftStage,
+        setDraftStage,
+        completedSteps,
+        setCompletedSteps,
+        markStepCompleted,
       }}
     >
       {children}

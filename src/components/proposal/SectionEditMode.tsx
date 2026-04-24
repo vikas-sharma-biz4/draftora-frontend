@@ -22,24 +22,14 @@ interface SectionEditModeProps {
   placeholder?: string;
 }
 
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 10) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ago`;
-}
-
 /**
- * Pure edit-only component for editing proposal section content.
+ * Always-editable component for proposal section content.
  * 
- * CRITICAL RULES:
- * - Only renders when explicitly in edit mode
- * - NO view mode rendering
+ * FEATURES:
+ * - Always rendered (no view/edit mode switching)
  * - Auto-saves with debouncing
  * - Handles content conversion (markdown → HTML)
+ * - Click anywhere to edit, cursor appears on click
  */
 const SectionEditMode = memo(function SectionEditMode({
   sectionKey,
@@ -50,8 +40,6 @@ const SectionEditMode = memo(function SectionEditMode({
   placeholder = "Start writing…",
 }: SectionEditModeProps): JSX.Element {
   const [localContent, setLocalContent] = useState<string>(content);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -64,11 +52,8 @@ const SectionEditMode = memo(function SectionEditMode({
         clearTimeout(autoSaveTimerRef.current);
       }
       autoSaveTimerRef.current = setTimeout(async () => {
-        setIsSaving(true);
         await onSave(sectionKey, contentToSave);
-        setLastSaved(new Date());
-        setIsSaving(false);
-      }, 1500);
+      }, 300);
     },
     [sectionKey, onSave]
   );
@@ -99,17 +84,6 @@ const SectionEditMode = memo(function SectionEditMode({
 
   return (
     <div className="section-edit-mode">
-      <div className="auto-save-indicator">
-        {isSaving ? (
-          <>
-            <span className="spinner spinner-sm" />
-            <span>Saving...</span>
-          </>
-        ) : lastSaved ? (
-          <span className="text-muted">Saved {formatTimeAgo(lastSaved)}</span>
-        ) : null}
-      </div>
-
       <RichEditor
         content={editorContent}
         onChange={handleEditorChange}

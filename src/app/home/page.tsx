@@ -11,7 +11,6 @@ import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/cons
 import { useProposal } from "@/context/ProposalContext";
 import { parseCustomTemplate } from "@/api/proposalApi";
 import type { ExtractedTemplateSection } from "@/api/proposalApi";
-import DynamicPipeline from "@/components/common/DynamicPipeline";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -29,7 +28,7 @@ const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"
 type SelectionMode = "template" | "scratch" | "upload";
 
 export default function HomePage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps } = useProposal();
+  const { updateProposalData, setCurrentStep } = useProposal();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,8 +40,6 @@ export default function HomePage(): JSX.Element {
   const [extractedSections, setExtractedSections] = useState<ExtractedTemplateSection[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
-
-  const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
 
   function handleSelectTemplate(id: string): void {
     setSelectedTemplateId(id);
@@ -135,7 +132,7 @@ export default function HomePage(): JSX.Element {
         });
       }
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/");
     } else if (selectionMode === "upload" && extractedSections.length > 0) {
       const sectionKeys = extractedSections.map((s) => s.key);
       const displayNames: Record<string, string> = {};
@@ -149,7 +146,7 @@ export default function HomePage(): JSX.Element {
         templateType: "custom",
       });
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/");
     } else if (selectionMode === "scratch") {
       updateProposalData({
         templateId: null,
@@ -157,7 +154,7 @@ export default function HomePage(): JSX.Element {
         sectionDisplayNames: {},
       });
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/");
     }
   }
 
@@ -168,12 +165,6 @@ export default function HomePage(): JSX.Element {
     <div className="app-container">
       <MainSidebar />
       <main className="main-content">
-        <DynamicPipeline 
-          currentStage={draftStage}
-          completedSteps={completedSteps}
-          visible={showPipeline}
-        />
-        
         <h1 className="page-title">Choose Your Proposal Type</h1>
         <p className="page-subtitle">
           Select a template that matches your project needs, or start from scratch with AI-powered guidance.
@@ -342,6 +333,19 @@ export default function HomePage(): JSX.Element {
             </ul>
           </div>
         )}
+
+        <div className="page-footer">
+          <div className="page-footer-left" />
+          <div className="page-footer-right">
+            <button
+              className="btn btn-primary"
+              onClick={handleContinue}
+              disabled={!selectionMode || isParsing}
+            >
+              Continue with Selection →
+            </button>
+          </div>
+        </div>
 
         {showTemplateModal && selectedTemplateId && (
           <TemplateSelectionModal

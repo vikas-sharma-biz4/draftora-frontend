@@ -126,10 +126,17 @@ export default function Sidebar(): JSX.Element {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <span className="sidebar-logo-text">
-          <span className="sidebar-logo-dot" />
-          Draftora
-        </span>
+        <button
+          className="sidebar-logo-btn"
+          onClick={() => router.push("/")}
+          aria-label="Go to home"
+        >
+          <img
+            src="/images/draftora-logo.png"
+            alt="Draftora"
+            className="sidebar-logo-img"
+          />
+        </button>
       </div>
 
       <span className="sidebar-section-label">Proposal Wizard</span>

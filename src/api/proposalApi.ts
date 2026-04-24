@@ -1,11 +1,12 @@
-import { API_BASE_URL } from "@/config/config";
+import { API_BASE_URL, DEFAULT_AI_MODEL } from "@/config/config";
 import type { ProposalData, ProposalListItem } from "@/types/proposal.types";
 
 // ngrok free tier shows an HTML interstitial page for browser fetch requests.
 // This header bypasses it so API calls get JSON responses instead of HTML.
-const BASE_HEADERS: Record<string, string> = {
-  "ngrok-skip-browser-warning": "1",
-};
+const BASE_HEADERS: Record<string, string> = {};
+if (process.env.NODE_ENV === "development") {
+  BASE_HEADERS["ngrok-skip-browser-warning"] = "1";
+}
 
 interface CreateProposalResponse {
   id: number;
@@ -61,7 +62,7 @@ export async function generateProposal(
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
-    ai_model: data.aiModel ?? "gpt-4o",
+    ai_model: data.aiModel || null,
     selected_sections: allSections,
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
     contextual_instructions: contextual || null,
@@ -130,7 +131,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
     tone: d.tone,
     lengthPreference: d.length_preference,
     language: d.language,
-    aiModel: d.ai_model ?? "gpt-4o",
+    aiModel: d.ai_model ?? DEFAULT_AI_MODEL,
     selectedSections: d.selected_sections ?? [],
     sectionDisplayNames: (d.section_display_names ?? {}) as Record<string, string>,
     customSections: [],

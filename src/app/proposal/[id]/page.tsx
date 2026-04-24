@@ -15,7 +15,7 @@ import {
   addProposalSection,
   removeProposalSection,
 } from "@/api/proposalApi";
-import { SECTION_DISPLAY_NAMES } from "@/constants";
+import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY, DRAFTS_STORAGE_KEY } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
 import type { ProposalData } from "@/types/proposal.types";
 
@@ -28,6 +28,15 @@ const ProposalSkeleton = dynamic(
   () => import("@/components/proposal/ProposalSkeleton"),
   { ssr: false }
 );
+
+const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
+  ssr: false,
+  loading: () => <div className="sidebar-skeleton" />,
+});
+
+const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
+  ssr: false,
+});
 
 interface SectionMeta {
   key: string;
@@ -62,6 +71,8 @@ export default function ProposalOutputPage(): JSX.Element {
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const [addLabelValue, setAddLabelValue] = useState<string>("");
   const [addingSection, setAddingSection] = useState<boolean>(false);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [isRejecting, setIsRejecting] = useState<boolean>(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -102,6 +113,50 @@ export default function ProposalOutputPage(): JSX.Element {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, [fetchProposal]);
+
+  // Auto-save to drafts when navigating away without approval/rejection
+  useEffect(() => {
+    function saveToDrafts(): void {
+      if (!proposal || !proposal.status || proposal.status !== "completed") return;
+      
+      try {
+        const draftItem = {
+          id: proposalId.toString(),
+          title: proposal.title,
+          clientName: proposal.clientName,
+          stage: "generated" as const,
+          status: "pending_approval" as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          data: proposal,
+        };
+        
+        const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
+        const existingIndex = drafts.findIndex((d: any) => d.id === draftItem.id);
+        
+        if (existingIndex >= 0) {
+          drafts[existingIndex] = draftItem;
+        } else {
+          drafts.unshift(draftItem);
+        }
+        
+        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+      } catch (error) {
+        console.error("Failed to save draft:", error);
+      }
+    }
+
+    const handleBeforeUnload = (): void => {
+      saveToDrafts();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      saveToDrafts();
+    };
+  }, [proposal, proposalId]);
 
   function handleScrollToSection(key: string): void {
     setActiveSection(key);
@@ -222,6 +277,64 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
+  // ── Approve/Reject handlers ──────────────────────────────────────────────────
+
+  async function handleApprove(): Promise<void> {
+    if (!proposal) return;
+    setIsApproving(true);
+    try {
+      const historyItem = {
+        id: proposalId.toString(),
+        proposalId,
+        title: proposal.title,
+        clientName: proposal.clientName,
+        status: "approved" as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: proposal,
+      };
+      
+      const history = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
+      history.unshift(historyItem);
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      
+      toast.success("Proposal approved and saved to history!");
+      router.push("/history");
+    } catch (error) {
+      toast.error("Failed to approve proposal");
+    } finally {
+      setIsApproving(false);
+    }
+  }
+
+  async function handleReject(): Promise<void> {
+    if (!proposal) return;
+    setIsRejecting(true);
+    try {
+      const historyItem = {
+        id: proposalId.toString(),
+        proposalId,
+        title: proposal.title,
+        clientName: proposal.clientName,
+        status: "rejected" as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        data: proposal,
+      };
+      
+      const history = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
+      history.unshift(historyItem);
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      
+      toast.success("Proposal rejected and saved to history");
+      router.push("/history");
+    } catch (error) {
+      toast.error("Failed to reject proposal");
+    } finally {
+      setIsRejecting(false);
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const displayNames = proposal?.sectionDisplayNames ?? {};
@@ -230,47 +343,53 @@ export default function ProposalOutputPage(): JSX.Element {
   );
 
   return (
-    <div className="proposal-page-wrap">
-      {/* Header */}
-      <header className="proposal-header">
-        <div className="proposal-header-left">
-          <span className="proposal-header-logo">Draftora</span>
-          {proposal && (
-            <>
-              <span className="text-light">›</span>
-              <span className="proposal-header-title">{proposal.title}</span>
-            </>
-          )}
-          {proposal?.status === "completed" && (
-            <span className="badge badge-success">Complete</span>
-          )}
-        </div>
-        <div className="proposal-header-right">
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => router.push("/review")}
-          >
-            ← Back
-          </button>
-          {proposal && (
-            <a
-              href={getDownloadUrl(proposalId)}
-              className="btn btn-secondary btn-sm"
-              download
+    <div className="app-container">
+      <MainSidebar />
+      
+      <main className="main-content">
+        <DynamicPipeline 
+          currentStage="generated"
+          completedSteps={[1, 2, 3]}
+          visible={true}
+        />
+        
+        <div className="proposal-actions-bar">
+          <div className="proposal-actions-left">
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => router.push("/review")}
             >
-              ⬇ Download DOCX
-            </a>
-          )}
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => { resetProposal(); router.push("/"); }}
-          >
-            + New Proposal
-          </button>
+              ← Back
+            </button>
+            {proposal && (
+              <a
+                href={getDownloadUrl(proposalId)}
+                className="btn btn-secondary btn-sm"
+                download
+              >
+                ⬇ Download DOCX
+              </a>
+            )}
+          </div>
+          <div className="proposal-actions-right">
+            <button
+              className="btn btn-success btn-sm"
+              onClick={handleApprove}
+              disabled={isApproving || !proposal}
+            >
+              {isApproving ? "Approving..." : "✓ Approve"}
+            </button>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={handleReject}
+              disabled={isRejecting || !proposal}
+            >
+              {isRejecting ? "Rejecting..." : "✗ Reject"}
+            </button>
+          </div>
         </div>
-      </header>
 
-      <div className="proposal-layout">
+        <div className="proposal-layout">
         {/* Left sidebar */}
         <nav className="proposal-sidebar" aria-label="Proposal sections">
           <div className="proposal-sidebar-title">Sections</div>
@@ -440,8 +559,9 @@ export default function ProposalOutputPage(): JSX.Element {
                 </button>
               </div>
             )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -8,37 +8,144 @@ import { toast } from "sonner";
 import styles from "./page.module.scss";
 
 import { generateProposal } from "@/api/proposalApi";
-import { SECTION_DISPLAY_NAMES } from "@/constants";
+import { SECTION_DISPLAY_NAMES, CLIENTS_STORAGE_KEY } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { formatBytes } from "@/utils/formatBytes";
+import type { Client } from "@/types/client.types";
 
-const Sidebar = dynamic(() => import("@/components/common/Sidebar"), {
+const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
   loading: () => <div className="sidebar-skeleton" />,
+});
+
+const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
+  ssr: false,
+});
+
+const ScopeEditorModal = dynamic(() => import("@/components/modals/ScopeEditorModal"), {
+  ssr: false,
+});
+
+const KnowledgeBaseSelectorModal = dynamic(() => import("@/components/modals/KnowledgeBaseSelectorModal"), {
+  ssr: false,
+});
+
+const StyleVoiceEditorModal = dynamic(() => import("@/components/modals/StyleVoiceEditorModal"), {
+  ssr: false,
+});
+
+const SectionsSelectorModal = dynamic(() => import("@/components/modals/SectionsSelectorModal"), {
+  ssr: false,
 });
 
 export default function ReviewPage(): JSX.Element {
   const {
     proposalData,
+    updateProposalData,
     setCurrentStep,
     isGenerating,
     setIsGenerating,
     setGeneratedProposalId,
+    setDraftStage,
+    markStepCompleted,
+    setCompletedSteps,
   } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
+  const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
+  const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
+  const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
+  const [availableDocuments, setAvailableDocuments] = useState<Client[]>([]);
+  const [showStickyDownload, setShowStickyDownload] = useState<boolean>(false);
 
   // Reset isGenerating when landing on review page
   useEffect(() => {
     setIsGenerating(false);
   }, [setIsGenerating]);
 
-  function handleEditStep(step: number, path: string): void {
-    setCurrentStep(step as 1 | 2 | 3 | 4 | 5);
-    router.push(path);
+  // Handle scroll for sticky download button
+  useEffect(() => {
+    const handleScroll = (): void => {
+      const scrolled = window.scrollY > 200;
+      setShowStickyDownload(scrolled);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Load available documents from client and sync filesMeta if needed
+  useEffect(() => {
+    if (proposalData.clientId) {
+      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
+      if (raw) {
+        const clients = JSON.parse(raw) as Client[];
+        setAvailableDocuments(clients);
+
+        // If filesMeta is empty but we have selectedDocumentIds, rebuild filesMeta from client data
+        const currentClient = clients.find((c) => c.id === proposalData.clientId);
+        if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
+          const rebuiltMeta = currentClient.documents
+            .filter((doc) => proposalData.selectedDocumentIds!.includes(doc.id))
+            .map((doc) => ({
+              name: doc.name,
+              size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
+              type: doc.fileType ? String(doc.fileType) : "application/pdf",
+            }));
+          if (rebuiltMeta.length > 0) {
+            updateProposalData({ filesMeta: rebuiltMeta });
+          }
+        }
+      }
+    }
+  }, [proposalData.clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSaveScope(data: { title: string; clientName: string; description: string }): void {
+    updateProposalData({
+      title: data.title,
+      clientName: data.clientName,
+      description: data.description,
+    });
+    setShowScopeModal(false);
   }
+
+  function handleSaveKnowledgeBase(selectedIds: string[]): void {
+    // Rebuild filesMeta from selected documents
+    const currentClient = availableDocuments.find((c) => c.id === proposalData.clientId);
+    const newFilesMeta = currentClient
+      ? currentClient.documents
+          .filter((doc) => selectedIds.includes(doc.id))
+          .map((doc) => ({
+            name: doc.name,
+            size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
+            type: doc.fileType ? String(doc.fileType) : "application/pdf",
+          }))
+      : [];
+
+    updateProposalData({
+      selectedDocumentIds: selectedIds,
+      filesMeta: newFilesMeta,
+    });
+    setShowKnowledgeBaseModal(false);
+  }
+
+  function handleSaveStyleVoice(data: { tone: string; lengthPreference: string; language: string }): void {
+    updateProposalData(data);
+    setShowStyleVoiceModal(false);
+  }
+
+  function handleSaveSections(sections: string[]): void {
+    updateProposalData({
+      selectedSections: sections,
+    });
+    setShowSectionsModal(false);
+  }
+
+  const currentClient = availableDocuments.find((c) => c.id === proposalData.clientId);
+  const clientDocuments = currentClient?.documents || [];
 
   async function handleGenerate(): Promise<void> {
     setIsGenerating(true);
@@ -50,6 +157,10 @@ export default function ReviewPage(): JSX.Element {
     try {
       const result = await generateProposal(proposalData);
       setGeneratedProposalId(result.id);
+      
+      // Mark review step completed and set stage to generated
+      markStepCompleted(2);
+      setDraftStage("review_complete");
       
       // Navigate to progress screen immediately
       router.push(`/generating/${result.id}`);
@@ -78,9 +189,14 @@ export default function ReviewPage(): JSX.Element {
 
   return (
     <div className="app-container">
-      <Sidebar />
+      <MainSidebar />
 
       <main className="main-content">
+        <DynamicPipeline 
+          currentStage="parameters_complete"
+          completedSteps={[1]}
+          visible={true}
+        />
         <div className="page-badge">Phase 05</div>
         <h1 className="page-title">Final Review</h1>
         <p className="page-subtitle">
@@ -94,86 +210,64 @@ export default function ReviewPage(): JSX.Element {
           </div>
         )}
 
+        {/* Sticky Download Documents Button */}
+        {proposalData.filesMeta && proposalData.filesMeta.length > 0 && (
+          <div className={`${styles.stickyDownloadBar} ${showStickyDownload ? styles.visible : ""}`}>
+            <div className={styles.downloadBarContent}>
+              <span className={styles.downloadBarText}>
+                {proposalData.filesMeta.length} document{proposalData.filesMeta.length > 1 ? "s" : ""} uploaded
+              </span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => toast.info("Download functionality coming soon")}
+              >
+                📥 Download All Docs
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="review-layout">
           {/* Left — Summary Cards */}
-          <div>
-            {/* Step 1 */}
-            <div className="review-card">
-              <div className="review-card-header">
-                <span className="review-card-title">Step 1 — Scope</span>
-                <button
-                  className="link-plain"
-                  onClick={() => handleEditStep(1, "/")}
-                >
-                  Edit
-                </button>
-              </div>
-              <div className="review-field">
-                <span className="review-field-label">Proposal Title</span>
-                <span className="review-field-value">
-                  {proposalData.title || "—"}
-                </span>
-              </div>
-              <div className="review-field">
-                <span className="review-field-label">Client Name</span>
-                <span className="review-field-value">
-                  {proposalData.clientName || "—"}
-                </span>
-              </div>
-              <div className="review-field">
-                <span className="review-field-label">Strategic Prompt Snippet</span>
-                <span className="review-field-value muted">
-                  "{descriptionSnippet}"
-                </span>
-              </div>
-            </div>
-
-            {/* Step 2 + Step 3 side by side */}
+          <div className="review-layout-left">
+            {/* Client + Style & Voice side by side */}
             <div className="grid-2">
               <div className="review-card">
                 <div className="review-card-header">
-                  <span className="review-card-title">Step 2 — Knowledge Base</span>
+                  <span className="review-card-title">CLIENT</span>
                   <button
                     className="link-plain"
-                    onClick={() => handleEditStep(2, "/knowledge-base")}
+                    onClick={() => setShowScopeModal(true)}
                   >
                     Edit
                   </button>
                 </div>
-                {proposalData.filesMeta.length > 0 ? (
-                  <ul className={styles.fileList}>
-                    {proposalData.filesMeta.map((f, i) => (
-                      <li key={i} className={styles.fileItem}>
-                        <span className={styles.fileItemName}>{f.name}</span>
-                        <span className={styles.fileItemSize}>
-                          {formatBytes(f.size)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span className="text-muted text-small">
-                    No files uploaded
+                <div className="review-field">
+                  <span className="review-field-label">Proposal Title</span>
+                  <span className="review-field-value dark-bold">
+                    {proposalData.title || "—"}
                   </span>
-                )}
-                {proposalData.webReferences.length > 0 && (
-                  <div className={styles.webRefsSection}>
-                    <span className={`review-field-label ${styles.webRefsLabel}`}>
-                      Web References
-                    </span>
-                    {proposalData.webReferences.map((r) => (
-                      <div key={r} className={styles.webRefUrl}>{r}</div>
-                    ))}
-                  </div>
-                )}
+                </div>
+                <div className="review-field">
+                  <span className="review-field-label">Client Name</span>
+                  <span className="review-field-value dark-bold">
+                    {proposalData.clientName || "—"}
+                  </span>
+                </div>
+                <div className="review-field">
+                  <span className="review-field-label">Strategic Prompt Snippet</span>
+                  <span className="review-field-value dark-bold">
+                    "{descriptionSnippet}"
+                  </span>
+                </div>
               </div>
 
               <div className="review-card">
                 <div className="review-card-header">
-                  <span className="review-card-title">Step 4 — Style &amp; Voice</span>
+                  <span className="review-card-title">STYLE & VOICE</span>
                   <button
                     className="link-plain"
-                    onClick={() => handleEditStep(4, "/parameters")}
+                    onClick={() => setShowStyleVoiceModal(true)}
                   >
                     Edit
                   </button>
@@ -188,15 +282,54 @@ export default function ReviewPage(): JSX.Element {
               </div>
             </div>
 
+            {/* Knowledge Base */}
+            <div className="review-card">
+              <div className="review-card-header">
+                <span className="review-card-title">KNOWLEDGE BASE</span>
+                <button
+                  className="link-plain"
+                  onClick={() => setShowKnowledgeBaseModal(true)}
+                >
+                  Edit
+                </button>
+              </div>
+              {proposalData.filesMeta.length > 0 ? (
+                <ul className={styles.fileList}>
+                  {proposalData.filesMeta.map((f, i) => (
+                    <li key={i} className={styles.fileItem}>
+                      <span className={styles.fileItemName}>{f.name}</span>
+                      <span className={styles.fileItemSize}>
+                        {formatBytes(f.size)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-muted text-small">
+                  No files uploaded
+                </span>
+              )}
+              {proposalData.webReferences.length > 0 && (
+                <div className={styles.webRefsSection}>
+                  <span className={`review-field-label ${styles.webRefsLabel}`}>
+                    Web References
+                  </span>
+                  {proposalData.webReferences.map((r) => (
+                    <div key={r} className={styles.webRefUrl}>{r}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Sections */}
             <div className="review-card">
               <div className="review-card-header">
                 <span className="review-card-title">
-                  Included Sections ({proposalData.selectedSections.length})
+                  INCLUDED SECTIONS
                 </span>
                 <button
                   className="link-plain"
-                  onClick={() => handleEditStep(4, "/parameters")}
+                  onClick={() => setShowSectionsModal(true)}
                 >
                   Edit
                 </button>
@@ -215,14 +348,14 @@ export default function ReviewPage(): JSX.Element {
               </div>
             </div>
           </div>
-
           {/* Right — Launch Panel */}
-          <div className="launch-panel">
-            <h2 className="launch-panel-title">Ready to launch?</h2>
-            <p className="launch-panel-desc">
-              Your proposal configuration is complete. The AI will now generate
-              each section based on your inputs. This may take 30–60 seconds.
-            </p>
+          <div className="review-layout-right">
+            <div className="launch-panel">
+              <h2 className="launch-panel-title">Ready to launch?</h2>
+              <p className="launch-panel-desc">
+                Your proposal configuration is complete. The AI will now generate
+                each section based on your inputs. This may take 30–60 seconds.
+              </p>
 
             <button
               className="launch-btn"
@@ -267,6 +400,7 @@ export default function ReviewPage(): JSX.Element {
                 </span>
               </div>
             </div>
+            </div>
           </div>
         </div>
 
@@ -274,12 +408,55 @@ export default function ReviewPage(): JSX.Element {
           <div className="page-footer-left">
             <button
               className="btn btn-ghost"
-              onClick={() => handleEditStep(4, "/parameters")}
+              onClick={() => router.push("/parameters")}
             >
               ← Back
             </button>
           </div>
         </div>
+
+        {/* Modals */}
+        {showScopeModal && (
+          <ScopeEditorModal
+            proposalTitle={proposalData.title}
+            clientName={proposalData.clientName}
+            description={proposalData.description}
+            onClose={() => setShowScopeModal(false)}
+            onSave={handleSaveScope}
+            onNewClient={() => {
+              setShowScopeModal(false);
+              toast.info("New client creation not implemented yet");
+            }}
+          />
+        )}
+
+        {showKnowledgeBaseModal && (
+          <KnowledgeBaseSelectorModal
+            availableDocuments={clientDocuments}
+            selectedDocumentIds={proposalData.selectedDocumentIds || []}
+            onClose={() => setShowKnowledgeBaseModal(false)}
+            onSave={handleSaveKnowledgeBase}
+          />
+        )}
+
+        {showStyleVoiceModal && (
+          <StyleVoiceEditorModal
+            tone={proposalData.tone}
+            lengthPreference={proposalData.lengthPreference}
+            language={proposalData.language}
+            onClose={() => setShowStyleVoiceModal(false)}
+            onSave={handleSaveStyleVoice}
+          />
+        )}
+
+        {showSectionsModal && (
+          <SectionsSelectorModal
+            selectedSections={proposalData.selectedSections}
+            sectionDisplayNames={proposalData.sectionDisplayNames}
+            onClose={() => setShowSectionsModal(false)}
+            onSave={handleSaveSections}
+          />
+        )}
       </main>
     </div>
   );

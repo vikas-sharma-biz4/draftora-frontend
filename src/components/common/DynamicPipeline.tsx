@@ -1,0 +1,85 @@
+"use client";
+
+import React from "react";
+import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
+
+import styles from "./DynamicPipeline.module.scss";
+import type { DraftStage } from "@/types/draft.types";
+import { PIPELINE_STEPS } from "@/types/draft.types";
+
+interface DynamicPipelineProps {
+  currentStage: DraftStage;
+  completedSteps: number[];
+  onStepClick?: (stepId: number, path: string) => void;
+  visible: boolean;
+}
+
+export default function DynamicPipeline({
+  currentStage,
+  completedSteps,
+  onStepClick,
+  visible,
+}: DynamicPipelineProps): JSX.Element {
+  const router = useRouter();
+
+  function handleStepClick(stepId: number, path: string): void {
+    if (onStepClick) {
+      onStepClick(stepId, path);
+    } else {
+      router.push(path);
+    }
+  }
+
+  function getCurrentStepId(): number {
+    if (currentStage === "template_selection") return 0;
+    if (currentStage === "wizard_in_progress") return 1;
+    if (currentStage === "parameters_complete") return 2;
+    if (currentStage === "review_complete" || currentStage === "generated") return 3;
+    return 0;
+  }
+
+  const currentStepId = getCurrentStepId();
+  const isAllCompleted = currentStage === "generated";
+
+  return (
+    <div 
+      className={`${styles.pipelineContainer} ${visible ? styles.visible : styles.hidden}`}
+      aria-hidden={!visible}
+    >
+      <div className={styles.pipelineSteps}>
+        {PIPELINE_STEPS.map((step, index) => {
+          const isActive = step.id === currentStepId;
+          const isCompleted = completedSteps.includes(step.id) || isAllCompleted;
+          const isClickable = isAllCompleted || isCompleted || step.id <= currentStepId;
+
+          return (
+            <React.Fragment key={step.id}>
+              <div
+                className={`${styles.step} ${isActive ? styles.active : ""} ${isCompleted ? styles.completed : ""} ${isClickable ? styles.clickable : ""}`}
+                onClick={() => isClickable && handleStepClick(step.id, step.path)}
+                role="button"
+                tabIndex={isClickable ? 0 : -1}
+                aria-current={isActive ? "step" : undefined}
+                aria-label={`${step.label} - ${isCompleted ? "Completed" : isActive ? "Current" : "Upcoming"}`}
+              >
+                <div className={styles.stepCircle}>
+                  {isCompleted ? (
+                    <Check size={12} className={styles.checkIcon} strokeWidth={3} />
+                  ) : (
+                    <span className={styles.stepNumber}>{step.id}</span>
+                  )}
+                </div>
+                <span className={styles.stepLabel}>{step.label}</span>
+              </div>
+
+              {index < PIPELINE_STEPS.length - 1 && (
+                <div className={`${styles.connector} ${isCompleted ? styles.completed : ""}`} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
