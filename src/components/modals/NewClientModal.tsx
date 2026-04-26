@@ -2,13 +2,15 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Upload, FileText, Loader2 } from "lucide-react";
+import { X, Upload, FileText, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./NewClientModal.module.scss";
 
 import type { Client, ClientDocument, NewClientFormData } from "@/types/client.types";
 import { CLIENTS_STORAGE_KEY, INDUSTRIES, PIPELINE_STAGES } from "@/constants";
+import { parseFiles } from "@/services/api";
+import type { ParsedFileResult } from "@/services/api";
 
 interface NewClientModalProps {
   onClose: () => void;
@@ -28,8 +30,12 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
     notes: "",
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
+  >([]);
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const processedFilesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
@@ -48,26 +54,140 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
     setFormData((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleUploadClick(): void {
-    fileInputRef.current?.click();
+  function handleDragOver(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
-    const files = e.target.files;
-    if (!files) return;
-    
-    setUploadedFiles((prev) => [...prev, ...Array.from(files)]);
-    e.target.value = "";
+  function handleDragEnter(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
   }
 
-  function handleRemoveFile(index: number): void {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  function handleDragLeave(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
   }
+
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    processFileList(e.dataTransfer.files);
+  }
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_TYPES = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ];
 
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function isValidFile(file: File): boolean {
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext);
+    const sizeOk = file.size <= MAX_FILE_SIZE;
+    if (!typeOk) {
+      toast.error(`"${file.name}" is not a supported file type`);
+      return false;
+    }
+    if (!sizeOk) {
+      toast.error(`"${file.name}" exceeds 10 MB limit`);
+      return false;
+    }
+    return true;
+  }
+
+  function processFileList(files: FileList | null): void {
+    if (!files || files.length === 0) return;
+    const validFiles = Array.from(files).filter(isValidFile);
+    if (validFiles.length === 0) return;
+
+    const newFiles = validFiles.map((file) => ({
+      file,
+      id: `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      status: "pending" as const,
+    }));
+
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+
+    // Start real backend parsing immediately for each file
+    newFiles.forEach((f) => startRealParsing(f.file, f.id));
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
+    processFileList(e.target.files);
+    e.target.value = "";
+  }
+
+  // Native backup listener — catches events that React's synthetic system misses
+  useEffect(() => {
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    const onNativeChange = (evt: Event) => {
+      const target = evt.target as HTMLInputElement;
+      const files = target.files;
+      if (!files || files.length === 0) return;
+
+      const fingerprint = Array.from(files)
+        .map((f) => `${f.name}-${f.size}-${f.lastModified}`)
+        .join("|");
+      if (processedFilesRef.current.has(fingerprint)) return;
+      processedFilesRef.current.add(fingerprint);
+      setTimeout(() => processedFilesRef.current.delete(fingerprint), 150);
+
+      processFileList(files);
+      target.value = "";
+    };
+
+    input.addEventListener("change", onNativeChange);
+    return () => input.removeEventListener("change", onNativeChange);
+  }, []);
+
+  async function startRealParsing(file: File, fileId: string): Promise<void> {
+    setUploadedFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, status: "parsing" } : f))
+    );
+
+    try {
+      const response = await parseFiles([file]);
+
+      if (response.errors.length > 0) {
+        const errMsg = response.errors[0].error;
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: errMsg } : f))
+        );
+        toast.error(`Failed to parse "${file.name}": ${errMsg}`);
+        return;
+      }
+
+      const result = response.results[0];
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
+      );
+      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Backend connection failed";
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: message } : f))
+      );
+      toast.error(`Backend error parsing "${file.name}"`);
+    }
+  }
+
+  function handleRemoveFile(fileId: string): void {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
   }
 
   async function handleCreate(): Promise<void> {
@@ -81,17 +201,25 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       return;
     }
 
+    // Prevent creating if any files are still parsing
+    const stillParsing = uploadedFiles.some((f) => f.status === "parsing");
+    if (stillParsing) {
+      toast.error("Please wait for all files to finish parsing");
+      return;
+    }
+
     setIsCreating(true);
 
-    const clientId = `client-${Date.now()}`;
-    const documents: ClientDocument[] = uploadedFiles.map((file, index) => {
-      const ext = file.name.split(".").pop()?.toLowerCase() as "pdf" | "docx" | "xlsx" | "pptx";
+    const clientId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+
+    const documents: ClientDocument[] = uploadedFiles.map((uploaded, index) => {
+      const ext = uploaded.file.name.split(".").pop()?.toLowerCase() as "pdf" | "docx" | "xlsx" | "pptx";
       return {
-        id: `${clientId}-doc-${index}`,
-        name: file.name,
-        size: formatFileSize(file.size),
+        id: uploaded.id,
+        name: uploaded.file.name,
+        size: formatFileSize(uploaded.file.size),
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        status: "processing" as const,
+        status: uploaded.status === "parsed" ? "parsed" : "processing",
         fileType: ext || "pdf",
         selected: false,
       };
@@ -121,18 +249,6 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       const clients = raw ? (JSON.parse(raw) as Client[]) : [];
       clients.push(newClient);
       localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
-
-      setTimeout(() => {
-        const updatedClients = clients.map((c) =>
-          c.id === clientId
-            ? {
-                ...c,
-                documents: c.documents.map((doc) => ({ ...doc, status: "parsed" as const })),
-              }
-            : c
-        );
-        localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updatedClients));
-      }, 3000);
 
       toast.success(`Client "${formData.clientName}" created successfully`);
       onClientCreated(newClient);
@@ -207,29 +323,66 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>Upload Documents</h3>
 
-            <div className={styles.uploadZone} onClick={handleUploadClick}>
-              <Upload size={24} className={styles.uploadIcon} />
+            <label
+              htmlFor="new-client-file-upload"
+              className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
               <div className={styles.uploadText}>
                 Click to upload or drag and drop
               </div>
               <div className={styles.uploadHint}>
                 PDF, DOCX, XLSX, PPTX (max 10MB each)
               </div>
-            </div>
+              <input
+                id="new-client-file-upload"
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.pptx"
+                multiple
+                onChange={handleFileChange}
+                className={styles.visuallyHidden}
+              />
+            </label>
 
             {uploadedFiles.length > 0 && (
               <div className={styles.fileList}>
-                {uploadedFiles.map((file, index) => (
-                  <div key={index} className={styles.fileItem}>
-                    <FileText size={16} className={styles.fileIcon} />
+                {uploadedFiles.map(({ file, id, status, error, parsedData }) => (
+                  <div key={id} className={styles.fileItem}>
+                    {status === "parsing" ? (
+                      <Loader2 size={16} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                    ) : status === "error" ? (
+                      <AlertCircle size={16} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                    ) : status === "parsed" ? (
+                      <CheckCircle size={16} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                    ) : (
+                      <FileText size={16} className={styles.fileIcon} />
+                    )}
                     <div className={styles.fileInfo}>
                       <span className={styles.fileName}>{file.name}</span>
-                      <span className={styles.fileSize}>{formatFileSize(file.size)}</span>
+                      <span className={styles.fileMeta}>
+                        {formatFileSize(file.size)}
+                        {status === "parsing" && (
+                          <span className={styles.parsingStatus}> • Parsing on server...</span>
+                        )}
+                        {status === "parsed" && parsedData && (
+                          <span className={styles.parsedStatus}> • {parsedData.word_count} words</span>
+                        )}
+                        {status === "error" && error && (
+                          <span className={styles.errorStatus}> • {error}</span>
+                        )}
+                      </span>
                     </div>
                     <button
                       className={styles.removeFileBtn}
-                      onClick={() => handleRemoveFile(index)}
+                      onClick={() => handleRemoveFile(id)}
+                      disabled={status === "parsing"}
                       aria-label="Remove file"
+                      title={status === "parsing" ? "Wait for parsing to complete" : "Remove file"}
                     >
                       <X size={14} />
                     </button>
@@ -237,15 +390,6 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
                 ))}
               </div>
             )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.xlsx,.pptx"
-              multiple
-              style={{ display: "none" }}
-              onChange={handleFileChange}
-            />
           </div>
         </div>
 
