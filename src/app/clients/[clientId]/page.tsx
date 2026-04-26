@@ -25,6 +25,10 @@ const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   loading: () => <div className="sidebar-skeleton" />,
 });
 
+const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
+  ssr: false,
+});
+
 export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
@@ -35,6 +39,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [clientProposals, setClientProposals] = useState<any[]>([]);
+  const [showEditModal, setShowEditModal] = useState<boolean>(false);
 
   useEffect(() => {
     loadClient();
@@ -383,7 +388,12 @@ export default function ClientWorkspacePage(): JSX.Element {
   }
 
   function handleNewProposal(): void {
-    router.push("/home");
+    router.push("/");
+  }
+
+  function handleClientUpdated(updatedClient: Client): void {
+    setClient(updatedClient);
+    setShowEditModal(false);
   }
 
   function handleDeleteDocument(docId: string): void {
@@ -497,7 +507,9 @@ export default function ClientWorkspacePage(): JSX.Element {
             </p>
           </div>
           <div className={styles.clientHeaderActions}>
-            <button className="btn btn-secondary">Edit Details</button>
+            <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
+              Edit Details
+            </button>
             <button className="btn btn-primary" onClick={handleNewProposal}>
               New Proposal
             </button>
@@ -721,6 +733,14 @@ export default function ClientWorkspacePage(): JSX.Element {
           </section>
         </div>
       </main>
+
+      {showEditModal && client && (
+        <EditClientModal
+          client={client}
+          onClose={() => setShowEditModal(false)}
+          onClientUpdated={handleClientUpdated}
+        />
+      )}
     </div>
   );
 }

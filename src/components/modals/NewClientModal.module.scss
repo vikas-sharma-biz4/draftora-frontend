@@ -189,19 +189,45 @@
   color: var(--color-text-light);
 }
 
+.visuallyHidden {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .uploadZone {
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-lg);
   padding: 32px 24px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
   background: var(--color-bg);
+  outline: none;
 }
 
-.uploadZone:hover {
+.uploadZone:hover,
+.uploadZone:focus-within {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
+}
+
+.dragOver {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: scale(1.01);
 }
 
 .uploadIcon {
@@ -260,9 +286,43 @@
   text-overflow: ellipsis;
 }
 
-.fileSize {
+.fileMeta {
   font-size: 11px;
   color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.parsingStatus {
+  color: var(--color-primary);
+  font-style: italic;
+}
+
+.parsedStatus {
+  color: var(--color-success);
+}
+
+.errorStatus {
+  color: var(--color-danger);
+}
+
+.spinningIcon {
+  animation: spin 1s linear infinite;
+  color: var(--color-primary);
+}
+
+.successIcon {
+  color: var(--color-success);
+}
+
+.errorIcon {
+  color: var(--color-danger);
+}
+
+.removeFileBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .removeFileBtn {

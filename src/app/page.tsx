@@ -135,7 +135,7 @@ export default function HomePage(): JSX.Element {
         });
       }
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/parameters");
     } else if (selectionMode === "upload" && extractedSections.length > 0) {
       const sectionKeys = extractedSections.map((s) => s.key);
       const displayNames: Record<string, string> = {};
@@ -149,7 +149,7 @@ export default function HomePage(): JSX.Element {
         templateType: "custom",
       });
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/parameters");
     } else if (selectionMode === "scratch") {
       updateProposalData({
         templateId: null,
@@ -157,7 +157,7 @@ export default function HomePage(): JSX.Element {
         sectionDisplayNames: {},
       });
       setCurrentStep(1);
-      router.push("/wizard");
+      router.push("/parameters");
     }
   }
 

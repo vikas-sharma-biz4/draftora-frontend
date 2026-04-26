@@ -7,11 +7,9 @@
   background: rgba(19, 27, 46, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 24px;
-  animation: fadeIn 0.15s ease-out;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -25,16 +23,22 @@
   }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .modalOverlay {
+    animation: fadeIn 0.15s ease-out;
+  }
+}
+
 .modalContent {
   background: var(--color-white);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 60px rgba(19, 27, 46, 0.2);
   max-width: 600px;
   width: 100%;
-  max-height: 85vh;
+  max-height: 85vh; /* Fallback for legacy browsers */
+  max-height: 85dvh;
   display: flex;
   flex-direction: column;
-  animation: slideUp 0.2s ease-out;
   margin: auto;
   position: relative;
 }
@@ -50,6 +54,12 @@
   }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .modalContent {
+    animation: slideUp 0.2s ease-out;
+  }
+}
+
 .modalHeader {
   display: flex;
   justify-content: space-between;
@@ -60,7 +70,7 @@
 }
 
 .modalTitle {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--color-text);
   letter-spacing: -0.3px;
@@ -68,7 +78,7 @@
 }
 
 .modalSubtitle {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 
@@ -83,6 +93,8 @@
   color: var(--color-text-muted);
   cursor: pointer;
   padding: 4px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   transition: all 0.15s;
   display: flex;
@@ -90,9 +102,17 @@
   justify-content: center;
 }
 
-.closeBtn:hover {
+@media (hover: hover) {
+  .closeBtn:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+
+.closeBtn:focus-visible {
   background: var(--color-bg);
   color: var(--color-text);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
 }
 
 .modalBody {
@@ -118,14 +138,14 @@
 
 .label {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text);
   margin-bottom: 8px;
 }
 
 .hint {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-bottom: 12px;
 }
@@ -134,7 +154,7 @@
 .select {
   width: 100%;
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: 0.875rem;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-white);
@@ -154,12 +174,38 @@
   color: var(--color-text-light);
 }
 
+.textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: var(--color-white);
+  font-family: inherit;
+  line-height: 1.5;
+  min-height: 100px;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.09);
+}
+
+.textarea::placeholder {
+  color: var(--color-text-light);
+}
+
 .searchWrapper {
   position: relative;
 }
 
 .searchInputWrapper {
   display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -167,7 +213,7 @@
   flex: 1;
   width: 100%;
   padding: 10px 14px;
-  font-size: 14px;
+  font-size: 0.875rem;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-white);
@@ -192,21 +238,43 @@
   color: var(--color-primary);
   cursor: pointer;
   padding: 10px 16px;
+  min-height: 44px;
+  width: 100%;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   transition: all 0.15s;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   white-space: nowrap;
   font-family: var(--font-sans);
   flex-shrink: 0;
 }
 
-.newClientBtn:hover {
+@media (hover: hover) {
+  .newClientBtn:hover {
+    background: var(--color-primary);
+    color: white;
+  }
+}
+
+.newClientBtn:focus-visible {
   background: var(--color-primary);
   color: white;
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
+}
+
+@media (min-width: 768px) {
+  .searchInputWrapper {
+    flex-direction: row;
+  }
+
+  .newClientBtn {
+    width: auto;
+    justify-content: flex-start;
+  }
 }
 
 .clientDropdown {
@@ -221,7 +289,6 @@
   max-height: 320px;
   overflow-y: auto;
   z-index: 10;
-  animation: slideDown 0.15s ease-out;
 }
 
 @keyframes slideDown {
@@ -235,19 +302,40 @@
   }
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .clientDropdown {
+    animation: slideDown 0.15s ease-out;
+  }
+}
+
 .clientOption {
+  display: block;
+  width: 100%;
   padding: 12px 16px;
   cursor: pointer;
   transition: background 0.15s;
+  appearance: none;
+  background: transparent;
+  border: none;
   border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 
 .clientOption:last-child {
   border-bottom: none;
 }
 
-.clientOption:hover {
+@media (hover: hover) {
+  .clientOption:hover {
+    background: var(--color-primary-light);
+  }
+}
+
+.clientOption:focus-visible {
   background: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
 }
 
 .clientOption.selected {
@@ -262,13 +350,13 @@
 }
 
 .clientOptionName {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .clientOptionIndustry {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   padding: 2px 8px;
   background: var(--color-bg);
@@ -276,14 +364,14 @@
 }
 
 .clientOptionMeta {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-light);
 }
 
 .noResults {
   padding: 24px 16px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
 
@@ -296,7 +384,7 @@
 }
 
 .noClients p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
   margin-bottom: 16px;
 }
@@ -306,16 +394,25 @@
   border: none;
   color: var(--color-primary);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   padding: 4px 8px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   transition: all 0.15s;
   font-family: var(--font-sans);
 }
 
-.toggleAllBtn:hover {
+@media (hover: hover) {
+  .toggleAllBtn:hover {
+    background: var(--color-primary-light);
+  }
+}
+
+.toggleAllBtn:focus-visible {
   background: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
 }
 
 .documentList {
@@ -340,9 +437,11 @@
   outline: none;
 }
 
-.documentItem:hover {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary-medium);
+@media (hover: hover) {
+  .documentItem:hover {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary-medium);
+  }
 }
 
 .documentItem.selected {
@@ -375,7 +474,7 @@
 }
 
 .documentName {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
@@ -384,7 +483,7 @@
 }
 
 .documentMeta {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-top: 2px;
 }
@@ -392,7 +491,7 @@
 .noDocuments {
   padding: 32px 24px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
   background: var(--color-bg);
   border-radius: var(--radius-lg);
@@ -400,7 +499,7 @@
 
 .selectionSummary {
   margin-top: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-primary);
   text-align: center;
@@ -426,33 +525,74 @@
   background: transparent;
   border: none;
   color: var(--color-danger);
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   padding: 4px 8px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   transition: all 0.15s;
   font-family: var(--font-sans);
 }
 
-.removeAllBtn:hover {
+@media (hover: hover) {
+  .removeAllBtn:hover {
+    background: var(--color-danger-light);
+  }
+}
+
+.removeAllBtn:focus-visible {
   background: var(--color-danger-light);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.visuallyHidden {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .uploadZone {
   border: 2px dashed var(--color-border-dark);
   border-radius: var(--radius-lg);
   padding: 24px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: all 0.2s;
   background: var(--color-bg);
   margin-top: 12px;
+  outline: none;
 }
 
-.uploadZone:hover {
+@media (hover: hover) {
+  .uploadZone:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+}
+
+.uploadZone:focus-within {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
+}
+
+.dragOver {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: scale(1.01);
 }
 
 .uploadIcon {
@@ -461,14 +601,14 @@
 }
 
 .uploadText {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text);
   margin-bottom: 4px;
 }
 
 .uploadHint {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-light);
 }
 
@@ -490,9 +630,17 @@
   transition: all 0.15s;
 }
 
-.uploadedFileItem:hover {
+@media (hover: hover) {
+  .uploadedFileItem:hover {
+    background: white;
+    border-color: var(--color-primary-medium);
+  }
+}
+
+.uploadedFileItem:focus-visible {
   background: white;
   border-color: var(--color-primary-medium);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
 }
 
 .fileIconWrapper {
@@ -512,7 +660,12 @@
 
 .spinningIcon {
   color: var(--color-primary);
-  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinningIcon {
+    animation: spin 1s linear infinite;
+  }
 }
 
 @keyframes spin {
@@ -530,7 +683,7 @@
 }
 
 .fileName {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
@@ -540,7 +693,7 @@
 }
 
 .fileMeta {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   display: flex;
   align-items: center;
@@ -549,26 +702,25 @@
 
 .parsingStatus {
   color: var(--color-primary);
-  font-weight: 600;
+  font-style: italic;
 }
 
-.progressBar {
-  width: 100%;
-  height: 4px;
-  background: var(--color-border);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-top: 6px;
+.parsedStatus {
+  color: var(--color-success);
 }
 
-.progressFill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
-  transition: width 0.3s ease;
-  border-radius: 2px;
+.errorStatus {
+  color: var(--color-danger);
 }
 
-.cancelBtn,
+.successIcon {
+  color: var(--color-success);
+}
+
+.errorIcon {
+  color: var(--color-danger);
+}
+
 .removeFileBtn {
   flex-shrink: 0;
   background: transparent;
@@ -576,6 +728,8 @@
   color: var(--color-text-muted);
   cursor: pointer;
   padding: 6px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   transition: all 0.15s;
   display: flex;
@@ -583,10 +737,29 @@
   justify-content: center;
 }
 
-.cancelBtn:hover,
-.removeFileBtn:hover {
+@media (hover: hover) {
+  .removeFileBtn:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+  }
+}
+
+.removeFileBtn:focus-visible {
   background: var(--color-danger-light);
   color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.removeFileBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .removeFileBtn:disabled:hover {
+    background: transparent;
+    color: var(--color-text-muted);
+  }
 }
 
 .modalFooter {
@@ -598,17 +771,20 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 767px) {
+  .modalOverlay {
+    padding: 0;
+  }
+
   .modalContent {
     max-width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
   }
 
-  .clientSelectWrapper {
-    flex-direction: column;
-  }
-
-  .newClientBtn {
-    width: 100%;
-    justify-content: center;
+  .modalHeader,
+  .modalBody,
+  .modalFooter {
+    padding: 16px 20px;
   }
 }
