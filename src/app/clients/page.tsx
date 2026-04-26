@@ -4,12 +4,11 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Users, Plus, Building2, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import type { Client } from "@/types/client.types";
-import { CLIENTS_STORAGE_KEY } from "@/constants";
-import { initializeSampleClients } from "@/utils/sampleData";
+import { listClients, type Client } from "@/api/clientApi";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -24,23 +23,27 @@ export default function ClientsPage(): JSX.Element {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    initializeSampleClients();
     loadClients();
   }, []);
 
-  function loadClients(): void {
+  async function loadClients(): Promise<void> {
     try {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      const loadedClients = raw ? (JSON.parse(raw) as Client[]) : [];
+      setLoading(true);
+      const loadedClients = await listClients();
       setClients(loadedClients);
-    } catch {
+    } catch (error) {
+      console.error("Failed to load clients:", error);
+      toast.error("Failed to load clients");
       setClients([]);
+    } finally {
+      setLoading(false);
     }
   }
 
-  function handleClientClick(clientId: string): void {
+  function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
   }
 
@@ -70,7 +73,11 @@ export default function ClientsPage(): JSX.Element {
           </button>
         </div>
 
-        {clients.length === 0 ? (
+        {loading ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyTitle}>Loading clients...</div>
+          </div>
+        ) : clients.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>
               <Users size={48} />
@@ -113,19 +120,18 @@ export default function ClientsPage(): JSX.Element {
                   <div className={styles.clientCardMeta}>
                     <div className={styles.clientCardMetaItem}>
                       <Calendar size={14} />
-                      <span>Onboarded {client.onboardedDate}</span>
+                      <span>Created {new Date(client.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className={styles.clientCardMetaItem}>
-                      <span>{client.documents.length} documents</span>
-                    </div>
-                    <div className={styles.clientCardMetaItem}>
-                      <span>{client.proposals.length} proposals</span>
-                    </div>
+                    {client.notes && (
+                      <div className={styles.clientCardMetaItem}>
+                        <span>{client.notes}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className={styles.clientCardFooter}>
-                  <span className={styles.clientCardTier}>{client.tier}</span>
+                  <span className={styles.clientCardTier}>{client.industry}</span>
                 </div>
               </article>
             ))}
