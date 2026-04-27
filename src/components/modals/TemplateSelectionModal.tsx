@@ -2,15 +2,17 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Plus, CheckSquare, Square, Upload, FileText, Loader2 } from "lucide-react";
+import { X, Plus, CheckSquare, Square, Upload, FileText, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import styles from "./TemplateSelectionModal.module.scss";
 
-import type { Client, ClientDocument } from "@/types/client.types";
-import { CLIENTS_STORAGE_KEY } from "@/constants";
+import { listClients, getClient, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
+import { PROPOSAL_TEMPLATES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
+import { parseFiles } from "@/services/api";
+import type { ParsedFileResult } from "@/services/api";
 
 interface TemplateSelectionModalProps {
   templateId: string;
@@ -29,15 +31,20 @@ export default function TemplateSelectionModal({
   const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
   
   const [mounted, setMounted] = useState<boolean>(false);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [clients, setClients] = useState<ClientWithDocuments[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [proposalName, setProposalName] = useState<string>("");
-  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
+  const [proposalDescription, setProposalDescription] = useState<string>("");
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [parsingFiles, setParsingFiles] = useState<Map<string, number>>(new Map());
+  const [uploadedFiles, setUploadedFiles] = useState<
+    { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processedFilesRef = useRef<Set<string>>(new Set());
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -51,7 +58,7 @@ export default function TemplateSelectionModal({
   useEffect(() => {
     if (selectedClientId) {
       const client = clients.find((c) => c.id === selectedClientId);
-      if (client) {
+      if (client && client.documents) {
         const allDocIds = new Set(client.documents.filter((d) => d.status === "parsed").map((d) => d.id));
         setSelectedDocuments(allDocIds);
       }
@@ -66,17 +73,116 @@ export default function TemplateSelectionModal({
     };
   }, []);
 
-  function loadClients(): void {
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_TYPES = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ];
+
+  /**
+   * Validates file extension and size against proposal upload rules.
+   * Accepted: PDF, DOCX, XLSX, PPTX ≤ 10 MB. Emits toast on rejection.
+   * @param file Candidate file from drag-and-drop or input change
+   * @returns    `true` if extension and size pass
+   */
+  function isValidFile(file: File): boolean {
+    const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext);
+    const sizeOk = file.size <= MAX_FILE_SIZE;
+    if (!typeOk) {
+      toast.error(`"${file.name}" is not a supported file type`);
+      return false;
+    }
+    if (!sizeOk) {
+      toast.error(`"${file.name}" exceeds 10 MB limit`);
+      return false;
+    }
+    return true;
+  }
+
+  function processFileList(files: FileList | null): void {
+    if (!files || files.length === 0) return;
+    const validFiles = Array.from(files).filter(isValidFile);
+    if (validFiles.length === 0) return;
+
+    const newFiles = validFiles.map((file) => ({
+      file,
+      id: `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      status: "pending" as const,
+    }));
+
+    setUploadedFiles((prev) => [...prev, ...newFiles]);
+    newFiles.forEach((f) => startRealParsing(f.file, f.id));
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDragEnter(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>): void {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    processFileList(e.dataTransfer.files);
+  }
+
+  /**
+   * Loads client list from API with documents.
+   */
+  async function loadClients(): Promise<void> {
     try {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      const loadedClients = raw ? (JSON.parse(raw) as Client[]) : [];
-      setClients(loadedClients);
-    } catch {
+      setLoading(true);
+      const clientList = await listClients();
+      
+      // Fetch each client with documents
+      const clientsWithDocs = await Promise.all(
+        clientList.map(async (client) => {
+          try {
+            return await getClient(client.id);
+          } catch (error) {
+            console.error(`Failed to load documents for client ${client.id}:`, error);
+            // Return client without documents if fetch fails
+            return {
+              ...client,
+              documents: [],
+            } as ClientWithDocuments;
+          }
+        })
+      );
+      
+      setClients(clientsWithDocs);
+    } catch (error) {
+      console.error("Failed to load clients:", error);
+      toast.error("Failed to load clients");
       setClients([]);
+    } finally {
+      setLoading(false);
     }
   }
 
-  function handleClientSelect(clientId: string, clientName: string): void {
+  /**
+   * Commits a client selection, closes the dropdown, and auto-selects
+   * all parsed documents belonging to that client.
+   * @param clientId   ID of the selected client
+   * @param clientName Display name used for the search input value
+   */
+  function handleClientSelect(clientId: number, clientName: string): void {
     setSelectedClientId(clientId);
     setClientSearchQuery(clientName);
     setShowClientDropdown(false);
@@ -86,7 +192,7 @@ export default function TemplateSelectionModal({
     setClientSearchQuery(value);
     setShowClientDropdown(true);
     if (!value.trim()) {
-      setSelectedClientId("");
+      setSelectedClientId(null);
     }
   }
 
@@ -98,7 +204,7 @@ export default function TemplateSelectionModal({
     setTimeout(() => setShowClientDropdown(false), 200);
   }
 
-  function toggleDocument(docId: string): void {
+  function toggleDocument(docId: number): void {
     setSelectedDocuments((prev) => {
       const next = new Set(prev);
       if (next.has(docId)) {
@@ -112,7 +218,7 @@ export default function TemplateSelectionModal({
 
   function toggleAllDocuments(): void {
     const client = clients.find((c) => c.id === selectedClientId);
-    if (!client) return;
+    if (!client || !client.documents) return;
 
     const parsedDocs = client.documents.filter((d) => d.status === "parsed");
     if (selectedDocuments.size === parsedDocs.length) {
@@ -122,65 +228,108 @@ export default function TemplateSelectionModal({
     }
   }
 
-  function handleFileUpload(): void {
-    fileInputRef.current?.click();
-  }
-
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
-    const files = e.target.files;
-    if (!files) return;
-    
-    const newFiles = Array.from(files);
-    setUploadedFiles((prev) => [...prev, ...newFiles]);
-    
-    // Start parsing simulation for each file
-    newFiles.forEach((file) => {
-      simulateFileParsing(file);
-    });
-    
+    processFileList(e.target.files);
     e.target.value = "";
   }
 
-  function simulateFileParsing(file: File): void {
-    const fileId = `${file.name}-${Date.now()}`;
-    setParsingFiles((prev) => new Map(prev).set(fileId, 0));
-    
-    const interval = setInterval(() => {
-      setParsingFiles((prev) => {
-        const newMap = new Map(prev);
-        const currentProgress = newMap.get(fileId) || 0;
-        
-        if (currentProgress >= 100) {
-          clearInterval(interval);
-          newMap.delete(fileId);
-          toast.success(`${file.name} parsed successfully`);
-          return newMap;
-        }
-        
-        newMap.set(fileId, currentProgress + Math.random() * 25);
-        return newMap;
-      });
-    }, 300);
+  // Native backup listener — catches events that React's synthetic system misses
+  useEffect(() => {
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    const onNativeChange = (evt: Event) => {
+      const target = evt.target as HTMLInputElement;
+      const files = target.files;
+      if (!files || files.length === 0) return;
+
+      const fingerprint = Array.from(files)
+        .map((f) => `${f.name}-${f.size}-${f.lastModified}`)
+        .join("|");
+      if (processedFilesRef.current.has(fingerprint)) return;
+      processedFilesRef.current.add(fingerprint);
+      setTimeout(() => processedFilesRef.current.delete(fingerprint), 150);
+
+      processFileList(files);
+      target.value = "";
+    };
+
+    input.addEventListener("change", onNativeChange);
+    return () => input.removeEventListener("change", onNativeChange);
+  }, []);
+
+  /**
+   * Uploads a single file to the parse API, tracks progress in
+   * `uploadedFiles`, and auto-attaches successful results to the
+   * currently selected client. Surfaces server and network errors
+   * via toast notifications.
+   * @param file   Raw File object from input or drag-and-drop
+   * @param fileId Stable local identifier for optimistic UI tracking
+   */
+  async function startRealParsing(file: File, fileId: string): Promise<void> {
+    setUploadedFiles((prev) =>
+      prev.map((f) => (f.id === fileId ? { ...f, status: "parsing" } : f))
+    );
+
+    try {
+      const response = await parseFiles([file]);
+
+      if (response.errors.length > 0) {
+        const errMsg = response.errors[0].error;
+        setUploadedFiles((prev) =>
+          prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: errMsg } : f))
+        );
+        toast.error(`Failed to parse "${file.name}": ${errMsg}`);
+        return;
+      }
+
+      const result = response.results[0];
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
+      );
+      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+
+      // Save to the selected client so it appears in Knowledge Base list
+      saveParsedDocumentToClient(file, fileId, result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Backend connection failed";
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: message } : f))
+      );
+      toast.error(`Backend error parsing "${file.name}"`);
+    }
   }
 
-  function handleRemoveFile(index: number): void {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  async function saveParsedDocumentToClient(file: File, fileId: string, result: ParsedFileResult): Promise<void> {
+    if (!selectedClientId) return;
+
+    try {
+      const uploadResult = await uploadDocument(selectedClientId, file);
+      
+      // Reload clients to get updated document list
+      await loadClients();
+      
+      // Auto-select newly uploaded document
+      setSelectedDocuments((prev) => {
+        const next = new Set(prev);
+        next.add(uploadResult.id);
+        return next;
+      });
+      
+      toast.success(`${file.name} uploaded successfully`);
+    } catch (error) {
+      console.error("Failed to upload document:", error);
+      toast.error(`Failed to upload ${file.name}`);
+    }
+  }
+
+  function handleRemoveFile(fileId: string): void {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
   }
 
   function handleRemoveAllFiles(): void {
     setUploadedFiles([]);
-    setParsingFiles(new Map());
     toast.info("All uploaded files removed");
-  }
-
-  function handleCancelParsing(fileName: string): void {
-    const fileId = `${fileName}-${Date.now()}`;
-    setParsingFiles((prev) => {
-      const newMap = new Map(prev);
-      newMap.delete(fileId);
-      return newMap;
-    });
-    toast.info("Parsing cancelled");
   }
 
   function formatFileSize(bytes: number): string {
@@ -189,6 +338,11 @@ export default function TemplateSelectionModal({
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   }
 
+  /**
+   * Validates form state, persists proposal metadata to context,
+   * and routes the user to the parameter wizard (step 4).
+   * Triggers toast errors for missing client, name, or documents.
+   */
   function handleContinue(): void {
     if (!selectedClientId) {
       toast.error("Please select a client");
@@ -205,25 +359,35 @@ export default function TemplateSelectionModal({
       return;
     }
 
+    const stillParsing = uploadedFiles.some((f) => f.status === "parsing");
+    if (stillParsing) {
+      toast.error("Please wait for all uploaded files to finish parsing");
+      return;
+    }
+
     const client = clients.find((c) => c.id === selectedClientId);
     if (!client) return;
 
-    // Build filesMeta from selected documents for persistence
     const selectedDocIds = Array.from(selectedDocuments);
-    const selectedDocsMeta = client.documents
+    const selectedDocsMeta = (client.documents || [])
       .filter((doc) => selectedDocIds.includes(doc.id))
       .map((doc) => ({
         name: doc.name,
-        size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
-        type: doc.fileType ? String(doc.fileType) : "application/pdf",
+        size: doc.size_bytes,
+        type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
+
+    const template = PROPOSAL_TEMPLATES.find((t) => t.id === templateId);
 
     updateProposalData({
       title: proposalName,
       clientName: client.name,
+      description: proposalDescription,
       clientId: selectedClientId,
       templateId,
       templateType: "predefined",
+      selectedSections: template ? [...template.sections] : [],
+      sectionDisplayNames: {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
     });
@@ -264,7 +428,11 @@ export default function TemplateSelectionModal({
         <div className={styles.modalBody}>
           <div className={styles.section}>
             <label className={styles.label}>Client Name</label>
-            {clients.length === 0 ? (
+            {loading ? (
+              <div className={styles.noClients}>
+                <p>Loading clients...</p>
+              </div>
+            ) : clients.length === 0 ? (
               <div className={styles.noClients}>
                 <p>No clients found. Create your first client to continue.</p>
                 <button className="btn btn-primary btn-sm" onClick={handleNewClientClick}>
@@ -293,21 +461,20 @@ export default function TemplateSelectionModal({
                 {showClientDropdown && filteredClients.length > 0 && (
                   <div className={styles.clientDropdown}>
                     {filteredClients.map((client) => (
-                      <div
+                      <button
                         key={client.id}
+                        type="button"
                         className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
                         onClick={() => handleClientSelect(client.id, client.name)}
-                        role="button"
-                        tabIndex={0}
                       >
                         <div className={styles.clientOptionMain}>
                           <span className={styles.clientOptionName}>{client.name}</span>
                           <span className={styles.clientOptionIndustry}>{client.industry}</span>
                         </div>
                         <div className={styles.clientOptionMeta}>
-                          {client.documents.length} docs • {client.proposals.length} proposals
+                          {client.documents?.length || 0} docs
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -334,12 +501,22 @@ export default function TemplateSelectionModal({
             />
           </div>
 
+          <div className={styles.section}>
+            <label className={styles.label}>Project Brief</label>
+            <textarea
+              className={styles.textarea}
+              placeholder="Describe the project scope, client's core challenge, desired outcomes, technical constraints, and any specific requirements..."
+              value={proposalDescription}
+              onChange={(e) => setProposalDescription(e.target.value)}
+            />
+          </div>
+
           {selectedClient && (
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <label className={styles.label}>Knowledge Base Selection</label>
                 <button className={styles.toggleAllBtn} onClick={toggleAllDocuments}>
-                  {selectedDocuments.size === selectedClient.documents.filter((d) => d.status === "parsed").length
+                  {selectedDocuments.size === (selectedClient.documents?.filter((d) => d.status === "parsed").length || 0)
                     ? "Deselect All"
                     : "Select All"}
                 </button>
@@ -349,12 +526,12 @@ export default function TemplateSelectionModal({
               </p>
 
               <div className={styles.documentList}>
-                {selectedClient.documents.filter((d) => d.status === "parsed").length === 0 ? (
+                {(selectedClient.documents?.filter((d) => d.status === "parsed").length || 0) === 0 ? (
                   <div className={styles.noDocuments}>
                     No parsed documents available for this client.
                   </div>
                 ) : (
-                  selectedClient.documents
+                  (selectedClient.documents || [])
                     .filter((d) => d.status === "parsed")
                     .map((doc) => (
                       <div
@@ -375,9 +552,9 @@ export default function TemplateSelectionModal({
                           )}
                         </div>
                         <div className={styles.documentInfo}>
-                          <div className={styles.documentName}>{doc.name}</div>
+                          <div className={styles.documentName} title={doc.name}>{doc.name}</div>
                           <div className={styles.documentMeta}>
-                            {doc.size} • {doc.date}
+                            {formatFileSize(doc.size_bytes)} • {new Date(doc.created_at).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
@@ -402,79 +579,72 @@ export default function TemplateSelectionModal({
                   )}
                 </div>
                 <p className={styles.hint}>Upload new documents that will be parsed automatically</p>
-                
-                <div className={styles.uploadZone} onClick={handleFileUpload}>
-                  <Upload size={24} className={styles.uploadIcon} />
-                  <div className={styles.uploadText}>Click to upload documents</div>
+
+                <label
+                  htmlFor="template-file-upload"
+                  className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
+                  <div className={styles.uploadText}>Click to upload or drag and drop</div>
                   <div className={styles.uploadHint}>PDF, DOCX, XLSX, PPTX (max 10MB each)</div>
-                </div>
+                  <input
+                    id="template-file-upload"
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.xlsx,.pptx"
+                    multiple
+                    onChange={handleFileChange}
+                    className={styles.visuallyHidden}
+                  />
+                </label>
 
                 {uploadedFiles.length > 0 && (
                   <div className={styles.uploadedFilesList}>
-                    {uploadedFiles.map((file, index) => {
-                      const fileId = `${file.name}-${Date.now()}`;
-                      const progress = parsingFiles.get(fileId) || 0;
-                      const isParsing = parsingFiles.has(fileId);
-
-                      return (
-                        <div key={index} className={styles.uploadedFileItem}>
-                          <div className={styles.fileIconWrapper}>
-                            {isParsing ? (
-                              <Loader2 size={18} className={styles.spinningIcon} />
-                            ) : (
-                              <FileText size={18} className={styles.fileIcon} />
-                            )}
-                          </div>
-                          <div className={styles.fileDetails}>
-                            <div className={styles.fileName}>{file.name}</div>
-                            <div className={styles.fileMeta}>
-                              {formatFileSize(file.size)}
-                              {isParsing && (
-                                <span className={styles.parsingStatus}>
-                                  • Parsing {Math.round(progress)}%
-                                </span>
-                              )}
-                            </div>
-                            {isParsing && (
-                              <div className={styles.progressBar}>
-                                <div 
-                                  className={styles.progressFill} 
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                            )}
-                          </div>
-                          {isParsing ? (
-                            <button
-                              className={styles.cancelBtn}
-                              onClick={() => handleCancelParsing(file.name)}
-                              title="Cancel parsing"
-                            >
-                              <X size={16} />
-                            </button>
+                    {uploadedFiles.map(({ file, id, status, error, parsedData }) => (
+                      <div key={id} className={styles.uploadedFileItem}>
+                        <div className={styles.fileIconWrapper}>
+                          {status === "parsing" ? (
+                            <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                          ) : status === "error" ? (
+                            <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                          ) : status === "parsed" ? (
+                            <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
                           ) : (
-                            <button
-                              className={styles.removeFileBtn}
-                              onClick={() => handleRemoveFile(index)}
-                              title="Remove file"
-                            >
-                              <X size={16} />
-                            </button>
+                            <FileText size={18} className={styles.fileIcon} />
                           )}
                         </div>
-                      );
-                    })}
+                        <div className={styles.fileDetails}>
+                          <div className={styles.fileName} title={file.name}>{file.name}</div>
+                          <div className={styles.fileMeta}>
+                            {formatFileSize(file.size)}
+                            {status === "parsing" && (
+                              <span className={styles.parsingStatus}> • Parsing on server...</span>
+                            )}
+                            {status === "parsed" && parsedData && (
+                              <span className={styles.parsedStatus}> • {parsedData.word_count} words</span>
+                            )}
+                            {status === "error" && error && (
+                              <span className={styles.errorStatus}> • {error}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.removeFileBtn}
+                          onClick={() => handleRemoveFile(id)}
+                          disabled={status === "parsing"}
+                          title={status === "parsing" ? "Wait for parsing to complete" : "Remove file"}
+                          aria-label="Remove file"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.docx,.xlsx,.pptx"
-                  multiple
-                  style={{ display: "none" }}
-                  onChange={handleFileChange}
-                />
               </div>
             </div>
           )}
@@ -487,7 +657,7 @@ export default function TemplateSelectionModal({
           <button
             className="btn btn-primary"
             onClick={handleContinue}
-            disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0}
+            disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
           >
             Continue to Wizard →
           </button>

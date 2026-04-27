@@ -7,33 +7,38 @@ import { History, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
-import { HISTORY_STORAGE_KEY } from "@/constants";
-import { getDownloadUrl } from "@/api/proposalApi";
+import { getDownloadUrl, listProposals } from "@/api/proposalApi";
+import type { ProposalListItem } from "@/types/proposal.types";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
   loading: () => <div className="sidebar-skeleton" />,
 });
 
-interface HistoryItem {
-  id: string;
-  proposalId: number;
-  title: string;
-  clientName: string;
-  status: "approved" | "rejected" | "pending_approval";
-  createdAt: string;
-  updatedAt: string;
-  data: any;
-}
-
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyItems, setHistoryItems] = useState<ProposalListItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const history = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
-    setHistoryItems(history);
+    loadHistory();
   }, []);
+
+  async function loadHistory(): Promise<void> {
+    try {
+      setLoading(true);
+      const proposals = await listProposals();
+      const history = proposals.filter(
+        (p) => p.approvalStatus === "approved" || p.approvalStatus === "rejected"
+      );
+      setHistoryItems(history);
+    } catch (error) {
+      console.error("Failed to load history:", error);
+      toast.error("Failed to load history");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function getStatusBadge(status: string): { label: string; className: string } {
     switch (status) {
@@ -66,7 +71,11 @@ export default function HistoryPage(): JSX.Element {
           View all completed, approved, and rejected proposals.
         </p>
 
-        {historyItems.length === 0 ? (
+        {loading ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyTitle}>Loading history...</div>
+          </div>
+        ) : historyItems.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>
               <History size={48} />
@@ -79,7 +88,7 @@ export default function HistoryPage(): JSX.Element {
         ) : (
           <div className={styles.historyGrid}>
             {historyItems.map((item) => {
-              const statusInfo = getStatusBadge(item.status);
+              const statusInfo = getStatusBadge(item.approvalStatus);
               return (
                 <div key={item.id} className={styles.historyCard}>
                   <div className={styles.cardHeader}>
@@ -98,12 +107,12 @@ export default function HistoryPage(): JSX.Element {
                   <div className={styles.cardActions}>
                     <button
                       className="btn btn-ghost btn-sm"
-                      onClick={() => router.push(`/proposal/${item.proposalId}`)}
+                      onClick={() => router.push(`/proposal/${item.id}`)}
                     >
                       <Eye size={14} /> View
                     </button>
                     <a
-                      href={getDownloadUrl(item.proposalId)}
+                      href={getDownloadUrl(item.id)}
                       className="btn btn-secondary btn-sm"
                       download
                       onClick={() => toast.success("Downloading proposal...")}
