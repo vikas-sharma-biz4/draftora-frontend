@@ -9,7 +9,6 @@ interface HeaderProps {
 export default function Header({ activeNav }: HeaderProps): JSX.Element {
   const navItems = [
     { key: "dashboard", label: "Dashboard", href: "/dashboard" },
-    { key: "templates", label: "Templates", href: "/templates" },
     { key: "archive", label: "Archive", href: "#" },
   ] as const;
 
