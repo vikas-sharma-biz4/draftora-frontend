@@ -7,8 +7,8 @@ import { toast } from "sonner";
 
 import styles from "./NewClientModal.module.scss";
 
-import type { Client } from "@/types/client.types";
-import { CLIENTS_STORAGE_KEY, INDUSTRIES } from "@/constants";
+import { INDUSTRIES } from "@/constants";
+import { updateClient, type Client } from "@/api/clientApi";
 
 interface EditClientModalProps {
   client: Client;
@@ -43,7 +43,7 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
     setFormData((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSave(): void {
+  async function handleSave(): Promise<void> {
     if (!formData.clientName.trim()) {
       toast.error("Client name is required");
       return;
@@ -56,23 +56,19 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
 
     setIsSaving(true);
 
-    const updatedClient: Client = {
-      ...client,
-      name: formData.clientName.trim(),
-      industry: formData.industry,
-      notes: formData.notes,
-    };
-
     try {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      const clients = raw ? (JSON.parse(raw) as Client[]) : [];
-      const updated = clients.map((c) => (c.id === updatedClient.id ? updatedClient : c));
-      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updated));
+      const updatedClient = await updateClient(client.id, {
+        name: formData.clientName.trim(),
+        industry: formData.industry,
+        notes: formData.notes || undefined,
+      });
 
       toast.success(`Client "${updatedClient.name}" updated successfully`);
       onClientUpdated(updatedClient);
     } catch (error) {
+      console.error("Failed to update client:", error);
       toast.error("Failed to update client");
+    } finally {
       setIsSaving(false);
     }
   }

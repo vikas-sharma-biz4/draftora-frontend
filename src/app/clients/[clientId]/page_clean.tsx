@@ -10,6 +10,7 @@ import styles from "./page.module.scss";
 
 import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
 import { listProposals } from "@/api/proposalApi";
+import type { ProposalListItem } from "@/types/proposal.types";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -28,7 +29,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [client, setClient] = useState<ClientWithDocuments | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
-  const [clientProposals, setClientProposals] = useState<any[]>([]);
+  const [clientProposals, setClientProposals] = useState<ProposalListItem[]>([]);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 

@@ -7,14 +7,15 @@ import { toast } from "sonner";
 
 import styles from "./NewClientModal.module.scss";
 
-import type { Client, ClientDocument, NewClientFormData } from "@/types/client.types";
-import { CLIENTS_STORAGE_KEY, INDUSTRIES, PIPELINE_STAGES } from "@/constants";
+import { createClient, uploadDocument, type Client as ApiClient } from "@/api/clientApi";
+import type { NewClientFormData } from "@/types/client.types";
+import { INDUSTRIES, PIPELINE_STAGES } from "@/constants";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
 
 interface NewClientModalProps {
   onClose: () => void;
-  onClientCreated: (client: Client) => void;
+  onClientCreated: () => void;
 }
 
 export default function NewClientModal({ onClose, onClientCreated }: NewClientModalProps): JSX.Element | null {
@@ -210,49 +211,30 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
 
     setIsCreating(true);
 
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
-
-    const documents: ClientDocument[] = uploadedFiles.map((uploaded, index) => {
-      const ext = uploaded.file.name.split(".").pop()?.toLowerCase() as "pdf" | "docx" | "xlsx" | "pptx";
-      return {
-        id: uploaded.id,
-        name: uploaded.file.name,
-        size: formatFileSize(uploaded.file.size),
-        date: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
-        status: uploaded.status === "parsed" ? "parsed" : "processing",
-        fileType: ext || "pdf",
-        selected: false,
-      };
-    });
-
-    const newClient: Client = {
-      id: clientId,
-      name: formData.clientName,
-      industry: formData.industry,
-      tier: "Mid-Market",
-      onboardedDate: new Date().toLocaleDateString("en-US", { month: "short", year: "numeric" }),
-      status: "active",
-      documents,
-      proposals: [],
-      primaryContact: formData.primaryContactName && formData.primaryContactEmail
-        ? {
-            name: formData.primaryContactName,
-            email: formData.primaryContactEmail,
-          }
-        : undefined,
-      pipelineStage: formData.pipelineStage,
-      notes: formData.notes,
-    };
-
     try {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      const clients = raw ? (JSON.parse(raw) as Client[]) : [];
-      clients.push(newClient);
-      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(clients));
+      // Create client via API
+      const newClient = await createClient({
+        name: formData.clientName,
+        industry: formData.industry,
+        notes: formData.notes || undefined,
+      });
+
+      // Upload documents if any
+      if (uploadedFiles.length > 0) {
+        for (const uploaded of uploadedFiles) {
+          try {
+            await uploadDocument(newClient.id, uploaded.file);
+          } catch (error) {
+            console.error(`Failed to upload ${uploaded.file.name}:`, error);
+            toast.error(`Failed to upload ${uploaded.file.name}`);
+          }
+        }
+      }
 
       toast.success(`Client "${formData.clientName}" created successfully`);
-      onClientCreated(newClient);
+      onClientCreated();
     } catch (error) {
+      console.error("Failed to create client:", error);
       toast.error("Failed to create client");
       setIsCreating(false);
     }
