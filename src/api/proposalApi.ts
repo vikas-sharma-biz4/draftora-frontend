@@ -57,6 +57,7 @@ export async function generateProposal(
 
   const proposalPayload = {
     title: data.title,
+    client_id: data.clientId || 0,
     client_name: data.clientName,
     description: data.description,
     tone: data.tone,
@@ -67,6 +68,7 @@ export async function generateProposal(
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
     contextual_instructions: contextual || null,
     web_references: data.webReferences,
+    selected_document_ids: data.selectedDocumentIds || [],
   };
 
   formData.append("proposal_data", JSON.stringify(proposalPayload));
@@ -193,8 +195,10 @@ export async function listProposals(): Promise<ProposalListItem[]> {
   return (json.data as Array<Record<string, unknown>>).map((item) => ({
     id: item.id as number,
     title: item.title as string,
+    clientId: item.client_id as number,
     clientName: item.client_name as string,
     status: item.status as string,
+    approvalStatus: (item.approval_status as "pending" | "approved" | "rejected") || "pending",
     tone: item.tone as string,
     lengthPreference: item.length_preference as string,
     createdAt: item.created_at as string,
@@ -401,4 +405,22 @@ export async function getSupportedParseFormats(): Promise<string[]> {
   });
   const json = await res.json();
   return (json?.data?.extensions ?? []) as string[];
+}
+
+/**
+ * Update the approval status of a proposal
+ */
+export async function updateApprovalStatus(
+  proposalId: number,
+  status: "pending" | "approved" | "rejected"
+): Promise<ProposalData> {
+  const res = await fetch(
+    `${API_BASE_URL}/proposals/${proposalId}/approval-status?approval_status=${status}`,
+    {
+      method: "PATCH",
+      headers: BASE_HEADERS,
+    }
+  );
+
+  return handleResponse<ProposalData>(res);
 }

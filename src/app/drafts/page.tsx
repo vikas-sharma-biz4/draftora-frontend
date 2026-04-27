@@ -95,7 +95,7 @@ export default function DraftsPage(): JSX.Element {
             <div className={styles.emptyDesc}>
               Drafts are automatically saved as you work on proposals. Start a new proposal to create your first draft.
             </div>
-            <button className="btn btn-primary" onClick={() => router.push("/home")}>
+            <button className="btn btn-primary" onClick={() => router.push("/")}>
               Create New Proposal
             </button>
           </div>
