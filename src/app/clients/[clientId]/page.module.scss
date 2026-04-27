@@ -231,9 +231,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   margin-top: 4px;
+  white-space: nowrap;
 }
 
 .documentStatus {
