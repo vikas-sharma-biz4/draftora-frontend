@@ -17,10 +17,8 @@ export const AI_MODEL_DEFAULT = "gpt-4o";
 
 export const WIZARD_STEPS = [
   { step: 1, label: "Define Scope", path: "/" },
-  { step: 2, label: "Knowledge Base", path: "/knowledge-base" },
-  { step: 3, label: "Templates", path: "/templates" },
-  { step: 4, label: "Parameters", path: "/parameters" },
-  { step: 5, label: "Review", path: "/review" },
+  { step: 2, label: "Parameters", path: "/parameters" },
+  { step: 3, label: "Review", path: "/review" },
 ] as const;
 
 export const TONE_OPTIONS = [

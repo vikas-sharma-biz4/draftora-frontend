@@ -22,7 +22,7 @@ export interface ProposalData {
   id?: number;
   title: string;
   clientName: string;
-  clientId?: string;
+  clientId?: number;
   description: string;
   tone: string;
   lengthPreference: string;
@@ -35,12 +35,13 @@ export interface ProposalData {
   webReferences: string[];
   files: File[];
   filesMeta: FileMeta[];
-  selectedDocumentIds?: string[];
+  selectedDocumentIds?: number[];
   // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;
   // Response fields from backend
   status?: string;
+  approvalStatus?: "pending" | "approved" | "rejected";
   sections?: Record<string, string>;
   /** Maps section_key → content type: "table" | "bullets" | "diagram" | "paragraph" */
   sectionTypes?: Record<string, string>;
@@ -74,8 +75,10 @@ export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 export interface ProposalListItem {
   id: number;
   title: string;
+  clientId: number;
   clientName: string;
   status: string;
+  approvalStatus: "pending" | "approved" | "rejected";
   tone: string;
   lengthPreference: string;
   createdAt: string;

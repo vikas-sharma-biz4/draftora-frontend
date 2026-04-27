@@ -1,14 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Target, Code, Palette, Check, X, Plus, Sparkles, Lock } from "lucide-react";
+import { Briefcase, Target, Code, Palette, Check, X, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
-import { suggestSections } from "@/api/proposalApi";
+// NOTE: suggestSections API is kept available for a future "AI section recommendations" feature
 import type { SectionItem } from "@/components/common/SortableSectionList";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
@@ -64,38 +64,6 @@ export default function ParametersPage(): JSX.Element {
   const [editLabel, setEditLabel] = useState<string>("");
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
-  const [isSuggestingAI, setIsSuggestingAI] = useState<boolean>(false);
-
-  const fetchAISuggestions = useCallback(async (): Promise<void> => {
-    if (!proposalData.title && !proposalData.description) return;
-    setIsSuggestingAI(true);
-    try {
-      const suggested = await suggestSections({
-        title: proposalData.title,
-        description: proposalData.description,
-        template_type: proposalData.templateType,
-        context: proposalData.contextualInstructions || undefined,
-      });
-      const items: SectionItem[] = suggested.map((s) => ({
-        key: s.key,
-        label: s.label,
-      }));
-      setSections(items);
-      const displayNames: Record<string, string> = {};
-      for (const s of suggested) {
-        displayNames[s.key] = s.label;
-      }
-      updateProposalData({
-        selectedSections: items.map((s) => s.key),
-        sectionDisplayNames: displayNames,
-      });
-      toast.success(`AI suggested ${items.length} sections for your proposal.`);
-    } catch {
-      toast.error("Could not fetch AI suggestions. You can add sections manually.");
-    } finally {
-      setIsSuggestingAI(false);
-    }
-  }, [proposalData.title, proposalData.description, proposalData.templateType, proposalData.contextualInstructions, updateProposalData]);
 
   // Sync local sections state with proposalData (e.g., after localStorage rehydration)
   useEffect(() => {
@@ -103,17 +71,6 @@ export default function ParametersPage(): JSX.Element {
       buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
     );
   }, [proposalData.selectedSections, proposalData.sectionDisplayNames]);
-
-  // Auto-suggest when coming from scratch with no sections
-  useEffect(() => {
-    if (
-      proposalData.templateType === "scratch" &&
-      proposalData.selectedSections.length === 0 &&
-      (proposalData.title || proposalData.description)
-    ) {
-      fetchAISuggestions();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleStartEdit(item: SectionItem): void {
     setEditingKey(item.key);
@@ -189,8 +146,8 @@ export default function ParametersPage(): JSX.Element {
   }
 
   function handleBack(): void {
-    setCurrentStep(3);
-    router.push("/templates");
+    setCurrentStep(1);
+    router.push("/");
   }
 
   const currentLengthOption = LENGTH_OPTIONS.find(
@@ -222,26 +179,12 @@ export default function ParametersPage(): JSX.Element {
               </span>
               <span className="badge badge-primary">{sections.length} sections</span>
             </div>
-            <button
-              className="btn btn-secondary btn-sm flex-center gap-6"
-              onClick={fetchAISuggestions}
-              disabled={isSuggestingAI}
-            >
-              <Sparkles size={13} />
-              {isSuggestingAI ? "Thinking…" : "AI Suggest"}
-            </button>
           </div>
 
-          {isSuggestingAI ? (
-            <div className="sections-ai-loading">
-              <div className="tmpl-spinner" aria-hidden="true" />
-              AI is suggesting the best sections for your proposal…
-            </div>
-          ) : sections.length === 0 ? (
+          {sections.length === 0 ? (
             <div className="ai-loading-hint">
               <div className="font-24 mb-8">✦</div>
-              No sections yet. Click{" "}
-              <strong>AI Suggest</strong> or add one manually below.
+              No sections yet. Add one manually below.
             </div>
           ) : (
             <SortableSectionList
