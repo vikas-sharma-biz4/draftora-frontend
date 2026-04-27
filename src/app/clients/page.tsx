@@ -122,16 +122,11 @@ export default function ClientsPage(): JSX.Element {
                       <Calendar size={14} />
                       <span>Created {new Date(client.created_at).toLocaleDateString()}</span>
                     </div>
-                    {client.notes && (
-                      <div className={styles.clientCardMetaItem}>
-                        <span>{client.notes}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 <div className={styles.clientCardFooter}>
-                  <span className={styles.clientCardTier}>{client.industry}</span>
+                  <span className={styles.clientCardTier}>Active Client</span>
                 </div>
               </article>
             ))}

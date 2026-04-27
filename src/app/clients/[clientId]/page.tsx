@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Upload, Search, FileText, Edit, CheckCircle, Clock, X } from "lucide-react";
+import { Upload, Search, FileText, Edit, CheckCircle, Clock, X, Filter } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
@@ -148,71 +148,218 @@ export default function ClientWorkspacePage(): JSX.Element {
     <div className="app-container">
       <MainSidebar />
       <main className="main-content">
-        {/* Rest of the component remains the same */}
-        <div className={styles.header}>
-          <div>
-            <h1 className="page-title">{client.name}</h1>
-            <p className="page-subtitle">{client.industry}</p>
+        <div className={styles.clientHeader}>
+          <div className={styles.clientHeaderLeft}>
+            <div className={styles.clientBadge}>
+              <span className={styles.clientBadgeLabel}>Client Workspace</span>
+              <span className={styles.clientBadgeStatus}>Active</span>
+            </div>
+            <h1 className={styles.clientName}>{client.name}</h1>
+            <p className={styles.clientMeta}>{client.industry} • Active • Created {new Date(client.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
           </div>
-          <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
-            <Edit size={18} />
-            Edit Client
-          </button>
+          <div className={styles.clientHeaderActions}>
+            <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
+              <Edit size={18} />
+              Edit Details
+            </button>
+            <button className="btn btn-primary" onClick={() => router.push('/')}>
+              New Proposal
+            </button>
+          </div>
         </div>
 
-        <div className={styles.documentsSection}>
-          <div className={styles.sectionHeader}>
-            <h2>Documents</h2>
-            <button 
-              className="btn btn-primary"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload size={18} />
-              Upload Document
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.xlsx,.pptx"
-              multiple
-              onChange={handleFileInputChange}
-              style={{ display: 'none' }}
-            />
+        <div className={styles.splitLayout}>
+          {/* Knowledge Base Section */}
+          <div className={styles.knowledgeBase}>
+            <div className={styles.panelHeader}>
+              <div>
+                <h2 className={styles.panelTitle}>Knowledge Base</h2>
+                <p className={styles.panelSubtitle}>Source documents for context generation</p>
+              </div>
+              <button 
+                className={styles.uploadBtn}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingFiles.size > 0}
+                title="Upload Document"
+              >
+                <Upload size={20} />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.xlsx,.pptx"
+                multiple
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {filteredDocuments.length === 0 ? (
+              <div className={styles.emptyState}>
+                <FileText size={48} />
+                <p>No documents yet</p>
+                <p>Upload documents to build context</p>
+              </div>
+            ) : (
+              <div className={styles.documentList}>
+                {filteredDocuments.map((doc) => {
+                  const iconClass = doc.file_type === 'pdf' ? styles.iconPdf :
+                                   doc.file_type === 'docx' ? styles.iconDocx :
+                                   doc.file_type === 'xlsx' ? styles.iconXlsx :
+                                   styles.iconDefault;
+                  
+                  return (
+                    <div key={doc.id} className={styles.documentItem}>
+                      <div className={`${styles.documentIcon} ${iconClass}`}>
+                        <FileText size={20} />
+                      </div>
+                      <div className={styles.documentInfo}>
+                        <div className={styles.documentName}>{doc.name}</div>
+                        <div className={styles.documentMeta}>
+                          <span>{Math.round(doc.size_bytes / 1024)} KB</span>
+                          <span>•</span>
+                          <span>{new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                        </div>
+                      </div>
+                      <div className={styles.documentStatus}>
+                        {doc.status === 'parsed' ? (
+                          <span className={styles.statusParsed}>
+                            <span className={styles.statusDot}></span>
+                            PARSED
+                          </span>
+                        ) : (
+                          <span className={styles.statusProcessing}>
+                            <span className={styles.statusDotProcessing}></span>
+                            PROCESSING
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        className={styles.deleteDocBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDocument(doc.id);
+                        }}
+                        title="Delete document"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className={styles.searchBar}>
-            <Search size={18} />
-            <input
-              type="text"
-              placeholder="Search documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          <div className={styles.documentsGrid}>
-            {filteredDocuments.map((doc) => (
-              <div key={doc.id} className={styles.documentCard}>
-                <div className={styles.documentIcon}>
-                  <FileText size={24} />
+          {/* Proposal History Section */}
+          <div className={styles.proposalHistory}>
+            <div className={styles.panelHeader}>
+              <div>
+                <h2 className={styles.panelTitle}>Proposal History</h2>
+                <p className={styles.panelSubtitle}>Recent outputs and generated drafts</p>
+              </div>
+              <div className={styles.headerActions}>
+                <div className={styles.searchInput}>
+                  <Search size={14} className={styles.searchIcon} />
+                  <input
+                    type="text"
+                    placeholder="Search proposals..."
+                  />
                 </div>
-                <div className={styles.documentInfo}>
-                  <h3>{doc.name}</h3>
-                  <p>{doc.file_type.toUpperCase()} • {Math.round(doc.size_bytes / 1024)} KB</p>
-                  <span className={`${styles.status} ${styles[doc.status]}`}>
-                    {doc.status === 'parsed' ? <CheckCircle size={14} /> : <Clock size={14} />}
-                    {doc.status}
-                  </span>
-                </div>
-                <button
-                  className={styles.deleteBtn}
-                  onClick={() => handleDeleteDocument(doc.id)}
-                  title="Delete document"
-                >
-                  <X size={18} />
+                <button className={styles.filterBtn}>
+                  <Filter size={18} />
                 </button>
               </div>
-            ))}
+            </div>
+
+            {clientProposals.length === 0 ? (
+              <div className={styles.emptyState}>
+                <FileText size={48} />
+                <p>No proposals yet</p>
+                <p>Create a proposal to get started</p>
+              </div>
+            ) : (
+              <div className={styles.tableWrapper}>
+                <table className={styles.proposalTable}>
+                  <thead>
+                    <tr>
+                      <th>Document Name</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th className={styles.actionsCol}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientProposals.map((proposal) => (
+                      <tr 
+                        key={proposal.id} 
+                        className={styles.proposalRow}
+                        onClick={() => router.push(`/proposal/${proposal.id}`)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <td>
+                          <div className={styles.proposalName}>{proposal.title}</div>
+                          <div className={styles.proposalVersion}>Version 1.0</div>
+                        </td>
+                        <td>
+                          <span className={styles.typeBadge}>BRD</span>
+                        </td>
+                        <td className={styles.dateCell}>
+                          {new Date(proposal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </td>
+                        <td>
+                          <div className={styles.statusCell}>
+                            {proposal.approvalStatus === 'approved' && (
+                              <>
+                                <CheckCircle size={16} className={styles.statusIconFinalized} />
+                                <span>Finalized</span>
+                              </>
+                            )}
+                            {proposal.approvalStatus === 'rejected' && (
+                              <>
+                                <Clock size={16} className={styles.statusIconReview} />
+                                <span className={styles.statusReview}>In Review</span>
+                              </>
+                            )}
+                            {proposal.approvalStatus === 'pending' && (
+                              <>
+                                <Clock size={16} className={styles.statusIconDraft} />
+                                <span>Draft</span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className={styles.actionsCol}>
+                          <div className={styles.actionButtons}>
+                            <button 
+                              className={styles.actionBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Download PDF
+                              }}
+                              title="Download PDF"
+                            >
+                              <FileText size={18} />
+                            </button>
+                            <button 
+                              className={styles.actionBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Download Word
+                              }}
+                              title="Download Word"
+                            >
+                              <FileText size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
 

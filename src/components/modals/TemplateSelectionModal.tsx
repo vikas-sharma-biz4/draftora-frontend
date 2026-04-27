@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import styles from "./TemplateSelectionModal.module.scss";
 
-import { listClients, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
+import { listClients, getClient, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
 import { PROPOSAL_TEMPLATES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
@@ -33,7 +33,7 @@ export default function TemplateSelectionModal({
   const [mounted, setMounted] = useState<boolean>(false);
   const [clients, setClients] = useState<ClientWithDocuments[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [proposalName, setProposalName] = useState<string>("");
   const [proposalDescription, setProposalDescription] = useState<string>("");
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
@@ -58,7 +58,7 @@ export default function TemplateSelectionModal({
   useEffect(() => {
     if (selectedClientId) {
       const client = clients.find((c) => c.id === selectedClientId);
-      if (client) {
+      if (client && client.documents) {
         const allDocIds = new Set(client.documents.filter((d) => d.status === "parsed").map((d) => d.id));
         setSelectedDocuments(allDocIds);
       }
@@ -143,13 +143,30 @@ export default function TemplateSelectionModal({
   }
 
   /**
-   * Loads client list from API.
+   * Loads client list from API with documents.
    */
   async function loadClients(): Promise<void> {
     try {
       setLoading(true);
-      const loadedClients = await listClients();
-      setClients(loadedClients);
+      const clientList = await listClients();
+      
+      // Fetch each client with documents
+      const clientsWithDocs = await Promise.all(
+        clientList.map(async (client) => {
+          try {
+            return await getClient(client.id);
+          } catch (error) {
+            console.error(`Failed to load documents for client ${client.id}:`, error);
+            // Return client without documents if fetch fails
+            return {
+              ...client,
+              documents: [],
+            } as ClientWithDocuments;
+          }
+        })
+      );
+      
+      setClients(clientsWithDocs);
     } catch (error) {
       console.error("Failed to load clients:", error);
       toast.error("Failed to load clients");
@@ -187,7 +204,7 @@ export default function TemplateSelectionModal({
     setTimeout(() => setShowClientDropdown(false), 200);
   }
 
-  function toggleDocument(docId: string): void {
+  function toggleDocument(docId: number): void {
     setSelectedDocuments((prev) => {
       const next = new Set(prev);
       if (next.has(docId)) {
@@ -201,7 +218,7 @@ export default function TemplateSelectionModal({
 
   function toggleAllDocuments(): void {
     const client = clients.find((c) => c.id === selectedClientId);
-    if (!client) return;
+    if (!client || !client.documents) return;
 
     const parsedDocs = client.documents.filter((d) => d.status === "parsed");
     if (selectedDocuments.size === parsedDocs.length) {
@@ -352,12 +369,12 @@ export default function TemplateSelectionModal({
     if (!client) return;
 
     const selectedDocIds = Array.from(selectedDocuments);
-    const selectedDocsMeta = client.documents
+    const selectedDocsMeta = (client.documents || [])
       .filter((doc) => selectedDocIds.includes(doc.id))
       .map((doc) => ({
         name: doc.name,
-        size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
-        type: doc.fileType ? String(doc.fileType) : "application/pdf",
+        size: doc.size_bytes,
+        type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
 
     const template = PROPOSAL_TEMPLATES.find((t) => t.id === templateId);
@@ -366,12 +383,12 @@ export default function TemplateSelectionModal({
       title: proposalName,
       clientName: client.name,
       description: proposalDescription,
-      clientId: selectedClientId ? parseInt(selectedClientId, 10) : undefined,
+      clientId: selectedClientId,
       templateId,
       templateType: "predefined",
       selectedSections: template ? [...template.sections] : [],
       sectionDisplayNames: {},
-      selectedDocumentIds: selectedDocIds.map(id => typeof id === 'string' ? parseInt(id, 10) : id),
+      selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
     });
 
@@ -411,7 +428,11 @@ export default function TemplateSelectionModal({
         <div className={styles.modalBody}>
           <div className={styles.section}>
             <label className={styles.label}>Client Name</label>
-            {clients.length === 0 ? (
+            {loading ? (
+              <div className={styles.noClients}>
+                <p>Loading clients...</p>
+              </div>
+            ) : clients.length === 0 ? (
               <div className={styles.noClients}>
                 <p>No clients found. Create your first client to continue.</p>
                 <button className="btn btn-primary btn-sm" onClick={handleNewClientClick}>
@@ -451,7 +472,7 @@ export default function TemplateSelectionModal({
                           <span className={styles.clientOptionIndustry}>{client.industry}</span>
                         </div>
                         <div className={styles.clientOptionMeta}>
-                          {client.documents.length} docs • {client.proposals.length} proposals
+                          {client.documents?.length || 0} docs
                         </div>
                       </button>
                     ))}
@@ -495,7 +516,7 @@ export default function TemplateSelectionModal({
               <div className={styles.sectionHeader}>
                 <label className={styles.label}>Knowledge Base Selection</label>
                 <button className={styles.toggleAllBtn} onClick={toggleAllDocuments}>
-                  {selectedDocuments.size === selectedClient.documents.filter((d) => d.status === "parsed").length
+                  {selectedDocuments.size === (selectedClient.documents?.filter((d) => d.status === "parsed").length || 0)
                     ? "Deselect All"
                     : "Select All"}
                 </button>
@@ -505,12 +526,12 @@ export default function TemplateSelectionModal({
               </p>
 
               <div className={styles.documentList}>
-                {selectedClient.documents.filter((d) => d.status === "parsed").length === 0 ? (
+                {(selectedClient.documents?.filter((d) => d.status === "parsed").length || 0) === 0 ? (
                   <div className={styles.noDocuments}>
                     No parsed documents available for this client.
                   </div>
                 ) : (
-                  selectedClient.documents
+                  (selectedClient.documents || [])
                     .filter((d) => d.status === "parsed")
                     .map((doc) => (
                       <div
@@ -533,7 +554,7 @@ export default function TemplateSelectionModal({
                         <div className={styles.documentInfo}>
                           <div className={styles.documentName} title={doc.name}>{doc.name}</div>
                           <div className={styles.documentMeta}>
-                            {doc.size} • {doc.date}
+                            {formatFileSize(doc.size_bytes)} • {new Date(doc.created_at).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
