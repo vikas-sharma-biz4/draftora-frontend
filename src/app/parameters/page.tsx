@@ -8,8 +8,8 @@ import { toast } from "sonner";
 
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
-// NOTE: suggestSections API is kept available for a future "AI section recommendations" feature
 import type { SectionItem } from "@/components/common/SortableSectionList";
+import SectionRecommendations from "@/components/proposal/SectionRecommendations";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -54,8 +54,10 @@ function buildSectionItems(
 }
 
 export default function ParametersPage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
+  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, currentProposalId, draftStage, completedSteps } = useProposal();
   const router = useRouter();
+  const isRegenerating = currentProposalId !== null;
+  const isRecreateMode = proposalData.templateType === "recreate";
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
     buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
@@ -143,6 +145,10 @@ export default function ParametersPage(): JSX.Element {
     setDraftStage("parameters_complete");
     setCurrentStep(5);
     router.push("/review");
+    
+    if (isRegenerating) {
+      toast.info("Parameters updated. Review and regenerate to apply changes.");
+    }
   }
 
   function handleBack(): void {
@@ -159,46 +165,101 @@ export default function ParametersPage(): JSX.Element {
       <MainSidebar />
       <main className="main-content">
         <DynamicPipeline 
-          currentStage="wizard_in_progress"
-          completedSteps={[]}
+          currentStage={draftStage}
+          completedSteps={completedSteps}
           visible={true}
+          proposalId={currentProposalId}
         />
         <div className="page-badge">Phase 04</div>
         <h1 className="page-title">Step 4: Section Structure &amp; Tone</h1>
         <p className="page-subtitle">
-          Review and refine the proposal structure. Reorder, rename, or remove
-          sections — and set the tone for the generated content.
+          {isRecreateMode
+            ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
+            : "Review and refine the proposal structure. Reorder, rename, or remove sections — and set the tone for the generated content."}
         </p>
 
-        {/* ── Section Structure ── */}
-        <div className="card mb-28">
-          <div className="flex-between mb-14">
-            <div className="flex-center gap-10">
-              <span className="form-label mb-0">
-                Section Structure
-              </span>
-              <span className="badge badge-primary">{sections.length} sections</span>
+        {isRecreateMode && (
+          <div className="recreate-banner">
+            <span className="recreate-banner-icon">↺</span>
+            <div>
+              <strong>Recreate Mode</strong>
+              {proposalData.exactDocumentName && (
+                <span className="recreate-banner-file"> · {proposalData.exactDocumentName}</span>
+              )}
+              <div className="recreate-banner-hint">
+                {proposalData.originalSections?.length ?? 0} sections will be rewritten using new context.
+              </div>
             </div>
           </div>
+        )}
 
-          {sections.length === 0 ? (
-            <div className="ai-loading-hint">
-              <div className="font-24 mb-8">✦</div>
-              No sections yet. Add one manually below.
+        {/* ── Section Structure with AI Recommendations ── */}
+        <div className="parameters-layout mb-28">
+          {/* Left Column: Section Structure */}
+          <div className="card">
+            <div className="flex-between mb-14">
+              <div className="flex-center gap-10">
+                <span className="form-label mb-0">
+                  Section Structure
+                </span>
+                <span className="badge badge-primary">{sections.length} sections</span>
+              </div>
             </div>
-          ) : (
-            <SortableSectionList
-              sections={sections}
-              editingKey={editingKey}
-              editLabel={editLabel}
-              onSectionsChange={setSections}
-              onStartEdit={handleStartEdit}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={handleCancelEdit}
-              onRemove={handleRemove}
-              onEditLabelChange={setEditLabel}
-            />
-          )}
+
+          <div
+            onDrop={(e) => {
+              e.preventDefault();
+              const sectionKey = e.dataTransfer.getData("section_key");
+              const sectionTitle = e.dataTransfer.getData("section_title");
+              
+              if (sectionKey && sectionTitle) {
+                // Check if section already exists
+                if (sections.some(s => s.key === sectionKey)) {
+                  toast.error(`"${sectionTitle}" is already in the structure`);
+                  return;
+                }
+                
+                const newSection: SectionItem = {
+                  key: sectionKey,
+                  label: sectionTitle,
+                };
+                setSections([...sections, newSection]);
+                updateProposalData({
+                  selectedSections: [...sections.map(s => s.key), sectionKey],
+                  sectionDisplayNames: {
+                    ...proposalData.sectionDisplayNames,
+                    [sectionKey]: sectionTitle,
+                  },
+                });
+                toast.success(`Added "${sectionTitle}" to section structure`);
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+            }}
+            className="section-drop-zone"
+          >
+            {sections.length === 0 ? (
+              <div className="ai-loading-hint">
+                <div className="font-24 mb-8">✦</div>
+                No sections yet. Add one manually below or drag from recommendations.
+              </div>
+            ) : (
+              <SortableSectionList
+                sections={sections}
+                editingKey={editingKey}
+                editLabel={editLabel}
+                onSectionsChange={setSections}
+                onStartEdit={handleStartEdit}
+                onSaveEdit={handleSaveEdit}
+                onCancelEdit={handleCancelEdit}
+                onRemove={handleRemove}
+                onEditLabelChange={setEditLabel}
+              />
+            )}
+          </div>
+        
 
           {/* Always Included — static sections (read-only) */}
           <div className="static-sections-panel">
@@ -257,6 +318,40 @@ export default function ParametersPage(): JSX.Element {
               Add Section
             </button>
           )}
+          </div>
+
+          {/* Right Column: AI Recommendations */}
+          <SectionRecommendations
+            templateId={proposalData.templateId}
+            existingSections={sections.map(s => s.key)}
+            context={
+              isRecreateMode
+                ? proposalData.contextualInstructions || ""
+                : proposalData.contextualInstructions || ""
+            }
+            documentContext={
+              isRecreateMode
+                ? (proposalData.exactDocumentName ?? "") +
+                  (proposalData.filesMeta?.length
+                    ? ", " + proposalData.filesMeta.map((f) => f.name).join(", ")
+                    : "")
+                : proposalData.filesMeta?.map((f) => f.name).join(", ") || ""
+            }
+            onAddSection={(sectionKey, title) => {
+              const newSection: SectionItem = {
+                key: sectionKey,
+                label: title,
+              };
+              setSections([...sections, newSection]);
+              updateProposalData({
+                selectedSections: [...sections.map(s => s.key), sectionKey],
+                sectionDisplayNames: {
+                  ...proposalData.sectionDisplayNames,
+                  [sectionKey]: title,
+                },
+              });
+            }}
+          />
         </div>
 
         {/* ── Tone of Voice ── */}

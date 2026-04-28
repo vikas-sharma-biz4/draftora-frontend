@@ -58,7 +58,8 @@ export default function ClientWorkspacePage(): JSX.Element {
   async function loadClient(): Promise<void> {
     try {
       setLoading(true);
-      const clientId = typeof params.clientId === 'string' ? parseInt(params.clientId, 10) : params.clientId as number;
+      const rawId = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
+      const clientId = parseInt(rawId, 10);
       const loadedClient = await getClient(clientId);
       setClient(loadedClient);
     } catch (error) {

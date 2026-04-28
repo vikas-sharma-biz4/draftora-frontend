@@ -3,12 +3,12 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Users, Plus, Building2, Calendar } from "lucide-react";
+import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { listClients, type Client } from "@/api/clientApi";
+import { listClients, deleteClient, type Client } from "@/api/clientApi";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -29,17 +29,17 @@ export default function ClientsPage(): JSX.Element {
     loadClients();
   }, []);
 
-  async function loadClients(): Promise<void> {
+  async function loadClients(silent = false): Promise<void> {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const loadedClients = await listClients();
       setClients(loadedClients);
     } catch (error) {
       console.error("Failed to load clients:", error);
       toast.error("Failed to load clients");
-      setClients([]);
+      if (!silent) setClients([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -52,8 +52,22 @@ export default function ClientsPage(): JSX.Element {
   }
 
   function handleClientCreated(): void {
-    loadClients();
+    loadClients(true); // Silent refresh — keeps existing list visible while updating
     setShowNewClientModal(false);
+  }
+
+  async function handleDeleteClient(clientId: number, e: React.MouseEvent): Promise<void> {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this client?")) return;
+
+    try {
+      await deleteClient(clientId);
+      toast.success("Client deleted");
+      setClients((prev) => prev.filter((c) => c.id !== clientId));
+    } catch (error) {
+      console.error("Failed to delete client:", error);
+      toast.error("Failed to delete client");
+    }
   }
 
   return (
@@ -108,9 +122,18 @@ export default function ClientsPage(): JSX.Element {
                   <div className={styles.clientCardIcon}>
                     <Building2 size={24} />
                   </div>
-                  <span className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}>
-                    {client.status}
-                  </span>
+                  <div className={styles.clientCardActions}>
+                    <span className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}>
+                      {client.status}
+                    </span>
+                    <button
+                      className={styles.deleteClientBtn}
+                      onClick={(e) => handleDeleteClient(client.id, e)}
+                      title="Delete client"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className={styles.clientCardBody}>
