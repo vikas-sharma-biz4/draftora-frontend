@@ -10,7 +10,15 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch";
+export type TemplateType = "predefined" | "custom" | "scratch" | "recreate";
+
+export interface OriginalSection {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  type: "text" | "table" | "mixed";
+}
 
 export interface FileMeta {
   name: string;
@@ -39,6 +47,12 @@ export interface ProposalData {
   // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;
+  // Recreate mode: sections extracted from the exact document
+  originalSections?: OriginalSection[];
+  // Recreate mode: maps section_key -> original content for rewrite prompts
+  originalSectionContents?: Record<string, string>;
+  // Recreate mode: filename of the uploaded exact document
+  exactDocumentName?: string;
   // Response fields from backend
   status?: string;
   approvalStatus?: "pending" | "approved" | "rejected";

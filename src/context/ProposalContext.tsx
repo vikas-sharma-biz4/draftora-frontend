@@ -22,6 +22,8 @@ interface ProposalContextType {
   setIsGenerating: (val: boolean) => void;
   generatedProposalId: number | null;
   setGeneratedProposalId: (id: number | null) => void;
+  currentProposalId: number | null;
+  setCurrentProposalId: (id: number | null) => void;
   resetProposal: () => void;
   hydrated: boolean;
   editMode: boolean;
@@ -72,6 +74,7 @@ export function ProposalProvider({
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(
     null
   );
+  const [currentProposalId, setCurrentProposalId] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
@@ -96,6 +99,8 @@ export function ProposalProvider({
         const saved = JSON.parse(raw) as {
           proposalData?: Partial<ProposalData>;
           currentStep?: WizardStep;
+          draftStage?: DraftStage;
+          completedSteps?: number[];
         };
         if (saved.proposalData) {
           setProposalData({
@@ -107,6 +112,12 @@ export function ProposalProvider({
         }
         if (saved.currentStep) {
           setCurrentStep(saved.currentStep);
+        }
+        if (saved.draftStage) {
+          setDraftStage(saved.draftStage);
+        }
+        if (saved.completedSteps) {
+          setCompletedSteps(saved.completedSteps);
         }
       }
     } catch {
@@ -122,12 +133,14 @@ export function ProposalProvider({
       const toSave = {
         proposalData: { ...proposalData, files: [] }, // filesMeta is kept (serializable)
         currentStep,
+        draftStage,
+        completedSteps,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch {
       // Ignore storage quota errors
     }
-  }, [proposalData, currentStep, hydrated]);
+  }, [proposalData, currentStep, hydrated, draftStage, completedSteps]);
 
   const updateProposalData = useCallback(
     (updates: Partial<ProposalData>): void => {
@@ -148,6 +161,7 @@ export function ProposalProvider({
     setCurrentStep(1);
     setIsGenerating(false);
     setGeneratedProposalId(null);
+    setCurrentProposalId(null);
     setEditMode(false);
     setMaxStepReached(1);
     setDraftStage("template_selection");
@@ -170,6 +184,8 @@ export function ProposalProvider({
         setIsGenerating,
         generatedProposalId,
         setGeneratedProposalId,
+        currentProposalId,
+        setCurrentProposalId,
         resetProposal,
         hydrated,
         editMode,

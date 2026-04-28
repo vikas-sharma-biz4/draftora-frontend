@@ -55,7 +55,7 @@ export async function generateProposal(
     ...Object.fromEntries(data.customSections.map((s) => [s.key, s.label])),
   };
 
-  const proposalPayload = {
+  const proposalPayload: Record<string, unknown> = {
     title: data.title,
     client_id: data.clientId || 0,
     client_name: data.clientName,
@@ -63,6 +63,7 @@ export async function generateProposal(
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
+    template_type: data.templateType || "scratch",
     ai_model: data.aiModel || null,
     selected_sections: allSections,
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
@@ -70,6 +71,11 @@ export async function generateProposal(
     web_references: data.webReferences,
     selected_document_ids: data.selectedDocumentIds || [],
   };
+
+  // Recreate mode: pass original section contents for per-section rewrite prompts
+  if (data.templateType === "recreate" && data.originalSectionContents) {
+    proposalPayload["original_section_contents"] = data.originalSectionContents;
+  }
 
   formData.append("proposal_data", JSON.stringify(proposalPayload));
 
@@ -423,4 +429,99 @@ export async function updateApprovalStatus(
   );
 
   return handleResponse<ProposalData>(res);
+}
+
+// ── Recreate template document parsing ──────────────────────────────────────
+
+export interface RecreateExtractedSection {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  type: string;
+}
+
+export interface ParseRecreateResult {
+  sections: RecreateExtractedSection[];
+  sourceType: string;
+  totalSections: number;
+  fullText: string;
+}
+
+/**
+ * Parse a document fully for recreate mode, returning sections with their content.
+ */
+export async function parseRecreateDocument(
+  file: File,
+  signal?: AbortSignal
+): Promise<ParseRecreateResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE_URL}/templates/parse-recreate/`, {
+    method: "POST",
+    headers: BASE_HEADERS,
+    body: formData,
+    signal,
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    const message: string =
+      json?.error?.message ?? `Document parse failed with status ${res.status}`;
+    throw new Error(message);
+  }
+
+  const d = json.data as {
+    sections: Array<{
+      id: string;
+      title: string;
+      content: string;
+      order: number;
+      type: string;
+    }>;
+    source_type: string;
+    total_sections: number;
+    full_text: string;
+  };
+
+  return {
+    sections: d.sections,
+    sourceType: d.source_type,
+    totalSections: d.total_sections,
+    fullText: d.full_text,
+  };
+}
+
+export interface SectionRecommendation {
+  section_title: string;
+  description: string;
+  reasoning: string;
+  relevance_score: number;
+}
+
+export interface RecommendSectionsRequest {
+  template_id?: string | null;
+  existing_sections: string[];
+  context: string;
+  user_prompt?: string | null;
+}
+
+/**
+ * Get AI-powered section recommendations based on context
+ */
+export async function getSectionRecommendations(
+  request: RecommendSectionsRequest
+): Promise<SectionRecommendation[]> {
+  const res = await fetch(`${API_BASE_URL}/proposals/recommend-sections`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...BASE_HEADERS,
+    },
+    body: JSON.stringify(request),
+  });
+
+  const response = await handleResponse<{ recommendations: SectionRecommendation[] }>(res);
+  return response.recommendations;
 }

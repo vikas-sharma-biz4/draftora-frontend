@@ -91,6 +91,12 @@
   justify-content: center;
 }
 
+.clientCardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .clientCardStatus {
   padding: 4px 10px;
   border-radius: var(--radius-full);
@@ -98,6 +104,29 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.deleteClientBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-light);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.clientCard:hover .deleteClientBtn {
+  opacity: 1;
+}
+
+.deleteClientBtn:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
 
 .statusActive {

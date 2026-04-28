@@ -2,16 +2,24 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
 import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
+import { listClientsWithDocuments, getCachedClientsWithDocuments, invalidateClientsCache } from "@/api/clientApi";
+import type { ClientWithDocuments } from "@/api/clientApi";
 import { useProposal } from "@/context/ProposalContext";
 import { parseCustomTemplate } from "@/api/proposalApi";
 import type { ExtractedTemplateSection } from "@/api/proposalApi";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
+
+// Eagerly warm the client cache the moment this page module is loaded.
+// By the time the user reads the page and clicks a template, the fetch is
+// already in-flight (or complete), eliminating the "Loading clients..." state.
+listClientsWithDocuments().catch(() => {});
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -26,7 +34,12 @@ const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"
   ssr: false,
 });
 
-type SelectionMode = "template" | "scratch" | "upload";
+const RecreateTemplateModal = dynamic(
+  () => import("@/components/modals/RecreateTemplateModal"),
+  { ssr: false }
+);
+
+type SelectionMode = "template" | "scratch" | "upload" | "recreate";
 
 export default function HomePage(): JSX.Element {
   const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps } = useProposal();
@@ -41,11 +54,46 @@ export default function HomePage(): JSX.Element {
   const [extractedSections, setExtractedSections] = useState<ExtractedTemplateSection[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const [showRecreateModal, setShowRecreateModal] = useState<boolean>(false);
+  const [preloadedClients, setPreloadedClients] = useState<ClientWithDocuments[] | null>(
+    getCachedClientsWithDocuments()
+  );
+  const [isClientsPrefetching, setIsClientsPrefetching] = useState<boolean>(false);
+
+  const prefetchClients = useCallback(async (): Promise<void> => {
+    try {
+      const clientsWithDocs = await listClientsWithDocuments();
+      setPreloadedClients(clientsWithDocs);
+    } catch {
+      setPreloadedClients([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    prefetchClients();
+  }, [prefetchClients]);
 
   const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
 
-  function handleSelectTemplate(id: string): void {
+  async function handleSelectTemplate(id: string): Promise<void> {
     setSelectedTemplateId(id);
+
+    if (preloadedClients !== null) {
+      setShowTemplateModal(true);
+      return;
+    }
+
+    // Clients not cached yet — await the in-flight fetch before opening the
+    // modal so the user never sees the "Loading clients..." state.
+    setIsClientsPrefetching(true);
+    try {
+      const clients = await listClientsWithDocuments();
+      setPreloadedClients(clients);
+    } catch {
+      setPreloadedClients([]);
+    } finally {
+      setIsClientsPrefetching(false);
+    }
     setShowTemplateModal(true);
   }
 
@@ -61,6 +109,8 @@ export default function HomePage(): JSX.Element {
 
   function handleClientCreated(): void {
     setShowNewClientModal(false);
+    invalidateClientsCache(); // Force fresh fetch so new client appears
+    prefetchClients(); // Background re-fetch — modal syncs via prop update + useEffect
     if (selectedTemplateId) {
       setShowTemplateModal(true);
     }
@@ -163,6 +213,7 @@ export default function HomePage(): JSX.Element {
 
   const isUploadSelected = selectionMode === "upload";
   const isScratchSelected = selectionMode === "scratch";
+  const isRecreateSelected = selectionMode === "recreate";
 
   return (
     <div className="app-container">
@@ -182,19 +233,26 @@ export default function HomePage(): JSX.Element {
         <div className="template-bento-row">
           {PROPOSAL_TEMPLATES.map((template) => {
             const isSelected = selectionMode === "template" && selectedTemplateId === template.id;
+            const isThisCardLoading = isClientsPrefetching && selectedTemplateId === template.id;
             return (
               <article
                 key={template.id}
                 className={`tmpl-card${isSelected ? " tmpl-selected" : ""}`}
-                onClick={() => handleSelectTemplate(template.id)}
+                onClick={() => !isClientsPrefetching && handleSelectTemplate(template.id)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") handleSelectTemplate(template.id);
+                  if ((e.key === "Enter" || e.key === " ") && !isClientsPrefetching) handleSelectTemplate(template.id);
                 }}
                 aria-pressed={isSelected}
+                aria-busy={isThisCardLoading}
+                style={isClientsPrefetching ? { pointerEvents: "none", opacity: isThisCardLoading ? 1 : 0.6 } : undefined}
               >
-                {isSelected && (
+                {isThisCardLoading ? (
+                  <div className="tmpl-selected-badge" aria-hidden="true" style={{ background: "var(--color-primary)" }}>
+                    <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                  </div>
+                ) : isSelected && (
                   <div className="tmpl-selected-badge" aria-hidden="true">
                     ✓
                   </div>
@@ -282,6 +340,29 @@ export default function HomePage(): JSX.Element {
             </div>
           </article>
 
+          <article
+            className={`tmpl-card tmpl-recreate${isRecreateSelected ? " tmpl-selected" : ""}`}
+            onClick={() => {
+              setSelectionMode("recreate");
+              setShowRecreateModal(true);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                setSelectionMode("recreate");
+                setShowRecreateModal(true);
+              }
+            }}
+            aria-label="Recreate an existing document with new context"
+          >
+            <div className="tmpl-upload-inner">
+              <div className="tmpl-upload-icon">{SPECIAL_CARDS.RECREATE_TEMPLATE.icon}</div>
+              <div className="tmpl-upload-label">{SPECIAL_CARDS.RECREATE_TEMPLATE.name}</div>
+              <div className="tmpl-upload-hint">{SPECIAL_CARDS.RECREATE_TEMPLATE.description}</div>
+            </div>
+          </article>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -343,6 +424,19 @@ export default function HomePage(): JSX.Element {
           </div>
         )}
 
+        {showRecreateModal && (
+          <RecreateTemplateModal
+            onClose={() => {
+              setShowRecreateModal(false);
+              setSelectionMode(null);
+            }}
+            onNewClient={() => {
+              setShowRecreateModal(false);
+              setShowNewClientModal(true);
+            }}
+          />
+        )}
+
         {showTemplateModal && selectedTemplateId && (
           <TemplateSelectionModal
             templateId={selectedTemplateId}
@@ -351,6 +445,7 @@ export default function HomePage(): JSX.Element {
             }
             onClose={handleCloseTemplateModal}
             onNewClient={handleNewClientFromModal}
+            initialClients={preloadedClients ?? undefined}
           />
         )}
 

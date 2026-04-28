@@ -363,6 +363,12 @@ export const SPECIAL_CARDS = {
     description: "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
     icon: "⇪",
   },
+  RECREATE_TEMPLATE: {
+    id: "recreate-template",
+    name: "Recreate Template",
+    description: "Upload an existing document and rewrite it with new context while preserving the original structure.",
+    icon: "↺",
+  },
 } as const;
 
 export const INDUSTRIES = [
