@@ -100,6 +100,10 @@ body {
   transition: margin-left 0.3s ease, width 0.3s ease;
 }
 
+.main-content.no-top-padding {
+  padding-top: 0;
+}
+
 /* ============================================================
    SIDEBAR
    ============================================================ */
@@ -1498,6 +1502,15 @@ body {
   background: var(--color-bg);
 }
 
+.proposal-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-bg);
+  padding: 0;
+  margin: 0;
+}
+
 .proposal-actions-bar {
   display: flex;
   align-items: center;
@@ -1905,7 +1918,15 @@ body {
 
 /* Bubble mount point — managed by BubbleMenuPlugin (floating-ui) */
 .rte-bubble-mount {
-  z-index: 100;
+  z-index: 9999;
+  position: absolute;
+  pointer-events: none;
+  transform: translateY(-100%);
+  margin-top: -10px;
+}
+
+.rte-bubble-mount > * {
+  pointer-events: auto;
 }
 
 /* Floating toolbar — rendered inside bubble mount, floats above content */
@@ -4662,11 +4683,45 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.06);
   animation: toolbarSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  max-width: 95vw;
+  max-width: 900px;
   overflow-x: auto;
   overflow-y: visible;
   position: relative;
-  z-index: 1000;
+  z-index: 10000;
+  flex-wrap: wrap;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-group:nth-child(n+3) {
+  display: none;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-divider:nth-child(n+2) {
+  display: none;
+}
+
+.rte-toolbar-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: auto;
+}
+
+.rte-toolbar-expand-btn:hover {
+  background: rgba(55, 48, 163, 0.08);
+  color: var(--color-primary);
 }
 
 @keyframes toolbarSlideIn {

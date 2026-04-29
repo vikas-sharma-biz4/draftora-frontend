@@ -58,7 +58,6 @@ export default function HomePage(): JSX.Element {
   const [preloadedClients, setPreloadedClients] = useState<ClientWithDocuments[] | null>(
     getCachedClientsWithDocuments()
   );
-  const [isClientsPrefetching, setIsClientsPrefetching] = useState<boolean>(false);
 
   const prefetchClients = useCallback(async (): Promise<void> => {
     try {
@@ -75,31 +74,15 @@ export default function HomePage(): JSX.Element {
 
   const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
 
-  async function handleSelectTemplate(id: string): Promise<void> {
+  function handleSelectTemplate(id: string): void {
     setSelectedTemplateId(id);
-
-    if (preloadedClients !== null) {
-      setShowTemplateModal(true);
-      return;
-    }
-
-    // Clients not cached yet — await the in-flight fetch before opening the
-    // modal so the user never sees the "Loading clients..." state.
-    setIsClientsPrefetching(true);
-    try {
-      const clients = await listClientsWithDocuments();
-      setPreloadedClients(clients);
-    } catch {
-      setPreloadedClients([]);
-    } finally {
-      setIsClientsPrefetching(false);
-    }
     setShowTemplateModal(true);
   }
 
   function handleCloseTemplateModal(): void {
     setShowTemplateModal(false);
     setSelectedTemplateId(null);
+    setSelectionMode(null);
   }
 
   function handleNewClientFromModal(): void {
@@ -111,7 +94,7 @@ export default function HomePage(): JSX.Element {
     setShowNewClientModal(false);
     invalidateClientsCache(); // Force fresh fetch so new client appears
     prefetchClients(); // Background re-fetch — modal syncs via prop update + useEffect
-    if (selectedTemplateId) {
+    if (selectedTemplateId || selectionMode === "scratch") {
       setShowTemplateModal(true);
     }
   }
@@ -120,6 +103,7 @@ export default function HomePage(): JSX.Element {
     setSelectionMode("scratch");
     setSelectedTemplateId(null);
     setExtractedSections([]);
+    setShowTemplateModal(true);
   }
 
   function handleUploadClick(): void {
@@ -233,26 +217,19 @@ export default function HomePage(): JSX.Element {
         <div className="template-bento-row">
           {PROPOSAL_TEMPLATES.map((template) => {
             const isSelected = selectionMode === "template" && selectedTemplateId === template.id;
-            const isThisCardLoading = isClientsPrefetching && selectedTemplateId === template.id;
             return (
               <article
                 key={template.id}
                 className={`tmpl-card${isSelected ? " tmpl-selected" : ""}`}
-                onClick={() => !isClientsPrefetching && handleSelectTemplate(template.id)}
+                onClick={() => handleSelectTemplate(template.id)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && !isClientsPrefetching) handleSelectTemplate(template.id);
+                  if (e.key === "Enter" || e.key === " ") handleSelectTemplate(template.id);
                 }}
                 aria-pressed={isSelected}
-                aria-busy={isThisCardLoading}
-                style={isClientsPrefetching ? { pointerEvents: "none", opacity: isThisCardLoading ? 1 : 0.6 } : undefined}
               >
-                {isThisCardLoading ? (
-                  <div className="tmpl-selected-badge" aria-hidden="true" style={{ background: "var(--color-primary)" }}>
-                    <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
-                  </div>
-                ) : isSelected && (
+                {isSelected && (
                   <div className="tmpl-selected-badge" aria-hidden="true">
                     ✓
                   </div>
@@ -437,12 +414,15 @@ export default function HomePage(): JSX.Element {
           />
         )}
 
-        {showTemplateModal && selectedTemplateId && (
+        {showTemplateModal && (selectedTemplateId || selectionMode === "scratch") && (
           <TemplateSelectionModal
-            templateId={selectedTemplateId}
+            templateId={selectedTemplateId ?? null}
             templateName={
-              PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name || ""
+              selectedTemplateId
+                ? PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name || ""
+                : ""
             }
+            isScratch={selectionMode === "scratch"}
             onClose={handleCloseTemplateModal}
             onNewClient={handleNewClientFromModal}
             initialClients={preloadedClients ?? undefined}

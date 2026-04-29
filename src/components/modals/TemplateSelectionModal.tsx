@@ -15,11 +15,12 @@ import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
 
 interface TemplateSelectionModalProps {
-  templateId: string;
-  templateName: string;
+  templateId?: string | null;
+  templateName?: string;
   onClose: () => void;
   onNewClient: () => void;
   initialClients?: ClientWithDocuments[];
+  isScratch?: boolean;
 }
 
 export default function TemplateSelectionModal({
@@ -28,6 +29,7 @@ export default function TemplateSelectionModal({
   onClose,
   onNewClient,
   initialClients,
+  isScratch = false,
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
@@ -376,15 +378,15 @@ export default function TemplateSelectionModal({
         type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
 
-    const template = PROPOSAL_TEMPLATES.find((t) => t.id === templateId);
+    const template = templateId ? PROPOSAL_TEMPLATES.find((t) => t.id === templateId) : null;
 
     updateProposalData({
       title: proposalName,
       clientName: client.name,
       description: proposalDescription,
       clientId: selectedClientId,
-      templateId,
-      templateType: "predefined",
+      templateId: isScratch ? null : templateId ?? null,
+      templateType: isScratch ? "scratch" : "predefined",
       selectedSections: template ? [...template.sections] : [],
       sectionDisplayNames: {},
       selectedDocumentIds: selectedDocIds,
@@ -414,9 +416,13 @@ export default function TemplateSelectionModal({
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
-            <h2 className={styles.modalTitle}>Create Proposal from Template</h2>
+            <h2 className={styles.modalTitle}>
+              {isScratch ? "Start From Scratch" : "Create Proposal from Template"}
+            </h2>
             <p className={styles.modalSubtitle}>
-              Using <strong>{templateName}</strong> template
+              {isScratch
+                ? "Build a proposal without a predefined template"
+                : <>Using <strong>{templateName}</strong> template</>}
             </p>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">

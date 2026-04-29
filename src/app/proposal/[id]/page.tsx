@@ -354,7 +354,7 @@ export default function ProposalOutputPage(): JSX.Element {
     <div className="app-container">
       <MainSidebar />
       
-      <main className="main-content">
+      <main className="main-content no-top-padding">
         <div className="proposal-header-bar">
           <DynamicPipeline 
             currentStage="generated"
