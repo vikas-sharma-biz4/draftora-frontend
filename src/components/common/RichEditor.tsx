@@ -38,6 +38,7 @@ export default function RichEditor({
   const [linkUrl, setLinkUrl] = useState<string>("");
   const [showImageInput, setShowImageInput] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>("");
+  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(true);
 
   const editor = useEditor({
     extensions: [
@@ -173,6 +174,8 @@ export default function RichEditor({
     if (!editor) return;
     const el = document.createElement("div");
     el.className = "rte-bubble-mount";
+    el.style.position = 'absolute';
+    el.style.zIndex = '9999';
     document.body.appendChild(el);
     bubbleElRef.current = el;
     const plugin = BubbleMenuPlugin({
@@ -199,7 +202,7 @@ export default function RichEditor({
   if (!editor) return <div className="rte-content" />;
 
   const toolbar = (
-    <div className="rte-toolbar-modern" role="toolbar" aria-label="Formatting toolbar">
+    <div className={`rte-toolbar-modern${isToolbarCollapsed ? " collapsed" : ""}`} role="toolbar" aria-label="Formatting toolbar">
       {/* Text Formatting Group */}
       <div className="rte-toolbar-group">
         <button
@@ -438,6 +441,26 @@ export default function RichEditor({
           </button>
         </>
       )}
+      
+      {/* Expand/Collapse Button */}
+      <button
+        type="button"
+        className="rte-toolbar-expand-btn"
+        title={isToolbarCollapsed ? "Show more options" : "Show less options"}
+        onClick={() => setIsToolbarCollapsed(!isToolbarCollapsed)}
+      >
+        {isToolbarCollapsed ? (
+          <>
+            <span>More</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </>
+        ) : (
+          <>
+            <span>Less</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+          </>
+        )}
+      </button>
     </div>
   );
 
