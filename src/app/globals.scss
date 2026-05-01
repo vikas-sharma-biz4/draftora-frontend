@@ -1916,13 +1916,10 @@ body {
   position: relative;
 }
 
-/* Bubble mount point — managed by BubbleMenuPlugin (floating-ui) */
+/* Bubble mount point — managed by BubbleMenuPlugin (Floating UI) */
 .rte-bubble-mount {
   z-index: 9999;
-  position: absolute;
   pointer-events: none;
-  transform: translateY(-100%);
-  margin-top: -10px;
 }
 
 .rte-bubble-mount > * {
@@ -4839,9 +4836,6 @@ body {
 }
 
 .rte-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
   min-width: 160px;
   background: white;
   border-radius: 10px;
@@ -4893,9 +4887,6 @@ body {
 
 /* Link/Image input panel */
 .rte-link-input-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5154,12 +5145,6 @@ body {
   }
 }
 
-/* Bubble menu mount point */
-.rte-bubble-mount {
-  position: absolute;
-  z-index: 1000;
-}
-
 /* Editor content styles */
 .rte-wrapper {
   position: relative;
@@ -5383,4 +5368,42 @@ body {
   font-size: 0.75rem;
   color: #166534;
   margin-top: 3px;
+}
+
+/* ── Hierarchical Section Structure (TOC Display) ───────────────────────────── */
+
+.section-content-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-child-indicator {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+.section-structure-item.section-child {
+  background: linear-gradient(to right, rgba(55, 48, 163, 0.02) 0%, transparent 100%);
+  border-left: 2px solid var(--color-primary-medium);
+}
+
+.section-structure-item.section-child:hover {
+  background: linear-gradient(to right, rgba(55, 48, 163, 0.04) 0%, transparent 100%);
+  border-left-color: var(--color-primary);
+}
+
+.section-structure-item.section-child .section-structure-name {
+  color: var(--color-text);
+}
+
+.section-structure-item.section-child .section-structure-num {
+  color: var(--color-primary);
+  font-weight: 500;
 }

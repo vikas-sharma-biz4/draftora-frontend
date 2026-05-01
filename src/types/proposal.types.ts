@@ -18,6 +18,8 @@ export interface OriginalSection {
   content: string;
   order: number;
   type: "text" | "table" | "mixed";
+  level?: number;
+  parentId?: string;
 }
 
 export interface FileMeta {

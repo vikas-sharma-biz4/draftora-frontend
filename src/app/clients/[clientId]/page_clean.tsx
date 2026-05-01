@@ -174,7 +174,7 @@ export default function ClientWorkspacePage(): JSX.Element {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,.xlsx,.pptx"
+              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
               multiple
               onChange={handleFileInputChange}
               style={{ display: 'none' }}

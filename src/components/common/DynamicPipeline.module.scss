@@ -91,15 +91,15 @@
   font-size: 0.625rem;
   color: #9ca3af;
 
-  .step.active & {
-    background: #3730a3;
-    border-color: #3730a3;
-    color: white;
-  }
-
   .step.completed & {
     background: #10b981;
     border-color: #10b981;
+    color: white;
+  }
+
+  .step.active & {
+    background: #3730a3;
+    border-color: #3730a3;
     color: white;
   }
 }
@@ -125,13 +125,13 @@
   letter-spacing: 0.025em;
   text-transform: uppercase;
 
+  .step.completed & {
+    color: #374151;
+  }
+
   .step.active & {
     color: #3730a3;
     font-weight: 700;
-  }
-
-  .step.completed & {
-    color: #374151;
   }
 
   .step:not(.clickable):not(.active):not(.completed) & {

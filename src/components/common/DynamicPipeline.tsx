@@ -43,6 +43,7 @@ export default function DynamicPipeline({
     // URL-first: always reflects the page the user is actually on
     if (pathname === "/parameters") return 1;
     if (pathname === "/review") return 2;
+    if (pathname.startsWith("/generating/")) return 2;
     if (pathname.startsWith("/proposal/") || pathname === "/web-view") return 3;
     // Fallback for home page or other routes
     if (currentStage === "wizard_in_progress") return 1;
@@ -51,29 +52,23 @@ export default function DynamicPipeline({
     return 0;
   }
 
-  function getMaxStepReached(): number {
-    // How far the user has ever progressed — determines which steps are clickable
-    if (currentStage === "wizard_in_progress") return 1;
-    if (currentStage === "parameters_complete") return 2;
-    if (currentStage === "review_complete" || currentStage === "generated") return 3;
-    return 0;
-  }
-
   const currentStepId = getCurrentStepId();
-  const maxStepReached = getMaxStepReached();
   const isAllCompleted = currentStage === "generated";
   const allowNonLinearNav = currentStage === "generated";
 
   return (
-    <div 
+    <div
       className={`${styles.pipelineContainer} ${visible ? styles.visible : styles.hidden}`}
       aria-hidden={!visible}
     >
       <div className={styles.pipelineSteps}>
         {PIPELINE_STEPS.map((step, index) => {
           const isActive = step.id === currentStepId;
-          const isCompleted = completedSteps.includes(step.id) || isAllCompleted;
-          const isClickable = allowNonLinearNav || isCompleted || step.id <= maxStepReached || step.id === currentStepId;
+          // A step is only "completed" (green) if it's before the current step (or fully generated).
+          // This prevents stale localStorage completedSteps from showing future steps as green.
+          const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
+          // Any step that has been completed, the current step, or fully generated proposals are clickable
+          const isClickable = completedSteps.includes(step.id) || step.id === currentStepId || allowNonLinearNav;
 
           return (
             <React.Fragment key={step.id}>
