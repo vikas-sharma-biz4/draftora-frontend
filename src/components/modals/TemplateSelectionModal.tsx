@@ -87,17 +87,20 @@ export default function TemplateSelectionModal({
   }, []);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
   const ACCEPTED_TYPES = [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/png",
+    "image/jpeg",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ];
 
   /**
    * Validates file extension and size against proposal upload rules.
-   * Accepted: PDF, DOCX, XLSX, PPTX ≤ 10 MB. Emits toast on rejection.
+   * Accepted: PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX ≤ 10 MB. Emits toast on rejection.
    * @param file Candidate file from drag-and-drop or input change
    * @returns    `true` if extension and size pass
    */
@@ -595,12 +598,12 @@ export default function TemplateSelectionModal({
                 >
                   <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
                   <div className={styles.uploadText}>Click to upload or drag and drop</div>
-                  <div className={styles.uploadHint}>PDF, DOCX, XLSX, PPTX (max 10MB each)</div>
+                  <div className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)</div>
                   <input
                     id="template-file-upload"
                     ref={fileInputRef}
                     type="file"
-                    accept=".pdf,.docx,.xlsx,.pptx"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                     multiple
                     onChange={handleFileChange}
                     className={styles.visuallyHidden}
