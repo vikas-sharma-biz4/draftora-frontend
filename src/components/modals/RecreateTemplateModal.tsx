@@ -87,10 +87,13 @@ export default function RecreateTemplateModal({
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
   const ACCEPTED_TYPES = [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/png",
+    "image/jpeg",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ];
@@ -128,6 +131,146 @@ export default function RecreateTemplateModal({
   }, []);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /**
+   * Universal hierarchy builder for any TOC content.
+   * Detects parent-child relationships based on numbering patterns:
+   * - Numeric: 1., 1.1, 1.1.1
+   * - Roman: I., II., III.
+   * - Alphabetic: A., B., C. or a., b., c.
+   * - Mixed: Any combination
+   * - Indentation-based (if available from backend)
+   * 
+   * Algorithm:
+   * 1. Analyze numbering depth (dots, nesting)
+   * 2. Track parent context based on level changes
+   * 3. Support any document category (technical, legal, business, etc.)
+   */
+  function buildSectionHierarchy(
+    sections: RecreateExtractedSection[]
+  ): RecreateExtractedSection[] {
+    if (sections.length === 0) return [];
+
+    const result: RecreateExtractedSection[] = [];
+    const parentStack: Array<{ section: RecreateExtractedSection; level: number }> = [];
+
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      const title = section.title.trim();
+
+      // Detect numbering level from various patterns
+      const level = detectSectionLevel(title, i, sections);
+      
+      // Find appropriate parent based on level
+      let parentId: string | undefined = undefined;
+      
+      // Pop stack until we find a parent at lower level
+      while (parentStack.length > 0 && parentStack[parentStack.length - 1].level >= level) {
+        parentStack.pop();
+      }
+      
+      // Current top of stack is the parent (if exists)
+      if (parentStack.length > 0) {
+        parentId = parentStack[parentStack.length - 1].section.id;
+      }
+
+      const hierarchicalSection: RecreateExtractedSection = {
+        ...section,
+        level,
+        parentId,
+      };
+
+      result.push(hierarchicalSection);
+      
+      // Add to stack as potential parent for future sections
+      parentStack.push({ section: hierarchicalSection, level });
+    }
+
+    return result;
+  }
+
+  /**
+   * Universal section level detector.
+   * Simple rule: Analyze numbering depth and context.
+   */
+  function detectSectionLevel(
+    title: string, 
+    index: number, 
+    allSections: RecreateExtractedSection[]
+  ): number {
+    // Rule 1: Multi-level numbering (1.1, 1.1.1, 2.3.4)
+    const multiLevel = title.match(/^(\d+(?:\.\d+)+)[\.\)]\s+/);
+    if (multiLevel) {
+      const dots = (multiLevel[1].match(/\./g) || []).length;
+      return dots + 1; // 1.1 → level 2, 1.1.1 → level 3
+    }
+
+    // Rule 2: Simple single number (1., 2., 3., etc.)
+    const singleNumber = title.match(/^(\d+)[\.\)]\s+/);
+    if (singleNumber) {
+      const num = parseInt(singleNumber[1], 10);
+      
+      // Look back up to 20 sections to find a non-numbered parent
+      const lookBackLimit = Math.min(index, 20);
+      for (let i = 1; i <= lookBackLimit; i++) {
+        const prevIndex = index - i;
+        const prevTitle = allSections[prevIndex].title.trim();
+        
+        // Check if previous section has NO numbering at start
+        const hasNumbering = /^(\d+|[IVXLCDM]+|[A-Za-z])[\.\)]\s+/.test(prevTitle);
+        
+        if (!hasNumbering) {
+          // Found a non-numbered section - this is likely the parent
+          // Current section is a child (level 2)
+          return 2;
+        }
+        
+        // If we hit a multi-level number (1.1, 2.3), stop searching
+        if (/^\d+\.\d+/.test(prevTitle)) {
+          break;
+        }
+      }
+      
+      // No parent found - top level
+      return 1;
+    }
+
+    // Rule 3: Roman numerals (I., II., III.)
+    if (/^([IVXLCDM]+)[\.\)]\s+/i.test(title)) {
+      return 1;
+    }
+
+    // Rule 4: Alphabetic (A., B., a., b.)
+    if (/^([A-Za-z])[\.\)]\s+/.test(title)) {
+      // Check if previous section is numbered
+      if (index > 0 && /^\d+[\.\)]\s+/.test(allSections[index - 1].title.trim())) {
+        return 2; // Subsection under number
+      }
+      return 1;
+    }
+
+    // Rule 5: Bullets (•, -, *, →)
+    if (/^[•\-\*→]\s+/.test(title)) {
+      return 2;
+    }
+
+    // Rule 6: Parenthesized numbers (1), (2)
+    if (/^\(\d+\)\s+/.test(title)) {
+      return 2;
+    }
+
+    // Rule 7: Non-numbered section - check if it's a parent
+    // If next section starts with "1." it's likely a parent
+    if (index < allSections.length - 1) {
+      const nextTitle = allSections[index + 1].title.trim();
+      if (/^1[\.\)]\s+/.test(nextTitle)) {
+        return 1; // Parent of numbered list
+      }
+    }
+
+    // Default: top-level
+    return 1;
+  }
 
   function isValidFile(file: File): boolean {
     const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -197,15 +340,38 @@ export default function RecreateTemplateModal({
         return;
       }
 
+      // Filter out static sections that are always included and not AI-generated
+      const STATIC_SECTIONS_TO_EXCLUDE = [
+        "Trusted Advisors",
+        "Our Trusted Clients",
+        "Why Choose Us?",
+        "Brain Behind Innovative Development",
+      ];
+
+      const filteredSections = result.sections.filter((section) => {
+        const normalizedTitle = section.title.trim();
+        return !STATIC_SECTIONS_TO_EXCLUDE.some(
+          (staticTitle) => normalizedTitle.toLowerCase() === staticTitle.toLowerCase()
+        );
+      });
+
+      const removedCount = result.sections.length - filteredSections.length;
+
+      // Build hierarchical structure from filtered sections
+      const hierarchicalSections = buildSectionHierarchy(filteredSections);
+
       setExactDocument({
         file,
         status: "parsed",
-        sections: result.sections,
+        sections: hierarchicalSections,
         fullText: result.fullText,
       });
-      toast.success(
-        `"${file.name}" parsed — ${result.totalSections} section(s) extracted`
-      );
+      
+      const message = removedCount > 0
+        ? `"${file.name}" parsed — ${filteredSections.length} dynamic section(s) extracted (${removedCount} static section(s) excluded)`
+        : `"${file.name}" parsed — ${filteredSections.length} section(s) extracted`;
+      
+      toast.success(message);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       const message = err instanceof Error ? err.message : "Parse failed";
@@ -386,13 +552,15 @@ export default function RecreateTemplateModal({
 
     const sections = exactDocument.sections ?? [];
 
-    // Build OriginalSection[] from parsed sections
+    // Build OriginalSection[] from parsed sections (preserving hierarchy)
     const originalSections: OriginalSection[] = sections.map((s) => ({
       id: s.id,
       title: s.title,
       content: s.content,
       order: s.order,
       type: (s.type as "text" | "table" | "mixed") ?? "text",
+      level: s.level,
+      parentId: s.parentId,
     }));
 
     // Build originalSectionContents map (key -> content) for rewrite prompts
@@ -577,7 +745,7 @@ export default function RecreateTemplateModal({
                 <input
                   ref={exactInputRef}
                   type="file"
-                  accept=".pdf,.docx,.xlsx,.pptx"
+                  accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                   style={{ display: "none" }}
                   onChange={handleExactInputChange}
                 />
@@ -585,7 +753,7 @@ export default function RecreateTemplateModal({
                 <span className={styles.uploadText}>
                   Drop document here or <strong>browse</strong>
                 </span>
-                <span className={styles.uploadHint}>PDF, DOCX, XLSX, PPTX · max 10 MB</span>
+                <span className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX · max 10 MB</span>
               </label>
             ) : (
               <div className={styles.uploadedFilesList}>
@@ -635,12 +803,25 @@ export default function RecreateTemplateModal({
                       Extracted Sections ({exactDocument.sections.length})
                     </p>
                     <div className={styles.sectionsList}>
-                      {exactDocument.sections.map((s, i) => (
-                        <div key={s.id} className={styles.sectionPreviewItem}>
-                          <span className={styles.sectionOrder}>{i + 1}</span>
-                          <span className={styles.sectionTitle}>{s.title}</span>
-                        </div>
-                      ))}
+                      {exactDocument.sections.map((s, i) => {
+                        const level = s.level || 1;
+                        const indentPx = (level - 1) * 20;
+                        return (
+                          <div 
+                            key={s.id} 
+                            className={styles.sectionPreviewItem}
+                            style={{ paddingLeft: `${indentPx}px` }}
+                          >
+                            <span className={styles.sectionOrder}>{i + 1}</span>
+                            <span className={styles.sectionTitle} style={{ fontWeight: level === 1 ? 600 : 400 }}>
+                              {s.title}
+                            </span>
+                            {s.parentId && (
+                              <span className={styles.childIndicator} title="Child section">↳</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -712,7 +893,7 @@ export default function RecreateTemplateModal({
               <input
                 ref={contextInputRef}
                 type="file"
-                accept=".pdf,.docx,.xlsx,.pptx"
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                 multiple
                 style={{ display: "none" }}
                 onChange={handleContextInputChange}
@@ -721,7 +902,7 @@ export default function RecreateTemplateModal({
               <span className={styles.uploadText}>
                 Add more context files
               </span>
-              <span className={styles.uploadHint}>PDF, DOCX, XLSX, PPTX · max 10 MB each</span>
+              <span className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX · max 10 MB each</span>
             </label>
 
             {/* Context uploads in progress */}

@@ -42,15 +42,23 @@ const TONE_ICONS = {
 
 function buildSectionItems(
   selectedSections: string[],
-  sectionDisplayNames: Record<string, string>
+  sectionDisplayNames: Record<string, string>,
+  originalSections?: Array<{ id: string; level?: number; parentId?: string }>
 ): SectionItem[] {
-  return selectedSections.map((key) => ({
-    key,
-    label:
-      sectionDisplayNames[key] ??
-      SECTION_DISPLAY_NAMES[key] ??
-      key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-  }));
+  return selectedSections.map((key) => {
+    // Find hierarchy info from originalSections if in recreate mode
+    const originalSection = originalSections?.find((s) => s.id === key);
+    
+    return {
+      key,
+      label:
+        sectionDisplayNames[key] ??
+        SECTION_DISPLAY_NAMES[key] ??
+        key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+      level: originalSection?.level,
+      parentId: originalSection?.parentId,
+    };
+  });
 }
 
 export default function ParametersPage(): JSX.Element {
@@ -60,7 +68,11 @@ export default function ParametersPage(): JSX.Element {
   const isRecreateMode = proposalData.templateType === "recreate";
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
-    buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
+    buildSectionItems(
+      proposalData.selectedSections, 
+      proposalData.sectionDisplayNames,
+      proposalData.originalSections
+    )
   );
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
@@ -70,9 +82,13 @@ export default function ParametersPage(): JSX.Element {
   // Sync local sections state with proposalData (e.g., after localStorage rehydration)
   useEffect(() => {
     setSections(
-      buildSectionItems(proposalData.selectedSections, proposalData.sectionDisplayNames)
+      buildSectionItems(
+        proposalData.selectedSections, 
+        proposalData.sectionDisplayNames,
+        proposalData.originalSections
+      )
     );
-  }, [proposalData.selectedSections, proposalData.sectionDisplayNames]);
+  }, [proposalData.selectedSections, proposalData.sectionDisplayNames, proposalData.originalSections]);
 
   function handleStartEdit(item: SectionItem): void {
     setEditingKey(item.key);

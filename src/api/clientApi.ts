@@ -27,7 +27,7 @@ export interface ClientDocument {
   id: number;
   client_id: number;
   name: string;
-  file_type: "pdf" | "docx" | "xlsx" | "pptx";
+  file_type: string;
   size_bytes: number;
   status: "processing" | "parsed" | "error";
   created_at: string;
@@ -170,6 +170,18 @@ export function invalidateClientsCache(): void {
 }
 
 /**
+ * List all clients with full documents array in a single API call.
+ */
+export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
+  const res = await fetch(`${API_BASE_URL}/clients/full-data`, {
+    method: "GET",
+    headers: BASE_HEADERS,
+  });
+
+  return handleResponse<ClientWithDocuments[]>(res);
+}
+
+/**
  * Fetches all clients with their documents.
  * Returns cached data immediately if available and not expired; otherwise fetches from API.
  */
@@ -182,16 +194,7 @@ export async function listClientsWithDocuments(): Promise<ClientWithDocuments[]>
 
   _inflightPromise = (async () => {
     try {
-      const clientList = await listClients();
-      const clientsWithDocs = await Promise.all(
-        clientList.map(async (client) => {
-          try {
-            return await getClient(client.id);
-          } catch {
-            return { ...client, documents: [] } as ClientWithDocuments;
-          }
-        })
-      );
+      const clientsWithDocs = await listClientsFullData();
       _cachedClientsWithDocs = clientsWithDocs;
       _cacheTimestamp = Date.now();
       return clientsWithDocs;

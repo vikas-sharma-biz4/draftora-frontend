@@ -80,10 +80,13 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
   }
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
   const ACCEPTED_TYPES = [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/png",
+    "image/jpeg",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ];
@@ -318,13 +321,13 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
                 Click to upload or drag and drop
               </div>
               <div className={styles.uploadHint}>
-                PDF, DOCX, XLSX, PPTX (max 10MB each)
+                PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
               </div>
               <input
                 id="new-client-file-upload"
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.xlsx,.pptx"
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                 multiple
                 onChange={handleFileChange}
                 className={styles.visuallyHidden}

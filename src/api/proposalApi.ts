@@ -439,6 +439,8 @@ export interface RecreateExtractedSection {
   content: string;
   order: number;
   type: string;
+  level?: number;
+  parentId?: string;
 }
 
 export interface ParseRecreateResult {
