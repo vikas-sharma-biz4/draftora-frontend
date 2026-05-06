@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Check } from "lucide-react";
 
 import styles from "./DynamicPipeline.module.scss";
@@ -13,6 +13,7 @@ interface DynamicPipelineProps {
   completedSteps: number[];
   onStepClick?: (stepId: number, path: string) => void;
   visible: boolean;
+  proposalId?: number | null;
 }
 
 export default function DynamicPipeline({
@@ -20,19 +21,31 @@ export default function DynamicPipeline({
   completedSteps,
   onStepClick,
   visible,
+  proposalId,
 }: DynamicPipelineProps): JSX.Element {
   const router = useRouter();
+  const pathname = usePathname();
 
   function handleStepClick(stepId: number, path: string): void {
     if (onStepClick) {
       onStepClick(stepId, path);
     } else {
-      router.push(path);
+      // If clicking Web View step and we have a proposalId, navigate to that proposal
+      if (stepId === 3 && proposalId) {
+        router.push(`/proposal/${proposalId}`);
+      } else {
+        router.push(path);
+      }
     }
   }
 
   function getCurrentStepId(): number {
-    if (currentStage === "template_selection") return 0;
+    // URL-first: always reflects the page the user is actually on
+    if (pathname === "/parameters") return 1;
+    if (pathname === "/review") return 2;
+    if (pathname.startsWith("/generating/")) return 2;
+    if (pathname.startsWith("/proposal/") || pathname === "/web-view") return 3;
+    // Fallback for home page or other routes
     if (currentStage === "wizard_in_progress") return 1;
     if (currentStage === "parameters_complete") return 2;
     if (currentStage === "review_complete" || currentStage === "generated") return 3;
@@ -41,17 +54,21 @@ export default function DynamicPipeline({
 
   const currentStepId = getCurrentStepId();
   const isAllCompleted = currentStage === "generated";
+  const allowNonLinearNav = currentStage === "generated";
 
   return (
-    <div 
+    <div
       className={`${styles.pipelineContainer} ${visible ? styles.visible : styles.hidden}`}
       aria-hidden={!visible}
     >
       <div className={styles.pipelineSteps}>
         {PIPELINE_STEPS.map((step, index) => {
           const isActive = step.id === currentStepId;
-          const isCompleted = completedSteps.includes(step.id) || isAllCompleted;
-          const isClickable = isAllCompleted || isCompleted || step.id <= currentStepId;
+          // A step is only "completed" (green) if it's before the current step (or fully generated).
+          // This prevents stale localStorage completedSteps from showing future steps as green.
+          const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
+          // Any step that has been completed, the current step, or fully generated proposals are clickable
+          const isClickable = completedSteps.includes(step.id) || step.id === currentStepId || allowNonLinearNav;
 
           return (
             <React.Fragment key={step.id}>

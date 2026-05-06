@@ -14,6 +14,7 @@ import {
   regenerateSection,
   addProposalSection,
   removeProposalSection,
+  updateApprovalStatus,
 } from "@/api/proposalApi";
 import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY, DRAFTS_STORAGE_KEY } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
@@ -57,7 +58,7 @@ function resolveSectionLabel(
 export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
-  const { resetProposal } = useProposal();
+  const { resetProposal, setCurrentProposalId, updateProposalData, setDraftStage, setCompletedSteps } = useProposal();
   const proposalId = Number(params.id);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -80,6 +81,9 @@ export default function ProposalOutputPage(): JSX.Element {
     try {
       const data = await getProposal(proposalId);
       setProposal(data);
+      
+      // Set current proposal ID for regeneration flow
+      setCurrentProposalId(proposalId);
 
       if (data.status === "completed") {
         setIsLoading(false);
@@ -88,6 +92,24 @@ export default function ProposalOutputPage(): JSX.Element {
         if (sections.length > 0 && !activeSection) {
           setActiveSection(sections[0]);
         }
+        
+        // Update proposal context with current data for regeneration
+        updateProposalData({
+          title: data.title,
+          clientName: data.clientName,
+          clientId: data.clientId,
+          description: data.description,
+          tone: data.tone,
+          lengthPreference: data.lengthPreference,
+          language: data.language,
+          aiModel: data.aiModel,
+          selectedSections: data.selectedSections,
+          sectionDisplayNames: data.sectionDisplayNames,
+          contextualInstructions: data.contextualInstructions,
+          webReferences: data.webReferences,
+        });
+        setDraftStage("generated");
+        setCompletedSteps([1, 2, 3]);
         return;
       }
 
@@ -283,22 +305,15 @@ export default function ProposalOutputPage(): JSX.Element {
     if (!proposal) return;
     setIsApproving(true);
     try {
-      const historyItem = {
-        id: proposalId.toString(),
-        proposalId,
-        title: proposal.title,
-        clientName: proposal.clientName,
-        status: "approved" as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        data: proposal,
-      };
+      // Update approval status via API
+      await updateApprovalStatus(proposalId, "approved");
       
-      const history = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
-      history.unshift(historyItem);
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      // Remove from drafts
+      const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
+      const updatedDrafts = drafts.filter((d: any) => d.id !== proposalId.toString());
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
       
-      toast.success("Proposal approved and saved to history!");
+      toast.success("Proposal approved and moved to history!");
       router.push("/history");
     } catch (error) {
       toast.error("Failed to approve proposal");
@@ -311,22 +326,15 @@ export default function ProposalOutputPage(): JSX.Element {
     if (!proposal) return;
     setIsRejecting(true);
     try {
-      const historyItem = {
-        id: proposalId.toString(),
-        proposalId,
-        title: proposal.title,
-        clientName: proposal.clientName,
-        status: "rejected" as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        data: proposal,
-      };
+      // Update approval status via API
+      await updateApprovalStatus(proposalId, "rejected");
       
-      const history = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
-      history.unshift(historyItem);
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+      // Remove from drafts
+      const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
+      const updatedDrafts = drafts.filter((d: any) => d.id !== proposalId.toString());
+      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
       
-      toast.success("Proposal rejected and saved to history");
+      toast.success("Proposal rejected and moved to history");
       router.push("/history");
     } catch (error) {
       toast.error("Failed to reject proposal");
@@ -346,32 +354,25 @@ export default function ProposalOutputPage(): JSX.Element {
     <div className="app-container">
       <MainSidebar />
       
-      <main className="main-content">
-        <DynamicPipeline 
-          currentStage="generated"
-          completedSteps={[1, 2, 3]}
-          visible={true}
-        />
-        
-        <div className="proposal-actions-bar">
-          <div className="proposal-actions-left">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => router.push("/review")}
-            >
-              ← Back
-            </button>
+      <main className="main-content no-top-padding">
+        <div className="proposal-header-bar">
+          <DynamicPipeline 
+            currentStage="generated"
+            completedSteps={[1, 2, 3]}
+            visible={true}
+            proposalId={proposalId}
+          />
+          
+          <div className="proposal-actions-bar">
             {proposal && (
               <a
                 href={getDownloadUrl(proposalId)}
                 className="btn btn-secondary btn-sm"
                 download
               >
-                ⬇ Download DOCX
+                ⬇ Download
               </a>
             )}
-          </div>
-          <div className="proposal-actions-right">
             <button
               className="btn btn-success btn-sm"
               onClick={handleApprove}
