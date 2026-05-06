@@ -50,9 +50,13 @@ export default function ReviewPage(): JSX.Element {
     setDraftStage,
     markStepCompleted,
     setCompletedSteps,
+    currentProposalId,
+    draftStage,
+    completedSteps,
   } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
+  const isRegenerating = currentProposalId !== null;
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
@@ -86,10 +90,10 @@ export default function ReviewPage(): JSX.Element {
         setAvailableDocuments(clients);
 
         // If filesMeta is empty but we have selectedDocumentIds, rebuild filesMeta from client data
-        const currentClient = clients.find((c) => c.id === proposalData.clientId);
+        const currentClient = clients.find((c) => Number(c.id) === proposalData.clientId);
         if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
           const rebuiltMeta = currentClient.documents
-            .filter((doc) => proposalData.selectedDocumentIds!.includes(doc.id))
+            .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
             .map((doc) => ({
               name: doc.name,
               size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
@@ -114,7 +118,7 @@ export default function ReviewPage(): JSX.Element {
 
   function handleSaveKnowledgeBase(selectedIds: string[]): void {
     // Rebuild filesMeta from selected documents
-    const currentClient = availableDocuments.find((c) => c.id === proposalData.clientId);
+    const currentClient = availableDocuments.find((c) => Number(c.id) === proposalData.clientId);
     const newFilesMeta = currentClient
       ? currentClient.documents
           .filter((doc) => selectedIds.includes(doc.id))
@@ -126,7 +130,7 @@ export default function ReviewPage(): JSX.Element {
       : [];
 
     updateProposalData({
-      selectedDocumentIds: selectedIds,
+      selectedDocumentIds: selectedIds.map(Number),
       filesMeta: newFilesMeta,
     });
     setShowKnowledgeBaseModal(false);
@@ -144,7 +148,7 @@ export default function ReviewPage(): JSX.Element {
     setShowSectionsModal(false);
   }
 
-  const currentClient = availableDocuments.find((c) => c.id === proposalData.clientId);
+  const currentClient = availableDocuments.find((c) => Number(c.id) === proposalData.clientId);
   const clientDocuments = currentClient?.documents || [];
 
   async function handleGenerate(): Promise<void> {
@@ -152,7 +156,11 @@ export default function ReviewPage(): JSX.Element {
     setErrorMessage("");
     
     // Show immediate feedback to user
-    toast.info("Starting proposal generation...");
+    if (isRegenerating) {
+      toast.info("Regenerating proposal with updated parameters...");
+    } else {
+      toast.info("Starting proposal generation...");
+    }
     
     try {
       const result = await generateProposal(proposalData);
@@ -193,9 +201,10 @@ export default function ReviewPage(): JSX.Element {
 
       <main className="main-content">
         <DynamicPipeline 
-          currentStage="parameters_complete"
-          completedSteps={[1]}
+          currentStage={draftStage}
+          completedSteps={completedSteps}
           visible={true}
+          proposalId={currentProposalId}
         />
         <div className="page-badge">Phase 05</div>
         <h1 className="page-title">Final Review</h1>
@@ -433,7 +442,7 @@ export default function ReviewPage(): JSX.Element {
         {showKnowledgeBaseModal && (
           <KnowledgeBaseSelectorModal
             availableDocuments={clientDocuments}
-            selectedDocumentIds={proposalData.selectedDocumentIds || []}
+            selectedDocumentIds={(proposalData.selectedDocumentIds || []).map(String)}
             onClose={() => setShowKnowledgeBaseModal(false)}
             onSave={handleSaveKnowledgeBase}
           />

@@ -22,6 +22,8 @@ interface ProposalContextType {
   setIsGenerating: (val: boolean) => void;
   generatedProposalId: number | null;
   setGeneratedProposalId: (id: number | null) => void;
+  currentProposalId: number | null;
+  setCurrentProposalId: (id: number | null) => void;
   resetProposal: () => void;
   hydrated: boolean;
   editMode: boolean;
@@ -33,6 +35,10 @@ interface ProposalContextType {
   completedSteps: number[];
   setCompletedSteps: (steps: number[]) => void;
   markStepCompleted: (stepId: number) => void;
+  currentDraftId: string | null;
+  setCurrentDraftId: (id: string | null) => void;
+  autoSaveEnabled: boolean;
+  setAutoSaveEnabled: (enabled: boolean) => void;
 }
 
 const STORAGE_KEY = "draftora_wizard_v1";
@@ -72,11 +78,14 @@ export function ProposalProvider({
   const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(
     null
   );
+  const [currentProposalId, setCurrentProposalId] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState<boolean>(false);
   const [editMode, setEditMode] = useState<boolean>(false);
   const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
   const [draftStage, setDraftStage] = useState<DraftStage>("template_selection");
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
 
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -96,6 +105,8 @@ export function ProposalProvider({
         const saved = JSON.parse(raw) as {
           proposalData?: Partial<ProposalData>;
           currentStep?: WizardStep;
+          draftStage?: DraftStage;
+          completedSteps?: number[];
         };
         if (saved.proposalData) {
           setProposalData({
@@ -107,6 +118,12 @@ export function ProposalProvider({
         }
         if (saved.currentStep) {
           setCurrentStep(saved.currentStep);
+        }
+        if (saved.draftStage) {
+          setDraftStage(saved.draftStage);
+        }
+        if (saved.completedSteps) {
+          setCompletedSteps(saved.completedSteps);
         }
       }
     } catch {
@@ -122,12 +139,14 @@ export function ProposalProvider({
       const toSave = {
         proposalData: { ...proposalData, files: [] }, // filesMeta is kept (serializable)
         currentStep,
+        draftStage,
+        completedSteps,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch {
       // Ignore storage quota errors
     }
-  }, [proposalData, currentStep, hydrated]);
+  }, [proposalData, currentStep, hydrated, draftStage, completedSteps]);
 
   const updateProposalData = useCallback(
     (updates: Partial<ProposalData>): void => {
@@ -148,6 +167,7 @@ export function ProposalProvider({
     setCurrentStep(1);
     setIsGenerating(false);
     setGeneratedProposalId(null);
+    setCurrentProposalId(null);
     setEditMode(false);
     setMaxStepReached(1);
     setDraftStage("template_selection");
@@ -170,6 +190,8 @@ export function ProposalProvider({
         setIsGenerating,
         generatedProposalId,
         setGeneratedProposalId,
+        currentProposalId,
+        setCurrentProposalId,
         resetProposal,
         hydrated,
         editMode,
@@ -181,6 +203,10 @@ export function ProposalProvider({
         completedSteps,
         setCompletedSteps,
         markStepCompleted,
+        currentDraftId,
+        setCurrentDraftId,
+        autoSaveEnabled,
+        setAutoSaveEnabled,
       }}
     >
       {children}

@@ -8,17 +8,19 @@ import { toast } from "sonner";
 
 import styles from "./TemplateSelectionModal.module.scss";
 
-import { listClients, getClient, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
+import { listClientsWithDocuments, invalidateClientsCache, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
 import { PROPOSAL_TEMPLATES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
 
 interface TemplateSelectionModalProps {
-  templateId: string;
-  templateName: string;
+  templateId?: string | null;
+  templateName?: string;
   onClose: () => void;
   onNewClient: () => void;
+  initialClients?: ClientWithDocuments[];
+  isScratch?: boolean;
 }
 
 export default function TemplateSelectionModal({
@@ -26,14 +28,16 @@ export default function TemplateSelectionModal({
   templateName,
   onClose,
   onNewClient,
+  initialClients,
+  isScratch = false,
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
   
   const [mounted, setMounted] = useState<boolean>(false);
-  const [clients, setClients] = useState<ClientWithDocuments[]>([]);
+  const [clients, setClients] = useState<ClientWithDocuments[]>(initialClients ?? []);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(initialClients === undefined);
   const [proposalName, setProposalName] = useState<string>("");
   const [proposalDescription, setProposalDescription] = useState<string>("");
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
@@ -52,8 +56,17 @@ export default function TemplateSelectionModal({
   }, []);
 
   useEffect(() => {
+    if (initialClients !== undefined) return; // Already provided by parent — skip fetch
     loadClients();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync when parent's background re-fetch completes (e.g. after new client created)
+  useEffect(() => {
+    if (initialClients !== undefined) {
+      setClients(initialClients);
+      setLoading(false);
+    }
+  }, [initialClients]);
 
   useEffect(() => {
     if (selectedClientId) {
@@ -74,17 +87,20 @@ export default function TemplateSelectionModal({
   }, []);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
   const ACCEPTED_TYPES = [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/png",
+    "image/jpeg",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ];
 
   /**
    * Validates file extension and size against proposal upload rules.
-   * Accepted: PDF, DOCX, XLSX, PPTX ≤ 10 MB. Emits toast on rejection.
+   * Accepted: PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX ≤ 10 MB. Emits toast on rejection.
    * @param file Candidate file from drag-and-drop or input change
    * @returns    `true` if extension and size pass
    */
@@ -144,28 +160,12 @@ export default function TemplateSelectionModal({
 
   /**
    * Loads client list from API with documents.
+   * Uses module-level cache when available to avoid redundant API calls.
    */
   async function loadClients(): Promise<void> {
     try {
       setLoading(true);
-      const clientList = await listClients();
-      
-      // Fetch each client with documents
-      const clientsWithDocs = await Promise.all(
-        clientList.map(async (client) => {
-          try {
-            return await getClient(client.id);
-          } catch (error) {
-            console.error(`Failed to load documents for client ${client.id}:`, error);
-            // Return client without documents if fetch fails
-            return {
-              ...client,
-              documents: [],
-            } as ClientWithDocuments;
-          }
-        })
-      );
-      
+      const clientsWithDocs = await listClientsWithDocuments();
       setClients(clientsWithDocs);
     } catch (error) {
       console.error("Failed to load clients:", error);
@@ -306,7 +306,8 @@ export default function TemplateSelectionModal({
     try {
       const uploadResult = await uploadDocument(selectedClientId, file);
       
-      // Reload clients to get updated document list
+      // Invalidate cache then reload to get updated document list
+      invalidateClientsCache();
       await loadClients();
       
       // Auto-select newly uploaded document
@@ -316,7 +317,10 @@ export default function TemplateSelectionModal({
         return next;
       });
       
-      toast.success(`${file.name} uploaded successfully`);
+      // Remove from uploaded files list (auto-move to selected documents)
+      setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
+      
+      toast.success(`${file.name} uploaded and added to selected documents`);
     } catch (error) {
       console.error("Failed to upload document:", error);
       toast.error(`Failed to upload ${file.name}`);
@@ -377,15 +381,15 @@ export default function TemplateSelectionModal({
         type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
 
-    const template = PROPOSAL_TEMPLATES.find((t) => t.id === templateId);
+    const template = templateId ? PROPOSAL_TEMPLATES.find((t) => t.id === templateId) : null;
 
     updateProposalData({
       title: proposalName,
       clientName: client.name,
       description: proposalDescription,
       clientId: selectedClientId,
-      templateId,
-      templateType: "predefined",
+      templateId: isScratch ? null : templateId ?? null,
+      templateType: isScratch ? "scratch" : "predefined",
       selectedSections: template ? [...template.sections] : [],
       sectionDisplayNames: {},
       selectedDocumentIds: selectedDocIds,
@@ -415,9 +419,13 @@ export default function TemplateSelectionModal({
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
-            <h2 className={styles.modalTitle}>Create Proposal from Template</h2>
+            <h2 className={styles.modalTitle}>
+              {isScratch ? "Start From Scratch" : "Create Proposal from Template"}
+            </h2>
             <p className={styles.modalSubtitle}>
-              Using <strong>{templateName}</strong> template
+              {isScratch
+                ? "Build a proposal without a predefined template"
+                : <>Using <strong>{templateName}</strong> template</>}
             </p>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
@@ -590,12 +598,12 @@ export default function TemplateSelectionModal({
                 >
                   <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
                   <div className={styles.uploadText}>Click to upload or drag and drop</div>
-                  <div className={styles.uploadHint}>PDF, DOCX, XLSX, PPTX (max 10MB each)</div>
+                  <div className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)</div>
                   <input
                     id="template-file-upload"
                     ref={fileInputRef}
                     type="file"
-                    accept=".pdf,.docx,.xlsx,.pptx"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                     multiple
                     onChange={handleFileChange}
                     className={styles.visuallyHidden}
@@ -635,8 +643,7 @@ export default function TemplateSelectionModal({
                         <button
                           className={styles.removeFileBtn}
                           onClick={() => handleRemoveFile(id)}
-                          disabled={status === "parsing"}
-                          title={status === "parsing" ? "Wait for parsing to complete" : "Remove file"}
+                          title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
                           aria-label="Remove file"
                         >
                           <X size={16} />

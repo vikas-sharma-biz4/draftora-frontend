@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cancelProposal, getProposal, getProposalStatus } from "@/api/proposalApi";
-import { GENERATION_STEPS } from "@/constants";
+import { GENERATION_STEPS, DRAFTS_STORAGE_KEY } from "@/constants";
 import { MAX_POLL_ATTEMPTS, POLLING_INTERVAL_MS } from "@/config/config";
 import { useProposal } from "@/context/ProposalContext";
 
@@ -75,8 +75,37 @@ export default function GeneratingPage(): JSX.Element {
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
         completedRef.current = true;
         setIsGenerating(false); // reset so review page button is clean if user goes back
-        // Only fetch the full proposal once, when generation is done
-        await getProposal(proposalId).catch(() => undefined);
+        
+        // Fetch the full proposal and save as draft
+        try {
+          const proposalData = await getProposal(proposalId);
+          
+          // Auto-save to drafts
+          const draftItem = {
+            id: proposalId.toString(),
+            title: proposalData.title,
+            clientName: proposalData.clientName,
+            stage: "generated" as const,
+            status: "pending_approval" as const,
+            createdAt: proposalData.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            data: proposalData,
+          };
+          
+          const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
+          const existingIndex = drafts.findIndex((d: any) => d.id === draftItem.id);
+          
+          if (existingIndex >= 0) {
+            drafts[existingIndex] = draftItem;
+          } else {
+            drafts.unshift(draftItem);
+          }
+          
+          localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+        } catch (error) {
+          console.error("Failed to save draft:", error);
+        }
+        
         router.push(`/proposal/${proposalId}`);
         return;
       }

@@ -764,7 +764,8 @@
 
 .modalFooter {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 20px 28px;
   border-top: 1px solid var(--color-border);
@@ -787,4 +788,329 @@
   .modalFooter {
     padding: 16px 20px;
   }
+}
+
+/* ── RecreateTemplateModal extras ─────────────────────────────────────────── */
+
+.sectionBadge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  padding: 2px 8px;
+  border-radius: 100px;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.sectionHint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+  margin-top: -4px;
+  line-height: 1.5;
+}
+
+.optionalBadge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-text-light);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  padding: 1px 6px;
+  border-radius: 100px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.descriptionTextarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--color-text);
+  background: var(--color-white);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.descriptionTextarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.09);
+}
+
+.descriptionTextarea::placeholder {
+  color: var(--color-text-light);
+}
+
+.uploadArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  padding: 28px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--color-bg);
+  text-align: center;
+  gap: 6px;
+}
+
+@media (hover: hover) {
+  .uploadArea:hover {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+  }
+}
+
+.uploadArea.dragOver {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: scale(1.01);
+}
+
+.uploadAreaCompact {
+  padding: 16px 24px;
+  margin-top: 12px;
+}
+
+.spinIcon {
+  color: var(--color-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spinNew {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.fileInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.fileSize {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  display: block;
+}
+
+.retryBtn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (hover: hover) {
+  .retryBtn:hover {
+    background: var(--color-primary-light);
+  }
+}
+
+.sectionsPreview {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--color-primary-light);
+  border: 1px solid var(--color-primary-medium);
+  border-radius: var(--radius-md);
+}
+
+.sectionsPreviewLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+}
+
+.sectionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.sectionPreviewItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.sectionOrder {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.625rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.documentsSection {
+  margin-bottom: 12px;
+}
+
+.documentsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.documentsTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.documentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.documentItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+@media (hover: hover) {
+  .documentItem:hover {
+    background: var(--color-primary-light);
+    border-color: var(--color-primary-medium);
+  }
+}
+
+.documentItem.selectedDocument {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.docCheckbox {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkIcon {
+  color: var(--color-primary);
+}
+
+.docFileIcon {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.docName {
+  flex: 1;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.docSize {
+  font-size: 0.75rem;
+  color: var(--color-text-light);
+  flex-shrink: 0;
+}
+
+.clientName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.clientDocs {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.selectedClient {
+  background: var(--color-primary-light);
+}
+
+.footerInfo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.parsingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.readyIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--color-success);
+  font-weight: 500;
 }
