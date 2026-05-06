@@ -344,10 +344,10 @@ export const GENERATION_STEPS = [
 ] as const;
 
 export const MAIN_NAV_ITEMS = [
-  { id: "home", label: "Home", path: "/", icon: "◆" },
-  { id: "clients", label: "Clients", path: "/clients", icon: "◈" },
-  { id: "drafts", label: "Drafts", path: "/drafts", icon: "◉" },
-  { id: "history", label: "History", path: "/history", icon: "◎" },
+  { id: "home", label: "Home", path: "/", icon: "H" },
+  { id: "clients", label: "Clients", path: "/clients", icon: "C" },
+  { id: "drafts", label: "Drafts", path: "/drafts", icon: "D" },
+  { id: "history", label: "History", path: "/history", icon: "H" },
 ] as const;
 
 export const SPECIAL_CARDS = {

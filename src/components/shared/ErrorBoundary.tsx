@@ -30,6 +30,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
+    
+    // Log to error tracking service if available (Sentry, etc.)
+    if (typeof window !== 'undefined' && (window as any).Sentry) {
+      (window as any).Sentry.captureException(error, {
+        contexts: {
+          react: {
+            componentStack: errorInfo.componentStack,
+          },
+        },
+      });
+    }
   }
 
   handleReset = (): void => {

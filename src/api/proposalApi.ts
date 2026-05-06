@@ -1,12 +1,9 @@
 import { API_BASE_URL, DEFAULT_AI_MODEL } from "@/config/config";
 import type { ProposalData, ProposalListItem } from "@/types/proposal.types";
+import { handleResponse, getBaseHeadersWithoutContentType, getBaseHeaders } from "@/services/apiClient";
 
-// ngrok free tier shows an HTML interstitial page for browser fetch requests.
-// This header bypasses it so API calls get JSON responses instead of HTML.
-const BASE_HEADERS: Record<string, string> = {};
-if (process.env.NODE_ENV === "development") {
-  BASE_HEADERS["ngrok-skip-browser-warning"] = "1";
-}
+// Base headers for requests (ngrok bypass in development)
+const BASE_HEADERS = getBaseHeadersWithoutContentType();
 
 interface CreateProposalResponse {
   id: number;
@@ -16,16 +13,6 @@ interface CreateProposalResponse {
 interface RegenerateResponse {
   section_key: string;
   content: string;
-}
-
-async function handleResponse<T>(res: Response): Promise<T> {
-  const json = await res.json();
-  if (!res.ok || !json.success) {
-    const message: string =
-      json?.error?.message ?? `Request failed with status ${res.status}`;
-    throw new Error(message);
-  }
-  return json.data as T;
 }
 
 export async function generateProposal(
@@ -168,7 +155,7 @@ export async function updateSection(
     `${API_BASE_URL}/proposals/${id}/sections/${sectionKey}/`,
     {
       method: "PUT",
-      headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
+      headers: getBaseHeaders(),
       body: JSON.stringify({ content }),
     }
   );
@@ -182,7 +169,7 @@ export async function regenerateSection(
 ): Promise<string> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/regenerate/`, {
     method: "POST",
-    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
+    headers: getBaseHeaders(),
     body: JSON.stringify({
       section_key: sectionKey,
       additional_instructions: instructions ?? null,
@@ -246,7 +233,7 @@ export async function addProposalSection(
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/sections/`, {
     method: "POST",
-    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
+    headers: getBaseHeaders(),
     body: JSON.stringify(payload),
   });
   await handleResponse<null>(res);
@@ -269,7 +256,7 @@ export async function reorderProposalSections(
 ): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/sections/reorder/`, {
     method: "PATCH",
-    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
+    headers: getBaseHeaders(),
     body: JSON.stringify(payload),
   });
   await handleResponse<null>(res);
@@ -295,7 +282,7 @@ export async function suggestSections(
 ): Promise<SuggestedSection[]> {
   const res = await fetch(`${API_BASE_URL}/proposals/suggest-sections/`, {
     method: "POST",
-    headers: { ...BASE_HEADERS, "Content-Type": "application/json" },
+    headers: getBaseHeaders(),
     body: JSON.stringify(payload),
   });
   const data = await handleResponse<{ sections: SuggestedSection[] }>(res);
@@ -517,10 +504,7 @@ export async function getSectionRecommendations(
 ): Promise<SectionRecommendation[]> {
   const res = await fetch(`${API_BASE_URL}/proposals/recommend-sections`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...BASE_HEADERS,
-    },
+    headers: getBaseHeaders(),
     body: JSON.stringify(request),
   });
 

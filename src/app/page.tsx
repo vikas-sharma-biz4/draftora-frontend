@@ -143,12 +143,11 @@ export default function HomePage(): JSX.Element {
                     <div className="tmpl-preview-line" />
                   </div>
                   <span className="tmpl-preview-icon" aria-hidden="true">
-                    {template.icon}
+                    {template.name}
                   </span>
                 </div>
 
                 <div className="tmpl-body">
-                  <div className="tmpl-name">{template.name}</div>
                   <div className="tmpl-desc">{template.description}</div>
                   <div className="tmpl-sections-preview">
                     {template.sections.slice(0, 3).map((key) => (
