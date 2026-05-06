@@ -60,7 +60,7 @@ export default function DocumentUploadCard({ onFilesUploaded }: DocumentUploadCa
 
   function processFiles(files: File[]): void {
     const validFiles = files.filter((file) => {
-      const validTypes = [".pdf", ".docx", ".xlsx", ".pptx"];
+      const validTypes = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
       const ext = "." + file.name.split(".").pop()?.toLowerCase();
       if (!validTypes.includes(ext)) {
         toast.error(`${file.name} is not a supported format`);
@@ -254,7 +254,7 @@ export default function DocumentUploadCard({ onFilesUploaded }: DocumentUploadCa
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.docx,.xlsx,.pptx"
+        accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
         multiple
         style={{ display: "none" }}
         onChange={handleFileChange}

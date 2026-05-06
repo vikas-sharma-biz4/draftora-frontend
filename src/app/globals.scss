@@ -32,6 +32,7 @@
   --color-sidebar-bg: #ffffff;
   --sidebar-width: clamp(13.75rem, 15vw, 15.5rem);
   --sidebar-collapsed-width: 4rem;
+  --main-top-padding: clamp(1.25rem, 3vw, 2rem);
   --radius-sm: 0.375rem;
   --radius-md: 0.625rem;
   --radius-lg: 0.75rem;
@@ -89,7 +90,7 @@ body {
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: 0 clamp(1.5rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem);
+  padding: var(--main-top-padding) clamp(1.5rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem);
   background: var(--color-bg);
   overflow-y: auto;
   overflow-x: hidden;
@@ -97,6 +98,10 @@ body {
   height: 100vh;
   position: relative;
   transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.main-content.no-top-padding {
+  padding-top: 0;
 }
 
 /* ============================================================
@@ -119,7 +124,7 @@ body {
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width 0.3s ease, min-width 0.3s ease;
+  transition: width 0.3s ease, min-width 0.3s ease, left 0.3s ease;
   z-index: 1000;
   -webkit-overflow-scrolling: touch;
 }
@@ -151,6 +156,28 @@ body {
   .main-content {
     margin-left: var(--sidebar-collapsed-width);
     width: calc(100% - var(--sidebar-collapsed-width));
+  }
+}
+
+@media (max-width: 640px) {
+  /* Keep collapsed sidebar visible as icon-only strip on mobile */
+  .sidebar,
+  .sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+    flex-basis: var(--sidebar-collapsed-width);
+    left: 0;
+  }
+
+  .main-content,
+  .sidebar.collapsed + .main-content {
+    margin-left: var(--sidebar-collapsed-width) !important;
+    width: calc(100% - var(--sidebar-collapsed-width)) !important;
+  }
+
+  /* Hide toggle button on mobile — sidebar is always icon-only */
+  .sidebar-toggle {
+    display: none;
   }
 }
 
@@ -282,8 +309,10 @@ body {
 
 .sidebar-steps {
   list-style: none;
-  padding: 4px 12px;
+  padding: 20px 12px 4px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-step-item {
@@ -349,7 +378,7 @@ body {
 }
 
 .sidebar-footer {
-  padding: 16px 12px;
+  padding: 20px 12px 16px;
   border-top: 1px solid var(--color-border);
 }
 
@@ -1214,7 +1243,7 @@ body {
 .review-layout {
   display: flex;
   gap: 24px;
-  align-items: start;
+  align-items: flex-start;
   position: relative;
 }
 
@@ -1231,6 +1260,31 @@ body {
   top: 140px;
   right: max(48px, calc((100vw - var(--sidebar-width) - 968px) / 2));
   z-index: 50;
+}
+
+@media (max-width: 1280px) {
+  .review-layout {
+    flex-direction: column;
+  }
+
+  .review-layout-left {
+    margin-right: 0;
+    max-width: 100%;
+  }
+
+  .review-layout-right {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: 100%;
+    min-width: unset;
+  }
+}
+
+@media (max-width: 640px) {
+  .review-layout-left .grid-2 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .review-card {
@@ -1448,6 +1502,15 @@ body {
   background: var(--color-bg);
 }
 
+.proposal-header-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-bg);
+  padding: 0;
+  margin: 0;
+}
+
 .proposal-actions-bar {
   display: flex;
   align-items: center;
@@ -1480,8 +1543,8 @@ body {
   border-left: 1px solid var(--color-border);
   padding: 24px 0;
   position: sticky;
-  top: 80px;
-  height: calc(100vh - 80px);
+  top: 65px;
+  height: calc(100vh - 65px);
   overflow-y: auto;
   order: 2;
 }
@@ -1853,9 +1916,14 @@ body {
   position: relative;
 }
 
-/* Bubble mount point — managed by BubbleMenuPlugin (floating-ui) */
+/* Bubble mount point — managed by BubbleMenuPlugin (Floating UI) */
 .rte-bubble-mount {
-  z-index: 100;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.rte-bubble-mount > * {
+  pointer-events: auto;
 }
 
 /* Floating toolbar — rendered inside bubble mount, floats above content */
@@ -3996,8 +4064,9 @@ body {
 .tmpl-preview-icon {
   position: relative;
   z-index: 1;
-  font-size: 22px;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 /* Card body */
@@ -4612,11 +4681,45 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.06);
   animation: toolbarSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  max-width: 95vw;
+  max-width: 900px;
   overflow-x: auto;
   overflow-y: visible;
   position: relative;
-  z-index: 1000;
+  z-index: 10000;
+  flex-wrap: wrap;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-group:nth-child(n+3) {
+  display: none;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-divider:nth-child(n+2) {
+  display: none;
+}
+
+.rte-toolbar-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: auto;
+}
+
+.rte-toolbar-expand-btn:hover {
+  background: rgba(55, 48, 163, 0.08);
+  color: var(--color-primary);
 }
 
 @keyframes toolbarSlideIn {
@@ -4734,9 +4837,6 @@ body {
 }
 
 .rte-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
   min-width: 160px;
   background: white;
   border-radius: 10px;
@@ -4788,9 +4888,6 @@ body {
 
 /* Link/Image input panel */
 .rte-link-input-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5049,12 +5146,6 @@ body {
   }
 }
 
-/* Bubble menu mount point */
-.rte-bubble-mount {
-  position: absolute;
-  z-index: 1000;
-}
-
 /* Editor content styles */
 .rte-wrapper {
   position: relative;
@@ -5158,4 +5249,162 @@ body {
 
 .ProseMirror td {
   background: white;
+}
+
+/* ── Proposal Header Bar ────────────────────────────────────────────────── */
+.proposal-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.proposal-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* Parameters Page - Two Column Layout */
+.parameters-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 1.5rem;
+  align-items: flex-start;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
+    
+    /* Stack recommendations below on smaller screens */
+    > :last-child {
+      order: 2;
+      max-height: 500px;
+    }
+  }
+}
+
+/* Section Drop Zone */
+.section-drop-zone {
+  min-height: 100px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  
+  &:empty {
+    border: 2px dashed var(--color-border);
+    background: var(--color-background);
+  }
+}
+
+.section-drop-zone[data-drag-over="true"] {
+  background: rgba(102, 126, 234, 0.05);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+@media (max-width: 768px) {
+  .proposal-header-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .proposal-actions-bar {
+    justify-content: flex-end;
+  }
+}
+
+/* ── Recreate Template Card ────────────────────────────────────────────────── */
+.tmpl-recreate {
+  cursor: pointer;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #bbf7d0;
+  border-radius: var(--radius-xl);
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tmpl-recreate:hover {
+  border-color: #4ade80;
+  box-shadow: 0 4px 20px rgba(74, 222, 128, 0.18);
+  transform: translateY(-1px);
+}
+
+.tmpl-recreate.tmpl-selected {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+/* ── Recreate Mode Banner (parameters page) ───────────────────────────────── */
+.recreate-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  margin-bottom: 24px;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.recreate-banner-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  line-height: 1.4;
+  color: #16a34a;
+}
+
+.recreate-banner-file {
+  font-weight: 500;
+  color: #15803d;
+}
+
+.recreate-banner-hint {
+  font-size: 0.75rem;
+  color: #166534;
+  margin-top: 3px;
+}
+
+/* ── Hierarchical Section Structure (TOC Display) ───────────────────────────── */
+
+.section-content-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-child-indicator {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+.section-structure-item.section-child {
+  background: linear-gradient(to right, rgba(55, 48, 163, 0.02) 0%, transparent 100%);
+  border-left: 2px solid var(--color-primary-medium);
+}
+
+.section-structure-item.section-child:hover {
+  background: linear-gradient(to right, rgba(55, 48, 163, 0.04) 0%, transparent 100%);
+  border-left-color: var(--color-primary);
+}
+
+.section-structure-item.section-child .section-structure-name {
+  color: var(--color-text);
+}
+
+.section-structure-item.section-child .section-structure-num {
+  color: var(--color-primary);
+  font-weight: 500;
 }

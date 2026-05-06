@@ -1,3 +1,5 @@
+import type { ProposalData, WizardStep } from "./proposal.types";
+
 export type DraftStage = 
   | "template_selection"
   | "wizard_in_progress"
@@ -5,14 +7,62 @@ export type DraftStage =
   | "review_complete"
   | "generated";
 
+export type DraftLocation = 
+  | "WIZARD_PARAMETERS"
+  | "WIZARD_REVIEW"
+  | "WEB_VIEW"
+  | "AI_SECTIONS";
+
+export interface DraftUIState {
+  scrollPosition: number;
+  activeSection: string | null;
+  expandedSections: string[];
+  lastVisibleSection: string | null;
+}
+
+export interface DraftWizardState {
+  currentStep: WizardStep;
+  maxStepReached: WizardStep;
+  completedSteps: number[];
+  proposalData: ProposalData;
+}
+
 export interface SavedDraft {
+  id: string;
+  proposalId: number | null;
+  title: string;
+  clientName: string;
+  status: "draft" | "generating" | "completed";
+  lastLocation: DraftLocation;
+  stage: DraftStage;
+  wizardState: DraftWizardState;
+  generatedContent: Record<string, string>;
+  uiState: DraftUIState;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface DraftMetadata {
   id: string;
   title: string;
   clientName: string;
+  status: "draft" | "generating" | "completed";
+  lastLocation: DraftLocation;
   stage: DraftStage;
-  createdAt: string;
   updatedAt: string;
-  data: Record<string, unknown>;
+}
+
+export interface SaveDraftPayload {
+  proposalId: number | null;
+  title: string;
+  clientName: string;
+  status: "draft" | "generating" | "completed";
+  lastLocation: DraftLocation;
+  stage: DraftStage;
+  wizardState: DraftWizardState;
+  generatedContent: Record<string, string>;
+  uiState: DraftUIState;
 }
 
 export interface PipelineStep {
