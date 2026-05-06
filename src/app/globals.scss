@@ -1243,7 +1243,7 @@ body {
 .review-layout {
   display: flex;
   gap: 24px;
-  align-items: start;
+  align-items: flex-start;
   position: relative;
 }
 
@@ -5274,7 +5274,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 1.5rem;
-  align-items: start;
+  align-items: flex-start;
 
   @media (max-width: 1200px) {
     grid-template-columns: 1fr;
