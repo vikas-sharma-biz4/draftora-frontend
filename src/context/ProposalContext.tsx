@@ -35,6 +35,10 @@ interface ProposalContextType {
   completedSteps: number[];
   setCompletedSteps: (steps: number[]) => void;
   markStepCompleted: (stepId: number) => void;
+  currentDraftId: string | null;
+  setCurrentDraftId: (id: string | null) => void;
+  autoSaveEnabled: boolean;
+  setAutoSaveEnabled: (enabled: boolean) => void;
 }
 
 const STORAGE_KEY = "draftora_wizard_v1";
@@ -80,6 +84,8 @@ export function ProposalProvider({
   const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
   const [draftStage, setDraftStage] = useState<DraftStage>("template_selection");
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
 
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -197,6 +203,10 @@ export function ProposalProvider({
         completedSteps,
         setCompletedSteps,
         markStepCompleted,
+        currentDraftId,
+        setCurrentDraftId,
+        autoSaveEnabled,
+        setAutoSaveEnabled,
       }}
     >
       {children}
