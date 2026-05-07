@@ -9,7 +9,8 @@ import { MAIN_NAV_ITEMS } from "@/constants";
 export default function MainSidebar(): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const MOBILE_BREAKPOINT = 640;
+  const [collapsed, setCollapsed] = useState(true);
 
   useEffect(() => {
     const handleResize = () => {
@@ -24,6 +25,11 @@ export default function MainSidebar(): JSX.Element {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  function handleToggle(): void {
+    if (window.innerWidth <= MOBILE_BREAKPOINT) return;
+    setCollapsed((prev) => !prev);
+  }
+
   function handleNavClick(path: string): void {
     router.push(path);
   }
@@ -36,7 +42,7 @@ export default function MainSidebar(): JSX.Element {
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       <button
         className="sidebar-toggle"
-        onClick={() => setCollapsed((prev) => !prev)}
+        onClick={handleToggle}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         type="button"
@@ -82,14 +88,14 @@ export default function MainSidebar(): JSX.Element {
         })}
       </ul>
 
-      <div className="sidebar-footer">
+      {/* <div className="sidebar-footer">
         <button
           className="btn btn-primary btn-sm btn-full"
           onClick={() => router.push("/")}
         >
           + New Proposal
         </button>
-      </div>
+      </div> */}
     </aside>
   );
 }
