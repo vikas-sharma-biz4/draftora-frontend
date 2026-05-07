@@ -11,6 +11,7 @@ import { listClientsWithDocuments, getCachedClientsWithDocuments, invalidateClie
 import type { ClientWithDocuments } from "@/api/clientApi";
 import { useProposal } from "@/context/ProposalContext";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 
 // Eagerly warm the client cache the moment this page module is loaded.
 // By the time the user reads the page and clicks a template, the fetch is
@@ -41,6 +42,9 @@ export default function HomePage(): JSX.Element {
   const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps } = useProposal();
   const router = useRouter();
 
+  // Enable auto-save to localStorage drafts when user is on home page
+  useDraftAutoSave({ enabled: true });
+
   const [selectionMode, setSelectionMode] = useState<SelectionMode | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -49,6 +53,12 @@ export default function HomePage(): JSX.Element {
   const [preloadedClients, setPreloadedClients] = useState<ClientWithDocuments[] | null>(
     getCachedClientsWithDocuments()
   );
+  const [newClientData, setNewClientData] = useState<{
+    client: { id: number; name: string };
+    notes: string;
+    uploadedFiles: File[];
+  } | null>(null);
+  const [enableTemplateSelection, setEnableTemplateSelection] = useState<boolean>(false);
 
   const prefetchClients = useCallback(async (): Promise<void> => {
     try {
@@ -74,6 +84,8 @@ export default function HomePage(): JSX.Element {
     setShowTemplateModal(false);
     setSelectedTemplateId(null);
     setSelectionMode(null);
+    setNewClientData(null);
+    setEnableTemplateSelection(false);
   }
 
   function handleNewClientFromModal(): void {
@@ -81,13 +93,13 @@ export default function HomePage(): JSX.Element {
     setShowNewClientModal(true);
   }
 
-  function handleClientCreated(): void {
+  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
     setShowNewClientModal(false);
     invalidateClientsCache(); // Force fresh fetch so new client appears
     prefetchClients(); // Background re-fetch — modal syncs via prop update + useEffect
-    if (selectedTemplateId || selectionMode === "scratch") {
-      setShowTemplateModal(true);
-    }
+    setNewClientData({ client, notes, uploadedFiles });
+    setEnableTemplateSelection(true);
+    setShowTemplateModal(true);
   }
 
   function handleSelectScratch(): void {
@@ -228,7 +240,7 @@ export default function HomePage(): JSX.Element {
           />
         )}
 
-        {showTemplateModal && (selectedTemplateId || selectionMode === "scratch") && (
+        {showTemplateModal && (selectedTemplateId || selectionMode === "scratch" || newClientData) && (
           <TemplateSelectionModal
             templateId={selectedTemplateId ?? null}
             templateName={
@@ -240,6 +252,8 @@ export default function HomePage(): JSX.Element {
             onClose={handleCloseTemplateModal}
             onNewClient={handleNewClientFromModal}
             initialClients={preloadedClients ?? undefined}
+            newClientData={newClientData ?? undefined}
+            enableTemplateSelection={enableTemplateSelection}
           />
         )}
 
@@ -247,6 +261,7 @@ export default function HomePage(): JSX.Element {
           <NewClientModal
             onClose={() => setShowNewClientModal(false)}
             onClientCreated={handleClientCreated}
+            existingClients={preloadedClients?.map((c) => ({ id: c.id, name: c.name })) ?? []}
           />
         )}
       </main>

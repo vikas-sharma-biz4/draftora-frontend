@@ -15,10 +15,11 @@ import type { ParsedFileResult } from "@/services/api";
 
 interface NewClientModalProps {
   onClose: () => void;
-  onClientCreated: () => void;
+  onClientCreated: (client: { id: number; name: string }, notes: string, uploadedFiles: File[]) => void;
+  existingClients?: { id: number; name: string }[];
 }
 
-export default function NewClientModal({ onClose, onClientCreated }: NewClientModalProps): JSX.Element | null {
+export default function NewClientModal({ onClose, onClientCreated, existingClients = [] }: NewClientModalProps): JSX.Element | null {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [mounted, setMounted] = useState<boolean>(false);
@@ -205,6 +206,15 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       return;
     }
 
+    // Check for duplicate client name
+    const isDuplicate = existingClients.some(
+      (client) => client.name.toLowerCase().trim() === formData.clientName.toLowerCase().trim()
+    );
+    if (isDuplicate) {
+      toast.error("A client with this name already exists");
+      return;
+    }
+
     // Prevent creating if any files are still parsing
     const stillParsing = uploadedFiles.some((f) => f.status === "parsing");
     if (stillParsing) {
@@ -235,7 +245,7 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       }
 
       toast.success(`Client "${formData.clientName}" created successfully`);
-      onClientCreated();
+      onClientCreated(newClient, formData.notes || "", uploadedFiles.map((f) => f.file));
     } catch (error) {
       console.error("Failed to create client:", error);
       toast.error("Failed to create client");
