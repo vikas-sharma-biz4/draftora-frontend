@@ -125,15 +125,15 @@ export default function RichEditor({
   // Only update if content is significantly different (not just formatting changes)
   useEffect(() => {
     if (!editor) return;
-    
+
     const currentHtml = editor.getHTML();
     const newContent = content;
-    
+
     // Don't update if content is the same or if editor is focused (user is typing)
     if (currentHtml === newContent || editor.isFocused) {
       return;
     }
-    
+
     // Only update if content changed externally (e.g., from regeneration)
     // emitUpdate: false prevents triggering onChange during external updates
     editor.commands.setContent(newContent, { emitUpdate: false });
@@ -211,48 +211,90 @@ export default function RichEditor({
 
   const bubbleElRef = useRef<HTMLDivElement | null>(null);
   const [bubbleReady, setBubbleReady] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [selectionCoords, setSelectionCoords] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!editor) return;
     const el = document.createElement("div");
     el.className = "rte-bubble-mount";
-    el.style.visibility = "hidden";
-    el.style.opacity = "0";
     document.body.appendChild(el);
     bubbleElRef.current = el;
 
-    // Find the first scrollable ancestor so Floating UI tracks it natively.
-    let scrollTarget: HTMLElement | Window = window;
-    let parent = (editor.view.dom as HTMLElement).parentElement;
-    while (parent) {
-      const style = window.getComputedStyle(parent);
-      if (/(auto|scroll)/.test(style.overflowY) || /(auto|scroll)/.test(style.overflowX)) {
-        scrollTarget = parent;
-        break;
-      }
-      parent = parent.parentElement;
-    }
+    const handleSelectionUpdate = () => {
+      const { from, to, empty } = editor.state.selection;
+      const hasTextSelected = !empty && from !== to;
 
-    const plugin = BubbleMenuPlugin({
-      pluginKey: "rteToolbar",
-      editor,
-      element: el,
-      shouldShow: ({ state, from, to }) => {
-        // Only show when text is selected (not just cursor position)
-        return from !== to;
-      },
-      appendTo: () => document.body,
-      options: {
-        strategy: "fixed",
-        placement: "top",
-        scrollTarget,
-      },
+      if (hasTextSelected) {
+        // Get selection coordinates from the editor view (already viewport-relative)
+        const startCoords = editor.view.coordsAtPos(from);
+        const endCoords = editor.view.coordsAtPos(to);
+
+        // Calculate center of selection
+        const top = endCoords.bottom + 2; // 2px below end of selection
+        const left = (startCoords.left + endCoords.left) / 2; // Center horizontally
+
+        setSelectionCoords({ top, left });
+        setHasSelection(true);
+
+        // Position and show the bubble
+        if (el) {
+          el.style.position = 'fixed';
+          el.style.top = `${top}px`;
+          el.style.left = `${left}px`;
+          el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
+          el.style.display = 'block';
+        }
+      } else {
+        setHasSelection(false);
+        // Hide the bubble
+        if (el) {
+          el.style.display = 'none';
+        }
+      }
+    };
+
+    // Track mouse state to only show toolbar after mouse is released
+    let isMouseDown = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Only track mouse down if clicking inside the editor, not on the toolbar
+      const editorDom = editor.view.dom;
+      if (editorDom.contains(e.target as Node)) {
+        isMouseDown = true;
+        // Hide toolbar when starting to select
+        if (el) {
+          el.style.display = 'none';
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      // Only handle mouse up if we were tracking a selection in the editor
+      if (isMouseDown) {
+        isMouseDown = false;
+        // Show toolbar after mouse is released and selection is complete
+        setTimeout(() => handleSelectionUpdate(), 50); // Longer delay to ensure selection is complete
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Also handle keyboard selection (no mouse involved)
+    editor.on('selectionUpdate', () => {
+      if (!isMouseDown) {
+        handleSelectionUpdate();
+      }
     });
-    editor.registerPlugin(plugin);
+
+    // Initial state - hidden
+    el.style.display = 'none';
     setBubbleReady(true);
 
     return () => {
-      editor.unregisterPlugin("rteToolbar");
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp);
       if (el.parentNode) {
         el.parentNode.removeChild(el);
       }
@@ -525,7 +567,8 @@ export default function RichEditor({
 
   return (
     <div className="rte-wrapper">
-      {bubbleReady && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
+      {/* Render toolbar into bubble mount via portal when text is selected */}
+      {bubbleReady && hasSelection && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
 
       {/* Editor content */}
       <div className="rte-content">

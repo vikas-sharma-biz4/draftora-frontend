@@ -11,6 +11,7 @@ import { generateProposal } from "@/api/proposalApi";
 import { SECTION_DISPLAY_NAMES, CLIENTS_STORAGE_KEY } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { formatBytes } from "@/utils/formatBytes";
 import type { Client } from "@/types/client.types";
 
@@ -57,6 +58,9 @@ export default function ReviewPage(): JSX.Element {
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
+
+  // Enable auto-save to localStorage drafts when user is in pipeline stage
+  useDraftAutoSave({ enabled: true });
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
@@ -420,6 +424,11 @@ export default function ReviewPage(): JSX.Element {
               onClick={() => router.push("/parameters")}
             >
               ← Back
+            </button>
+          </div>
+          <div className="page-footer-right">
+            <button className="btn btn-secondary" onClick={handleSaveDraft}>
+              Save Draft
             </button>
           </div>
         </div>

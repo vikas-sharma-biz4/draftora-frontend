@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { DRAFTS_STORAGE_KEY } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import type { ProposalData, WizardStep } from "@/types/proposal.types";
+import type { DraftStage, DraftLocation } from "@/types/draft.types";
 
 export interface SavedDraft {
   id: string;
@@ -13,6 +14,10 @@ export interface SavedDraft {
   title: string;
   clientName: string;
   currentStep: WizardStep;
+  draftStage: DraftStage;
+  lastLocation: DraftLocation;
+  maxStepReached: WizardStep;
+  completedSteps: number[];
   proposalData: Partial<ProposalData>;
 }
 
@@ -23,7 +28,7 @@ export interface SavedDraft {
  * No draft limit is enforced — all drafts are kept.
  */
 export function useSaveDraft(): () => void {
-  const { proposalData, currentStep, resetProposal } = useProposal();
+  const { proposalData, currentStep, draftStage, completedSteps, maxStepReached, resetProposal } = useProposal();
   const router = useRouter();
 
   return function saveDraft(): void {
@@ -35,12 +40,27 @@ export function useSaveDraft(): () => void {
       return;
     }
 
+    // Determine lastLocation based on current pathname
+    const lastLocation: DraftLocation = (() => {
+      if (typeof window !== "undefined") {
+        const pathname = window.location.pathname;
+        if (pathname === "/parameters") return "WIZARD_PARAMETERS";
+        if (pathname === "/review") return "WIZARD_REVIEW";
+        if (pathname.startsWith("/proposal/") || pathname === "/web-view") return "WEB_VIEW";
+      }
+      return "WIZARD_PARAMETERS";
+    })();
+
     const draft: SavedDraft = {
       id: Date.now().toString(),
       savedAt: new Date().toISOString(),
       title: proposalData.title || "Untitled Proposal",
       clientName: proposalData.clientName || "",
       currentStep,
+      draftStage,
+      lastLocation,
+      maxStepReached,
+      completedSteps,
       proposalData: { ...proposalData, files: [] },
     };
 

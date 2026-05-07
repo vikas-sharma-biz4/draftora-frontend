@@ -21,6 +21,12 @@ interface TemplateSelectionModalProps {
   onNewClient: () => void;
   initialClients?: ClientWithDocuments[];
   isScratch?: boolean;
+  newClientData?: {
+    client: { id: number; name: string };
+    notes: string;
+    uploadedFiles: File[];
+  };
+  enableTemplateSelection?: boolean;
 }
 
 export default function TemplateSelectionModal({
@@ -30,6 +36,8 @@ export default function TemplateSelectionModal({
   onNewClient,
   initialClients,
   isScratch = false,
+  newClientData,
+  enableTemplateSelection = false,
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
@@ -40,7 +48,9 @@ export default function TemplateSelectionModal({
   const [loading, setLoading] = useState<boolean>(initialClients === undefined);
   const [proposalName, setProposalName] = useState<string>("");
   const [proposalDescription, setProposalDescription] = useState<string>("");
+  const [initialContextNotes, setInitialContextNotes] = useState<string>("");
   const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
+  const [selectedTemplateIdState, setSelectedTemplateIdState] = useState<string | null>(templateId ?? null);
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
   const [uploadedFiles, setUploadedFiles] = useState<
@@ -77,6 +87,35 @@ export default function TemplateSelectionModal({
       }
     }
   }, [selectedClientId, clients]);
+
+  // Handle new client data from NewClientModal
+  useEffect(() => {
+    if (newClientData) {
+      // Auto-select the newly created client
+      setSelectedClientId(newClientData.client.id);
+      // Auto-fill the client name in search input
+      setClientSearchQuery(newClientData.client.name);
+      // Set the initial context notes
+      setInitialContextNotes(newClientData.notes);
+      // If template selection is enabled, clear the templateId to allow user to select any template
+      if (enableTemplateSelection) {
+        setSelectedTemplateIdState(null);
+      }
+      // Note: Files uploaded in NewClientModal are already uploaded to the client
+      // They will appear in the Knowledge Base section automatically when the client is selected
+      // We do NOT re-process or re-upload them here to avoid duplicates
+    }
+  }, [newClientData, enableTemplateSelection]);
+
+  // Fix client auto-selection timing - wait for clients list to be updated
+  useEffect(() => {
+    if (newClientData && clients.length > 0) {
+      const clientExists = clients.find((c) => c.id === newClientData.client.id);
+      if (clientExists) {
+        setSelectedClientId(newClientData.client.id);
+      }
+    }
+  }, [newClientData, clients]);
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -201,7 +240,7 @@ export default function TemplateSelectionModal({
   }
 
   function handleClientSearchBlur(): void {
-    setTimeout(() => setShowClientDropdown(false), 200);
+    setTimeout(() => setShowClientDropdown(false), 300);
   }
 
   function toggleDocument(docId: number): void {
@@ -358,6 +397,11 @@ export default function TemplateSelectionModal({
       return;
     }
 
+    if (enableTemplateSelection && !selectedTemplateIdState) {
+      toast.error("Please select a template");
+      return;
+    }
+
     if (selectedDocuments.size === 0) {
       toast.error("Please select at least one document");
       return;
@@ -381,14 +425,15 @@ export default function TemplateSelectionModal({
         type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
 
-    const template = templateId ? PROPOSAL_TEMPLATES.find((t) => t.id === templateId) : null;
+    const finalTemplateId = enableTemplateSelection ? selectedTemplateIdState : templateId;
+    const template = finalTemplateId ? PROPOSAL_TEMPLATES.find((t) => t.id === finalTemplateId) : null;
 
     updateProposalData({
       title: proposalName,
       clientName: client.name,
-      description: proposalDescription,
+      description: initialContextNotes ? `${initialContextNotes}\n\n${proposalDescription}` : proposalDescription,
       clientId: selectedClientId,
-      templateId: isScratch ? null : templateId ?? null,
+      templateId: isScratch ? null : finalTemplateId ?? null,
       templateType: isScratch ? "scratch" : "predefined",
       selectedSections: template ? [...template.sections] : [],
       sectionDisplayNames: {},
@@ -434,6 +479,28 @@ export default function TemplateSelectionModal({
         </div>
 
         <div className={styles.modalBody}>
+          {enableTemplateSelection && (
+            <div className={styles.section}>
+              <label className={styles.label}>Select a Template</label>
+              <div className={styles.templateGrid}>
+                {PROPOSAL_TEMPLATES.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className={`${styles.templateCard} ${selectedTemplateIdState === template.id ? styles.selected : ""}`}
+                    onClick={() => setSelectedTemplateIdState(template.id)}
+                  >
+                    <div className={styles.templateCardIcon}>{template.icon}</div>
+                    <div className={styles.templateCardInfo}>
+                      <div className={styles.templateCardTitle}>{template.name}</div>
+                      <div className={styles.templateCardDescription}>{template.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className={styles.section}>
             <label className={styles.label}>Client Name</label>
             {loading ? (
@@ -473,7 +540,10 @@ export default function TemplateSelectionModal({
                         key={client.id}
                         type="button"
                         className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
-                        onClick={() => handleClientSelect(client.id, client.name)}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          handleClientSelect(client.id, client.name);
+                        }}
                       >
                         <div className={styles.clientOptionMain}>
                           <span className={styles.clientOptionName}>{client.name}</span>
@@ -508,6 +578,19 @@ export default function TemplateSelectionModal({
               onChange={(e) => setProposalName(e.target.value)}
             />
           </div>
+
+          {initialContextNotes && (
+            <div className={styles.section}>
+              <label className={styles.label}>Initial Context & Notes</label>
+              <textarea
+                className={styles.textarea}
+                placeholder="Initial context and notes from client creation..."
+                value={initialContextNotes}
+                onChange={(e) => setInitialContextNotes(e.target.value)}
+                rows={4}
+              />
+            </div>
+          )}
 
           <div className={styles.section}>
             <label className={styles.label}>Project Brief</label>
