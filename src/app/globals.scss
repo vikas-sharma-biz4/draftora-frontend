@@ -90,7 +90,7 @@ body {
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: var(--main-top-padding) clamp(1.5rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem);
+  padding: 0 clamp(1.5rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem);
   background: var(--color-bg);
   overflow-y: auto;
   overflow-x: hidden;
@@ -302,9 +302,10 @@ body {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: var(--color-text-light);
+  color: black;
   text-transform: uppercase;
   padding: 20px 20px 8px;
+  text-align: center;
 }
 
 .sidebar-steps {
@@ -814,23 +815,37 @@ body {
 .btn-success {
   background: var(--color-success-light);
   color: var(--color-success-dark);
-  border: none;
+  border: 1.5px solid var(--color-success);
 }
 
 .btn-success:hover:not(:disabled) {
   background: var(--color-success);
   color: white;
+  border-color: var(--color-success-dark);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-success:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .btn-danger {
   background: var(--color-danger-light);
   color: var(--color-danger);
-  border: none;
+  border: 1.5px solid var(--color-danger);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: var(--color-danger);
   color: white;
+  border-color: #b91c1c;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger:focus-visible:not(:disabled) {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
 }
 
 .btn-sm {
@@ -1918,12 +1933,24 @@ body {
 
 /* Bubble mount point — managed by BubbleMenuPlugin (Floating UI) */
 .rte-bubble-mount {
+  display: none;
   z-index: 9999;
   pointer-events: none;
 }
 
+.rte-bubble-mount.is-visible {
+  display: block;
+}
+
 .rte-bubble-mount > * {
   pointer-events: auto;
+}
+
+/* Inline toolbar container - shown when text is selected */
+.rte-toolbar-container {
+  position: relative;
+  z-index: 100;
+  margin-bottom: 12px;
 }
 
 /* Floating toolbar — rendered inside bubble mount, floats above content */

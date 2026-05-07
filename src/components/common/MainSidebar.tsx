@@ -88,14 +88,14 @@ export default function MainSidebar(): JSX.Element {
         })}
       </ul>
 
-      <div className="sidebar-footer">
+      {/* <div className="sidebar-footer">
         <button
           className="btn btn-primary btn-sm btn-full"
           onClick={() => router.push("/")}
         >
           + New Proposal
         </button>
-      </div>
+      </div> */}
     </aside>
   );
 }

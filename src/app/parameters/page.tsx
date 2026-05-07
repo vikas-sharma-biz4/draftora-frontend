@@ -10,6 +10,9 @@ import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAM
 import { useProposal } from "@/context/ProposalContext";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import SectionRecommendations from "@/components/proposal/SectionRecommendations";
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
+import { useSaveDraft } from "@/hooks/useSaveDraft";
+import { SaveDraftButton } from "@/components/draft/SaveDraftButton";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -64,8 +67,12 @@ function buildSectionItems(
 export default function ParametersPage(): JSX.Element {
   const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, currentProposalId, draftStage, completedSteps } = useProposal();
   const router = useRouter();
+  const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
   const isRecreateMode = proposalData.templateType === "recreate";
+
+  // Enable auto-save to localStorage drafts when user is in pipeline stage
+  useDraftAutoSave({ enabled: true });
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
     buildSectionItems(
@@ -488,6 +495,9 @@ export default function ParametersPage(): JSX.Element {
             </button>
           </div>
           <div className="page-footer-right">
+            <button className="btn btn-secondary" onClick={handleSaveDraft}>
+              Save Draft
+            </button>
             <button className="btn btn-primary" onClick={handleNext}>
               Next: Review &amp; Generate →
             </button>
