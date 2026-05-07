@@ -18,7 +18,7 @@ const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
 });
 
 export default function DraftsPage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, hydrated } = useProposal();
+  const { updateProposalData, setCurrentStep, setDraftStage, setCompletedSteps, setMaxStepReached, hydrated } = useProposal();
   const router = useRouter();
   const [drafts, setDrafts] = useState<SavedDraft[]>([]);
 
@@ -31,8 +31,10 @@ export default function DraftsPage(): JSX.Element {
     try {
       const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
       const allDrafts = raw ? (JSON.parse(raw) as SavedDraft[]) : [];
+      console.log("Loaded drafts:", allDrafts.length, allDrafts);
       setDrafts(allDrafts);
-    } catch {
+    } catch (error) {
+      console.error("Failed to load drafts:", error);
       setDrafts([]);
     }
   }
@@ -40,7 +42,29 @@ export default function DraftsPage(): JSX.Element {
   function handleLoadDraft(draft: SavedDraft): void {
     updateProposalData(draft.proposalData as Partial<ProposalData>);
     setCurrentStep(draft.currentStep);
-    router.push("/");
+
+    // Handle old drafts that don't have the new fields
+    setDraftStage(draft.draftStage || "wizard_in_progress");
+    setCompletedSteps(draft.completedSteps || []);
+    setMaxStepReached(draft.maxStepReached || draft.currentStep);
+
+    // Navigate to the correct pipeline stage based on lastLocation
+    // Default to "/" for old drafts without lastLocation
+    const location = draft.lastLocation || (draft.currentStep >= 4 ? "WIZARD_PARAMETERS" : null);
+    switch (location) {
+      case "WIZARD_PARAMETERS":
+        router.push("/parameters");
+        break;
+      case "WIZARD_REVIEW":
+        router.push("/review");
+        break;
+      case "WEB_VIEW":
+        // Navigate to web-view (proposalId is handled by the backend draft system)
+        router.push("/web-view");
+        break;
+      default:
+        router.push("/");
+    }
   }
 
   function handleDeleteDraft(id: string, e: React.MouseEvent): void {

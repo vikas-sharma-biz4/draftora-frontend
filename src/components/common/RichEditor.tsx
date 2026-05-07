@@ -26,6 +26,45 @@ interface RichEditorProps {
   onRegenerateSelection?: (selectedText: string) => void;
 }
 
+function DropdownPortal({
+  triggerRef,
+  isOpen,
+  children,
+  className,
+}: {
+  triggerRef: React.RefObject<HTMLElement | null>;
+  isOpen: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const elRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current || !elRef.current) return;
+    let rafId: number;
+    const update = () => {
+      if (!triggerRef.current || !elRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      elRef.current.style.position = "fixed";
+      elRef.current.style.top = `${rect.bottom + 6}px`;
+      elRef.current.style.left = `${rect.left}px`;
+      elRef.current.style.zIndex = "10001";
+      rafId = requestAnimationFrame(update);
+    };
+    rafId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(rafId);
+  }, [isOpen, triggerRef]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div ref={elRef} className={className}>
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 export default function RichEditor({
   content,
   onChange,
@@ -38,6 +77,10 @@ export default function RichEditor({
   const [linkUrl, setLinkUrl] = useState<string>("");
   const [showImageInput, setShowImageInput] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>("");
+  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(true);
+  const headingBtnRef = useRef<HTMLButtonElement | null>(null);
+  const linkBtnRef = useRef<HTMLButtonElement | null>(null);
+  const imageBtnRef = useRef<HTMLButtonElement | null>(null);
 
   const editor = useEditor({
     extensions: [
@@ -82,15 +125,15 @@ export default function RichEditor({
   // Only update if content is significantly different (not just formatting changes)
   useEffect(() => {
     if (!editor) return;
-    
+
     const currentHtml = editor.getHTML();
     const newContent = content;
-    
+
     // Don't update if content is the same or if editor is focused (user is typing)
     if (currentHtml === newContent || editor.isFocused) {
       return;
     }
-    
+
     // Only update if content changed externally (e.g., from regeneration)
     // emitUpdate: false prevents triggering onChange during external updates
     editor.commands.setContent(newContent, { emitUpdate: false });
@@ -168,6 +211,8 @@ export default function RichEditor({
 
   const bubbleElRef = useRef<HTMLDivElement | null>(null);
   const [bubbleReady, setBubbleReady] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
+  const [selectionCoords, setSelectionCoords] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!editor) return;
@@ -175,19 +220,81 @@ export default function RichEditor({
     el.className = "rte-bubble-mount";
     document.body.appendChild(el);
     bubbleElRef.current = el;
-    const plugin = BubbleMenuPlugin({
-      pluginKey: "rteToolbar",
-      editor,
-      element: el,
-      shouldShow: ({ state, from, to }) => {
-        // Only show when text is selected (not just cursor position)
-        return from !== to;
-      },
+
+    const handleSelectionUpdate = () => {
+      const { from, to, empty } = editor.state.selection;
+      const hasTextSelected = !empty && from !== to;
+
+      if (hasTextSelected) {
+        // Get selection coordinates from the editor view (already viewport-relative)
+        const startCoords = editor.view.coordsAtPos(from);
+        const endCoords = editor.view.coordsAtPos(to);
+
+        // Calculate center of selection
+        const top = endCoords.bottom + 2; // 2px below end of selection
+        const left = (startCoords.left + endCoords.left) / 2; // Center horizontally
+
+        setSelectionCoords({ top, left });
+        setHasSelection(true);
+
+        // Position and show the bubble
+        if (el) {
+          el.style.position = 'fixed';
+          el.style.top = `${top}px`;
+          el.style.left = `${left}px`;
+          el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
+          el.style.display = 'block';
+        }
+      } else {
+        setHasSelection(false);
+        // Hide the bubble
+        if (el) {
+          el.style.display = 'none';
+        }
+      }
+    };
+
+    // Track mouse state to only show toolbar after mouse is released
+    let isMouseDown = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Only track mouse down if clicking inside the editor, not on the toolbar
+      const editorDom = editor.view.dom;
+      if (editorDom.contains(e.target as Node)) {
+        isMouseDown = true;
+        // Hide toolbar when starting to select
+        if (el) {
+          el.style.display = 'none';
+        }
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      // Only handle mouse up if we were tracking a selection in the editor
+      if (isMouseDown) {
+        isMouseDown = false;
+        // Show toolbar after mouse is released and selection is complete
+        setTimeout(() => handleSelectionUpdate(), 50); // Longer delay to ensure selection is complete
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Also handle keyboard selection (no mouse involved)
+    editor.on('selectionUpdate', () => {
+      if (!isMouseDown) {
+        handleSelectionUpdate();
+      }
     });
-    editor.registerPlugin(plugin);
+
+    // Initial state - hidden
+    el.style.display = 'none';
     setBubbleReady(true);
+
     return () => {
-      editor.unregisterPlugin("rteToolbar");
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp);
       if (el.parentNode) {
         el.parentNode.removeChild(el);
       }
@@ -199,7 +306,7 @@ export default function RichEditor({
   if (!editor) return <div className="rte-content" />;
 
   const toolbar = (
-    <div className="rte-toolbar-modern" role="toolbar" aria-label="Formatting toolbar">
+    <div className={`rte-toolbar-modern${isToolbarCollapsed ? " collapsed" : ""}`} role="toolbar" aria-label="Formatting toolbar">
       {/* Text Formatting Group */}
       <div className="rte-toolbar-group">
         <button
@@ -250,6 +357,7 @@ export default function RichEditor({
       <div className="rte-toolbar-group">
         <div className="rte-dropdown">
           <button
+            ref={headingBtnRef}
             type="button"
             className="rte-btn-dropdown"
             title="Text style"
@@ -258,17 +366,15 @@ export default function RichEditor({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 12h3"/><path d="M17 18V6"/><path d="M20 18V6"/></svg>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          {showHeadingMenu && (
-            <div className="rte-dropdown-menu">
-              <button onClick={() => { editor.chain().focus().setParagraph().run(); setShowHeadingMenu(false); }}>Paragraph</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 1 }).run(); setShowHeadingMenu(false); }}>Heading 1</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 2 }).run(); setShowHeadingMenu(false); }}>Heading 2</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 3 }).run(); setShowHeadingMenu(false); }}>Heading 3</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 4 }).run(); setShowHeadingMenu(false); }}>Heading 4</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 5 }).run(); setShowHeadingMenu(false); }}>Heading 5</button>
-              <button onClick={() => { editor.chain().focus().toggleHeading({ level: 6 }).run(); setShowHeadingMenu(false); }}>Heading 6</button>
-            </div>
-          )}
+          <DropdownPortal triggerRef={headingBtnRef} isOpen={showHeadingMenu} className="rte-dropdown-menu">
+            <button onClick={() => { editor.chain().focus().setParagraph().run(); setShowHeadingMenu(false); }}>Paragraph</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 1 }).run(); setShowHeadingMenu(false); }}>Heading 1</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 2 }).run(); setShowHeadingMenu(false); }}>Heading 2</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 3 }).run(); setShowHeadingMenu(false); }}>Heading 3</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 4 }).run(); setShowHeadingMenu(false); }}>Heading 4</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 5 }).run(); setShowHeadingMenu(false); }}>Heading 5</button>
+            <button onClick={() => { editor.chain().focus().toggleHeading({ level: 6 }).run(); setShowHeadingMenu(false); }}>Heading 6</button>
+          </DropdownPortal>
         </div>
         <button
           type="button"
@@ -308,6 +414,7 @@ export default function RichEditor({
       <div className="rte-toolbar-group">
         <div className="rte-dropdown">
           <button
+            ref={linkBtnRef}
             type="button"
             className={`rte-btn-icon${editor.isActive("link") ? " active" : ""}`}
             title={editor.isActive("link") ? "Edit link" : "Add link"}
@@ -321,27 +428,26 @@ export default function RichEditor({
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           </button>
-          {showLinkInput && (
-            <div className="rte-link-input-panel">
-              <input
-                type="url"
-                placeholder="https://example.com"
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && setLink()}
-                autoFocus
-              />
-              <button onClick={setLink} className="rte-link-btn-apply">✓</button>
-              {editor.isActive("link") && (
-                <button onClick={removeLink} className="rte-link-btn-remove" title="Remove link">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-              )}
-            </div>
-          )}
+          <DropdownPortal triggerRef={linkBtnRef} isOpen={showLinkInput} className="rte-link-input-panel">
+            <input
+              type="url"
+              placeholder="https://example.com"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setLink()}
+              autoFocus
+            />
+            <button onClick={setLink} className="rte-link-btn-apply">✓</button>
+            {editor.isActive("link") && (
+              <button onClick={removeLink} className="rte-link-btn-remove" title="Remove link">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            )}
+          </DropdownPortal>
         </div>
         <div className="rte-dropdown">
           <button
+            ref={imageBtnRef}
             type="button"
             className="rte-btn-icon"
             title="Insert image"
@@ -349,19 +455,17 @@ export default function RichEditor({
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </button>
-          {showImageInput && (
-            <div className="rte-link-input-panel">
-              <input
-                type="url"
-                placeholder="Image URL"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && insertImage()}
-                autoFocus
-              />
-              <button onClick={insertImage} className="rte-link-btn-apply">✓</button>
-            </div>
-          )}
+          <DropdownPortal triggerRef={imageBtnRef} isOpen={showImageInput} className="rte-link-input-panel">
+            <input
+              type="url"
+              placeholder="Image URL"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && insertImage()}
+              autoFocus
+            />
+            <button onClick={insertImage} className="rte-link-btn-apply">✓</button>
+          </DropdownPortal>
         </div>
         <button
           type="button"
@@ -438,12 +542,33 @@ export default function RichEditor({
           </button>
         </>
       )}
+      
+      {/* Expand/Collapse Button */}
+      <button
+        type="button"
+        className="rte-toolbar-expand-btn"
+        title={isToolbarCollapsed ? "Show more options" : "Show less options"}
+        onClick={() => setIsToolbarCollapsed(!isToolbarCollapsed)}
+      >
+        {isToolbarCollapsed ? (
+          <>
+            <span>More</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </>
+        ) : (
+          <>
+            <span>Less</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
+          </>
+        )}
+      </button>
     </div>
   );
 
   return (
     <div className="rte-wrapper">
-      {bubbleReady && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
+      {/* Render toolbar into bubble mount via portal when text is selected */}
+      {bubbleReady && hasSelection && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
 
       {/* Editor content */}
       <div className="rte-content">

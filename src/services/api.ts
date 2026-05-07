@@ -3,6 +3,7 @@
  */
 
 import { API_BASE_URL } from "../config/config";
+import { logger } from "@/utils/logger";
 
 export interface ParsedFileResult {
   filename: string;
@@ -33,12 +34,12 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
     formData.append('files', file);
   });
 
-  console.log(`[API] Sending ${files.length} file(s) to backend for parsing...`);
-  console.log('[API] Endpoint:', `${API_BASE_URL}/parse/`);
-  console.log('[API] Files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+  logger.debug(`[API] Sending ${files.length} file(s) to backend for parsing...`);
+  logger.debug('[API] Endpoint:', `${API_BASE_URL}/parse/`);
+  logger.debug('[API] Files:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
 
   try {
-    console.log('[API] Making request to:', `${API_BASE_URL}/parse/`);
+    logger.debug('[API] Making request to:', `${API_BASE_URL}/parse/`);
 
     const response = await fetch(`${API_BASE_URL}/parse/`, {
       method: 'POST',
@@ -46,17 +47,17 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
       mode: 'cors',
     });
 
-    console.log('[API] Response status:', response.status);
-    console.log('[API] Response headers:', Object.fromEntries(response.headers.entries()));
+    logger.debug('[API] Response status:', response.status);
+    logger.debug('[API] Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[API ERROR] HTTP ${response.status}:`, errorText);
+      logger.error(`[API ERROR] HTTP ${response.status}:`, errorText);
       throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
     const data: ParseFilesResponse = await response.json();
-    console.log('[API] Parse response received:', {
+    logger.debug('[API] Parse response received:', {
       success: data.success,
       filesReceived: data.files_received,
       filesParsed: data.files_parsed,
@@ -67,9 +68,9 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
 
     return data;
   } catch (error) {
-    console.error('[API ERROR] Failed to parse files:', error);
-    console.error('[API ERROR] Error type:', error instanceof TypeError ? 'Network/CORS error' : 'Other error');
-    console.error('[API ERROR] API_BASE_URL:', API_BASE_URL);
+    logger.error('[API ERROR] Failed to parse files:', error);
+    logger.error('[API ERROR] Error type:', error instanceof TypeError ? 'Network/CORS error' : 'Other error');
+    logger.error('[API ERROR] API_BASE_URL:', API_BASE_URL);
     throw error;
   }
 }
@@ -88,7 +89,7 @@ export async function getSupportedFormats(): Promise<{ extensions: string[]; max
     const data = await response.json();
     return data.data;
   } catch (error) {
-    console.error('[API ERROR] Failed to get supported formats:', error);
+    logger.error('[API ERROR] Failed to get supported formats:', error);
     throw error;
   }
 }

@@ -15,10 +15,11 @@ import type { ParsedFileResult } from "@/services/api";
 
 interface NewClientModalProps {
   onClose: () => void;
-  onClientCreated: () => void;
+  onClientCreated: (client: { id: number; name: string }, notes: string, uploadedFiles: File[]) => void;
+  existingClients?: { id: number; name: string }[];
 }
 
-export default function NewClientModal({ onClose, onClientCreated }: NewClientModalProps): JSX.Element | null {
+export default function NewClientModal({ onClose, onClientCreated, existingClients = [] }: NewClientModalProps): JSX.Element | null {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [mounted, setMounted] = useState<boolean>(false);
@@ -80,10 +81,13 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
   }
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
-  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"];
+  const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
   const ACCEPTED_TYPES = [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/png",
+    "image/jpeg",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ];
@@ -202,6 +206,15 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       return;
     }
 
+    // Check for duplicate client name
+    const isDuplicate = existingClients.some(
+      (client) => client.name.toLowerCase().trim() === formData.clientName.toLowerCase().trim()
+    );
+    if (isDuplicate) {
+      toast.error("A client with this name already exists");
+      return;
+    }
+
     // Prevent creating if any files are still parsing
     const stillParsing = uploadedFiles.some((f) => f.status === "parsing");
     if (stillParsing) {
@@ -232,7 +245,7 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
       }
 
       toast.success(`Client "${formData.clientName}" created successfully`);
-      onClientCreated();
+      onClientCreated(newClient, formData.notes || "", uploadedFiles.map((f) => f.file));
     } catch (error) {
       console.error("Failed to create client:", error);
       toast.error("Failed to create client");
@@ -318,13 +331,13 @@ export default function NewClientModal({ onClose, onClientCreated }: NewClientMo
                 Click to upload or drag and drop
               </div>
               <div className={styles.uploadHint}>
-                PDF, DOCX, XLSX, PPTX (max 10MB each)
+                PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
               </div>
               <input
                 id="new-client-file-upload"
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.xlsx,.pptx"
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                 multiple
                 onChange={handleFileChange}
                 className={styles.visuallyHidden}

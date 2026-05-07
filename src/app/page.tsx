@@ -2,16 +2,21 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useRef } from "react";
-import { toast } from "sonner";
+import { useState, useEffect, useCallback } from "react";
 
 import styles from "./page.module.scss";
 
 import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
+import { listClientsWithDocuments, getCachedClientsWithDocuments, invalidateClientsCache } from "@/api/clientApi";
+import type { ClientWithDocuments } from "@/api/clientApi";
 import { useProposal } from "@/context/ProposalContext";
-import { parseCustomTemplate } from "@/api/proposalApi";
-import type { ExtractedTemplateSection } from "@/api/proposalApi";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
+import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
+
+// Eagerly warm the client cache the moment this page module is loaded.
+// By the time the user reads the page and clicks a template, the fetch is
+// already in-flight (or complete), eliminating the "Loading clients..." state.
+listClientsWithDocuments().catch(() => {});
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -26,21 +31,47 @@ const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"
   ssr: false,
 });
 
-type SelectionMode = "template" | "scratch" | "upload";
+const RecreateTemplateModal = dynamic(
+  () => import("@/components/modals/RecreateTemplateModal"),
+  { ssr: false }
+);
+
+type SelectionMode = "template" | "scratch" | "recreate";
 
 export default function HomePage(): JSX.Element {
   const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps } = useProposal();
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Enable auto-save to localStorage drafts when user is on home page
+  useDraftAutoSave({ enabled: true });
 
   const [selectionMode, setSelectionMode] = useState<SelectionMode | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [uploadedFileName, setUploadedFileName] = useState<string>("");
-  const [isParsing, setIsParsing] = useState<boolean>(false);
-  const [parseProgress, setParseProgress] = useState<number>(0);
-  const [extractedSections, setExtractedSections] = useState<ExtractedTemplateSection[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const [showRecreateModal, setShowRecreateModal] = useState<boolean>(false);
+  const [preloadedClients, setPreloadedClients] = useState<ClientWithDocuments[] | null>(
+    getCachedClientsWithDocuments()
+  );
+  const [newClientData, setNewClientData] = useState<{
+    client: { id: number; name: string };
+    notes: string;
+    uploadedFiles: File[];
+  } | null>(null);
+  const [enableTemplateSelection, setEnableTemplateSelection] = useState<boolean>(false);
+
+  const prefetchClients = useCallback(async (): Promise<void> => {
+    try {
+      const clientsWithDocs = await listClientsWithDocuments();
+      setPreloadedClients(clientsWithDocs);
+    } catch {
+      setPreloadedClients([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    prefetchClients();
+  }, [prefetchClients]);
 
   const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
 
@@ -52,6 +83,9 @@ export default function HomePage(): JSX.Element {
   function handleCloseTemplateModal(): void {
     setShowTemplateModal(false);
     setSelectedTemplateId(null);
+    setSelectionMode(null);
+    setNewClientData(null);
+    setEnableTemplateSelection(false);
   }
 
   function handleNewClientFromModal(): void {
@@ -59,119 +93,32 @@ export default function HomePage(): JSX.Element {
     setShowNewClientModal(true);
   }
 
-  function handleClientCreated(): void {
+  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
     setShowNewClientModal(false);
-    if (selectedTemplateId) {
-      setShowTemplateModal(true);
-    }
+    invalidateClientsCache(); // Force fresh fetch so new client appears
+    prefetchClients(); // Background re-fetch — modal syncs via prop update + useEffect
+    setNewClientData({ client, notes, uploadedFiles });
+    setEnableTemplateSelection(true);
+    setShowTemplateModal(true);
   }
 
   function handleSelectScratch(): void {
     setSelectionMode("scratch");
     setSelectedTemplateId(null);
-    setExtractedSections([]);
+    setShowTemplateModal(true);
   }
 
-  function handleUploadClick(): void {
-    fileInputRef.current?.click();
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    if (!e.target.files) return;
-    e.target.value = "";
-    if (!file) return;
-
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext !== "docx" && ext !== "pdf") {
-      toast.error("Only DOCX and PDF files are supported for template upload.");
-      return;
-    }
-
-    setUploadedFileName(file.name);
-    setIsParsing(true);
-    setParseProgress(5);
-    setSelectionMode("upload");
-    setSelectedTemplateId(null);
-    setExtractedSections([]);
-
-    const progressInterval = setInterval(() => {
-      setParseProgress((prev) => {
-        if (prev >= 88) {
-          clearInterval(progressInterval);
-          return 88;
-        }
-        return prev + Math.floor(Math.random() * 8) + 3;
-      });
-    }, 600);
-
-    try {
-      const result = await parseCustomTemplate(file);
-      clearInterval(progressInterval);
-      setParseProgress(100);
-      setExtractedSections(result.sections);
-      toast.success(`Extracted ${result.sections.length} sections from "${file.name}".`);
-    } catch (err) {
-      clearInterval(progressInterval);
-      const message = err instanceof Error ? err.message : "Failed to parse template file.";
-      toast.error(message);
-      setSelectionMode(null);
-      setUploadedFileName("");
-      setParseProgress(0);
-    } finally {
-      setIsParsing(false);
-    }
-  }
-
-  function handleContinue(): void {
-    if (selectionMode === "template" && selectedTemplateId) {
-      const template = PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId);
-      if (template) {
-        updateProposalData({
-          selectedSections: [...template.sections],
-          sectionDisplayNames: {},
-          templateId: selectedTemplateId,
-          templateType: "predefined",
-        });
-      }
-      setCurrentStep(1);
-      router.push("/parameters");
-    } else if (selectionMode === "upload" && extractedSections.length > 0) {
-      const sectionKeys = extractedSections.map((s) => s.key);
-      const displayNames: Record<string, string> = {};
-      for (const s of extractedSections) {
-        displayNames[s.key] = s.label;
-      }
-      updateProposalData({
-        selectedSections: sectionKeys,
-        sectionDisplayNames: displayNames,
-        templateId: null,
-        templateType: "custom",
-      });
-      setCurrentStep(1);
-      router.push("/parameters");
-    } else if (selectionMode === "scratch") {
-      updateProposalData({
-        templateId: null,
-        templateType: "scratch",
-        sectionDisplayNames: {},
-      });
-      setCurrentStep(1);
-      router.push("/parameters");
-    }
-  }
-
-  const isUploadSelected = selectionMode === "upload";
   const isScratchSelected = selectionMode === "scratch";
+  const isRecreateSelected = selectionMode === "recreate";
 
   return (
     <div className="app-container">
       <MainSidebar />
       <main className="main-content">
-        <DynamicPipeline 
+        <DynamicPipeline
           currentStage={draftStage}
           completedSteps={completedSteps}
-          visible={showPipeline}
+          visible={false}
         />
         
         <h1 className="page-title">Choose Your Proposal Type</h1>
@@ -208,12 +155,11 @@ export default function HomePage(): JSX.Element {
                     <div className="tmpl-preview-line" />
                   </div>
                   <span className="tmpl-preview-icon" aria-hidden="true">
-                    {template.icon}
+                    {template.name}
                   </span>
                 </div>
 
                 <div className="tmpl-body">
-                  <div className="tmpl-name">{template.name}</div>
                   <div className="tmpl-desc">{template.description}</div>
                   <div className="tmpl-sections-preview">
                     {template.sections.slice(0, 3).map((key) => (
@@ -257,100 +203,57 @@ export default function HomePage(): JSX.Element {
           </article>
 
           <article
-            className={`tmpl-card tmpl-upload${isUploadSelected ? " tmpl-selected" : ""}`}
-            onClick={handleUploadClick}
+            className={`tmpl-card tmpl-recreate${isRecreateSelected ? " tmpl-selected" : ""}`}
+            onClick={() => {
+              setSelectionMode("recreate");
+              setShowRecreateModal(true);
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") handleUploadClick();
+              if (e.key === "Enter" || e.key === " ") {
+                setSelectionMode("recreate");
+                setShowRecreateModal(true);
+              }
             }}
-            aria-label="Upload a custom DOCX or PDF template"
+            aria-label="Recreate an existing document with new context"
           >
-            {isUploadSelected && !isParsing && (
-              <div className="tmpl-selected-badge" aria-hidden="true">
-                ✓
-              </div>
-            )}
             <div className="tmpl-upload-inner">
-              <div className="tmpl-upload-icon">{SPECIAL_CARDS.CUSTOM_TEMPLATE.icon}</div>
-              <div className="tmpl-upload-label">
-                {isUploadSelected && uploadedFileName ? uploadedFileName : SPECIAL_CARDS.CUSTOM_TEMPLATE.name}
-              </div>
-              <div className="tmpl-upload-hint">
-                {isParsing ? "Extracting sections…" : SPECIAL_CARDS.CUSTOM_TEMPLATE.description}
-              </div>
+              <div className="tmpl-upload-icon">{SPECIAL_CARDS.RECREATE_TEMPLATE.icon}</div>
+              <div className="tmpl-upload-label">{SPECIAL_CARDS.RECREATE_TEMPLATE.name}</div>
+              <div className="tmpl-upload-hint">{SPECIAL_CARDS.RECREATE_TEMPLATE.description}</div>
             </div>
           </article>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".docx,.pdf"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-            aria-hidden="true"
-          />
         </div>
 
-        {isParsing && (
-          <div className="tmpl-processing-pill" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-              <div className="tmpl-spinner" aria-hidden="true" />
-              <span>
-                Parsing <strong>{uploadedFileName}</strong> — scanning for section structure…
-              </span>
-              <span style={{ marginLeft: "auto", fontWeight: 700, fontSize: 13 }}>
-                {parseProgress}%
-              </span>
-            </div>
-            <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.2)", borderRadius: 3, overflow: "hidden" }}>
-              <div
-                style={{
-                  height: "100%",
-                  width: `${parseProgress}%`,
-                  background: "var(--color-primary)",
-                  borderRadius: 3,
-                  transition: "width 0.4s ease",
-                }}
-              />
-            </div>
-          </div>
+        {showRecreateModal && (
+          <RecreateTemplateModal
+            onClose={() => {
+              setShowRecreateModal(false);
+              setSelectionMode(null);
+            }}
+            onNewClient={() => {
+              setShowRecreateModal(false);
+              setShowNewClientModal(true);
+            }}
+          />
         )}
 
-        {!isParsing && isUploadSelected && extractedSections.length > 0 && (
-          <div className="tmpl-extracted-panel">
-            <div className="tmpl-extracted-header">
-              <div>
-                <div className={styles.extractedTitle}>Sections extracted from your template</div>
-                <div className="tmpl-extracted-meta">
-                  {uploadedFileName} · {extractedSections.length} sections identified
-                </div>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={handleUploadClick}>
-                Replace file
-              </button>
-            </div>
-            <ul className="tmpl-extracted-sections-list" role="list">
-              {extractedSections.map((s) => (
-                <li key={s.key} className="tmpl-extracted-section-row">
-                  <span className="tmpl-extracted-check" aria-hidden="true">
-                    ✓
-                  </span>
-                  {s.label}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {showTemplateModal && selectedTemplateId && (
+        {showTemplateModal && (selectedTemplateId || selectionMode === "scratch" || newClientData) && (
           <TemplateSelectionModal
-            templateId={selectedTemplateId}
+            templateId={selectedTemplateId ?? null}
             templateName={
-              PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name || ""
+              selectedTemplateId
+                ? PROPOSAL_TEMPLATES.find((t) => t.id === selectedTemplateId)?.name || ""
+                : ""
             }
+            isScratch={selectionMode === "scratch"}
             onClose={handleCloseTemplateModal}
             onNewClient={handleNewClientFromModal}
+            initialClients={preloadedClients ?? undefined}
+            newClientData={newClientData ?? undefined}
+            enableTemplateSelection={enableTemplateSelection}
           />
         )}
 
@@ -358,6 +261,7 @@ export default function HomePage(): JSX.Element {
           <NewClientModal
             onClose={() => setShowNewClientModal(false)}
             onClientCreated={handleClientCreated}
+            existingClients={preloadedClients?.map((c) => ({ id: c.id, name: c.name })) ?? []}
           />
         )}
       </main>

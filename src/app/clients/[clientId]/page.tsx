@@ -3,12 +3,12 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Upload, Search, FileText, Edit, CheckCircle, Clock, X, Filter } from "lucide-react";
+import { Upload, Search, FileText, Edit, CheckCircle, Clock, X, Filter, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
+import { getClient, deleteClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
 import { listProposals } from "@/api/proposalApi";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
@@ -17,6 +17,10 @@ const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
 });
 
 const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
+  ssr: false,
+});
+
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
   ssr: false,
 });
 
@@ -30,6 +34,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [clientProposals, setClientProposals] = useState<any[]>([]);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -72,7 +77,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
   async function handleDeleteDocument(docId: number): Promise<void> {
     if (!client) return;
-    
+
     try {
       await deleteDocument(client.id, docId);
       toast.success("Document deleted");
@@ -80,6 +85,36 @@ export default function ClientWorkspacePage(): JSX.Element {
     } catch (error) {
       console.error("Failed to delete document:", error);
       toast.error("Failed to delete document");
+    }
+  }
+
+  async function handleDeleteAllDocuments(): Promise<void> {
+    if (!client || client.documents.length === 0) return;
+
+    if (!confirm("Are you sure you want to delete all documents?")) return;
+
+    try {
+      await Promise.all(client.documents.map((doc) => deleteDocument(client.id, doc.id)));
+      toast.success("All documents deleted");
+      await loadClient();
+    } catch (error) {
+      console.error("Failed to delete all documents:", error);
+      toast.error("Failed to delete some documents");
+    }
+  }
+
+  async function handleDeleteClient(): Promise<void> {
+    if (!client) return;
+
+    if (!confirm("Are you sure you want to delete this client? This action cannot be undone.")) return;
+
+    try {
+      await deleteClient(client.id);
+      toast.success("Client deleted");
+      router.push("/clients");
+    } catch (error) {
+      console.error("Failed to delete client:", error);
+      toast.error("Failed to delete client");
     }
   }
 
@@ -162,8 +197,15 @@ export default function ClientWorkspacePage(): JSX.Element {
               <Edit size={18} />
               Edit Details
             </button>
-            <button className="btn btn-primary" onClick={() => router.push('/')}>
+            <button className="btn btn-primary" onClick={() => setShowTemplateModal(true)}>
               New Proposal
+            </button>
+            <button
+              className={styles.deleteClientBtn}
+              onClick={handleDeleteClient}
+              title="Delete client"
+            >
+              <Trash2 size={18} />
             </button>
           </div>
         </div>
@@ -176,18 +218,29 @@ export default function ClientWorkspacePage(): JSX.Element {
                 <h2 className={styles.panelTitle}>Knowledge Base</h2>
                 <p className={styles.panelSubtitle}>Source documents for context generation</p>
               </div>
-              <button 
-                className={styles.uploadBtn}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFiles.size > 0}
-                title="Upload Document"
-              >
-                <Upload size={20} />
-              </button>
+              <div className={styles.headerActions}>
+                {filteredDocuments.length > 0 && (
+                  <button
+                    className={styles.deleteAllBtn}
+                    onClick={handleDeleteAllDocuments}
+                    title="Delete all documents"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+                <button
+                  className={styles.uploadBtn}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingFiles.size > 0}
+                  title="Upload Document"
+                >
+                  <Upload size={20} />
+                </button>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.docx,.xlsx,.pptx"
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
                 multiple
                 onChange={handleFileInputChange}
                 style={{ display: 'none' }}
@@ -371,6 +424,22 @@ export default function ClientWorkspacePage(): JSX.Element {
               loadClient();
               setShowEditModal(false);
             }}
+          />
+        )}
+
+        {showTemplateModal && client && (
+          <TemplateSelectionModal
+            templateId={null}
+            templateName=""
+            onClose={() => setShowTemplateModal(false)}
+            onNewClient={() => {}}
+            initialClients={[client]}
+            newClientData={{
+              client: { id: client.id, name: client.name },
+              notes: client.notes || "",
+              uploadedFiles: []
+            }}
+            enableTemplateSelection={true}
           />
         )}
       </main>

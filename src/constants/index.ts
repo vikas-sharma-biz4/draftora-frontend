@@ -344,10 +344,10 @@ export const GENERATION_STEPS = [
 ] as const;
 
 export const MAIN_NAV_ITEMS = [
-  { id: "home", label: "Home", path: "/", icon: "◆" },
-  { id: "clients", label: "Clients", path: "/clients", icon: "◈" },
-  { id: "drafts", label: "Drafts", path: "/drafts", icon: "◉" },
-  { id: "history", label: "History", path: "/history", icon: "◎" },
+  { id: "home", label: "Home", path: "/", icon: "H" },
+  { id: "clients", label: "Clients", path: "/clients", icon: "C" },
+  { id: "drafts", label: "Drafts", path: "/drafts", icon: "D" },
+  { id: "history", label: "History", path: "/history", icon: "H" },
 ] as const;
 
 export const SPECIAL_CARDS = {
@@ -362,6 +362,12 @@ export const SPECIAL_CARDS = {
     name: "Custom Template",
     description: "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
     icon: "⇪",
+  },
+  RECREATE_TEMPLATE: {
+    id: "recreate-template",
+    name: "Recreate Template",
+    description: "Upload an existing document and rewrite it with new context while preserving the original structure.",
+    icon: "↺",
   },
 } as const;
 
