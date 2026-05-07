@@ -20,6 +20,10 @@ const EditClientModal = dynamic(() => import("@/components/modals/EditClientModa
   ssr: false,
 });
 
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+  ssr: false,
+});
+
 export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
@@ -30,6 +34,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [clientProposals, setClientProposals] = useState<any[]>([]);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -192,7 +197,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               <Edit size={18} />
               Edit Details
             </button>
-            <button className="btn btn-primary" onClick={() => router.push('/')}>
+            <button className="btn btn-primary" onClick={() => setShowTemplateModal(true)}>
               New Proposal
             </button>
             <button
@@ -419,6 +424,22 @@ export default function ClientWorkspacePage(): JSX.Element {
               loadClient();
               setShowEditModal(false);
             }}
+          />
+        )}
+
+        {showTemplateModal && client && (
+          <TemplateSelectionModal
+            templateId={null}
+            templateName=""
+            onClose={() => setShowTemplateModal(false)}
+            onNewClient={() => {}}
+            initialClients={[client]}
+            newClientData={{
+              client: { id: client.id, name: client.name },
+              notes: client.notes || "",
+              uploadedFiles: []
+            }}
+            enableTemplateSelection={true}
           />
         )}
       </main>
