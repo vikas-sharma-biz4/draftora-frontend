@@ -19,10 +19,21 @@ const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"
   ssr: false,
 });
 
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+  ssr: false,
+});
+
 export default function ClientsPage(): JSX.Element {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
+  const [newClientData, setNewClientData] = useState<{
+    client: { id: number; name: string };
+    notes: string;
+    uploadedFiles: File[];
+  } | null>(null);
+  const [enableTemplateSelection, setEnableTemplateSelection] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -51,9 +62,18 @@ export default function ClientsPage(): JSX.Element {
     setShowNewClientModal(true);
   }
 
-  function handleClientCreated(): void {
+  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
     loadClients(true); // Silent refresh — keeps existing list visible while updating
+    setNewClientData({ client, notes, uploadedFiles });
+    setEnableTemplateSelection(true);
     setShowNewClientModal(false);
+    setShowTemplateModal(true);
+  }
+
+  function handleCloseTemplateModal(): void {
+    setShowTemplateModal(false);
+    setNewClientData(null);
+    setEnableTemplateSelection(false);
   }
 
   async function handleDeleteClient(clientId: number, e: React.MouseEvent): Promise<void> {
@@ -160,6 +180,19 @@ export default function ClientsPage(): JSX.Element {
           <NewClientModal
             onClose={() => setShowNewClientModal(false)}
             onClientCreated={handleClientCreated}
+            existingClients={clients.map((c) => ({ id: c.id, name: c.name }))}
+          />
+        )}
+
+        {showTemplateModal && newClientData && (
+          <TemplateSelectionModal
+            templateId={null}
+            templateName=""
+            onClose={handleCloseTemplateModal}
+            onNewClient={() => {}}
+            initialClients={clients.map((c) => ({ ...c, documents: [] }))}
+            newClientData={newClientData}
+            enableTemplateSelection={enableTemplateSelection}
           />
         )}
       </main>

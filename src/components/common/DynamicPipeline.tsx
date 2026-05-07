@@ -56,6 +56,25 @@ export default function DynamicPipeline({
   const isAllCompleted = currentStage === "generated";
   const allowNonLinearNav = currentStage === "generated";
 
+  // Determine the maximum step that should be clickable based on the draftStage
+  // This allows users to navigate back to stages they have already reached
+  function getMaxClickableStep(): number {
+    switch (currentStage) {
+      case "wizard_in_progress":
+        return 1; // Can only click Parameters
+      case "parameters_complete":
+        return 2; // Can click Parameters and Review
+      case "review_complete":
+        return 3; // Can click Parameters, Review, and Web View
+      case "generated":
+        return 3; // All steps clickable (handled by allowNonLinearNav)
+      default:
+        return 0;
+    }
+  }
+
+  const maxClickableStep = getMaxClickableStep();
+
   return (
     <div
       className={`${styles.pipelineContainer} ${visible ? styles.visible : styles.hidden}`}
@@ -67,8 +86,8 @@ export default function DynamicPipeline({
           // A step is only "completed" (green) if it's before the current step (or fully generated).
           // This prevents stale localStorage completedSteps from showing future steps as green.
           const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
-          // Any step that has been completed, the current step, or fully generated proposals are clickable
-          const isClickable = completedSteps.includes(step.id) || step.id === currentStepId || allowNonLinearNav;
+          // Any step that has been completed, the current step, fully generated proposals, or steps up to the max reached stage are clickable
+          const isClickable = completedSteps.includes(step.id) || step.id === currentStepId || allowNonLinearNav || step.id <= maxClickableStep;
 
           return (
             <React.Fragment key={step.id}>

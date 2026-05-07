@@ -19,6 +19,7 @@ import {
 import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY, DRAFTS_STORAGE_KEY } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
 import type { ProposalData } from "@/types/proposal.types";
+import { useSaveDraft } from "@/hooks/useSaveDraft";
 
 const ProposalSectionEditor = dynamic(
   () => import("@/components/proposal/ProposalSectionEditor"),
@@ -58,7 +59,8 @@ function resolveSectionLabel(
 export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
-  const { resetProposal, setCurrentProposalId, updateProposalData, setDraftStage, setCompletedSteps } = useProposal();
+  const { resetProposal, setCurrentProposalId, updateProposalData, setDraftStage, setCompletedSteps, proposalData } = useProposal();
+  const handleSaveDraft = useSaveDraft();
   const proposalId = Number(params.id);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -81,6 +83,7 @@ export default function ProposalOutputPage(): JSX.Element {
     try {
       const data = await getProposal(proposalId);
       setProposal(data);
+      console.log("Proposal loaded - approvalStatus:", data.approvalStatus);
       
       // Set current proposal ID for regeneration flow
       setCurrentProposalId(proposalId);
@@ -373,19 +376,34 @@ export default function ProposalOutputPage(): JSX.Element {
                 ⬇ Download
               </a>
             )}
+            {(() => {
+              console.log("Save Draft button condition check:", {
+                proposal: !!proposal,
+                approvalStatus: proposal?.approvalStatus,
+                shouldShow: !proposal?.approvalStatus || proposal?.approvalStatus === "pending"
+              });
+              return proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSaveDraft}
+                >
+                  Save Draft
+                </button>
+              );
+            })()}
             <button
               className="btn btn-success btn-sm"
               onClick={handleApprove}
               disabled={isApproving || !proposal}
             >
-              {isApproving ? "Approving..." : "✓ Approve"}
+              {isApproving ? "Approving..." : "Approve"}
             </button>
             <button
               className="btn btn-danger btn-sm"
               onClick={handleReject}
               disabled={isRejecting || !proposal}
             >
-              {isRejecting ? "Rejecting..." : "✗ Reject"}
+              {isRejecting ? "Rejecting..." : "Reject"}
             </button>
           </div>
         </div>
