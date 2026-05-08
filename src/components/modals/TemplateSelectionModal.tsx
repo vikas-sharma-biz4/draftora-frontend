@@ -9,14 +9,15 @@ import { toast } from "sonner";
 import styles from "./TemplateSelectionModal.module.scss";
 
 import { useClients } from "@/hooks/useClients";
-import { useClientStore } from "@/store/clientStore";
+import { useClientStore } from "@/redux/features/clientStore";
 import { useModalHistory } from "@/hooks/useModalHistory";
-import type { ClientWithDocuments } from "@/api/clientApi";
+import type { ClientWithDocuments } from "@/services/clientApi";
 import { PROPOSAL_TEMPLATES, SCRATCH_TEMPLATE_DEFAULT_SECTIONS, SECTION_DISPLAY_NAMES, INDUSTRIES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
-import type { NewClientFormData } from "@/types/client.types";
+import type { NewClientFormData } from "@/interfaces/clientInterfaces";
+import { formatDate } from "@/utils/dateUtils";
 
 interface TemplateSelectionModalProps {
   templateId?: string | null;
@@ -883,7 +884,7 @@ export default function TemplateSelectionModal({
                         <div className={styles.documentInfo}>
                           <div className={styles.documentName} title={doc.name}>{doc.name}</div>
                           <div className={styles.documentMeta}>
-                            {formatFileSize(doc.size_bytes)} • {new Date(doc.created_at).toLocaleDateString()}
+                            {formatFileSize(doc.size_bytes)} • {formatDate(doc.created_at)}
                           </div>
                         </div>
                       </div>

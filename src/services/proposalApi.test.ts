@@ -13,7 +13,7 @@ import {
   parseFiles,
   getSupportedParseFormats,
 } from "./proposalApi";
-import type { ProposalData } from "@/types/proposal.types";
+import type { ProposalData } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------
 // Helpers

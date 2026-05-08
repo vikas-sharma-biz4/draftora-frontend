@@ -4,10 +4,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { useProposal } from "@/context/ProposalContext";
-import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/api/draftApi";
-import { useDraftStore } from "@/store/draftStore";
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
-import type { DraftStage, DraftLocation, DraftUIState } from "@/types/draft.types";
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/services/draftApi";
+import { useDraftStore } from "@/redux/features/draftStore";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { DraftStage, DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 /**
  * Returns a `saveDraft` function that persists the current wizard state to

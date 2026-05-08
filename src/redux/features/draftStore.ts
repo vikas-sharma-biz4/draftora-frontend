@@ -9,8 +9,8 @@
  */
 
 import { create } from 'zustand';
-import type { DraftMetadata, SavedDraft, SaveDraftPayload } from '@/types/draft.types';
-import * as draftApi from '@/api/draftApi';
+import type { DraftMetadata, SavedDraft, SaveDraftPayload } from '@/interfaces/draftInterfaces';
+import * as draftApi from '@/services/draftApi';
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (drafts change frequently)
 
@@ -32,6 +32,7 @@ interface DraftState {
   addDraft: (draft: DraftMetadata) => void;
   updateDraft: (id: string, updates: Partial<DraftMetadata>) => void;
   removeDraft: (id: string) => void;
+  removeAllDrafts: () => void;
   invalidateCache: () => void;
   
   // Mutation wrappers
@@ -39,6 +40,7 @@ interface DraftState {
   updateDraftApi: (draftId: string, payload: Partial<SaveDraftPayload>) => Promise<SavedDraft>;
   getDraft: (draftId: string) => Promise<SavedDraft>;
   deleteDraft: (draftId: string) => Promise<void>;
+  deleteAllDrafts: () => Promise<void>;
 }
 
 export const useDraftStore = create<DraftState>((set, get) => ({
@@ -125,7 +127,14 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       lastFetched: Date.now(),
     }));
   },
-  
+
+  removeAllDrafts: () => {
+    set({
+      drafts: [],
+      lastFetched: Date.now(),
+    });
+  },
+
   invalidateCache: () => {
     set({
       lastFetched: null,
@@ -192,9 +201,20 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   deleteDraft: async (draftId: string) => {
     try {
       await draftApi.deleteDraft(draftId);
-      
+
       // Remove from store
       get().removeDraft(draftId);
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  deleteAllDrafts: async () => {
+    try {
+      await draftApi.deleteAllDrafts();
+
+      // Remove all from store
+      get().removeAllDrafts();
     } catch (error) {
       throw error;
     }

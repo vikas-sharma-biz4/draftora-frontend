@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { SECTION_DISPLAY_NAMES } from "@/constants";
-import { regenerateSection, updateSection } from "@/api/proposalApi";
+import { regenerateSection, updateSection } from "@/services/proposalApi";
 
 interface SectionCardProps {
   proposalId: number;

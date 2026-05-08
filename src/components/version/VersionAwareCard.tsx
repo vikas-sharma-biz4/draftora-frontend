@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Edit2, FileText, Info, Save, X } from "lucide-react";
-import type { ProposalVersion } from "@/types/version.types";
+import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./VersionAwareCard.module.scss";
 
 interface VersionAwareCardProps {

@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProposal } from "@/context/ProposalContext";
-import { Pencil, X, Check, Plus } from "lucide-react";
+import { useProposalStore } from "@/redux/features/proposalStore";
+import { Pencil, X, Check, Plus, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -15,13 +16,13 @@ import {
   addProposalSection,
   removeProposalSection,
   updateApprovalStatus,
-} from "@/api/proposalApi";
+} from "@/services/proposalApi";
 import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
-import type { DraftUIState } from "@/types/draft.types";
-import { saveDraft as saveDraftApi, updateDraft as updateDraftApi, deleteDraft as deleteDraftApi, listDrafts } from "@/api/draftApi";
+import type { DraftUIState } from "@/interfaces/draftInterfaces";
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi, deleteDraft as deleteDraftApi, listDrafts } from "@/services/draftApi";
 
 const ProposalSectionEditor = dynamic(
   () => import("@/components/proposal/ProposalSectionEditor"),
@@ -33,18 +34,13 @@ const ProposalSkeleton = dynamic(
   { ssr: false }
 );
 
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+const PageLayout = dynamic(() => import("@/components/common/PageLayout"), { ssr: false });
 
 const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
   ssr: false,
 });
 
-const ConfirmModal = dynamic(() => import("@/components/common/ConfirmModal"), {
-  ssr: false,
-});
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 interface SectionMeta {
   key: string;
@@ -78,6 +74,8 @@ export default function ProposalOutputPage(): JSX.Element {
     syncVisitedStepsFromBackend,
   } = useProposal();
   const handleSaveDraft = useSaveDraft();
+  const updateProposalInStore = useProposalStore(state => state.updateProposal);
+  const invalidateCache = useProposalStore(state => state.invalidateCache);
   const proposalId = Number(params.id);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -94,6 +92,7 @@ export default function ProposalOutputPage(): JSX.Element {
   const [addingSection, setAddingSection] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; actionType: "approve" | "reject" | null }>({
     isOpen: false,
     message: "",
@@ -449,12 +448,7 @@ export default function ProposalOutputPage(): JSX.Element {
   // ── Approve/Reject handlers ──────────────────────────────────────────────────
 
   async function handleApprove(): Promise<void> {
-    console.log('[DEBUG] handleApprove clicked', { proposal, isApproving });
-    if (!proposal) {
-      console.log('[DEBUG] No proposal found, returning');
-      return;
-    }
-    console.log('[DEBUG] Opening confirm modal for approve');
+    if (!proposal) return;
     setConfirmModal({
       isOpen: true,
       message: "Are you sure you want to approve this proposal?",
@@ -463,12 +457,7 @@ export default function ProposalOutputPage(): JSX.Element {
   }
 
   async function handleReject(): Promise<void> {
-    console.log('[DEBUG] handleReject clicked', { proposal, isRejecting });
-    if (!proposal) {
-      console.log('[DEBUG] No proposal found, returning');
-      return;
-    }
-    console.log('[DEBUG] Opening confirm modal for reject');
+    if (!proposal) return;
     setConfirmModal({
       isOpen: true,
       message: "Are you sure you want to reject this proposal?",
@@ -476,8 +465,32 @@ export default function ProposalOutputPage(): JSX.Element {
     });
   }
 
+  async function handleDownload(): Promise<void> {
+    setIsDownloading(true);
+    try {
+      const url = getDownloadUrl(proposalId);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Failed to download proposal");
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `proposal-${proposalId}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+      toast.success("Proposal downloaded successfully");
+    } catch (error) {
+      toast.error("Failed to download proposal");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
   async function executeApprovalAction(actionType: "approve" | "reject"): Promise<void> {
-    console.log('[DEBUG] executeApprovalAction called', { actionType, proposalId });
     const status = actionType === "approve" ? "approved" : "rejected";
     const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
     const successMessage = actionType === "approve" 
@@ -500,10 +513,27 @@ export default function ProposalOutputPage(): JSX.Element {
         console.error("Failed to remove draft:", draftError);
       }
 
+      // Update local proposal state
+      setProposal((prev) => {
+        if (!prev) return prev;
+        return { ...prev, approvalStatus: status };
+      });
+
+      // Update proposal store to reflect the new approval status
+      updateProposalInStore(proposalId, { approvalStatus: status });
+      
+      // Invalidate cache to force refresh on history page
+      invalidateCache();
+
       toast.success(successMessage);
+      
+      // Small delay to ensure toast is shown before redirect
+      await new Promise(resolve => setTimeout(resolve, 500));
       router.push("/history");
     } catch (error) {
-      toast.error(`Failed to ${actionType} proposal`);
+      const message = error instanceof Error ? error.message : `Failed to ${actionType} proposal`;
+      toast.error(message);
+      throw error; // Re-throw to keep modal open on error
     } finally {
       setLoading(false);
     }
@@ -517,80 +547,66 @@ export default function ProposalOutputPage(): JSX.Element {
   );
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      
-      <main className="main-content no-top-padding">
+    <PageLayout noPadding>
         <div className="proposal-header-bar">
-          <DynamicPipeline 
+          <DynamicPipeline
             currentStage="generated"
             completedSteps={[1, 2, 3]}
             visitedSteps={visitedPipelineSteps}
             visible={true}
             proposalId={proposalId}
           />
-          
           <div className="proposal-actions-bar">
-            {proposal && (
-              <a
-                href={getDownloadUrl(proposalId)}
-                className="btn btn-secondary btn-sm"
-                download
-              >
-                ⬇ Download
-              </a>
-            )}
-            {proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
+          {proposal && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Downloading...
+                </>
+              ) : (
+                <>
+                  <Download size={14} /> Download
+                </>
+              )}
+            </button>
+          )}
+          {proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleSaveDraft}
+              disabled={isDownloading}
+            >
+              Save Draft
+            </button>
+          )}
+          {proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
+            <>
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={handleSaveDraft}
+                onClick={handleApprove}
+                disabled={isApproving}
               >
-                Save Draft
+                {isApproving ? "Approving..." : "Approve"}
               </button>
-            )}
-            {(() => {
-              // Conditional button rendering based on navigation source and approval status
-              if (fromHistory) {
-                // When viewing from History, only show status badges (no action buttons)
-                if (proposal?.approvalStatus === "approved") {
-                  return <span className="badge badge-success">Approved</span>;
-                }
-                if (proposal?.approvalStatus === "rejected") {
-                  return <span className="badge badge-danger">Rejected</span>;
-                }
-                // If from history but status is pending or unknown, show pending badge
-                return <span className="badge badge-warning">Pending</span>;
-              }
-              // When coming from Draft (not from history), show action buttons if pending
-              if (!proposal?.approvalStatus || proposal?.approvalStatus === "pending") {
-                return (
-                  <>
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={handleApprove}
-                      disabled={isApproving || !proposal}
-                    >
-                      {isApproving ? "Approving..." : "Approve"}
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={handleReject}
-                      disabled={isRejecting || !proposal}
-                    >
-                      {isRejecting ? "Rejecting..." : "Reject"}
-                    </button>
-                  </>
-                );
-              }
-              // If already approved/rejected when not from history, show badge only
-              if (proposal?.approvalStatus === "approved") {
-                return <span className="badge badge-success">Approved</span>;
-              }
-              if (proposal?.approvalStatus === "rejected") {
-                return <span className="badge badge-danger">Rejected</span>;
-              }
-              return null;
-            })()}
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleReject}
+                disabled={isRejecting}
+              >
+                {isRejecting ? "Rejecting..." : "Reject"}
+              </button>
+            </>
+          )}
+          {proposal?.approvalStatus === "approved" && (
+            <span className="badge badge-success">Approved</span>
+          )}
+          {proposal?.approvalStatus === "rejected" && (
+            <span className="badge badge-danger">Rejected</span>
+          )}
           </div>
         </div>
 
@@ -766,21 +782,27 @@ export default function ProposalOutputPage(): JSX.Element {
             )}
           </div>
         </div>
-      </main>
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         message={confirmModal.message}
         onConfirm={async () => {
           const actionType = confirmModal.actionType;
-          setConfirmModal({ isOpen: false, message: "", actionType: null });
           if (actionType) {
-            await executeApprovalAction(actionType);
+            try {
+              await executeApprovalAction(actionType);
+              setConfirmModal({ isOpen: false, message: "", actionType: null });
+            } catch (error) {
+              // Keep modal open on error - user can retry or cancel
+              console.error("Approval action failed:", error);
+            }
+          } else {
+            setConfirmModal({ isOpen: false, message: "", actionType: null });
           }
         }}
         onCancel={() => {
           setConfirmModal({ isOpen: false, message: "", actionType: null });
         }}
       />
-    </div>
+    </PageLayout>
   );
 }

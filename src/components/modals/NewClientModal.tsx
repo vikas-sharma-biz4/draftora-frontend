@@ -7,8 +7,8 @@ import { toast } from "sonner";
 
 import styles from "./NewClientModal.module.scss";
 
-import { useClientStore } from "@/store/clientStore";
-import type { NewClientFormData } from "@/types/client.types";
+import { useClientStore } from "@/redux/features/clientStore";
+import type { NewClientFormData } from "@/interfaces/clientInterfaces";
 import { INDUSTRIES, PIPELINE_STAGES } from "@/constants";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";

@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { cancelProposal, getProposal, getProposalStatus } from "@/api/proposalApi";
+import { cancelProposal, getProposal, getProposalStatus } from "@/services/proposalApi";
 import { GENERATION_STEPS, DRAFTS_STORAGE_KEY } from "@/constants";
 import { MAX_POLL_ATTEMPTS, POLLING_INTERVAL_MS } from "@/config/config";
 import { useProposal } from "@/context/ProposalContext";
@@ -302,7 +302,7 @@ export default function GeneratingPage(): JSX.Element {
           }}
           type="button"
         >
-          <span aria-hidden="true">✕</span> Cancel Generation
+          Cancel Generation
         </button>
       </div>
     </div>

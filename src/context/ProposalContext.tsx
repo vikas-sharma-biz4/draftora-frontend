@@ -9,8 +9,8 @@ import React, {
   type ReactNode,
 } from "react";
 
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
-import type { DraftStage } from "@/types/draft.types";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { DraftStage } from "@/interfaces/draftInterfaces";
 import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
 
 interface ProposalContextType {

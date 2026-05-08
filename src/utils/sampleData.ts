@@ -1,4 +1,4 @@
-import type { Client } from "@/types/client.types";
+import type { Client } from "@/interfaces/clientInterfaces";
 
 export const SAMPLE_CLIENTS: Client[] = [
   {

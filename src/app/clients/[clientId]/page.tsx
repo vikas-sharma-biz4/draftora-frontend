@@ -9,16 +9,13 @@ import { toast } from "sonner";
 import styles from "./page.module.scss";
 
 import { useClient } from "@/hooks/useClients";
-import { useClientStore } from "@/store/clientStore";
-import type { ClientDocument } from "@/api/clientApi";
-import { listProposals } from "@/api/proposalApi";
+import { useClientStore } from "@/redux/features/clientStore";
+import type { ClientDocument } from "@/services/clientApi";
+import { listProposals } from "@/services/proposalApi";
 import { useProposal } from "@/context/ProposalContext";
-import ClientDetailSkeleton from "@/components/skeletons/ClientDetailSkeleton";
-
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+import { formatDate } from "@/utils/dateUtils";
+import PageLayout from "@/components/common/PageLayout";
+import ClientDetailSkeleton from "@/components/common/skeletons/ClientDetailSkeleton";
 
 const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
   ssr: false,
@@ -212,25 +209,19 @@ export default function ClientWorkspacePage(): JSX.Element {
 
   if (loading) {
     return (
-      <div className="app-container">
-        <MainSidebar />
-        <main className="main-content">
-          <ClientDetailSkeleton />
-        </main>
-      </div>
+      <PageLayout>
+        <ClientDetailSkeleton />
+      </PageLayout>
     );
   }
 
   if (!client) {
     return (
-      <div className="app-container">
-        <MainSidebar />
-        <main className="main-content">
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Client not found</div>
-          </div>
-        </main>
-      </div>
+      <PageLayout>
+        <div className={styles.emptyState}>
+          <div className={styles.emptyTitle}>Client not found</div>
+        </div>
+      </PageLayout>
     );
   }
 
@@ -243,9 +234,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   );
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
+    <PageLayout>
         <div className={styles.clientHeader}>
           <div className={styles.clientHeaderLeft}>
             <div className={styles.clientBadge}>
@@ -253,7 +242,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               <span className={styles.clientBadgeStatus}>Active</span>
             </div>
             <h1 className={styles.clientName}>{client.name}</h1>
-            <p className={styles.clientMeta}>{client.industry} • Active • Created {new Date(client.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            <p className={styles.clientMeta}>{client.industry} • Active • Created {formatDate(client.created_at)}</p>
           </div>
           <div className={styles.clientHeaderActions}>
             <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
@@ -340,7 +329,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                         <div className={styles.documentMeta}>
                           <span>{Math.round(doc.size_bytes / 1024)} KB</span>
                           <span>•</span>
-                          <span>{new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span>{formatDate(doc.created_at)}</span>
                         </div>
                       </div>
                       <div className={styles.documentStatus}>
@@ -431,7 +420,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                           <span className={styles.typeBadge}>{getTemplateTypeLabel(proposal)}</span>
                         </td>
                         <td className={styles.dateCell}>
-                          {new Date(proposal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatDate(proposal.createdAt)}
                         </td>
                         <td>
                           <div className={styles.statusCell}>
@@ -539,7 +528,6 @@ export default function ClientWorkspacePage(): JSX.Element {
             onConfirm={confirmDeleteAllDocuments}
           />
         )}
-      </main>
-    </div>
+    </PageLayout>
   );
 }

@@ -8,8 +8,8 @@
  */
 
 import { useEffect } from 'react';
-import { useClientStore } from '@/store/clientStore';
-import type { ClientWithDocuments } from '@/api/clientApi';
+import { useClientStore } from '@/redux/features/clientStore';
+import type { ClientWithDocuments } from '@/services/clientApi';
 
 interface UseClientsOptions {
   autoFetch?: boolean;
