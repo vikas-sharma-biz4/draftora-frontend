@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import styles from "./NewClientModal.module.scss";
 
-import { createClient, uploadDocument, type Client as ApiClient } from "@/api/clientApi";
+import { useClientStore } from "@/store/clientStore";
 import type { NewClientFormData } from "@/types/client.types";
 import { INDUSTRIES, PIPELINE_STAGES } from "@/constants";
 import { parseFiles } from "@/services/api";
@@ -20,6 +20,8 @@ interface NewClientModalProps {
 }
 
 export default function NewClientModal({ onClose, onClientCreated, existingClients = [] }: NewClientModalProps): JSX.Element | null {
+  const createClientInStore = useClientStore(state => state.createClient);
+  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [mounted, setMounted] = useState<boolean>(false);
@@ -225,8 +227,8 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
     setIsCreating(true);
 
     try {
-      // Create client via API
-      const newClient = await createClient({
+      // Create client via Zustand store
+      const newClient = await createClientInStore({
         name: formData.clientName,
         industry: formData.industry,
         notes: formData.notes || undefined,
@@ -236,7 +238,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
       if (uploadedFiles.length > 0) {
         for (const uploaded of uploadedFiles) {
           try {
-            await uploadDocument(newClient.id, uploaded.file);
+            await uploadDocumentToStore(newClient.id, uploaded.file);
           } catch (error) {
             console.error(`Failed to upload ${uploaded.file.name}:`, error);
             toast.error(`Failed to upload ${uploaded.file.name}`);
@@ -256,7 +258,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
   if (!mounted) return null;
 
   return createPortal(
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div className={styles.modalOverlay}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>

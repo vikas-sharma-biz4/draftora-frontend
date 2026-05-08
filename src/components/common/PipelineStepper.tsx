@@ -14,6 +14,7 @@ interface PipelineStep {
 
 interface PipelineStepperProps {
   currentStep: number;
+  completedSteps?: number[];
   onStepClick?: (step: number, path: string) => void;
 }
 
@@ -23,7 +24,7 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { id: 3, label: "Web View", path: "/web-view" },
 ];
 
-export default function PipelineStepper({ currentStep, onStepClick }: PipelineStepperProps): JSX.Element {
+export default function PipelineStepper({ currentStep, completedSteps = [], onStepClick }: PipelineStepperProps): JSX.Element {
   const router = useRouter();
 
   function handleStepClick(step: PipelineStep): void {
@@ -39,8 +40,8 @@ export default function PipelineStepper({ currentStep, onStepClick }: PipelineSt
       <div className={styles.pipelineSteps}>
         {PIPELINE_STEPS.map((step, index) => {
           const isActive = step.id === currentStep;
-          const isCompleted = step.id < currentStep;
-          const isClickable = step.id <= currentStep;
+          const isCompleted = completedSteps.includes(step.id) && step.id < currentStep;
+          const isClickable = completedSteps.includes(step.id) || step.id === currentStep;
 
           return (
             <React.Fragment key={step.id}>

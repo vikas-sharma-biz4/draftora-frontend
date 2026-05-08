@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import styles from "./NewClientModal.module.scss";
 
 import { INDUSTRIES } from "@/constants";
-import { updateClient, type Client } from "@/api/clientApi";
+import { useClientStore } from "@/store/clientStore";
+import { useModalHistory } from "@/hooks/useModalHistory";
+import type { Client } from "@/api/clientApi";
 
 interface EditClientModalProps {
   client: Client;
@@ -17,6 +19,7 @@ interface EditClientModalProps {
 }
 
 export default function EditClientModal({ client, onClose, onClientUpdated }: EditClientModalProps): JSX.Element | null {
+  const updateClientInStore = useClientStore(state => state.updateClientApi);
   const [mounted, setMounted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -30,6 +33,9 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // Enable browser back button to close modal
+  useModalHistory({ isOpen: true, onClose, modalId: 'edit-client-modal' });
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -57,7 +63,7 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
     setIsSaving(true);
 
     try {
-      const updatedClient = await updateClient(client.id, {
+      const updatedClient = await updateClientInStore(client.id, {
         name: formData.clientName.trim(),
         industry: formData.industry,
         notes: formData.notes || undefined,
@@ -76,7 +82,7 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
   if (!mounted) return null;
 
   return createPortal(
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div className={styles.modalOverlay}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>

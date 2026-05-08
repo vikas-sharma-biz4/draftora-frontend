@@ -102,6 +102,18 @@ export const LANGUAGE_OPTIONS = [
 
 export const DEFAULT_SELECTED_SECTIONS = SECTION_OPTIONS.map((s) => s.key);
 
+// Default sections for "Start From Scratch" template
+export const SCRATCH_TEMPLATE_DEFAULT_SECTIONS = [
+  "introduction",
+  "purpose",
+  "high_level_scope",
+  "proposed_solution",
+  "system_architecture",
+  "implementation_plan",
+  "timeline",
+  "conclusion",
+] as const;
+
 export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   executive_summary: "Executive Summary",
   project_understanding: "Project Understanding",

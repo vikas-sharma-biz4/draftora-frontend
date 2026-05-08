@@ -8,82 +8,55 @@ import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { listClients, deleteClient, type Client } from "@/api/clientApi";
+import { useClients } from "@/hooks/useClients";
+import { useClientStore } from "@/store/clientStore";
+import ClientCardSkeleton from "@/components/skeletons/ClientCardSkeleton";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
   loading: () => <div className="sidebar-skeleton" />,
 });
 
-const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"), {
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
   ssr: false,
 });
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClientModal"), {
   ssr: false,
 });
 
 export default function ClientsPage(): JSX.Element {
   const router = useRouter();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const { clients, isLoading: loading, refetch } = useClients();
+  const deleteClientFromStore = useClientStore(state => state.deleteClient);
+  
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
-  const [newClientData, setNewClientData] = useState<{
-    client: { id: number; name: string };
-    notes: string;
-    uploadedFiles: File[];
-  } | null>(null);
-  const [enableTemplateSelection, setEnableTemplateSelection] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    loadClients();
-  }, []);
-
-  async function loadClients(silent = false): Promise<void> {
-    try {
-      if (!silent) setLoading(true);
-      const loadedClients = await listClients();
-      setClients(loadedClients);
-    } catch (error) {
-      console.error("Failed to load clients:", error);
-      toast.error("Failed to load clients");
-      if (!silent) setClients([]);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }
+  const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
 
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
   }
 
   function handleNewClient(): void {
-    setShowNewClientModal(true);
-  }
-
-  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
-    loadClients(true); // Silent refresh — keeps existing list visible while updating
-    setNewClientData({ client, notes, uploadedFiles });
-    setEnableTemplateSelection(true);
-    setShowNewClientModal(false);
     setShowTemplateModal(true);
   }
 
   function handleCloseTemplateModal(): void {
     setShowTemplateModal(false);
-    setNewClientData(null);
-    setEnableTemplateSelection(false);
   }
 
-  async function handleDeleteClient(clientId: number, e: React.MouseEvent): Promise<void> {
+  function handleDeleteClient(clientId: number, clientName: string, e: React.MouseEvent): void {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this client?")) return;
+    setDeleteModalData({ id: clientId, name: clientName });
+  }
+
+  async function confirmDeleteClient(): Promise<void> {
+    if (!deleteModalData) return;
 
     try {
-      await deleteClient(clientId);
+      await deleteClientFromStore(deleteModalData.id);
       toast.success("Client deleted");
-      setClients((prev) => prev.filter((c) => c.id !== clientId));
+      setDeleteModalData(null);
     } catch (error) {
       console.error("Failed to delete client:", error);
       toast.error("Failed to delete client");
@@ -108,8 +81,10 @@ export default function ClientsPage(): JSX.Element {
         </div>
 
         {loading ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Loading clients...</div>
+          <div className={styles.clientsGrid}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <ClientCardSkeleton key={i} />
+            ))}
           </div>
         ) : clients.length === 0 ? (
           <div className={styles.emptyState}>
@@ -148,7 +123,7 @@ export default function ClientsPage(): JSX.Element {
                     </span>
                     <button
                       className={styles.deleteClientBtn}
-                      onClick={(e) => handleDeleteClient(client.id, e)}
+                      onClick={(e) => handleDeleteClient(client.id, client.name, e)}
                       title="Delete client"
                     >
                       <Trash2 size={14} />
@@ -176,23 +151,21 @@ export default function ClientsPage(): JSX.Element {
           </div>
         )}
 
-        {showNewClientModal && (
-          <NewClientModal
-            onClose={() => setShowNewClientModal(false)}
-            onClientCreated={handleClientCreated}
-            existingClients={clients.map((c) => ({ id: c.id, name: c.name }))}
-          />
-        )}
-
-        {showTemplateModal && newClientData && (
+        {showTemplateModal && (
           <TemplateSelectionModal
             templateId={null}
             templateName=""
             onClose={handleCloseTemplateModal}
-            onNewClient={() => {}}
-            initialClients={clients.map((c) => ({ ...c, documents: [] }))}
-            newClientData={newClientData}
-            enableTemplateSelection={enableTemplateSelection}
+            initialClients={clients}
+            initialView="new_client"
+          />
+        )}
+
+        {deleteModalData && (
+          <DeleteClientModal
+            clientName={deleteModalData.name}
+            onClose={() => setDeleteModalData(null)}
+            onConfirm={confirmDeleteClient}
           />
         )}
       </main>
