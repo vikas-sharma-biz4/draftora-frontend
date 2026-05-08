@@ -7,8 +7,10 @@ import { History, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
-import { getDownloadUrl, listProposals } from "@/api/proposalApi";
+import { useProposals } from "@/hooks/useProposals";
+import { getDownloadUrl } from "@/api/proposalApi";
 import type { ProposalListItem } from "@/types/proposal.types";
+import HistoryCardSkeleton from "@/components/skeletons/HistoryCardSkeleton";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -17,28 +19,13 @@ const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
 
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const [historyItems, setHistoryItems] = useState<ProposalListItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { proposals: historyItems, isLoading: loading, error } = useProposals({ filter: 'history' });
 
   useEffect(() => {
-    loadHistory();
-  }, []);
-
-  async function loadHistory(): Promise<void> {
-    try {
-      setLoading(true);
-      const proposals = await listProposals();
-      const history = proposals.filter(
-        (p) => p.approvalStatus === "approved" || p.approvalStatus === "rejected"
-      );
-      setHistoryItems(history);
-    } catch (error) {
-      console.error("Failed to load history:", error);
+    if (error) {
       toast.error("Failed to load history");
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [error]);
 
   function getStatusBadge(status: string): { label: string; className: string } {
     switch (status) {
@@ -72,8 +59,10 @@ export default function HistoryPage(): JSX.Element {
         </p>
 
         {loading ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Loading history...</div>
+          <div className={styles.historyGrid}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <HistoryCardSkeleton key={i} />
+            ))}
           </div>
         ) : historyItems.length === 0 ? (
           <div className={styles.emptyState}>
@@ -107,7 +96,7 @@ export default function HistoryPage(): JSX.Element {
                   <div className={styles.cardActions}>
                     <button
                       className="btn btn-ghost btn-sm"
-                      onClick={() => router.push(`/proposal/${item.id}`)}
+                      onClick={() => router.push(`/proposal/${item.id}?from=history`)}
                     >
                       <Eye size={14} /> View
                     </button>

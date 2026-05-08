@@ -137,6 +137,7 @@ export async function getProposal(id: number): Promise<ProposalData> {
     templateId: null,
     templateType: "scratch" as const,
     status: d.status,
+    approvalStatus: (d.approval_status as "pending" | "approved" | "rejected") || "pending",
     sections: d.sections ?? {},
     sectionTypes: (d.section_types ?? {}) as Record<string, string>,
     generatingSection: d.generating_section ?? null,
@@ -194,6 +195,7 @@ export async function listProposals(): Promise<ProposalListItem[]> {
     approvalStatus: (item.approval_status as "pending" | "approved" | "rejected") || "pending",
     tone: item.tone as string,
     lengthPreference: item.length_preference as string,
+    templateType: (item.template_type as "predefined" | "custom" | "scratch" | "recreate") || "scratch",
     createdAt: item.created_at as string,
     updatedAt: item.updated_at as string,
   }));
@@ -217,9 +219,9 @@ export async function cancelProposal(id: number): Promise<void> {
 // ── Section Management ─────────────────────────────────────────────────────────
 
 export interface AddSectionPayload {
-  section_key: string;
+  key: string;
   label: string;
-  content?: string;
+  instructions?: string;
 }
 
 export interface ReorderSectionsPayload {
@@ -230,13 +232,14 @@ export interface ReorderSectionsPayload {
 export async function addProposalSection(
   id: number,
   payload: AddSectionPayload
-): Promise<void> {
+): Promise<{ key: string; label: string; content: string }> {
   const res = await fetch(`${API_BASE_URL}/proposals/${id}/sections/`, {
     method: "POST",
     headers: getBaseHeaders(),
     body: JSON.stringify(payload),
   });
-  await handleResponse<null>(res);
+  const response = await handleResponse<{ key: string; label: string; content: string }>(res);
+  return response;
 }
 
 export async function removeProposalSection(
@@ -487,11 +490,23 @@ export interface SectionRecommendation {
   description: string;
   reasoning: string;
   relevance_score: number;
+  include: string;
+  exclude: string;
+  purpose: string;
+}
+
+export interface ExistingSectionWithRules {
+  section_key: string;
+  section_name: string;
+  include?: string;
+  exclude?: string;
+  purpose?: string;
 }
 
 export interface RecommendSectionsRequest {
   template_id?: string | null;
   existing_sections: string[];
+  existing_sections_with_rules: ExistingSectionWithRules[];
   context: string;
   user_prompt?: string | null;
 }

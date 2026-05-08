@@ -2,23 +2,27 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Plus, CheckSquare, Square, Upload, FileText, Loader2, AlertCircle, CheckCircle } from "lucide-react";
+import { X, Plus, CheckSquare, Square, Upload, FileText, Loader2, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import styles from "./TemplateSelectionModal.module.scss";
 
-import { listClientsWithDocuments, invalidateClientsCache, uploadDocument, type ClientWithDocuments } from "@/api/clientApi";
-import { PROPOSAL_TEMPLATES } from "@/constants";
+import { useClients } from "@/hooks/useClients";
+import { useClientStore } from "@/store/clientStore";
+import { useModalHistory } from "@/hooks/useModalHistory";
+import type { ClientWithDocuments } from "@/api/clientApi";
+import { PROPOSAL_TEMPLATES, SCRATCH_TEMPLATE_DEFAULT_SECTIONS, SECTION_DISPLAY_NAMES, INDUSTRIES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
+import type { NewClientFormData } from "@/types/client.types";
 
 interface TemplateSelectionModalProps {
   templateId?: string | null;
   templateName?: string;
   onClose: () => void;
-  onNewClient: () => void;
+  onNewClient?: () => void;
   initialClients?: ClientWithDocuments[];
   isScratch?: boolean;
   newClientData?: {
@@ -27,7 +31,10 @@ interface TemplateSelectionModalProps {
     uploadedFiles: File[];
   };
   enableTemplateSelection?: boolean;
+  initialView?: ModalView;
 }
+
+type ModalView = "template_selection" | "new_client";
 
 export default function TemplateSelectionModal({
   templateId,
@@ -38,14 +45,18 @@ export default function TemplateSelectionModal({
   isScratch = false,
   newClientData,
   enableTemplateSelection = false,
+  initialView = "template_selection",
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted } = useProposal();
   
+  const { clients: storeClients, isLoading: storeLoading } = useClients({ autoFetch: initialClients === undefined });
+  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
+  
   const [mounted, setMounted] = useState<boolean>(false);
-  const [clients, setClients] = useState<ClientWithDocuments[]>(initialClients ?? []);
+  const clients = initialClients ?? storeClients;
+  const loading = initialClients === undefined ? storeLoading : false;
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(initialClients === undefined);
   const [proposalName, setProposalName] = useState<string>("");
   const [proposalDescription, setProposalDescription] = useState<string>("");
   const [initialContextNotes, setInitialContextNotes] = useState<string>("");
@@ -59,24 +70,26 @@ export default function TemplateSelectionModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processedFilesRef = useRef<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [modalView, setModalView] = useState<ModalView>(initialView);
+  const [newClientFormData, setNewClientFormData] = useState<NewClientFormData>({
+    clientName: "",
+    industry: "",
+    pipelineStage: "Discovery",
+    primaryContactName: "",
+    primaryContactEmail: "",
+    notes: "",
+  });
+  const [isCreatingClient, setIsCreatingClient] = useState<boolean>(false);
+  const [showTemplateSelector, setShowTemplateSelector] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
-  useEffect(() => {
-    if (initialClients !== undefined) return; // Already provided by parent — skip fetch
-    loadClients();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Enable browser back button to close modal
+  useModalHistory({ isOpen: true, onClose, modalId: 'template-selection-modal' });
 
-  // Sync when parent's background re-fetch completes (e.g. after new client created)
-  useEffect(() => {
-    if (initialClients !== undefined) {
-      setClients(initialClients);
-      setLoading(false);
-    }
-  }, [initialClients]);
 
   useEffect(() => {
     if (selectedClientId) {
@@ -195,24 +208,6 @@ export default function TemplateSelectionModal({
     e.stopPropagation();
     setIsDragOver(false);
     processFileList(e.dataTransfer.files);
-  }
-
-  /**
-   * Loads client list from API with documents.
-   * Uses module-level cache when available to avoid redundant API calls.
-   */
-  async function loadClients(): Promise<void> {
-    try {
-      setLoading(true);
-      const clientsWithDocs = await listClientsWithDocuments();
-      setClients(clientsWithDocs);
-    } catch (error) {
-      console.error("Failed to load clients:", error);
-      toast.error("Failed to load clients");
-      setClients([]);
-    } finally {
-      setLoading(false);
-    }
   }
 
   /**
@@ -343,11 +338,7 @@ export default function TemplateSelectionModal({
     if (!selectedClientId) return;
 
     try {
-      const uploadResult = await uploadDocument(selectedClientId, file);
-      
-      // Invalidate cache then reload to get updated document list
-      invalidateClientsCache();
-      await loadClients();
+      const uploadResult = await uploadDocumentToStore(selectedClientId, file);
       
       // Auto-select newly uploaded document
       setSelectedDocuments((prev) => {
@@ -397,7 +388,8 @@ export default function TemplateSelectionModal({
       return;
     }
 
-    if (enableTemplateSelection && !selectedTemplateIdState) {
+    const shouldShowTemplateSelector = enableTemplateSelection || showTemplateSelector || (selectedClientId && !templateId && !isScratch);
+    if (shouldShowTemplateSelector && !selectedTemplateIdState) {
       toast.error("Please select a template");
       return;
     }
@@ -425,8 +417,16 @@ export default function TemplateSelectionModal({
         type: doc.file_type ? `application/${doc.file_type}` : "application/pdf",
       }));
 
-    const finalTemplateId = enableTemplateSelection ? selectedTemplateIdState : templateId;
+    const finalTemplateId = (enableTemplateSelection || showTemplateSelector) ? selectedTemplateIdState : templateId;
     const template = finalTemplateId ? PROPOSAL_TEMPLATES.find((t) => t.id === finalTemplateId) : null;
+
+    // Build section display names for scratch template
+    const scratchSectionDisplayNames: Record<string, string> = {};
+    if (isScratch) {
+      SCRATCH_TEMPLATE_DEFAULT_SECTIONS.forEach((key) => {
+        scratchSectionDisplayNames[key] = SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      });
+    }
 
     updateProposalData({
       title: proposalName,
@@ -435,8 +435,8 @@ export default function TemplateSelectionModal({
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
       templateType: isScratch ? "scratch" : "predefined",
-      selectedSections: template ? [...template.sections] : [],
-      sectionDisplayNames: {},
+      selectedSections: isScratch ? [...SCRATCH_TEMPLATE_DEFAULT_SECTIONS] : template ? [...template.sections] : [],
+      sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
     });
@@ -448,8 +448,95 @@ export default function TemplateSelectionModal({
   }
 
   function handleNewClientClick(): void {
-    onClose();
-    onNewClient();
+    setModalView("new_client");
+  }
+
+  function handleBackToTemplateSelection(): void {
+    setModalView("template_selection");
+    setNewClientFormData({
+      clientName: "",
+      industry: "",
+      pipelineStage: "Discovery",
+      primaryContactName: "",
+      primaryContactEmail: "",
+      notes: "",
+    });
+  }
+
+  function handleNewClientInputChange(field: keyof NewClientFormData, value: string): void {
+    setNewClientFormData((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleCreateClient(): Promise<void> {
+    if (!newClientFormData.clientName.trim()) {
+      toast.error("Client name is required");
+      return;
+    }
+
+    if (!newClientFormData.industry) {
+      toast.error("Please select an industry");
+      return;
+    }
+
+    const isDuplicate = clients.some(
+      (client) => client.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
+    );
+    if (isDuplicate) {
+      toast.error("A client with this name already exists");
+      return;
+    }
+
+    const stillParsing = uploadedFiles.some((f) => f.status === "parsing");
+    if (stillParsing) {
+      toast.error("Please wait for all files to finish parsing");
+      return;
+    }
+
+    setIsCreatingClient(true);
+
+    try {
+      const createClientInStore = useClientStore.getState().createClient;
+      const newClient = await createClientInStore({
+        name: newClientFormData.clientName,
+        industry: newClientFormData.industry,
+        notes: newClientFormData.notes || undefined,
+      });
+
+      if (uploadedFiles.length > 0) {
+        for (const uploaded of uploadedFiles) {
+          try {
+            await uploadDocumentToStore(newClient.id, uploaded.file);
+          } catch (error) {
+            console.error(`Failed to upload ${uploaded.file.name}:`, error);
+            toast.error(`Failed to upload ${uploaded.file.name}`);
+          }
+        }
+      }
+
+      toast.success(`Client "${newClientFormData.clientName}" created successfully`);
+      
+      // Client is automatically added to store by createClient
+      setSelectedClientId(newClient.id);
+      setClientSearchQuery(newClient.name);
+      setInitialContextNotes(newClientFormData.notes || "");
+      setSelectedTemplateIdState(null);
+      setUploadedFiles([]);
+      setShowTemplateSelector(true); // Show template selector after creating client
+      setModalView("template_selection");
+      setNewClientFormData({
+        clientName: "",
+        industry: "",
+        pipelineStage: "Discovery",
+        primaryContactName: "",
+        primaryContactEmail: "",
+        notes: "",
+      });
+    } catch (error) {
+      console.error("Failed to create client:", error);
+      toast.error("Failed to create client");
+    } finally {
+      setIsCreatingClient(false);
+    }
   }
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
@@ -460,18 +547,46 @@ export default function TemplateSelectionModal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div className={styles.modalOverlay}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <div>
-            <h2 className={styles.modalTitle}>
-              {isScratch ? "Start From Scratch" : "Create Proposal from Template"}
-            </h2>
-            <p className={styles.modalSubtitle}>
-              {isScratch
-                ? "Build a proposal without a predefined template"
-                : <>Using <strong>{templateName}</strong> template</>}
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {modalView === "new_client" && (
+              <button 
+                className={styles.backBtn} 
+                onClick={handleBackToTemplateSelection}
+                aria-label="Back to template selection"
+                style={{ 
+                  background: "none", 
+                  border: "none", 
+                  cursor: "pointer", 
+                  padding: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "6px",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-bg-hover, rgba(0,0,0,0.05))"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <div>
+              <h2 className={styles.modalTitle}>
+                {modalView === "new_client" 
+                  ? "Add New Client"
+                  : isScratch ? "Start From Scratch" : "Create Proposal from Template"}
+              </h2>
+              <p className={styles.modalSubtitle}>
+                {modalView === "new_client"
+                  ? "Enter details to provision a new client workspace."
+                  : isScratch
+                    ? "Build a proposal without a predefined template"
+                    : <>Using <strong>{templateName}</strong> template</>}
+              </p>
+            </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <X size={20} />
@@ -479,7 +594,130 @@ export default function TemplateSelectionModal({
         </div>
 
         <div className={styles.modalBody}>
-          {enableTemplateSelection && (
+          {modalView === "new_client" ? (
+            <>
+              <div className={styles.section}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Client Name</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    placeholder="e.g. Acme Corporation"
+                    value={newClientFormData.clientName}
+                    onChange={(e) => handleNewClientInputChange("clientName", e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Industry</label>
+                  <select
+                    className={styles.select}
+                    value={newClientFormData.industry}
+                    onChange={(e) => handleNewClientInputChange("industry", e.target.value)}
+                  >
+                    <option value="">Select industry...</option>
+                    {INDUSTRIES.map((industry) => (
+                      <option key={industry} value={industry}>
+                        {industry}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>
+                  Initial Context & Notes
+                  <span className={styles.optional}>Optional</span>
+                </h3>
+
+                <div className={styles.formGroup}>
+                  <textarea
+                    className={styles.textarea}
+                    placeholder="Add any background context, specific requirements, or initial observations..."
+                    value={newClientFormData.notes}
+                    onChange={(e) => handleNewClientInputChange("notes", e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>Upload Documents</h3>
+
+                <label
+                  htmlFor="new-client-file-upload"
+                  className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
+                  onDragOver={handleDragOver}
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
+                  <div className={styles.uploadText}>
+                    Click to upload or drag and drop
+                  </div>
+                  <div className={styles.uploadHint}>
+                    PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
+                  </div>
+                  <input
+                    id="new-client-file-upload"
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                    multiple
+                    onChange={handleFileChange}
+                    className={styles.visuallyHidden}
+                  />
+                </label>
+
+                {uploadedFiles.length > 0 && (
+                  <div className={styles.uploadedFilesList}>
+                    {uploadedFiles.map(({ file, id, status, error, parsedData }) => (
+                      <div key={id} className={styles.uploadedFileItem}>
+                        <div className={styles.fileIconWrapper}>
+                          {status === "parsing" ? (
+                            <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                          ) : status === "error" ? (
+                            <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                          ) : status === "parsed" ? (
+                            <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                          ) : (
+                            <FileText size={18} className={styles.fileIcon} />
+                          )}
+                        </div>
+                        <div className={styles.fileDetails}>
+                          <div className={styles.fileName} title={file.name}>{file.name}</div>
+                          <div className={styles.fileMeta}>
+                            {formatFileSize(file.size)}
+                            {status === "parsing" && (
+                              <span className={styles.parsingStatus}> • Parsing on server...</span>
+                            )}
+                            {status === "parsed" && parsedData && (
+                              <span className={styles.parsedStatus}> • {parsedData.word_count} words</span>
+                            )}
+                            {status === "error" && error && (
+                              <span className={styles.errorStatus}> • {error}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.removeFileBtn}
+                          onClick={() => handleRemoveFile(id)}
+                          title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
+                          aria-label="Remove file"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {(enableTemplateSelection || showTemplateSelector || (selectedClientId && !templateId && !isScratch)) && (
             <div className={styles.section}>
               <label className={styles.label}>Select a Template</label>
               <div className={styles.templateGrid}>
@@ -738,19 +976,45 @@ export default function TemplateSelectionModal({
               </div>
             </div>
           )}
+            </>
+          )}
         </div>
 
         <div className={styles.modalFooter}>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleContinue}
-            disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
-          >
-            Continue to Wizard →
-          </button>
+          {modalView === "new_client" ? (
+            <>
+              <button className="btn btn-secondary" onClick={handleBackToTemplateSelection}>
+                Back
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateClient}
+                disabled={isCreatingClient || !newClientFormData.clientName.trim() || !newClientFormData.industry}
+              >
+                {isCreatingClient ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Client"
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="btn btn-secondary" onClick={onClose}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleContinue}
+                disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
+              >
+                Continue to Wizard →
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>,

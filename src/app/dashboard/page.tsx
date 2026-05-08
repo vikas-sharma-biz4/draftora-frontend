@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { listProposals } from "@/api/proposalApi";
+import { useProposals } from "@/hooks/useProposals";
 import type { ProposalListItem } from "@/types/proposal.types";
 
 const Header = dynamic(() => import("@/components/common/Header"), {
@@ -26,24 +26,14 @@ const SkeletonCard = dynamic(
 );
 
 export default function DashboardPage(): JSX.Element {
-  const [proposals, setProposals] = useState<ProposalListItem[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { proposals, isLoading, error } = useProposals();
   const [search, setSearch] = useState<string>("");
 
   useEffect(() => {
-    listProposals()
-      .then((data) => {
-        const sorted = [...data].sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setProposals(sorted);
-      })
-      .catch(() => {
-        toast.error("Failed to load proposals. Is the backend running?");
-      })
-      .finally(() => setIsLoading(false));
-  }, []);
+    if (error) {
+      toast.error("Failed to load proposals. Is the backend running?");
+    }
+  }, [error]);
 
   const filtered = proposals.filter(
     (p) =>

@@ -938,8 +938,12 @@ body {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.75rem;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .grid-3 {
@@ -1082,9 +1086,21 @@ body {
 
 .tone-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 28px;
+
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 500px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .tone-card {
@@ -1257,6 +1273,7 @@ body {
 
 .review-layout {
   display: flex;
+  flex-direction: column;
   gap: 24px;
   align-items: flex-start;
   position: relative;
@@ -1264,35 +1281,28 @@ body {
 
 .review-layout-left {
   flex: 1;
-  max-width: 900px;
-  margin-right: 344px; /* 320px panel width + 24px gap */
+  max-width: 100%;
+  width: 100%;
 }
 
 .review-layout-right {
-  width: 320px;
-  min-width: 320px;
-  position: fixed;
-  top: 140px;
-  right: max(48px, calc((100vw - var(--sidebar-width) - 968px) / 2));
-  z-index: 50;
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
 }
 
-@media (max-width: 1280px) {
+@media (min-width: 1281px) {
   .review-layout {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .review-layout-left {
-    margin-right: 0;
-    max-width: 100%;
+    max-width: 900px;
   }
 
   .review-layout-right {
-    position: relative;
-    top: auto;
-    right: auto;
-    width: 100%;
-    min-width: unset;
+    width: 320px;
+    min-width: 320px;
   }
 }
 
@@ -1524,6 +1534,11 @@ body {
   background: var(--color-bg);
   padding: 0;
   margin: 0;
+  pointer-events: none;
+}
+
+.proposal-header-bar > * {
+  pointer-events: auto;
 }
 
 .proposal-actions-bar {
@@ -1536,6 +1551,8 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 101;
 }
 
 .proposal-actions-left,
@@ -2661,6 +2678,84 @@ body {
 
 .empty-content-card { text-align: center; padding: 40px; }
 
+/* ============================================================
+   SKELETON LOADERS
+   ============================================================ */
+
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f0f0f0 0px,
+    #f8f8f8 40px,
+    #f0f0f0 80px
+  );
+  background-size: 468px;
+  animation: shimmer 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-badge {
+  border-radius: var(--radius-full);
+}
+
+.skeleton-button {
+  border-radius: var(--radius-md);
+}
+
+.skeleton-card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.skeleton-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.skeleton-card-body {
+  margin-bottom: 16px;
+}
+
+.skeleton-card-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.skeleton-card-footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
 /* Parameters page utilities */
 .ai-loading-hint {
   padding: 24px 16px;
@@ -3010,10 +3105,6 @@ body {
     overflow-y: auto;
   }
 
-  .tone-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .sections-grid {
     grid-template-columns: 1fr;
   }
@@ -3033,10 +3124,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .tone-grid {
-    grid-template-columns: 1fr;
-  }
-
   .page-footer {
     flex-direction: column;
     gap: 12px;
@@ -3189,8 +3276,9 @@ body {
 .generating-log-steps {
   list-style: none;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .generating-log-step {
