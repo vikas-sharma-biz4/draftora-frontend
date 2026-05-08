@@ -45,6 +45,7 @@ export interface SavedDraft {
 
 export interface DraftMetadata {
   id: string;
+  proposalId: number | null;
   title: string;
   clientName: string;
   status: "draft" | "generating" | "completed";

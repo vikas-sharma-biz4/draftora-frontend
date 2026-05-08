@@ -39,6 +39,13 @@ interface ProposalContextType {
   setCurrentDraftId: (id: string | null) => void;
   autoSaveEnabled: boolean;
   setAutoSaveEnabled: (enabled: boolean) => void;
+  visitedPipelineSteps: number[];
+  setVisitedPipelineSteps: (steps: number[]) => void;
+  highestVisitedStep: number | null;
+  setHighestVisitedStep: (step: number | null) => void;
+  syncVisitedStepsFromBackend: (proposalId: number) => Promise<void>;
+  markStepVisitedOnBackend: (proposalId: number, stepId: number) => Promise<void>;
+  canAccessStep: (proposalId: number, stepId: number) => Promise<boolean>;
 }
 
 const STORAGE_KEY = "draftora_wizard_v1";
@@ -86,6 +93,8 @@ export function ProposalProvider({
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
+  const [visitedPipelineSteps, setVisitedPipelineSteps] = useState<number[]>([]);
+  const [highestVisitedStep, setHighestVisitedStep] = useState<number | null>(null);
 
   // Rehydrate from localStorage on mount (client only)
   useEffect(() => {
@@ -172,10 +181,85 @@ export function ProposalProvider({
     setMaxStepReached(1);
     setDraftStage("template_selection");
     setCompletedSteps([]);
+    setCurrentDraftId(null);
+    setVisitedPipelineSteps([]);
+    setHighestVisitedStep(null);
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
       // Ignore
+    }
+  }, []);
+
+  const syncVisitedStepsFromBackend = useCallback(async (proposalId: number): Promise<void> => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/proposals/${proposalId}/status/`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch proposal status");
+      }
+      const data = await response.json();
+      if (data.success && data.data) {
+        const visitedSteps = data.data.visited_pipeline_steps || [];
+        const highestStep = data.data.highest_visited_step || null;
+        setVisitedPipelineSteps(visitedSteps);
+        setHighestVisitedStep(highestStep);
+      }
+    } catch (error) {
+      console.error("Failed to sync visited steps from backend:", error);
+    }
+  }, []);
+
+  const markStepVisitedOnBackend = useCallback(async (proposalId: number, stepId: number): Promise<void> => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/proposals/${proposalId}/mark-step-visited/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ target_step: stepId }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to mark step as visited");
+      }
+      
+      setVisitedPipelineSteps((prev) => {
+        if (prev.includes(stepId)) return prev;
+        const updated = [...prev, stepId].sort((a, b) => a - b);
+        return updated;
+      });
+      
+      setHighestVisitedStep((prev) => {
+        if (prev === null || stepId > prev) return stepId;
+        return prev;
+      });
+    } catch (error) {
+      console.error("Failed to mark step visited on backend:", error);
+    }
+  }, []);
+
+  const canAccessStep = useCallback(async (proposalId: number, stepId: number): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/proposals/${proposalId}/validate-step-access/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ target_step: stepId }),
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to validate step access");
+      }
+      const data = await response.json();
+      return data.success && data.data?.can_access === true;
+    } catch (error) {
+      console.error("Failed to validate step access:", error);
+      return false;
     }
   }, []);
 
@@ -207,6 +291,13 @@ export function ProposalProvider({
         setCurrentDraftId,
         autoSaveEnabled,
         setAutoSaveEnabled,
+        visitedPipelineSteps,
+        setVisitedPipelineSteps,
+        highestVisitedStep,
+        setHighestVisitedStep,
+        syncVisitedStepsFromBackend,
+        markStepVisitedOnBackend,
+        canAccessStep,
       }}
     >
       {children}
