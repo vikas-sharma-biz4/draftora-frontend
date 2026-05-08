@@ -65,7 +65,19 @@ function buildSectionItems(
 }
 
 export default function ParametersPage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, currentProposalId, draftStage, completedSteps } = useProposal();
+  const { 
+    proposalData, 
+    updateProposalData, 
+    setCurrentStep, 
+    setDraftStage, 
+    markStepCompleted, 
+    currentProposalId, 
+    draftStage, 
+    completedSteps,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+    markStepVisitedOnBackend,
+  } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
@@ -73,6 +85,13 @@ export default function ParametersPage(): JSX.Element {
 
   // Enable auto-save to localStorage drafts when user is in pipeline stage
   useDraftAutoSave({ enabled: true });
+
+  // Sync visited steps from backend on mount
+  useEffect(() => {
+    if (currentProposalId) {
+      syncVisitedStepsFromBackend(currentProposalId);
+    }
+  }, [currentProposalId, syncVisitedStepsFromBackend]);
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
     buildSectionItems(
@@ -96,6 +115,32 @@ export default function ParametersPage(): JSX.Element {
       )
     );
   }, [proposalData.selectedSections, proposalData.sectionDisplayNames, proposalData.originalSections]);
+
+  // Mark step 1 as visited when this page loads
+  useEffect(() => {
+    markStepCompleted(1);
+  }, [markStepCompleted]);
+
+  // Restore scroll position from draft UI state
+  useEffect(() => {
+    try {
+      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      if (uiStateStr) {
+        const uiState = JSON.parse(uiStateStr);
+        if (uiState.scrollPosition > 0) {
+          setTimeout(() => {
+            window.scrollTo({
+              top: uiState.scrollPosition,
+              behavior: "smooth",
+            });
+          }, 300);
+        }
+        sessionStorage.removeItem("draft_ui_state");
+      }
+    } catch {
+      // Ignore errors restoring UI state
+    }
+  }, []);
 
   function handleStartEdit(item: SectionItem): void {
     setEditingKey(item.key);
@@ -149,7 +194,7 @@ export default function ParametersPage(): JSX.Element {
     updateProposalData({ tone: value });
   }
 
-  function handleNext(): void {
+  async function handleNext(): Promise<void> {
     if (sections.length === 0) {
       toast.error("Please add at least one section.");
       return;
@@ -164,6 +209,12 @@ export default function ParametersPage(): JSX.Element {
       sectionDisplayNames: displayNames,
       customSections: [],
     });
+    
+    // Mark Step 1 as visited when proceeding to Review
+    if (currentProposalId) {
+      await markStepVisitedOnBackend(currentProposalId, 1);
+    }
+    
     markStepCompleted(1);
     setDraftStage("parameters_complete");
     setCurrentStep(5);
@@ -190,11 +241,12 @@ export default function ParametersPage(): JSX.Element {
         <DynamicPipeline 
           currentStage={draftStage}
           completedSteps={completedSteps}
+          visitedSteps={visitedPipelineSteps}
           visible={true}
           proposalId={currentProposalId}
         />
         <div className="page-badge">Phase 04</div>
-        <h1 className="page-title">Step 4: Section Structure &amp; Tone</h1>
+        <h1 className="page-title">Step 4: Table of Contents &amp; Parameters</h1>
         <p className="page-subtitle">
           {isRecreateMode
             ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
@@ -223,7 +275,7 @@ export default function ParametersPage(): JSX.Element {
             <div className="flex-between mb-14">
               <div className="flex-center gap-10">
                 <span className="form-label mb-0">
-                  Section Structure
+                  Table of Contents
                 </span>
                 <span className="badge badge-primary">{sections.length} sections</span>
               </div>
@@ -380,7 +432,7 @@ export default function ParametersPage(): JSX.Element {
         {/* ── Tone of Voice ── */}
         <div className="mb-28">
           <div className="form-label mb-14">
-            Tone of Voice
+            Parameters
           </div>
           <div className="tone-grid">
             {TONE_OPTIONS.map(({ value, label, description }) => {

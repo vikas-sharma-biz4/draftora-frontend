@@ -214,7 +214,7 @@ export async function listClientsWithDocuments(): Promise<ClientWithDocuments[]>
 export async function uploadDocument(
   clientId: number,
   file: File
-): Promise<{ id: number; name: string; status: string }> {
+): Promise<ClientDocument> {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -224,7 +224,7 @@ export async function uploadDocument(
     body: formData,
   });
 
-  return handleResponse<{ id: number; name: string; status: string }>(res);
+  return handleResponse<ClientDocument>(res);
 }
 
 /**

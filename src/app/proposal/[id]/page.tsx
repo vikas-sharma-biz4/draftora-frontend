@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useProposal } from "@/context/ProposalContext";
 import { Pencil, X, Check, Plus } from "lucide-react";
@@ -16,10 +16,12 @@ import {
   removeProposalSection,
   updateApprovalStatus,
 } from "@/api/proposalApi";
-import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY, DRAFTS_STORAGE_KEY } from "@/constants";
+import { SECTION_DISPLAY_NAMES, HISTORY_STORAGE_KEY } from "@/constants";
 import { DIAGRAM_SECTION_KEYS } from "@/utils/contentParser";
-import type { ProposalData } from "@/types/proposal.types";
+import type { ProposalData, WizardStep } from "@/types/proposal.types";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
+import type { DraftUIState } from "@/types/draft.types";
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi, deleteDraft as deleteDraftApi, listDrafts } from "@/api/draftApi";
 
 const ProposalSectionEditor = dynamic(
   () => import("@/components/proposal/ProposalSectionEditor"),
@@ -37,6 +39,10 @@ const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
 });
 
 const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
+  ssr: false,
+});
+
+const ConfirmModal = dynamic(() => import("@/components/common/ConfirmModal"), {
   ssr: false,
 });
 
@@ -59,7 +65,18 @@ function resolveSectionLabel(
 export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
-  const { resetProposal, setCurrentProposalId, updateProposalData, setDraftStage, setCompletedSteps, proposalData } = useProposal();
+  const searchParams = useSearchParams();
+  const { 
+    resetProposal, 
+    setCurrentProposalId, 
+    updateProposalData, 
+    setDraftStage, 
+    setCompletedSteps, 
+    markStepCompleted, 
+    proposalData,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+  } = useProposal();
   const handleSaveDraft = useSaveDraft();
   const proposalId = Number(params.id);
 
@@ -67,6 +84,7 @@ export default function ProposalOutputPage(): JSX.Element {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [activeSection, setActiveSection] = useState<string>("");
+  const [fromHistory, setFromHistory] = useState<boolean>(false);
 
   // Sidebar section management
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
@@ -76,14 +94,36 @@ export default function ProposalOutputPage(): JSX.Element {
   const [addingSection, setAddingSection] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; actionType: "approve" | "reject" | null }>({
+    isOpen: false,
+    message: "",
+    actionType: null,
+  });
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Check if navigating from History
+  useEffect(() => {
+    const fromParam = searchParams.get("from");
+    setFromHistory(fromParam === "history");
+  }, [searchParams]);
+
+  // Mark step 3 as visited when this page loads
+  useEffect(() => {
+    markStepCompleted(3);
+  }, [markStepCompleted]);
+
+  // Sync visited steps from backend on mount
+  useEffect(() => {
+    if (proposalId) {
+      syncVisitedStepsFromBackend(proposalId);
+    }
+  }, [proposalId, syncVisitedStepsFromBackend]);
 
   const fetchProposal = useCallback(async (): Promise<void> => {
     try {
       const data = await getProposal(proposalId);
       setProposal(data);
-      console.log("Proposal loaded - approvalStatus:", data.approvalStatus);
       
       // Set current proposal ID for regeneration flow
       setCurrentProposalId(proposalId);
@@ -139,14 +179,110 @@ export default function ProposalOutputPage(): JSX.Element {
     };
   }, [fetchProposal]);
 
+  // Restore scroll position and active section from draft UI state
+  useEffect(() => {
+    try {
+      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      if (uiStateStr) {
+        const uiState = JSON.parse(uiStateStr);
+        
+        // Restore active section if available
+        if (uiState.activeSection && proposal?.selectedSections?.includes(uiState.activeSection)) {
+          setActiveSection(uiState.activeSection);
+        }
+        
+        // Restore scroll position
+        if (uiState.scrollPosition > 0) {
+          setTimeout(() => {
+            window.scrollTo({
+              top: uiState.scrollPosition,
+              behavior: "smooth",
+            });
+          }, 300);
+        }
+        
+        sessionStorage.removeItem("draft_ui_state");
+      }
+    } catch {
+      // Ignore errors restoring UI state
+    }
+  }, [proposal]);
+
   // Auto-save to drafts when navigating away without approval/rejection
   useEffect(() => {
-    function saveToDrafts(): void {
+    let currentDraftId: string | null = null;
+    let isMounted = true;
+
+    async function saveToDrafts(): Promise<void> {
+      if (!proposal || !proposal.status || proposal.status !== "completed") return;
+      
+      // Skip auto-save for approved/rejected proposals
+      if (proposal.approvalStatus === "approved" || proposal.approvalStatus === "rejected") {
+        return;
+      }
+      
+      try {
+        // Capture UI state for restoration
+        const uiState: DraftUIState = {
+          scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+          activeSection: activeSection,
+          expandedSections: [],
+          lastVisibleSection: null,
+        };
+
+        const draftPayload = {
+          proposalId: proposalId,
+          title: proposal.title,
+          clientName: proposal.clientName,
+          status: "draft" as const,
+          lastLocation: "WEB_VIEW" as const,
+          stage: "generated" as const,
+          wizardState: {
+            proposalData: proposal,
+            currentStep: 5 as WizardStep,
+            maxStepReached: 5 as WizardStep,
+            completedSteps: [1, 2, 3, 4, 5],
+          },
+          generatedContent: proposal.sections || {},
+          uiState,
+        };
+
+        // Check if draft already exists for this proposal
+        if (!currentDraftId) {
+          const existingDrafts = await listDrafts();
+          const existingDraft = existingDrafts.find(d => d.proposalId === proposalId);
+          if (existingDraft) {
+            currentDraftId = existingDraft.id;
+          }
+        }
+
+        if (currentDraftId) {
+          await updateDraftApi(currentDraftId, draftPayload);
+        } else {
+          const saved = await saveDraftApi(draftPayload);
+          if (isMounted) {
+            currentDraftId = saved.id;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to save draft:", error);
+      }
+    }
+
+    const handleBeforeUnload = (): void => {
+      // Fallback to localStorage for synchronous save
       if (!proposal || !proposal.status || proposal.status !== "completed") return;
       
       try {
+        const uiState: DraftUIState = {
+          scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+          activeSection: activeSection,
+          expandedSections: [],
+          lastVisibleSection: null,
+        };
+
         const draftItem = {
-          id: proposalId.toString(),
+          id: currentDraftId || proposalId.toString(),
           title: proposal.title,
           clientName: proposal.clientName,
           stage: "generated" as const,
@@ -154,9 +290,10 @@ export default function ProposalOutputPage(): JSX.Element {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           data: proposal,
+          uiState,
         };
         
-        const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
+        const drafts = JSON.parse(localStorage.getItem("drafts_autosave_fallback") || "[]");
         const existingIndex = drafts.findIndex((d: any) => d.id === draftItem.id);
         
         if (existingIndex >= 0) {
@@ -165,23 +302,21 @@ export default function ProposalOutputPage(): JSX.Element {
           drafts.unshift(draftItem);
         }
         
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+        localStorage.setItem("drafts_autosave_fallback", JSON.stringify(drafts));
       } catch (error) {
-        console.error("Failed to save draft:", error);
+        console.error("Failed to save draft fallback:", error);
       }
-    }
-
-    const handleBeforeUnload = (): void => {
-      saveToDrafts();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     
     return () => {
+      isMounted = false;
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      saveToDrafts();
+      // Only save on unmount, not on every re-render
+      void saveToDrafts();
     };
-  }, [proposal, proposalId]);
+  }, [proposalId]); // Only depend on proposalId to avoid re-running on every state change
 
   function handleScrollToSection(key: string): void {
     setActiveSection(key);
@@ -282,21 +417,30 @@ export default function ProposalOutputPage(): JSX.Element {
 
     setAddingSection(true);
     try {
-      await addProposalSection(proposalId, { section_key: key, label, content: "" });
+      toast.info("Generating content for new section...");
+      const result = await addProposalSection(proposalId, { key, label });
       setProposal((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           selectedSections: [...prev.selectedSections, key],
           sectionDisplayNames: { ...(prev.sectionDisplayNames ?? {}), [key]: label },
-          sections: { ...(prev.sections ?? {}), [key]: "" },
+          sections: { ...(prev.sections ?? {}), [key]: result.content },
         };
       });
       setAddLabelValue("");
       setShowAddInput(false);
-      toast.success(`"${label}" section added.`);
-    } catch {
-      toast.error("Failed to add section.");
+      toast.success(`"${label}" section added with AI-generated content!`);
+      setActiveSection(key);
+      setTimeout(() => {
+        const el = document.getElementById(`section-${key}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to add section.";
+      toast.error(message);
     } finally {
       setAddingSection(false);
     }
@@ -305,44 +449,63 @@ export default function ProposalOutputPage(): JSX.Element {
   // ── Approve/Reject handlers ──────────────────────────────────────────────────
 
   async function handleApprove(): Promise<void> {
-    if (!proposal) return;
-    setIsApproving(true);
-    try {
-      // Update approval status via API
-      await updateApprovalStatus(proposalId, "approved");
-      
-      // Remove from drafts
-      const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
-      const updatedDrafts = drafts.filter((d: any) => d.id !== proposalId.toString());
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
-      
-      toast.success("Proposal approved and moved to history!");
-      router.push("/history");
-    } catch (error) {
-      toast.error("Failed to approve proposal");
-    } finally {
-      setIsApproving(false);
+    console.log('[DEBUG] handleApprove clicked', { proposal, isApproving });
+    if (!proposal) {
+      console.log('[DEBUG] No proposal found, returning');
+      return;
     }
+    console.log('[DEBUG] Opening confirm modal for approve');
+    setConfirmModal({
+      isOpen: true,
+      message: "Are you sure you want to approve this proposal?",
+      actionType: "approve",
+    });
   }
 
   async function handleReject(): Promise<void> {
-    if (!proposal) return;
-    setIsRejecting(true);
+    console.log('[DEBUG] handleReject clicked', { proposal, isRejecting });
+    if (!proposal) {
+      console.log('[DEBUG] No proposal found, returning');
+      return;
+    }
+    console.log('[DEBUG] Opening confirm modal for reject');
+    setConfirmModal({
+      isOpen: true,
+      message: "Are you sure you want to reject this proposal?",
+      actionType: "reject",
+    });
+  }
+
+  async function executeApprovalAction(actionType: "approve" | "reject"): Promise<void> {
+    console.log('[DEBUG] executeApprovalAction called', { actionType, proposalId });
+    const status = actionType === "approve" ? "approved" : "rejected";
+    const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
+    const successMessage = actionType === "approve" 
+      ? "Proposal approved and moved to history!" 
+      : "Proposal rejected and moved to history";
+
+    setLoading(true);
     try {
       // Update approval status via API
-      await updateApprovalStatus(proposalId, "rejected");
-      
-      // Remove from drafts
-      const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
-      const updatedDrafts = drafts.filter((d: any) => d.id !== proposalId.toString());
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updatedDrafts));
-      
-      toast.success("Proposal rejected and moved to history");
+      await updateApprovalStatus(proposalId, status);
+
+      // Remove from drafts via API
+      try {
+        const drafts = await listDrafts();
+        const proposalDraft = drafts.find((d) => d.proposalId === proposalId);
+        if (proposalDraft) {
+          await deleteDraftApi(proposalDraft.id);
+        }
+      } catch (draftError) {
+        console.error("Failed to remove draft:", draftError);
+      }
+
+      toast.success(successMessage);
       router.push("/history");
     } catch (error) {
-      toast.error("Failed to reject proposal");
+      toast.error(`Failed to ${actionType} proposal`);
     } finally {
-      setIsRejecting(false);
+      setLoading(false);
     }
   }
 
@@ -362,6 +525,7 @@ export default function ProposalOutputPage(): JSX.Element {
           <DynamicPipeline 
             currentStage="generated"
             completedSteps={[1, 2, 3]}
+            visitedSteps={visitedPipelineSteps}
             visible={true}
             proposalId={proposalId}
           />
@@ -376,35 +540,57 @@ export default function ProposalOutputPage(): JSX.Element {
                 ⬇ Download
               </a>
             )}
+            {proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={handleSaveDraft}
+              >
+                Save Draft
+              </button>
+            )}
             {(() => {
-              console.log("Save Draft button condition check:", {
-                proposal: !!proposal,
-                approvalStatus: proposal?.approvalStatus,
-                shouldShow: !proposal?.approvalStatus || proposal?.approvalStatus === "pending"
-              });
-              return proposal && (!proposal.approvalStatus || proposal.approvalStatus === "pending") && (
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={handleSaveDraft}
-                >
-                  Save Draft
-                </button>
-              );
+              // Conditional button rendering based on navigation source and approval status
+              if (fromHistory) {
+                // When viewing from History, only show status badges (no action buttons)
+                if (proposal?.approvalStatus === "approved") {
+                  return <span className="badge badge-success">Approved</span>;
+                }
+                if (proposal?.approvalStatus === "rejected") {
+                  return <span className="badge badge-danger">Rejected</span>;
+                }
+                // If from history but status is pending or unknown, show pending badge
+                return <span className="badge badge-warning">Pending</span>;
+              }
+              // When coming from Draft (not from history), show action buttons if pending
+              if (!proposal?.approvalStatus || proposal?.approvalStatus === "pending") {
+                return (
+                  <>
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={handleApprove}
+                      disabled={isApproving || !proposal}
+                    >
+                      {isApproving ? "Approving..." : "Approve"}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={handleReject}
+                      disabled={isRejecting || !proposal}
+                    >
+                      {isRejecting ? "Rejecting..." : "Reject"}
+                    </button>
+                  </>
+                );
+              }
+              // If already approved/rejected when not from history, show badge only
+              if (proposal?.approvalStatus === "approved") {
+                return <span className="badge badge-success">Approved</span>;
+              }
+              if (proposal?.approvalStatus === "rejected") {
+                return <span className="badge badge-danger">Rejected</span>;
+              }
+              return null;
             })()}
-            <button
-              className="btn btn-success btn-sm"
-              onClick={handleApprove}
-              disabled={isApproving || !proposal}
-            >
-              {isApproving ? "Approving..." : "Approve"}
-            </button>
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={handleReject}
-              disabled={isRejecting || !proposal}
-            >
-              {isRejecting ? "Rejecting..." : "Reject"}
-            </button>
           </div>
         </div>
 
@@ -581,6 +767,20 @@ export default function ProposalOutputPage(): JSX.Element {
           </div>
         </div>
       </main>
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        message={confirmModal.message}
+        onConfirm={async () => {
+          const actionType = confirmModal.actionType;
+          setConfirmModal({ isOpen: false, message: "", actionType: null });
+          if (actionType) {
+            await executeApprovalAction(actionType);
+          }
+        }}
+        onCancel={() => {
+          setConfirmModal({ isOpen: false, message: "", actionType: null });
+        }}
+      />
     </div>
   );
 }

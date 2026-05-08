@@ -97,6 +97,7 @@ export interface ProposalListItem {
   approvalStatus: "pending" | "approved" | "rejected";
   tone: string;
   lengthPreference: string;
+  templateType: TemplateType;
   createdAt: string;
   updatedAt: string;
 }

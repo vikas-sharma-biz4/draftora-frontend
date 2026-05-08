@@ -54,6 +54,9 @@ export default function ReviewPage(): JSX.Element {
     currentProposalId,
     draftStage,
     completedSteps,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+    markStepVisitedOnBackend,
   } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
@@ -61,6 +64,13 @@ export default function ReviewPage(): JSX.Element {
 
   // Enable auto-save to localStorage drafts when user is in pipeline stage
   useDraftAutoSave({ enabled: true });
+
+  // Sync visited steps from backend on mount
+  useEffect(() => {
+    if (currentProposalId) {
+      syncVisitedStepsFromBackend(currentProposalId);
+    }
+  }, [currentProposalId, syncVisitedStepsFromBackend]);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
@@ -73,6 +83,32 @@ export default function ReviewPage(): JSX.Element {
   useEffect(() => {
     setIsGenerating(false);
   }, [setIsGenerating]);
+
+  // Mark step 2 as visited when this page loads
+  useEffect(() => {
+    markStepCompleted(2);
+  }, [markStepCompleted]);
+
+  // Restore scroll position from draft UI state
+  useEffect(() => {
+    try {
+      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      if (uiStateStr) {
+        const uiState = JSON.parse(uiStateStr);
+        if (uiState.scrollPosition > 0) {
+          setTimeout(() => {
+            window.scrollTo({
+              top: uiState.scrollPosition,
+              behavior: "smooth",
+            });
+          }, 300);
+        }
+        sessionStorage.removeItem("draft_ui_state");
+      }
+    } catch {
+      // Ignore errors restoring UI state
+    }
+  }, []);
 
   // Handle scroll for sticky download button
   useEffect(() => {
@@ -170,6 +206,11 @@ export default function ReviewPage(): JSX.Element {
       const result = await generateProposal(proposalData);
       setGeneratedProposalId(result.id);
       
+      // Mark Step 2 as visited when starting generation
+      if (result.id) {
+        await markStepVisitedOnBackend(result.id, 2);
+      }
+      
       // Mark review step completed and set stage to generated
       markStepCompleted(2);
       setDraftStage("review_complete");
@@ -207,6 +248,7 @@ export default function ReviewPage(): JSX.Element {
         <DynamicPipeline 
           currentStage={draftStage}
           completedSteps={completedSteps}
+          visitedSteps={visitedPipelineSteps}
           visible={true}
           proposalId={currentProposalId}
         />
