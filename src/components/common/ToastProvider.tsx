@@ -7,6 +7,7 @@ export default function ToastProvider(): JSX.Element {
     <Toaster
       position="top-right"
       richColors
+      closeButton
       toastOptions={{
         style: {
           fontFamily: "var(--font-sans)",

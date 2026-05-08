@@ -5,8 +5,8 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useDraftStore } from '@/store/draftStore';
-import type { DraftMetadata } from '@/types/draft.types';
+import { useDraftStore } from '@/redux/features/draftStore';
+import type { DraftMetadata } from '@/interfaces/draftInterfaces';
 
 interface UseDraftsOptions {
   autoFetch?: boolean;

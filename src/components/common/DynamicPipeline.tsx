@@ -5,8 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { Check } from "lucide-react";
 
 import styles from "./DynamicPipeline.module.scss";
-import type { DraftStage } from "@/types/draft.types";
-import { PIPELINE_STEPS } from "@/types/draft.types";
+import type { DraftStage } from "@/interfaces/draftInterfaces";
+import { PIPELINE_STEPS } from "@/interfaces/draftInterfaces";
 
 interface DynamicPipelineProps {
   currentStage: DraftStage;

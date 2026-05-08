@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useProposal } from "@/context/ProposalContext";
-import { saveDraft, updateDraft } from "@/api/draftApi";
-import type { DraftLocation, SaveDraftPayload } from "@/types/draft.types";
+import { saveDraft, updateDraft } from "@/services/draftApi";
+import type { DraftLocation, SaveDraftPayload } from "@/interfaces/draftInterfaces";
 
 interface UseAutoSaveOptions {
   enabled: boolean;

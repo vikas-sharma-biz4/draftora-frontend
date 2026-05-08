@@ -5,8 +5,8 @@
  */
 
 import { useEffect, useMemo } from 'react';
-import { useProposalStore } from '@/store/proposalStore';
-import type { ProposalListItem } from '@/types/proposal.types';
+import { useProposalStore } from '@/redux/features/proposalStore';
+import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
 
 interface UseProposalsOptions {
   autoFetch?: boolean;

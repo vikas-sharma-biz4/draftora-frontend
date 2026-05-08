@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import styles from "./NewClientModal.module.scss";
 
 import { INDUSTRIES } from "@/constants";
-import { useClientStore } from "@/store/clientStore";
+import { useClientStore } from "@/redux/features/clientStore";
 import { useModalHistory } from "@/hooks/useModalHistory";
-import type { Client } from "@/api/clientApi";
+import type { Client } from "@/services/clientApi";
 
 interface EditClientModalProps {
   client: Client;

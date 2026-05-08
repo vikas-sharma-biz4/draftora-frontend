@@ -2,20 +2,20 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
 import { useClients } from "@/hooks/useClients";
-import { useClientStore } from "@/store/clientStore";
-import ClientCardSkeleton from "@/components/skeletons/ClientCardSkeleton";
-
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+import { useClientStore } from "@/redux/features/clientStore";
+import { formatDate } from "@/utils/dateUtils";
+import PageLayout from "@/components/common/PageLayout";
+import PageHeader from "@/components/common/PageHeader";
+import EmptyState from "@/components/common/EmptyState";
+import SkeletonGrid from "@/components/common/SkeletonGrid";
+import ClientCardSkeleton from "@/components/common/skeletons/ClientCardSkeleton";
 
 const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
   ssr: false,
@@ -64,42 +64,31 @@ export default function ClientsPage(): JSX.Element {
   }
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
-        <div className={styles.header}>
-          <div>
-            <h1 className="page-title">Clients</h1>
-            <p className="page-subtitle">
-              Manage your client relationships and view all proposals associated with each client.
-            </p>
-          </div>
+    <PageLayout>
+      <PageHeader
+        title="Clients"
+        subtitle="Manage your client relationships and view all proposals associated with each client."
+        action={
           <button className="btn btn-primary" onClick={handleNewClient}>
             <Plus size={18} />
             New Client
           </button>
-        </div>
+        }
+      />
 
         {loading ? (
-          <div className={styles.clientsGrid}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <ClientCardSkeleton key={i} />
-            ))}
-          </div>
+          <SkeletonGrid
+            className={styles.clientsGrid}
+            renderItem={() => <ClientCardSkeleton />}
+          />
         ) : clients.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Users size={48} />
-            </div>
-            <div className={styles.emptyTitle}>No clients yet</div>
-            <div className={styles.emptyDesc}>
-              Create your first client to start organizing proposals and managing relationships.
-            </div>
-            <button className="btn btn-primary" onClick={handleNewClient}>
-              <Plus size={18} />
-              Create First Client
-            </button>
-          </div>
+          <EmptyState
+            icon={<Users size={48} />}
+            title="No clients yet"
+            subtitle="Create your first client to start organizing proposals and managing relationships."
+            ctaLabel="Create First Client"
+            onCtaClick={handleNewClient}
+          />
         ) : (
           <div className={styles.clientsGrid}>
             {clients.map((client) => (
@@ -138,7 +127,7 @@ export default function ClientsPage(): JSX.Element {
                   <div className={styles.clientCardMeta}>
                     <div className={styles.clientCardMetaItem}>
                       <Calendar size={14} />
-                      <span>Created {new Date(client.created_at).toLocaleDateString()}</span>
+                      <span>Created {formatDate(client.created_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -168,7 +157,6 @@ export default function ClientsPage(): JSX.Element {
             onConfirm={confirmDeleteClient}
           />
         )}
-      </main>
-    </div>
+    </PageLayout>
   );
 }

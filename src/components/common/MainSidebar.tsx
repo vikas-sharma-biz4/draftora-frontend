@@ -51,7 +51,7 @@ export default function MainSidebar(): JSX.Element {
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         type="button"
       >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
       <div className="sidebar-logo">
         <button

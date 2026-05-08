@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 
 import { useProposals } from "@/hooks/useProposals";
-import type { ProposalListItem } from "@/types/proposal.types";
+import { useErrorToast } from "@/hooks/useErrorToast";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 const Header = dynamic(() => import("@/components/common/Header"), {
   ssr: false,
@@ -16,24 +16,22 @@ const ProposalCard = dynamic(() => import("@/components/proposal/ProposalCard"),
   ssr: false,
 });
 
-const EmptyState = dynamic(() => import("@/components/shared/EmptyState"), {
+const EmptyState = dynamic(() => import("@/components/common/EmptyState"), {
   ssr: false,
 });
 
 const SkeletonCard = dynamic(
-  () => import("@/components/shared/Skeleton").then((mod) => ({ default: mod.SkeletonCard })),
+  () => import("@/components/common/Skeleton").then((mod) => ({ default: mod.SkeletonCard })),
   { ssr: false }
 );
+
+const SkeletonGrid = dynamic(() => import("@/components/common/SkeletonGrid"), { ssr: false });
 
 export default function DashboardPage(): JSX.Element {
   const { proposals, isLoading, error } = useProposals();
   const [search, setSearch] = useState<string>("");
 
-  useEffect(() => {
-    if (error) {
-      toast.error("Failed to load proposals. Is the backend running?");
-    }
-  }, [error]);
+  useErrorToast(error, "Failed to load proposals. Is the backend running?");
 
   const filtered = proposals.filter(
     (p) =>
@@ -69,11 +67,10 @@ export default function DashboardPage(): JSX.Element {
 
         {/* Content */}
         {isLoading ? (
-          <div className="proposals-grid">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonCard key={i} />
-            ))}
-          </div>
+          <SkeletonGrid
+            className="proposals-grid"
+            renderItem={() => <SkeletonCard />}
+          />
         ) : filtered.length === 0 ? (
           <div style={{ marginTop: 60 }}>
             {proposals.length === 0 ? (

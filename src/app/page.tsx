@@ -12,10 +12,7 @@ import DynamicPipeline from "@/components/common/DynamicPipeline";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { useClients } from "@/hooks/useClients";
 
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+const PageLayout = dynamic(() => import("@/components/common/PageLayout"), { ssr: false });
 
 const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
   ssr: false,
@@ -67,9 +64,7 @@ export default function HomePage(): JSX.Element {
   const isRecreateSelected = selectionMode === "recreate";
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
+    <PageLayout noPadding>
         <DynamicPipeline
           currentStage={draftStage}
           completedSteps={completedSteps}
@@ -204,7 +199,6 @@ export default function HomePage(): JSX.Element {
             initialClients={preloadedClients ?? undefined}
           />
         )}
-      </main>
-    </div>
+    </PageLayout>
   );
 }
