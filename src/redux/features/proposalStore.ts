@@ -11,8 +11,8 @@
  */
 
 import { create } from 'zustand';
-import type { ProposalListItem } from '@/types/proposal.types';
-import * as proposalApi from '@/api/proposalApi';
+import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
+import * as proposalApi from '@/services/proposalApi';
 
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 

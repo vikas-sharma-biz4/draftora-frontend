@@ -5,7 +5,7 @@ import type {
   CreateVersionPayload,
   UpdateVersionDecisionPayload,
   RegenerateFromVersionPayload,
-} from "@/types/version.types";
+} from "@/interfaces/versionInterfaces";
 
 const BASE_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",

@@ -1,5 +1,5 @@
 import { API_BASE_URL, DEFAULT_AI_MODEL } from "@/config/config";
-import type { ProposalData, ProposalListItem } from "@/types/proposal.types";
+import type { ProposalData, ProposalListItem } from "@/interfaces/proposalInterfaces";
 import { handleResponse, getBaseHeadersWithoutContentType, getBaseHeaders } from "@/services/apiClient";
 
 // Base headers for requests (ngrok bypass in development)

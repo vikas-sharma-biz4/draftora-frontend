@@ -8,7 +8,7 @@ import {
   VersionAwareCard,
 } from "@/components/version";
 import { toast } from "sonner";
-import type { ProposalVersion } from "@/types/version.types";
+import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./ReviewPageWithVersionControl.module.scss";
 
 interface ReviewPageWithVersionControlProps {

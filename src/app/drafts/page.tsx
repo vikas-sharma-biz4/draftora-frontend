@@ -11,19 +11,23 @@ import styles from "./page.module.scss";
 import { useProposal } from "@/context/ProposalContext";
 import { useDrafts } from "@/hooks/useDrafts";
 import { useClients } from "@/hooks/useClients";
-import { useDraftStore } from "@/store/draftStore";
-import type { SavedDraft } from "@/types/draft.types";
-import type { ProposalData } from "@/types/proposal.types";
+import { useDraftStore } from "@/redux/features/draftStore";
+import type { SavedDraft } from "@/interfaces/draftInterfaces";
+import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import { formatDateWithTime } from "@/utils/dateUtils";
+import PageLayout from "@/components/common/PageLayout";
+import PageHeader from "@/components/common/PageHeader";
+import EmptyState from "@/components/common/EmptyState";
+import SkeletonGrid from "@/components/common/SkeletonGrid";
 import TemplateSelectionModal from "@/components/modals/TemplateSelectionModal";
 import NewClientModal from "@/components/modals/NewClientModal";
-import DraftCardSkeleton from "@/components/skeletons/DraftCardSkeleton";
-
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+import DraftCardSkeleton from "@/components/common/skeletons/DraftCardSkeleton";
 
 const DeleteDraftModal = dynamic(() => import("@/components/modals/DeleteDraftModal"), {
+  ssr: false,
+});
+
+const DeleteAllDraftsModal = dynamic(() => import("@/components/modals/DeleteAllDraftsModal"), {
   ssr: false,
 });
 
@@ -35,6 +39,7 @@ export default function DraftsPage(): JSX.Element {
   const { clients } = useClients({ autoFetch: false });
   const getDraftFromStore = useDraftStore(state => state.getDraft);
   const deleteDraftFromStore = useDraftStore(state => state.deleteDraft);
+  const deleteAllDraftsFromStore = useDraftStore(state => state.deleteAllDrafts);
   
   const [loadingDraftId, setLoadingDraftId] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -45,6 +50,7 @@ export default function DraftsPage(): JSX.Element {
     uploadedFiles: File[];
   } | undefined>(undefined);
   const [deleteModalData, setDeleteModalData] = useState<{ id: string; name: string } | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
 
   // Force refresh drafts when page becomes visible to show updated status
   useEffect(() => {
@@ -155,17 +161,14 @@ export default function DraftsPage(): JSX.Element {
     }
   }
 
-  function formatDate(iso: string): string {
+  async function confirmDeleteAllDrafts(): Promise<void> {
     try {
-      return new Date(iso).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "";
+      await deleteAllDraftsFromStore();
+      toast.success("All drafts deleted");
+      setShowDeleteAllModal(false);
+    } catch (error) {
+      console.error("Failed to delete all drafts:", error);
+      toast.error("Failed to delete all drafts");
     }
   }
 
@@ -192,33 +195,35 @@ export default function DraftsPage(): JSX.Element {
   }
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
-        <h1 className="page-title">Drafts</h1>
-        <p className="page-subtitle">
-          Resume work on proposals that are in progress or pending completion.
-        </p>
+    <PageLayout>
+      <PageHeader
+        title="Drafts"
+        subtitle="Resume work on proposals that are in progress or pending completion."
+        action={
+          !isLoading && drafts.length > 0 ? (
+            <button
+              className="btn btn-primary btn-delete-all"
+              onClick={() => setShowDeleteAllModal(true)}
+            >
+              Delete All
+            </button>
+          ) : undefined
+        }
+      />
 
         {isLoading ? (
-          <div className={styles.draftsGrid}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <DraftCardSkeleton key={i} />
-            ))}
-          </div>
+          <SkeletonGrid
+            className={styles.draftsGrid}
+            renderItem={() => <DraftCardSkeleton />}
+          />
         ) : drafts.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <FileText size={48} />
-            </div>
-            <div className={styles.emptyTitle}>No drafts yet</div>
-            <div className={styles.emptyDesc}>
-              Drafts are automatically saved as you work on proposals. Start a new proposal to create your first draft.
-            </div>
-            <button className="btn btn-primary" onClick={handleNewProposalClick}>
-              Create New Proposal
-            </button>
-          </div>
+          <EmptyState
+            icon={<FileText size={48} />}
+            title="No drafts yet"
+            subtitle="Drafts are automatically saved as you work on proposals. Start a new proposal to create your first draft."
+            ctaLabel="Create New Proposal"
+            onCtaClick={handleNewProposalClick}
+          />
         ) : (
           <div className={styles.draftsGrid}>
             {drafts.map((draft) => (
@@ -258,7 +263,7 @@ export default function DraftsPage(): JSX.Element {
                     </span>
                     <span className={styles.draftDate}>
                       <Clock size={12} />
-                      {formatDate(draft.updatedAt)}
+                      {formatDateWithTime(draft.updatedAt)}
                     </span>
                   </div>
                   <div className={styles.draftLocation}>
@@ -274,7 +279,7 @@ export default function DraftsPage(): JSX.Element {
                     </button>
                   ) : (
                     <button className="btn btn-ghost btn-sm btn-full">
-                      Resume Editing →
+                      Resume Editing
                     </button>
                   )}
                 </div>
@@ -282,7 +287,6 @@ export default function DraftsPage(): JSX.Element {
             ))}
           </div>
         )}
-      </main>
 
       {showTemplateModal && (
         <TemplateSelectionModal
@@ -307,6 +311,14 @@ export default function DraftsPage(): JSX.Element {
           onConfirm={confirmDeleteDraft}
         />
       )}
-    </div>
+
+      {showDeleteAllModal && (
+        <DeleteAllDraftsModal
+          draftCount={drafts.length}
+          onClose={() => setShowDeleteAllModal(false)}
+          onConfirm={confirmDeleteAllDrafts}
+        />
+      )}
+    </PageLayout>
   );
 }

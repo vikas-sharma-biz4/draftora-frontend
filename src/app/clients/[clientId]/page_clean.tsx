@@ -8,9 +8,9 @@ import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
-import { listProposals } from "@/api/proposalApi";
-import type { ProposalListItem } from "@/types/proposal.types";
+import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/services/clientApi";
+import { listProposals } from "@/services/proposalApi";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,

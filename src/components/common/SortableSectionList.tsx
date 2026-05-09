@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -177,6 +178,94 @@ function SortableSection({
  * Intended to be dynamically imported to avoid loading the heavy
  * DnD libraries in the initial bundle.
  */
+// Custom modifier to restrict dragging within window bounds
+const restrictToWindowBounds: Modifier = ({ transform, active }) => {
+  const { x, y } = transform;
+  
+  if (!active || !active.rect.current) {
+    return transform;
+  }
+
+  const rect = active.rect.current.translated || active.rect.current.initial;
+  if (!rect) {
+    return transform;
+  }
+
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  
+  const elementWidth = rect.width;
+  const elementHeight = rect.height;
+  
+  // Calculate boundaries
+  const minX = 0;
+  const maxX = windowWidth - elementWidth;
+  const minY = 0;
+  const maxY = windowHeight - elementHeight;
+  
+  // Constrain x and y within bounds
+  const constrainedX = Math.max(minX, Math.min(maxX, x));
+  const constrainedY = Math.max(minY, Math.min(maxY, y));
+  
+  return {
+    ...transform,
+    x: constrainedX,
+    y: constrainedY,
+  };
+};
+
+// Custom modifier to restrict dragging to vertical axis only
+const restrictToVerticalAxis: Modifier = ({ transform }) => {
+  return {
+    ...transform,
+    x: 0,
+  };
+};
+
+// Custom modifier to restrict dragging within parent element bounds
+const restrictToParentElement: Modifier = ({ transform, active, containerNodeRect }) => {
+  const { x, y } = transform;
+  
+  if (!active || !active.rect.current || !containerNodeRect) {
+    return transform;
+  }
+
+  const initialRect = active.rect.current.initial;
+  const translatedRect = active.rect.current.translated;
+  
+  if (!initialRect) {
+    return transform;
+  }
+
+  // Calculate how far the element can move in each direction
+  // The transform is relative to the initial position
+  const initialTop = initialRect.top;
+  const initialBottom = initialRect.bottom;
+  const initialLeft = initialRect.left;
+  const initialRight = initialRect.right;
+  
+  const containerTop = containerNodeRect.top;
+  const containerBottom = containerNodeRect.bottom;
+  const containerLeft = containerNodeRect.left;
+  const containerRight = containerNodeRect.right;
+  
+  // Calculate maximum allowed offsets
+  const maxUpwardMove = initialTop - containerTop;
+  const maxDownwardMove = containerBottom - initialBottom;
+  const maxLeftMove = initialLeft - containerLeft;
+  const maxRightMove = containerRight - initialRight;
+  
+  // Constrain the transform values
+  const constrainedX = Math.max(-maxLeftMove, Math.min(maxRightMove, x));
+  const constrainedY = Math.max(-maxUpwardMove, Math.min(maxDownwardMove, y));
+  
+  return {
+    ...transform,
+    x: constrainedX,
+    y: constrainedY,
+  };
+};
+
 export default function SortableSectionList({
   sections,
   editingKey,
@@ -257,6 +346,7 @@ export default function SortableSectionList({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
+      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
     >
       <SortableContext
         items={sections.map((s) => s.key)}

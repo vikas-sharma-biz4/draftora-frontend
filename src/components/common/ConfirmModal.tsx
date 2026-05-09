@@ -26,55 +26,90 @@ export default function ConfirmModal({
     return () => setMounted(false);
   }, []);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
-
   if (!mounted || !isOpen) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      style={{
+        position: "fixed",
+        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 99999,
+      }}
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: "12px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+          maxWidth: "440px",
+          width: "calc(100% - 32px)",
+          padding: "28px 28px 24px",
+          position: "relative",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+          <h3
+            style={{
+              fontSize: "17px",
+              fontWeight: 700,
+              color: "#111827",
+              marginBottom: "10px",
+              marginTop: 0,
+            }}
+          >
+            {title}
+          </h3>
         )}
-        <p className="text-gray-700 mb-6">{message}</p>
-        <div className="flex justify-end gap-3">
+        <p
+          style={{
+            fontSize: "14px",
+            color: "#4b5563",
+            lineHeight: 1.6,
+            marginBottom: "24px",
+            marginTop: 0,
+          }}
+        >
+          {message}
+        </p>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "10px",
+          }}
+        >
           <button
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-secondary btn-sm"
             onClick={onCancel}
             disabled={isConfirming}
           >
             Cancel
           </button>
           <button
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-primary btn-sm"
             onClick={async () => {
               setIsConfirming(true);
               try {
                 await onConfirm();
               } catch (error) {
-                console.error('[ConfirmModal] Error in onConfirm:', error);
+                console.error("[ConfirmModal] Error in onConfirm:", error);
               } finally {
                 setIsConfirming(false);
               }
             }}
             disabled={isConfirming}
           >
-            {isConfirming ? "Processing..." : "OK"}
+            {isConfirming ? "Processing..." : "Confirm"}
           </button>
         </div>
       </div>

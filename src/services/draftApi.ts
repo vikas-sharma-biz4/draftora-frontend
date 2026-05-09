@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/config/config";
-import type { SavedDraft, SaveDraftPayload, DraftMetadata } from "@/types/draft.types";
+import type { SavedDraft, SaveDraftPayload, DraftMetadata } from "@/interfaces/draftInterfaces";
 
 const BASE_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
@@ -203,6 +203,15 @@ export async function listDrafts(): Promise<DraftMetadata[]> {
 
 export async function deleteDraft(draftId: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/drafts/${draftId}/`, {
+    method: "DELETE",
+    headers: BASE_HEADERS,
+  });
+
+  await handleResponse<null>(res);
+}
+
+export async function deleteAllDrafts(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/drafts/`, {
     method: "DELETE",
     headers: BASE_HEADERS,
   });
