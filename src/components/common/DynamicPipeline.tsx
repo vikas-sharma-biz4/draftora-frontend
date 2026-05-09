@@ -5,12 +5,13 @@ import { useRouter, usePathname } from "next/navigation";
 import { Check } from "lucide-react";
 
 import styles from "./DynamicPipeline.module.scss";
-import type { DraftStage } from "@/types/draft.types";
-import { PIPELINE_STEPS } from "@/types/draft.types";
+import type { DraftStage } from "@/interfaces/draftInterfaces";
+import { PIPELINE_STEPS } from "@/interfaces/draftInterfaces";
 
 interface DynamicPipelineProps {
   currentStage: DraftStage;
   completedSteps: number[];
+  visitedSteps?: number[];
   onStepClick?: (stepId: number, path: string) => void;
   visible: boolean;
   proposalId?: number | null;
@@ -19,6 +20,7 @@ interface DynamicPipelineProps {
 export default function DynamicPipeline({
   currentStage,
   completedSteps,
+  visitedSteps,
   onStepClick,
   visible,
   proposalId,
@@ -56,25 +58,6 @@ export default function DynamicPipeline({
   const isAllCompleted = currentStage === "generated";
   const allowNonLinearNav = currentStage === "generated";
 
-  // Determine the maximum step that should be clickable based on the draftStage
-  // This allows users to navigate back to stages they have already reached
-  function getMaxClickableStep(): number {
-    switch (currentStage) {
-      case "wizard_in_progress":
-        return 1; // Can only click Parameters
-      case "parameters_complete":
-        return 2; // Can click Parameters and Review
-      case "review_complete":
-        return 3; // Can click Parameters, Review, and Web View
-      case "generated":
-        return 3; // All steps clickable (handled by allowNonLinearNav)
-      default:
-        return 0;
-    }
-  }
-
-  const maxClickableStep = getMaxClickableStep();
-
   return (
     <div
       className={`${styles.pipelineContainer} ${visible ? styles.visible : styles.hidden}`}
@@ -86,8 +69,9 @@ export default function DynamicPipeline({
           // A step is only "completed" (green) if it's before the current step (or fully generated).
           // This prevents stale localStorage completedSteps from showing future steps as green.
           const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
-          // Any step that has been completed, the current step, fully generated proposals, or steps up to the max reached stage are clickable
-          const isClickable = completedSteps.includes(step.id) || step.id === currentStepId || allowNonLinearNav || step.id <= maxClickableStep;
+          // Access control: Only allow clicking steps that have been visited (backend-tracked), the current step, or if all steps are completed
+          const stepsToCheck = visitedSteps && visitedSteps.length > 0 ? visitedSteps : completedSteps;
+          const isClickable = stepsToCheck.includes(step.id) || step.id === currentStepId || allowNonLinearNav;
 
           return (
             <React.Fragment key={step.id}>

@@ -2,88 +2,61 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { listClients, deleteClient, type Client } from "@/api/clientApi";
-
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
-
-const NewClientModal = dynamic(() => import("@/components/modals/NewClientModal"), {
-  ssr: false,
-});
+import { useClients } from "@/hooks/useClients";
+import { useClientStore } from "@/redux/features/clientStore";
+import { formatDate } from "@/utils/dateUtils";
+import PageLayout from "@/components/common/PageLayout";
+import PageHeader from "@/components/common/PageHeader";
+import EmptyState from "@/components/common/EmptyState";
+import SkeletonGrid from "@/components/common/SkeletonGrid";
+import ClientCardSkeleton from "@/components/common/skeletons/ClientCardSkeleton";
 
 const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
   ssr: false,
 });
 
+const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClientModal"), {
+  ssr: false,
+});
+
 export default function ClientsPage(): JSX.Element {
   const router = useRouter();
-  const [clients, setClients] = useState<Client[]>([]);
-  const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
+  const { clients, isLoading: loading, refetch } = useClients();
+  const deleteClientFromStore = useClientStore(state => state.deleteClient);
+  
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
-  const [newClientData, setNewClientData] = useState<{
-    client: { id: number; name: string };
-    notes: string;
-    uploadedFiles: File[];
-  } | null>(null);
-  const [enableTemplateSelection, setEnableTemplateSelection] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-
-  useEffect(() => {
-    loadClients();
-  }, []);
-
-  async function loadClients(silent = false): Promise<void> {
-    try {
-      if (!silent) setLoading(true);
-      const loadedClients = await listClients();
-      setClients(loadedClients);
-    } catch (error) {
-      console.error("Failed to load clients:", error);
-      toast.error("Failed to load clients");
-      if (!silent) setClients([]);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }
+  const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
 
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
   }
 
   function handleNewClient(): void {
-    setShowNewClientModal(true);
-  }
-
-  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
-    loadClients(true); // Silent refresh — keeps existing list visible while updating
-    setNewClientData({ client, notes, uploadedFiles });
-    setEnableTemplateSelection(true);
-    setShowNewClientModal(false);
     setShowTemplateModal(true);
   }
 
   function handleCloseTemplateModal(): void {
     setShowTemplateModal(false);
-    setNewClientData(null);
-    setEnableTemplateSelection(false);
   }
 
-  async function handleDeleteClient(clientId: number, e: React.MouseEvent): Promise<void> {
+  function handleDeleteClient(clientId: number, clientName: string, e: React.MouseEvent): void {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this client?")) return;
+    setDeleteModalData({ id: clientId, name: clientName });
+  }
+
+  async function confirmDeleteClient(): Promise<void> {
+    if (!deleteModalData) return;
 
     try {
-      await deleteClient(clientId);
+      await deleteClientFromStore(deleteModalData.id);
       toast.success("Client deleted");
-      setClients((prev) => prev.filter((c) => c.id !== clientId));
+      setDeleteModalData(null);
     } catch (error) {
       console.error("Failed to delete client:", error);
       toast.error("Failed to delete client");
@@ -91,40 +64,31 @@ export default function ClientsPage(): JSX.Element {
   }
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
-        <div className={styles.header}>
-          <div>
-            <h1 className="page-title">Clients</h1>
-            <p className="page-subtitle">
-              Manage your client relationships and view all proposals associated with each client.
-            </p>
-          </div>
+    <PageLayout>
+      <PageHeader
+        title="Clients"
+        subtitle="Manage your client relationships and view all proposals associated with each client."
+        action={
           <button className="btn btn-primary" onClick={handleNewClient}>
             <Plus size={18} />
             New Client
           </button>
-        </div>
+        }
+      />
 
         {loading ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Loading clients...</div>
-          </div>
+          <SkeletonGrid
+            className={styles.clientsGrid}
+            renderItem={() => <ClientCardSkeleton />}
+          />
         ) : clients.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Users size={48} />
-            </div>
-            <div className={styles.emptyTitle}>No clients yet</div>
-            <div className={styles.emptyDesc}>
-              Create your first client to start organizing proposals and managing relationships.
-            </div>
-            <button className="btn btn-primary" onClick={handleNewClient}>
-              <Plus size={18} />
-              Create First Client
-            </button>
-          </div>
+          <EmptyState
+            icon={<Users size={48} />}
+            title="No clients yet"
+            subtitle="Create your first client to start organizing proposals and managing relationships."
+            ctaLabel="Create First Client"
+            onCtaClick={handleNewClient}
+          />
         ) : (
           <div className={styles.clientsGrid}>
             {clients.map((client) => (
@@ -148,7 +112,7 @@ export default function ClientsPage(): JSX.Element {
                     </span>
                     <button
                       className={styles.deleteClientBtn}
-                      onClick={(e) => handleDeleteClient(client.id, e)}
+                      onClick={(e) => handleDeleteClient(client.id, client.name, e)}
                       title="Delete client"
                     >
                       <Trash2 size={14} />
@@ -163,7 +127,7 @@ export default function ClientsPage(): JSX.Element {
                   <div className={styles.clientCardMeta}>
                     <div className={styles.clientCardMetaItem}>
                       <Calendar size={14} />
-                      <span>Created {new Date(client.created_at).toLocaleDateString()}</span>
+                      <span>Created {formatDate(client.created_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -176,26 +140,23 @@ export default function ClientsPage(): JSX.Element {
           </div>
         )}
 
-        {showNewClientModal && (
-          <NewClientModal
-            onClose={() => setShowNewClientModal(false)}
-            onClientCreated={handleClientCreated}
-            existingClients={clients.map((c) => ({ id: c.id, name: c.name }))}
-          />
-        )}
-
-        {showTemplateModal && newClientData && (
+        {showTemplateModal && (
           <TemplateSelectionModal
             templateId={null}
             templateName=""
             onClose={handleCloseTemplateModal}
-            onNewClient={() => {}}
-            initialClients={clients.map((c) => ({ ...c, documents: [] }))}
-            newClientData={newClientData}
-            enableTemplateSelection={enableTemplateSelection}
+            initialClients={clients}
+            initialView="new_client"
           />
         )}
-      </main>
-    </div>
+
+        {deleteModalData && (
+          <DeleteClientModal
+            clientName={deleteModalData.name}
+            onClose={() => setDeleteModalData(null)}
+            onConfirm={confirmDeleteClient}
+          />
+        )}
+    </PageLayout>
   );
 }

@@ -9,15 +9,13 @@ import { toast } from "sonner";
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import type { SectionItem } from "@/components/common/SortableSectionList";
-import SectionRecommendations from "@/components/proposal/SectionRecommendations";
+import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { SaveDraftButton } from "@/components/draft/SaveDraftButton";
+import { useRef } from "react";
 
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+const PageLayout = dynamic(() => import("@/components/common/PageLayout"), { ssr: false });
 
 const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
   ssr: false,
@@ -65,7 +63,19 @@ function buildSectionItems(
 }
 
 export default function ParametersPage(): JSX.Element {
-  const { proposalData, updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, currentProposalId, draftStage, completedSteps } = useProposal();
+  const { 
+    proposalData, 
+    updateProposalData, 
+    setCurrentStep, 
+    setDraftStage, 
+    markStepCompleted, 
+    currentProposalId, 
+    draftStage, 
+    completedSteps,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+    markStepVisitedOnBackend,
+  } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
@@ -73,6 +83,13 @@ export default function ParametersPage(): JSX.Element {
 
   // Enable auto-save to localStorage drafts when user is in pipeline stage
   useDraftAutoSave({ enabled: true });
+
+  // Sync visited steps from backend on mount
+  useEffect(() => {
+    if (currentProposalId) {
+      syncVisitedStepsFromBackend(currentProposalId);
+    }
+  }, [currentProposalId, syncVisitedStepsFromBackend]);
 
   const [sections, setSections] = useState<SectionItem[]>(() =>
     buildSectionItems(
@@ -85,6 +102,7 @@ export default function ParametersPage(): JSX.Element {
   const [editLabel, setEditLabel] = useState<string>("");
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
+  const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
 
   // Sync local sections state with proposalData (e.g., after localStorage rehydration)
   useEffect(() => {
@@ -96,6 +114,32 @@ export default function ParametersPage(): JSX.Element {
       )
     );
   }, [proposalData.selectedSections, proposalData.sectionDisplayNames, proposalData.originalSections]);
+
+  // Mark step 1 as visited when this page loads
+  useEffect(() => {
+    markStepCompleted(1);
+  }, [markStepCompleted]);
+
+  // Restore scroll position from draft UI state
+  useEffect(() => {
+    try {
+      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      if (uiStateStr) {
+        const uiState = JSON.parse(uiStateStr);
+        if (uiState.scrollPosition > 0) {
+          setTimeout(() => {
+            window.scrollTo({
+              top: uiState.scrollPosition,
+              behavior: "smooth",
+            });
+          }, 300);
+        }
+        sessionStorage.removeItem("draft_ui_state");
+      }
+    } catch {
+      // Ignore errors restoring UI state
+    }
+  }, []);
 
   function handleStartEdit(item: SectionItem): void {
     setEditingKey(item.key);
@@ -145,11 +189,17 @@ export default function ParametersPage(): JSX.Element {
     setShowAddInput(false);
   }
 
+  function handleSectionAddedFromRecommendations(sectionKey: string): void {
+    // This callback is triggered when a section is added from recommendations
+    // The SectionRecommendations component handles its own state removal
+    // This can be used for additional tracking if needed
+  }
+
   function handleToneSelect(value: string): void {
     updateProposalData({ tone: value });
   }
 
-  function handleNext(): void {
+  async function handleNext(): Promise<void> {
     if (sections.length === 0) {
       toast.error("Please add at least one section.");
       return;
@@ -164,6 +214,12 @@ export default function ParametersPage(): JSX.Element {
       sectionDisplayNames: displayNames,
       customSections: [],
     });
+    
+    // Mark Step 1 as visited when proceeding to Review
+    if (currentProposalId) {
+      await markStepVisitedOnBackend(currentProposalId, 1);
+    }
+    
     markStepCompleted(1);
     setDraftStage("parameters_complete");
     setCurrentStep(5);
@@ -184,17 +240,16 @@ export default function ParametersPage(): JSX.Element {
   );
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
+    <PageLayout noPadding>
         <DynamicPipeline 
           currentStage={draftStage}
           completedSteps={completedSteps}
+          visitedSteps={visitedPipelineSteps}
           visible={true}
           proposalId={currentProposalId}
         />
         <div className="page-badge">Phase 04</div>
-        <h1 className="page-title">Step 4: Section Structure &amp; Tone</h1>
+        <h1 className="page-title">Step 4: Table of Contents &amp; Parameters</h1>
         <p className="page-subtitle">
           {isRecreateMode
             ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
@@ -203,7 +258,6 @@ export default function ParametersPage(): JSX.Element {
 
         {isRecreateMode && (
           <div className="recreate-banner">
-            <span className="recreate-banner-icon">↺</span>
             <div>
               <strong>Recreate Mode</strong>
               {proposalData.exactDocumentName && (
@@ -223,7 +277,7 @@ export default function ParametersPage(): JSX.Element {
             <div className="flex-between mb-14">
               <div className="flex-center gap-10">
                 <span className="form-label mb-0">
-                  Section Structure
+                  Table of Contents
                 </span>
                 <span className="badge badge-primary">{sections.length} sections</span>
               </div>
@@ -255,6 +309,9 @@ export default function ParametersPage(): JSX.Element {
                   },
                 });
                 toast.success(`Added "${sectionTitle}" to section structure`);
+                
+                // Remove from recommendations list
+                sectionRecommendationsRef.current?.removeRecommendation(sectionKey);
               }
             }}
             onDragOver={(e) => {
@@ -345,6 +402,7 @@ export default function ParametersPage(): JSX.Element {
 
           {/* Right Column: AI Recommendations */}
           <SectionRecommendations
+            ref={sectionRecommendationsRef}
             templateId={proposalData.templateId}
             existingSections={sections.map(s => s.key)}
             context={
@@ -374,13 +432,14 @@ export default function ParametersPage(): JSX.Element {
                 },
               });
             }}
+            onSectionAdded={handleSectionAddedFromRecommendations}
           />
         </div>
 
         {/* ── Tone of Voice ── */}
         <div className="mb-28">
           <div className="form-label mb-14">
-            Tone of Voice
+            Parameters
           </div>
           <div className="tone-grid">
             {TONE_OPTIONS.map(({ value, label, description }) => {
@@ -503,7 +562,6 @@ export default function ParametersPage(): JSX.Element {
             </button>
           </div>
         </div>
-      </main>
-    </div>
+    </PageLayout>
   );
 }

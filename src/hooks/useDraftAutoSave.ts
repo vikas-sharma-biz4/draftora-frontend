@@ -2,20 +2,22 @@
 
 import { useEffect } from "react";
 
-import { DRAFTS_STORAGE_KEY } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
-import type { DraftLocation } from "@/types/draft.types";
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/services/draftApi";
+import { useDraftStore } from "@/redux/features/draftStore";
+import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 interface UseDraftAutoSaveOptions {
   enabled: boolean;
 }
 
 /**
- * Auto-saves the current proposal state to localStorage drafts when:
+ * Auto-saves the current proposal state to backend database when:
  * - The browser is closing (beforeunload event)
  * - The tab is hidden (visibilitychange event)
  * 
  * This ensures work is not lost when users close the browser or their PC shuts down.
+ * Drafts are persisted across different users and devices.
  */
 export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const { enabled } = options;
@@ -26,7 +28,10 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
     completedSteps,
     maxStepReached,
     currentProposalId,
+    currentDraftId,
+    setCurrentDraftId,
   } = useProposal();
+  const invalidateCache = useDraftStore(state => state.invalidateCache);
 
   useEffect(() => {
     if (!enabled) {
@@ -57,40 +62,57 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
       return "WIZARD_PARAMETERS";
     };
 
-    const saveToDrafts = (): void => {
+    const saveToDrafts = async (): Promise<void> => {
       try {
-        const draft = {
-          id: Date.now().toString(),
-          savedAt: new Date().toISOString(),
-          title: proposalData.title || "Untitled Proposal",
-          clientName: proposalData.clientName || "",
-          currentStep,
-          draftStage,
-          lastLocation: getLastLocation(),
-          maxStepReached,
-          completedSteps,
-          proposalData: { ...proposalData, files: [] },
+        // Capture UI state for restoration
+        const uiState: DraftUIState = {
+          scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+          activeSection: null,
+          expandedSections: [],
+          lastVisibleSection: null,
         };
 
-        const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
-        const existing = raw ? JSON.parse(raw) : [];
+        const draftPayload = {
+          proposalId: currentProposalId,
+          title: proposalData.title || "Untitled Proposal",
+          clientName: proposalData.clientName || "",
+          status: "draft" as const,
+          lastLocation: getLastLocation(),
+          stage: draftStage,
+          wizardState: {
+            proposalData: { ...proposalData, files: [] },
+            currentStep,
+            maxStepReached,
+            completedSteps,
+          },
+          generatedContent: {},
+          uiState,
+        };
 
-        // Update existing draft with same title, or add new one
-        const filtered = existing.filter((d: { title: string }) => d.title !== draft.title);
-        const updated = [draft, ...filtered];
-
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updated));
-        console.log("Auto-save draft saved:", draft.title);
+        if (currentDraftId) {
+          // Update existing draft
+          await updateDraftApi(currentDraftId, draftPayload);
+          console.log("Auto-save draft updated:", draftPayload.title);
+        } else {
+          // Create new draft and store ID in context
+          const saved = await saveDraftApi(draftPayload);
+          setCurrentDraftId(saved.id);
+          console.log("Auto-save draft created:", draftPayload.title);
+        }
+        
+        // Invalidate cache so draft list will show updated status
+        invalidateCache();
       } catch (error) {
         console.error("Auto-save to drafts failed:", error);
       }
     };
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent): void => {
-      // Save synchronously before unload
+    const handleBeforeUnload = (): void => {
+      // Use synchronous localStorage as fallback for beforeunload
+      // since async fetch won't complete before unload
       try {
-        const draft = {
-          id: Date.now().toString(),
+        const draftData = {
+          id: currentDraftId || `draft_${Date.now()}`,
           savedAt: new Date().toISOString(),
           title: proposalData.title || "Untitled Proposal",
           clientName: proposalData.clientName || "",
@@ -100,33 +122,34 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
           maxStepReached,
           completedSteps,
           proposalData: { ...proposalData, files: [] },
+          uiState: {
+            scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+            activeSection: null,
+            expandedSections: [],
+            lastVisibleSection: null,
+          },
         };
 
-        const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
+        const raw = localStorage.getItem("drafts_autosave_fallback");
         const existing = raw ? JSON.parse(raw) : [];
-
-        // Update existing draft with same title, or add new one
-        const filtered = existing.filter((d: { title: string }) => d.title !== draft.title);
-        const updated = [draft, ...filtered];
-
-        // Store in localStorage synchronously before unload
-        localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updated));
-        console.log("Auto-save on unload saved:", draft.title);
+        const filtered = existing.filter((d: any) => d.title !== draftData.title);
+        localStorage.setItem("drafts_autosave_fallback", JSON.stringify([draftData, ...filtered]));
+        console.log("Auto-save fallback stored in localStorage");
       } catch (error) {
-        console.error("Auto-save on unload failed:", error);
+        console.error("Auto-save fallback failed:", error);
       }
     };
 
     const handleVisibilityChange = (): void => {
       // Save when tab is hidden (user switches tabs or minimizes browser)
       if (document.hidden) {
-        saveToDrafts();
+        void saveToDrafts();
       }
     };
 
     const handlePageHide = (): void => {
       // Save when page is hidden (more reliable than beforeunload in some browsers)
-      saveToDrafts();
+      void saveToDrafts();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -146,5 +169,8 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
     completedSteps,
     maxStepReached,
     currentProposalId,
+    currentDraftId,
+    setCurrentDraftId,
+    invalidateCache,
   ]);
 }

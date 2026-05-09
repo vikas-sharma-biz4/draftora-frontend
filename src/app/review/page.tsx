@@ -7,18 +7,16 @@ import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { generateProposal } from "@/api/proposalApi";
-import { SECTION_DISPLAY_NAMES, CLIENTS_STORAGE_KEY } from "@/constants";
+import { generateProposal } from "@/services/proposalApi";
+import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
+import { useClients } from "@/hooks/useClients";
 import { formatBytes } from "@/utils/formatBytes";
-import type { Client } from "@/types/client.types";
+import { formatDate } from "@/utils/dateUtils";
 
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+const PageLayout = dynamic(() => import("@/components/common/PageLayout"), { ssr: false });
 
 const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
   ssr: false,
@@ -40,6 +38,10 @@ const SectionsSelectorModal = dynamic(() => import("@/components/modals/Sections
   ssr: false,
 });
 
+const TemplateSelectorModal = dynamic(() => import("@/components/modals/TemplateSelectorModal"), {
+  ssr: false,
+});
+
 export default function ReviewPage(): JSX.Element {
   const {
     proposalData,
@@ -54,25 +56,62 @@ export default function ReviewPage(): JSX.Element {
     currentProposalId,
     draftStage,
     completedSteps,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+    markStepVisitedOnBackend,
   } = useProposal();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
+  const { clients, refetch: refetchClients } = useClients({ autoFetch: true });
 
   // Enable auto-save to localStorage drafts when user is in pipeline stage
   useDraftAutoSave({ enabled: true });
+
+  // Sync visited steps from backend on mount
+  useEffect(() => {
+    if (currentProposalId) {
+      syncVisitedStepsFromBackend(currentProposalId);
+    }
+  }, [currentProposalId, syncVisitedStepsFromBackend]);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
-  const [availableDocuments, setAvailableDocuments] = useState<Client[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showStickyDownload, setShowStickyDownload] = useState<boolean>(false);
 
   // Reset isGenerating when landing on review page
   useEffect(() => {
     setIsGenerating(false);
   }, [setIsGenerating]);
+
+  // Mark step 2 as visited when this page loads
+  useEffect(() => {
+    markStepCompleted(2);
+  }, [markStepCompleted]);
+
+  // Restore scroll position from draft UI state
+  useEffect(() => {
+    try {
+      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      if (uiStateStr) {
+        const uiState = JSON.parse(uiStateStr);
+        if (uiState.scrollPosition > 0) {
+          setTimeout(() => {
+            window.scrollTo({
+              top: uiState.scrollPosition,
+              behavior: "smooth",
+            });
+          }, 300);
+        }
+        sessionStorage.removeItem("draft_ui_state");
+      }
+    } catch {
+      // Ignore errors restoring UI state
+    }
+  }, []);
 
   // Handle scroll for sticky download button
   useEffect(() => {
@@ -85,31 +124,24 @@ export default function ReviewPage(): JSX.Element {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load available documents from client and sync filesMeta if needed
+  // Rebuild filesMeta if empty but we have selectedDocumentIds (using Zustand store)
   useEffect(() => {
-    if (proposalData.clientId) {
-      const raw = localStorage.getItem(CLIENTS_STORAGE_KEY);
-      if (raw) {
-        const clients = JSON.parse(raw) as Client[];
-        setAvailableDocuments(clients);
-
-        // If filesMeta is empty but we have selectedDocumentIds, rebuild filesMeta from client data
-        const currentClient = clients.find((c) => Number(c.id) === proposalData.clientId);
-        if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
-          const rebuiltMeta = currentClient.documents
-            .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
-            .map((doc) => ({
-              name: doc.name,
-              size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
-              type: doc.fileType ? String(doc.fileType) : "application/pdf",
-            }));
-          if (rebuiltMeta.length > 0) {
-            updateProposalData({ filesMeta: rebuiltMeta });
-          }
+    if (proposalData.clientId && clients.length > 0) {
+      const currentClient = clients.find((c) => c.id === proposalData.clientId);
+      if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
+        const rebuiltMeta = currentClient.documents
+          .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
+          .map((doc) => ({
+            name: doc.name,
+            size: doc.size_bytes || 0,
+            type: doc.file_type || "application/pdf",
+          }));
+        if (rebuiltMeta.length > 0) {
+          updateProposalData({ filesMeta: rebuiltMeta });
         }
       }
     }
-  }, [proposalData.clientId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [proposalData.clientId, clients]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSaveScope(data: { title: string; clientName: string; description: string }): void {
     updateProposalData({
@@ -120,16 +152,16 @@ export default function ReviewPage(): JSX.Element {
     setShowScopeModal(false);
   }
 
-  function handleSaveKnowledgeBase(selectedIds: string[]): void {
-    // Rebuild filesMeta from selected documents
-    const currentClient = availableDocuments.find((c) => Number(c.id) === proposalData.clientId);
+  async function handleSaveKnowledgeBase(selectedIds: string[]): Promise<void> {
+    // Rebuild filesMeta from selected documents using Zustand store
+    const currentClient = clients.find((c) => c.id === proposalData.clientId);
     const newFilesMeta = currentClient
       ? currentClient.documents
-          .filter((doc) => selectedIds.includes(doc.id))
+          .filter((doc) => selectedIds.includes(String(doc.id)))
           .map((doc) => ({
             name: doc.name,
-            size: typeof doc.size === "number" ? doc.size : Number(doc.size) || 0,
-            type: doc.fileType ? String(doc.fileType) : "application/pdf",
+            size: doc.size_bytes || 0,
+            type: doc.file_type || "application/pdf",
           }))
       : [];
 
@@ -137,6 +169,9 @@ export default function ReviewPage(): JSX.Element {
       selectedDocumentIds: selectedIds.map(Number),
       filesMeta: newFilesMeta,
     });
+    
+    // Refresh clients from API to get newly uploaded documents
+    await refetchClients();
     setShowKnowledgeBaseModal(false);
   }
 
@@ -152,8 +187,38 @@ export default function ReviewPage(): JSX.Element {
     setShowSectionsModal(false);
   }
 
-  const currentClient = availableDocuments.find((c) => Number(c.id) === proposalData.clientId);
-  const clientDocuments = currentClient?.documents || [];
+  function handleSaveTemplate(templateId: string, templateType: string): void {
+    // Find the selected template to get its sections
+    const selectedTemplate = PROPOSAL_TEMPLATES.find((t: { id: string }) => t.id === templateId);
+    
+    if (selectedTemplate) {
+      updateProposalData({
+        templateId,
+        templateType: "predefined" as const,
+        selectedSections: [...selectedTemplate.sections],
+      });
+      toast.success(`Template updated to ${selectedTemplate.name}`);
+    } else {
+      updateProposalData({
+        templateId,
+        templateType: "predefined" as const,
+      });
+      toast.success("Template updated successfully");
+    }
+    
+    setShowTemplateModal(false);
+  }
+
+  const currentClient = clients.find((c) => c.id === proposalData.clientId);
+  // Map API ClientDocument to the shape expected by KnowledgeBaseSelectorModal
+  const clientDocuments = (currentClient?.documents || []).map((doc) => ({
+    id: String(doc.id),
+    name: doc.name,
+    size: String(doc.size_bytes || 0),
+    date: doc.created_at ? formatDate(doc.created_at) : "",
+    status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
+    fileType: (doc.file_type?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
+  }));
 
   async function handleGenerate(): Promise<void> {
     setIsGenerating(true);
@@ -169,6 +234,11 @@ export default function ReviewPage(): JSX.Element {
     try {
       const result = await generateProposal(proposalData);
       setGeneratedProposalId(result.id);
+      
+      // Mark Step 2 as visited when starting generation
+      if (result.id) {
+        await markStepVisitedOnBackend(result.id, 2);
+      }
       
       // Mark review step completed and set stage to generated
       markStepCompleted(2);
@@ -199,14 +269,16 @@ export default function ReviewPage(): JSX.Element {
 
   const estimatedPages = `${proposalData.selectedSections.length * 2}–${proposalData.selectedSections.length * 3} Pages`;
 
-  return (
-    <div className="app-container">
-      <MainSidebar />
+  // Get current template name for display
+  const currentTemplate = PROPOSAL_TEMPLATES.find((t: { id: string }) => t.id === proposalData.templateId);
+  const currentTemplateName = currentTemplate?.name || (proposalData.templateType === "scratch" ? "Start From Scratch" : proposalData.templateType === "recreate" ? "Recreate Template" : "Custom Template");
 
-      <main className="main-content">
+  return (
+    <PageLayout noPadding>
         <DynamicPipeline 
           currentStage={draftStage}
           completedSteps={completedSteps}
+          visitedSteps={visitedPipelineSteps}
           visible={true}
           proposalId={currentProposalId}
         />
@@ -245,6 +317,31 @@ export default function ReviewPage(): JSX.Element {
           <div className="review-layout-left">
             {/* Client + Style & Voice side by side */}
             <div className="grid-2">
+              {/* Template */}
+              <div className="review-card">
+                <div className="review-card-header">
+                  <span className="review-card-title">TEMPLATE</span>
+                  <button
+                    className="link-plain"
+                    onClick={() => setShowTemplateModal(true)}
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="review-field">
+                  <span className="review-field-label">Selected Template</span>
+                  <span className="review-field-value dark-bold">
+                    {currentTemplateName}
+                  </span>
+                </div>
+                <div className="review-field">
+                  <span className="review-field-label">Template ID</span>
+                  <span className="review-field-value">
+                    {proposalData.templateId || "—"}
+                  </span>
+                </div>
+              </div>
+
               <div className="review-card">
                 <div className="review-card-header">
                   <span className="review-card-title">CLIENT</span>
@@ -381,7 +478,7 @@ export default function ReviewPage(): JSX.Element {
                   Generating...
                 </>
               ) : (
-                "✦ Generate Proposal"
+                "Generate Proposal"
               )}
             </button>
 
@@ -454,6 +551,10 @@ export default function ReviewPage(): JSX.Element {
             selectedDocumentIds={(proposalData.selectedDocumentIds || []).map(String)}
             onClose={() => setShowKnowledgeBaseModal(false)}
             onSave={handleSaveKnowledgeBase}
+            clientId={proposalData.clientId}
+            onRefreshDocuments={async () => {
+              await refetchClients();
+            }}
           />
         )}
 
@@ -475,7 +576,15 @@ export default function ReviewPage(): JSX.Element {
             onSave={handleSaveSections}
           />
         )}
-      </main>
-    </div>
+
+        {showTemplateModal && (
+          <TemplateSelectorModal
+            currentTemplateId={proposalData.templateId}
+            currentTemplateType={proposalData.templateType}
+            onClose={() => setShowTemplateModal(false)}
+            onSave={handleSaveTemplate}
+          />
+        )}
+    </PageLayout>
   );
 }

@@ -1,3 +1,11 @@
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  gap: 16px;
+}
+
 .emptyState {
   display: flex;
   flex-direction: column;

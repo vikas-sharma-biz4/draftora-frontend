@@ -10,7 +10,12 @@ export default function MainSidebar(): JSX.Element {
   const pathname = usePathname();
   const router = useRouter();
   const MOBILE_BREAKPOINT = 640;
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 1024;
+    }
+    return true;
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -20,7 +25,6 @@ export default function MainSidebar(): JSX.Element {
         setCollapsed(false);
       }
     };
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -47,7 +51,7 @@ export default function MainSidebar(): JSX.Element {
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         type="button"
       >
-        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
       <div className="sidebar-logo">
         <button

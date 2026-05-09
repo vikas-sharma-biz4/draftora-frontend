@@ -14,6 +14,7 @@ import {
   CheckCircle,
   RefreshCw,
   FileSearch,
+  ArrowLeft,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,20 +26,25 @@ import {
   invalidateClientsCache,
   uploadDocument,
   type ClientWithDocuments,
-} from "@/api/clientApi";
+} from "@/services/clientApi";
+import { INDUSTRIES } from "@/constants";
+import type { NewClientFormData } from "@/interfaces/clientInterfaces";
+import { useClientStore } from "@/redux/features/clientStore";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
 import {
   parseRecreateDocument,
   type RecreateExtractedSection,
-} from "@/api/proposalApi";
-import type { OriginalSection } from "@/types/proposal.types";
+} from "@/services/proposalApi";
+import type { OriginalSection } from "@/interfaces/proposalInterfaces";
 
 interface RecreateTemplateModalProps {
   onClose: () => void;
-  onNewClient: () => void;
+  onNewClient?: () => void;
 }
+
+type ModalView = "recreate_template" | "new_client";
 
 interface ContextUploadEntry {
   file: File;
@@ -85,6 +91,19 @@ export default function RecreateTemplateModal({
   // Client search
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
+
+  // Modal view state
+  const [modalView, setModalView] = useState<ModalView>("recreate_template");
+  const [newClientFormData, setNewClientFormData] = useState<NewClientFormData>({
+    clientName: "",
+    industry: "",
+    pipelineStage: "Discovery",
+    primaryContactName: "",
+    primaryContactEmail: "",
+    notes: "",
+  });
+  const [isCreatingClient, setIsCreatingClient] = useState<boolean>(false);
+  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
@@ -609,6 +628,99 @@ export default function RecreateTemplateModal({
     onClose();
   }
 
+  // ── New Client Handlers ────────────────────────────────────────────────────
+
+  function handleNewClientClick(): void {
+    setModalView("new_client");
+  }
+
+  function handleBackToRecreateTemplate(): void {
+    setModalView("recreate_template");
+    setNewClientFormData({
+      clientName: "",
+      industry: "",
+      pipelineStage: "Discovery",
+      primaryContactName: "",
+      primaryContactEmail: "",
+      notes: "",
+    });
+  }
+
+  function handleNewClientInputChange(field: keyof NewClientFormData, value: string): void {
+    setNewClientFormData((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleCreateClient(): Promise<void> {
+    if (!newClientFormData.clientName.trim()) {
+      toast.error("Client name is required");
+      return;
+    }
+
+    if (!newClientFormData.industry) {
+      toast.error("Please select an industry");
+      return;
+    }
+
+    const isDuplicate = clients.some(
+      (client) => client.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
+    );
+    if (isDuplicate) {
+      toast.error("A client with this name already exists");
+      return;
+    }
+
+    const stillParsing = contextUploads.some((f) => f.status === "parsing");
+    if (stillParsing) {
+      toast.error("Please wait for all files to finish parsing");
+      return;
+    }
+
+    setIsCreatingClient(true);
+
+    try {
+      const createClientInStore = useClientStore.getState().createClient;
+      const newClient = await createClientInStore({
+        name: newClientFormData.clientName,
+        industry: newClientFormData.industry,
+        notes: newClientFormData.notes || undefined,
+      });
+
+      if (contextUploads.length > 0) {
+        for (const uploaded of contextUploads) {
+          try {
+            await uploadDocumentToStore(newClient.id, uploaded.file);
+          } catch (error) {
+            console.error(`Failed to upload ${uploaded.file.name}:`, error);
+            toast.error(`Failed to upload ${uploaded.file.name}`);
+          }
+        }
+      }
+
+      toast.success(`Client "${newClientFormData.clientName}" created successfully`);
+      
+      // Reload clients to get the newly created client with full data
+      await loadClients();
+      
+      setSelectedClientId(newClient.id);
+      setClientSearchQuery(newClient.name);
+      setContextUploads([]);
+      setModalView("recreate_template");
+      setNewClientFormData({
+        clientName: "",
+        industry: "",
+        pipelineStage: "Discovery",
+        primaryContactName: "",
+        primaryContactEmail: "",
+        notes: "",
+      });
+    } catch (error) {
+      console.error("Failed to create client:", error);
+      toast.error("Failed to create client");
+    } finally {
+      setIsCreatingClient(false);
+    }
+  }
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
@@ -622,15 +734,43 @@ export default function RecreateTemplateModal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div className={styles.modalOverlay}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className={styles.modalHeader}>
-          <div>
-            <h2 className={styles.modalTitle}>Recreate Template</h2>
-            <p className={styles.modalSubtitle}>
-              Upload an <strong>exact document</strong> to extract its structure, then provide context to rewrite it
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {modalView === "new_client" && (
+              <button 
+                className={styles.backBtn} 
+                onClick={handleBackToRecreateTemplate}
+                aria-label="Back to recreate template"
+                style={{ 
+                  background: "none", 
+                  border: "none", 
+                  cursor: "pointer", 
+                  padding: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "6px",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-bg-hover, rgba(0,0,0,0.05))"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <div>
+              <h2 className={styles.modalTitle}>
+                {modalView === "new_client" ? "Add New Client" : "Recreate Template"}
+              </h2>
+              <p className={styles.modalSubtitle}>
+                {modalView === "new_client"
+                  ? "Enter details to provision a new client workspace."
+                  : <>Upload an <strong>exact document</strong> to extract its structure, then provide context to rewrite it</>}
+              </p>
+            </div>
           </div>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <X size={20} />
@@ -638,9 +778,125 @@ export default function RecreateTemplateModal({
         </div>
 
         <div className={styles.modalBody}>
-          {/* ── Client ─────────────────────────────────────────────────────── */}
-          <div className={styles.section}>
-            <label className={styles.label}>Client Name</label>
+          {modalView === "new_client" ? (
+            <>
+              <div className={styles.section}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Client Name</label>
+                  <input
+                    type="text"
+                    className={styles.input}
+                    placeholder="e.g. Acme Corporation"
+                    value={newClientFormData.clientName}
+                    onChange={(e) => handleNewClientInputChange("clientName", e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Industry</label>
+                  <select
+                    className={styles.select}
+                    value={newClientFormData.industry}
+                    onChange={(e) => handleNewClientInputChange("industry", e.target.value)}
+                  >
+                    <option value="">Select industry...</option>
+                    {INDUSTRIES.map((industry) => (
+                      <option key={industry} value={industry}>
+                        {industry}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>
+                  Initial Context & Notes
+                  <span className={styles.optional}>Optional</span>
+                </h3>
+
+                <div className={styles.formGroup}>
+                  <textarea
+                    className={styles.textarea}
+                    placeholder="Add any background context, specific requirements, or initial observations..."
+                    value={newClientFormData.notes}
+                    onChange={(e) => handleNewClientInputChange("notes", e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.section}>
+                <h3 className={styles.sectionTitle}>Upload Documents</h3>
+
+                <label
+                  htmlFor="new-client-file-upload-recreate"
+                  className={`${styles.uploadZone} ${contextDragOver ? styles.dragOver : ""}`}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setContextDragOver(true); }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setContextDragOver(false); }}
+                  onDrop={handleContextDrop}
+                >
+                  <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
+                  <div className={styles.uploadText}>
+                    Click to upload or drag and drop
+                  </div>
+                  <div className={styles.uploadHint}>
+                    PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
+                  </div>
+                  <input
+                    id="new-client-file-upload-recreate"
+                    ref={contextInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                    multiple
+                    onChange={handleContextInputChange}
+                    className={styles.visuallyHidden}
+                  />
+                </label>
+
+                {contextUploads.length > 0 && (
+                  <div className={styles.uploadedFilesList}>
+                    {contextUploads.map((entry) => (
+                      <div key={entry.id} className={styles.uploadedFileItem}>
+                        <div className={styles.fileIconWrapper}>
+                          {entry.status === "parsing" ? (
+                            <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                          ) : entry.status === "error" ? (
+                            <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                          ) : entry.status === "parsed" ? (
+                            <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                          ) : (
+                            <FileText size={18} className={styles.fileIcon} />
+                          )}
+                        </div>
+                        <div className={styles.fileDetails}>
+                          <div className={styles.fileName} title={entry.file.name}>{entry.file.name}</div>
+                          <div className={styles.fileMeta}>
+                            {entry.status === "parsing" && <span className={styles.parsingStatus}>Parsing on server...</span>}
+                            {entry.status === "parsed" && entry.parsedData && <span className={styles.parsedStatus}>{entry.parsedData.word_count} words</span>}
+                            {entry.status === "error" && entry.error && <span className={styles.errorStatus}>{entry.error}</span>}
+                          </div>
+                        </div>
+                        <button
+                          className={styles.removeFileBtn}
+                          onClick={() => setContextUploads((prev) => prev.filter((f) => f.id !== entry.id))}
+                          title={entry.status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
+                          aria-label="Remove file"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* ── Client ─────────────────────────────────────────────────────── */}
+              <div className={styles.section}>
+                <label className={styles.label}>Client Name</label>
             {loading ? (
               <div className={styles.noClients}>
                 <p>Loading clients...</p>
@@ -650,7 +906,7 @@ export default function RecreateTemplateModal({
                 <p>No clients found.</p>
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => { onClose(); onNewClient(); }}
+                  onClick={handleNewClientClick}
                 >
                   <Plus size={16} /> New Client
                 </button>
@@ -669,7 +925,7 @@ export default function RecreateTemplateModal({
                   />
                   <button
                     className={styles.newClientBtn}
-                    onClick={() => { onClose(); onNewClient(); }}
+                    onClick={handleNewClientClick}
                   >
                     <Plus size={16} /> New Client
                   </button>
@@ -940,36 +1196,62 @@ export default function RecreateTemplateModal({
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className={styles.modalFooter}>
-          <div className={styles.footerInfo}>
-            {isParsing && (
-              <span className={styles.parsingIndicator}>
-                <Loader2 size={14} className={styles.spinIcon} />
-                Processing documents...
-              </span>
-            )}
-            {exactDocument?.status === "parsed" && !isParsing && (
-              <span className={styles.readyIndicator}>
-                <CheckCircle size={14} />
-                {exactDocument.sections?.length} section(s) ready
-              </span>
-            )}
-          </div>
-          <div className={styles.footerActions}>
-            <button className="btn btn-ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={handleContinue}
-              disabled={isParsing || !exactDocument || exactDocument.status !== "parsed"}
-            >
-              Continue to Parameters
-            </button>
-          </div>
+          {modalView === "new_client" ? (
+            <>
+              <button className="btn btn-secondary" onClick={handleBackToRecreateTemplate}>
+                Back
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateClient}
+                disabled={isCreatingClient || !newClientFormData.clientName.trim() || !newClientFormData.industry}
+              >
+                {isCreatingClient ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Client"
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className={styles.footerInfo}>
+                {isParsing && (
+                  <span className={styles.parsingIndicator}>
+                    <Loader2 size={14} className={styles.spinIcon} />
+                    Processing documents...
+                  </span>
+                )}
+                {exactDocument?.status === "parsed" && !isParsing && (
+                  <span className={styles.readyIndicator}>
+                    <CheckCircle size={14} />
+                    {exactDocument.sections?.length} section(s) ready
+                  </span>
+                )}
+              </div>
+              <div className={styles.footerActions}>
+                <button className="btn btn-ghost" onClick={onClose}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleContinue}
+                  disabled={isParsing || !exactDocument || exactDocument.status !== "parsed"}
+                >
+                  Continue to Parameters
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>,

@@ -3,18 +3,19 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Upload, Search, FileText, Edit, CheckCircle, Clock, X, Filter, Trash2 } from "lucide-react";
+import { Upload, Search, FileText, Edit, CheckCircle, Clock, X, Trash2, Download, FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 import styles from "./page.module.scss";
 
-import { getClient, deleteClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
-import { listProposals } from "@/api/proposalApi";
-
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+import { useClient } from "@/hooks/useClients";
+import { useClientStore } from "@/redux/features/clientStore";
+import type { ClientDocument } from "@/services/clientApi";
+import { listProposals } from "@/services/proposalApi";
+import { useProposal } from "@/context/ProposalContext";
+import { formatDate } from "@/utils/dateUtils";
+import PageLayout from "@/components/common/PageLayout";
+import ClientDetailSkeleton from "@/components/common/skeletons/ClientDetailSkeleton";
 
 const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
   ssr: false,
@@ -24,92 +25,112 @@ const TemplateSelectionModal = dynamic(() => import("@/components/modals/Templat
   ssr: false,
 });
 
+const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClientModal"), {
+  ssr: false,
+});
+
+const DeleteDocumentModal = dynamic(() => import("@/components/modals/DeleteDocumentModal"), {
+  ssr: false,
+});
+
+const DeleteAllDocumentsModal = dynamic(() => import("@/components/modals/DeleteAllDocumentsModal"), {
+  ssr: false,
+});
+
 export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { setCurrentDraftId } = useProposal();
   
-  const [client, setClient] = useState<ClientWithDocuments | null>(null);
+  const clientIdParam = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
+  const clientId = typeof clientIdParam === 'string' ? parseInt(clientIdParam, 10) : clientIdParam as number;
+  
+  const { client, isLoading: loading } = useClient(clientId);
+  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
+  const deleteDocumentFromStore = useClientStore(state => state.deleteDocument);
+  const deleteClientFromStore = useClientStore(state => state.deleteClient);
+  
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [proposalSearchQuery, setProposalSearchQuery] = useState<string>("");
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [clientProposals, setClientProposals] = useState<any[]>([]);
+  const [isLoadingProposals, setIsLoadingProposals] = useState<boolean>(true);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
+  const [deleteDocModalData, setDeleteDocModalData] = useState<{ id: number; name: string } | null>(null);
+  const [deleteAllDocsModalOpen, setDeleteAllDocsModalOpen] = useState<boolean>(false);
 
-  useEffect(() => {
-    loadClient();
-  }, [params.clientId]);
+  function handleNewProposal(): void {
+    setCurrentDraftId(null); // Clear draft ID for new proposal
+    setShowTemplateModal(true);
+  }
 
+
+  // Auto-load proposals immediately when component mounts
   useEffect(() => {
-    if (client) {
-      loadClientProposals();
-    }
-  }, [client]);
+    loadClientProposals();
+  }, [clientId]);
 
   async function loadClientProposals(): Promise<void> {
-    if (!client) return;
-    
+    setIsLoadingProposals(true);
     try {
       const proposals = await listProposals();
-      const clientHistory = proposals.filter((p) => p.clientId === client.id);
+      const clientHistory = proposals.filter((p) => p.clientId === clientId);
       setClientProposals(clientHistory);
     } catch (error) {
       console.error("Failed to load client proposals:", error);
-    }
-  }
-
-  async function loadClient(): Promise<void> {
-    try {
-      setLoading(true);
-      const clientIdParam = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
-      const clientId = typeof clientIdParam === 'string' ? parseInt(clientIdParam, 10) : clientIdParam as number;
-      const loadedClient = await getClient(clientId);
-      setClient(loadedClient);
-    } catch (error) {
-      console.error("Failed to load client:", error);
-      toast.error("Client not found");
-      router.push("/clients");
     } finally {
-      setLoading(false);
+      setIsLoadingProposals(false);
     }
   }
 
-  async function handleDeleteDocument(docId: number): Promise<void> {
-    if (!client) return;
+
+  function handleDeleteDocument(docId: number, docName: string): void {
+    setDeleteDocModalData({ id: docId, name: docName });
+  }
+
+  async function confirmDeleteDocument(): Promise<void> {
+    if (!client || !deleteDocModalData) return;
 
     try {
-      await deleteDocument(client.id, docId);
+      await deleteDocumentFromStore(client.id, deleteDocModalData.id);
       toast.success("Document deleted");
-      await loadClient();
+      setDeleteDocModalData(null);
     } catch (error) {
       console.error("Failed to delete document:", error);
       toast.error("Failed to delete document");
     }
   }
 
-  async function handleDeleteAllDocuments(): Promise<void> {
+  function handleDeleteAllDocuments(): void {
+    if (!client || client.documents.length === 0) return;
+    setDeleteAllDocsModalOpen(true);
+  }
+
+  async function confirmDeleteAllDocuments(): Promise<void> {
     if (!client || client.documents.length === 0) return;
 
-    if (!confirm("Are you sure you want to delete all documents?")) return;
-
     try {
-      await Promise.all(client.documents.map((doc) => deleteDocument(client.id, doc.id)));
+      await Promise.all(client.documents.map((doc) => deleteDocumentFromStore(client.id, doc.id)));
       toast.success("All documents deleted");
-      await loadClient();
+      setDeleteAllDocsModalOpen(false);
     } catch (error) {
       console.error("Failed to delete all documents:", error);
       toast.error("Failed to delete some documents");
     }
   }
 
-  async function handleDeleteClient(): Promise<void> {
+  function handleDeleteClient(): void {
+    setDeleteClientModalOpen(true);
+  }
+
+  async function confirmDeleteClient(): Promise<void> {
     if (!client) return;
 
-    if (!confirm("Are you sure you want to delete this client? This action cannot be undone.")) return;
-
     try {
-      await deleteClient(client.id);
+      await deleteClientFromStore(client.id);
       toast.success("Client deleted");
       router.push("/clients");
     } catch (error) {
@@ -124,18 +145,26 @@ export default function ClientWorkspacePage(): JSX.Element {
     const fileArray = Array.from(files);
     
     for (const file of fileArray) {
+      const fileId = `${file.name}-${Date.now()}`;
       try {
-        setUploadingFiles(prev => new Set(prev).add(file.name));
-        const result = await uploadDocument(client.id, file);
-        toast.success(`${file.name} uploaded successfully`);
-        await loadClient();
+        setUploadingFiles(prev => new Set(prev).add(fileId));
+        toast.info(`Uploading ${file.name}...`, { duration: 2000 });
+        
+        const uploadedDoc = await uploadDocumentToStore(client.id, file);
+        
+        // Show parsing status
+        if (uploadedDoc.status === 'processing') {
+          toast.info(`${file.name} is being parsed...`, { duration: 3000 });
+        } else if (uploadedDoc.status === 'parsed') {
+          toast.success(`${file.name} uploaded and parsed successfully`);
+        }
       } catch (error) {
         console.error(`Failed to upload ${file.name}:`, error);
         toast.error(`Failed to upload ${file.name}`);
       } finally {
         setUploadingFiles(prev => {
           const next = new Set(prev);
-          next.delete(file.name);
+          next.delete(fileId);
           return next;
         });
       }
@@ -149,29 +178,50 @@ export default function ClientWorkspacePage(): JSX.Element {
     }
   }
 
+  function getTemplateTypeLabel(proposal: any): string {
+    // Use templateId to determine the actual template name
+    if (proposal.templateId) {
+      // Map template IDs to names
+      const templateNames: Record<string, string> = {
+        'saas': 'SaaS',
+        'consulting': 'Consulting',
+        'agency': 'Agency',
+        'ecommerce': 'E-Commerce',
+        'enterprise': 'Enterprise',
+      };
+      return templateNames[proposal.templateId] || proposal.templateId;
+    }
+    
+    // Fallback to templateType
+    switch (proposal.templateType) {
+      case "predefined":
+        return "Template";
+      case "custom":
+        return "Custom";
+      case "scratch":
+        return "From Scratch";
+      case "recreate":
+        return "Recreated";
+      default:
+        return proposal.templateType || "Template";
+    }
+  }
+
   if (loading) {
     return (
-      <div className="app-container">
-        <MainSidebar />
-        <main className="main-content">
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Loading client...</div>
-          </div>
-        </main>
-      </div>
+      <PageLayout>
+        <ClientDetailSkeleton />
+      </PageLayout>
     );
   }
 
   if (!client) {
     return (
-      <div className="app-container">
-        <MainSidebar />
-        <main className="main-content">
-          <div className={styles.emptyState}>
-            <div className={styles.emptyTitle}>Client not found</div>
-          </div>
-        </main>
-      </div>
+      <PageLayout>
+        <div className={styles.emptyState}>
+          <div className={styles.emptyTitle}>Client not found</div>
+        </div>
+      </PageLayout>
     );
   }
 
@@ -179,10 +229,12 @@ export default function ClientWorkspacePage(): JSX.Element {
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredProposals = clientProposals.filter((proposal) =>
+    proposal.title.toLowerCase().includes(proposalSearchQuery.toLowerCase())
+  );
+
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
+    <PageLayout>
         <div className={styles.clientHeader}>
           <div className={styles.clientHeaderLeft}>
             <div className={styles.clientBadge}>
@@ -190,14 +242,14 @@ export default function ClientWorkspacePage(): JSX.Element {
               <span className={styles.clientBadgeStatus}>Active</span>
             </div>
             <h1 className={styles.clientName}>{client.name}</h1>
-            <p className={styles.clientMeta}>{client.industry} • Active • Created {new Date(client.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+            <p className={styles.clientMeta}>{client.industry} • Active • Created {formatDate(client.created_at)}</p>
           </div>
           <div className={styles.clientHeaderActions}>
             <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
               <Edit size={18} />
               Edit Details
             </button>
-            <button className="btn btn-primary" onClick={() => setShowTemplateModal(true)}>
+            <button className="btn btn-primary" onClick={handleNewProposal}>
               New Proposal
             </button>
             <button
@@ -247,7 +299,13 @@ export default function ClientWorkspacePage(): JSX.Element {
               />
             </div>
 
-            {filteredDocuments.length === 0 ? (
+            {uploadingFiles.size > 0 && (
+              <div className={styles.uploadingIndicator}>
+                <div className={styles.uploadingText}>Uploading and parsing documents...</div>
+              </div>
+            )}
+            
+            {filteredDocuments.length === 0 && uploadingFiles.size === 0 ? (
               <div className={styles.emptyState}>
                 <FileText size={48} />
                 <p>No documents yet</p>
@@ -271,7 +329,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                         <div className={styles.documentMeta}>
                           <span>{Math.round(doc.size_bytes / 1024)} KB</span>
                           <span>•</span>
-                          <span>{new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span>{formatDate(doc.created_at)}</span>
                         </div>
                       </div>
                       <div className={styles.documentStatus}>
@@ -291,7 +349,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                         className={styles.deleteDocBtn}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteDocument(doc.id);
+                          handleDeleteDocument(doc.id, doc.name);
                         }}
                         title="Delete document"
                       >
@@ -317,15 +375,18 @@ export default function ClientWorkspacePage(): JSX.Element {
                   <input
                     type="text"
                     placeholder="Search proposals..."
+                    value={proposalSearchQuery}
+                    onChange={(e) => setProposalSearchQuery(e.target.value)}
                   />
                 </div>
-                <button className={styles.filterBtn}>
-                  <Filter size={18} />
-                </button>
               </div>
             </div>
 
-            {clientProposals.length === 0 ? (
+            {isLoadingProposals ? (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyTitle}>Loading proposals...</div>
+              </div>
+            ) : filteredProposals.length === 0 ? (
               <div className={styles.emptyState}>
                 <FileText size={48} />
                 <p>No proposals yet</p>
@@ -344,7 +405,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                     </tr>
                   </thead>
                   <tbody>
-                    {clientProposals.map((proposal) => (
+                    {filteredProposals.map((proposal) => (
                       <tr 
                         key={proposal.id} 
                         className={styles.proposalRow}
@@ -356,10 +417,10 @@ export default function ClientWorkspacePage(): JSX.Element {
                           <div className={styles.proposalVersion}>Version 1.0</div>
                         </td>
                         <td>
-                          <span className={styles.typeBadge}>BRD</span>
+                          <span className={styles.typeBadge}>{getTemplateTypeLabel(proposal)}</span>
                         </td>
                         <td className={styles.dateCell}>
-                          {new Date(proposal.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {formatDate(proposal.createdAt)}
                         </td>
                         <td>
                           <div className={styles.statusCell}>
@@ -389,21 +450,23 @@ export default function ClientWorkspacePage(): JSX.Element {
                               className={styles.actionBtn}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Download PDF
+                                window.open(`/api/proposals/${proposal.id}/download?format=pdf`, '_blank');
                               }}
-                              title="Download PDF"
+                              title="Download as PDF"
                             >
-                              <FileText size={18} />
+                              <Download size={16} />
+                              <span className={styles.actionLabel}>PDF</span>
                             </button>
                             <button 
                               className={styles.actionBtn}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Download Word
+                                window.open(`/api/proposals/${proposal.id}/download?format=docx`, '_blank');
                               }}
-                              title="Download Word"
+                              title="Download as Word Document"
                             >
-                              <FileText size={18} />
+                              <FileDown size={16} />
+                              <span className={styles.actionLabel}>DOCX</span>
                             </button>
                           </div>
                         </td>
@@ -421,7 +484,6 @@ export default function ClientWorkspacePage(): JSX.Element {
             client={client as any}
             onClose={() => setShowEditModal(false)}
             onClientUpdated={() => {
-              loadClient();
               setShowEditModal(false);
             }}
           />
@@ -442,7 +504,30 @@ export default function ClientWorkspacePage(): JSX.Element {
             enableTemplateSelection={true}
           />
         )}
-      </main>
-    </div>
+
+        {deleteClientModalOpen && client && (
+          <DeleteClientModal
+            clientName={client.name}
+            onClose={() => setDeleteClientModalOpen(false)}
+            onConfirm={confirmDeleteClient}
+          />
+        )}
+
+        {deleteDocModalData && (
+          <DeleteDocumentModal
+            documentName={deleteDocModalData.name}
+            onClose={() => setDeleteDocModalData(null)}
+            onConfirm={confirmDeleteDocument}
+          />
+        )}
+
+        {deleteAllDocsModalOpen && client && (
+          <DeleteAllDocumentsModal
+            documentCount={client.documents.length}
+            onClose={() => setDeleteAllDocsModalOpen(false)}
+            onConfirm={confirmDeleteAllDocuments}
+          />
+        )}
+    </PageLayout>
   );
 }

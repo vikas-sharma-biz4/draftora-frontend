@@ -1,4 +1,4 @@
-import type { ProposalData, WizardStep } from "./proposal.types";
+import type { ProposalData, WizardStep } from "./proposalInterfaces";
 
 export type DraftStage = 
   | "template_selection"
@@ -45,6 +45,7 @@ export interface SavedDraft {
 
 export interface DraftMetadata {
   id: string;
+  proposalId: number | null;
   title: string;
   clientName: string;
   status: "draft" | "generating" | "completed";

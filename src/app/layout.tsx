@@ -4,11 +4,11 @@ import "./globals.scss";
 import { ProposalProvider } from "@/context/ProposalContext";
 
 // Lazy load heavy components to reduce initial bundle size
-const ErrorBoundary = dynamic(() => import("@/components/shared/ErrorBoundary"), {
+const ErrorBoundary = dynamic(() => import("@/components/common/ErrorBoundary"), {
   ssr: true,
 });
 
-const ToastProvider = dynamic(() => import("@/components/shared/ToastProvider"), {
+const ToastProvider = dynamic(() => import("@/components/common/ToastProvider"), {
   ssr: false,
 });
 

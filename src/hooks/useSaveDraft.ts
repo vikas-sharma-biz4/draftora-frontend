@@ -3,35 +3,22 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { DRAFTS_STORAGE_KEY } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
-import type { DraftStage, DraftLocation } from "@/types/draft.types";
-
-export interface SavedDraft {
-  id: string;
-  savedAt: string;
-  title: string;
-  clientName: string;
-  currentStep: WizardStep;
-  draftStage: DraftStage;
-  lastLocation: DraftLocation;
-  maxStepReached: WizardStep;
-  completedSteps: number[];
-  proposalData: Partial<ProposalData>;
-}
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/services/draftApi";
+import { useDraftStore } from "@/redux/features/draftStore";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { DraftStage, DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 /**
  * Returns a `saveDraft` function that persists the current wizard state to
- * localStorage, resets the wizard, and navigates back to the root.
- *
- * No draft limit is enforced — all drafts are kept.
+ * the backend database, resets the wizard, and navigates back to the root.
  */
-export function useSaveDraft(): () => void {
-  const { proposalData, currentStep, draftStage, completedSteps, maxStepReached, resetProposal } = useProposal();
+export function useSaveDraft(): () => Promise<void> {
+  const { proposalData, currentStep, draftStage, completedSteps, maxStepReached, resetProposal, currentProposalId, currentDraftId, setCurrentDraftId } = useProposal();
   const router = useRouter();
+  const invalidateCache = useDraftStore(state => state.invalidateCache);
 
-  return function saveDraft(): void {
+  return async function saveDraft(): Promise<void> {
     const hasData =
       proposalData.title.trim() !== "" || proposalData.clientName.trim() !== "";
 
@@ -51,31 +38,51 @@ export function useSaveDraft(): () => void {
       return "WIZARD_PARAMETERS";
     })();
 
-    const draft: SavedDraft = {
-      id: Date.now().toString(),
-      savedAt: new Date().toISOString(),
-      title: proposalData.title || "Untitled Proposal",
-      clientName: proposalData.clientName || "",
-      currentStep,
-      draftStage,
-      lastLocation,
-      maxStepReached,
-      completedSteps,
-      proposalData: { ...proposalData, files: [] },
+    // Capture UI state for restoration
+    const uiState: DraftUIState = {
+      scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+      activeSection: null,
+      expandedSections: [],
+      lastVisibleSection: null,
     };
 
     try {
-      const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
-      const existing: SavedDraft[] = raw ? (JSON.parse(raw) as SavedDraft[]) : [];
-      const updated = [draft, ...existing];
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      toast.error("Could not save draft — storage may be full.");
-      return;
-    }
+      const draftPayload = {
+        proposalId: currentProposalId,
+        title: proposalData.title || "Untitled Proposal",
+        clientName: proposalData.clientName || "",
+        status: "draft" as const,
+        lastLocation,
+        stage: draftStage,
+        wizardState: {
+          proposalData: { ...proposalData, files: [] },
+          currentStep,
+          maxStepReached,
+          completedSteps,
+        },
+        generatedContent: {},
+        uiState,
+      };
 
-    resetProposal();
-    router.push("/");
-    toast.success(`Draft "${draft.title}" saved.`);
+      if (currentDraftId) {
+        // Update existing draft
+        await updateDraftApi(currentDraftId, draftPayload);
+        toast.success(`Draft "${proposalData.title || "Untitled Proposal"}" updated.`);
+      } else {
+        // Create new draft and store ID
+        const saved = await saveDraftApi(draftPayload);
+        setCurrentDraftId(saved.id);
+        toast.success(`Draft "${proposalData.title || "Untitled Proposal"}" saved.`);
+      }
+
+      // Invalidate cache to force fresh fetch on drafts page
+      invalidateCache();
+
+      resetProposal();
+      router.push("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save draft";
+      toast.error(message);
+    }
   };
 }

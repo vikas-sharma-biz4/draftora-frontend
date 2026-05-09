@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "@/config/config";
-import type { SavedDraft, SaveDraftPayload, DraftMetadata } from "@/types/draft.types";
+import type { SavedDraft, SaveDraftPayload, DraftMetadata } from "@/interfaces/draftInterfaces";
 
 const BASE_HEADERS: Record<string, string> = {
   "Content-Type": "application/json",
@@ -11,12 +11,21 @@ if (process.env.NODE_ENV === "development") {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   const json = await res.json();
-  if (!res.ok || !json.success) {
+  if (!res.ok) {
     const message: string =
       json?.error?.message ?? `Request failed with status ${res.status}`;
     throw new Error(message);
   }
-  return json.data as T;
+  // Handle both wrapped response format { success: true, data: ... } and direct data
+  if (json.success !== undefined) {
+    if (!json.success) {
+      const message: string = json?.error?.message ?? "Request failed";
+      throw new Error(message);
+    }
+    return json.data as T;
+  }
+  // Return data directly if not wrapped
+  return json as T;
 }
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
@@ -168,30 +177,41 @@ export async function listDrafts(): Promise<DraftMetadata[]> {
   });
 
   const data = await handleResponse<
-    Array<{
+    {
       id: string;
+      proposal_id: number | null;
       title: string;
       client_name: string;
       status: string;
       last_location: string;
       stage: string;
       updated_at: string;
-    }>
+    }[]
   >(res);
 
-  return data.map((item) => ({
-    id: item.id,
-    title: item.title,
-    clientName: item.client_name,
-    status: item.status as "draft" | "generating" | "completed",
-    lastLocation: item.last_location as DraftMetadata["lastLocation"],
-    stage: item.stage as DraftMetadata["stage"],
-    updatedAt: item.updated_at,
+  return data.map((d) => ({
+    id: d.id,
+    proposalId: d.proposal_id,
+    title: d.title,
+    clientName: d.client_name,
+    status: d.status as DraftMetadata["status"],
+    lastLocation: d.last_location as DraftMetadata["lastLocation"],
+    stage: d.stage as DraftMetadata["stage"],
+    updatedAt: d.updated_at,
   }));
 }
 
 export async function deleteDraft(draftId: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/drafts/${draftId}/`, {
+    method: "DELETE",
+    headers: BASE_HEADERS,
+  });
+
+  await handleResponse<null>(res);
+}
+
+export async function deleteAllDrafts(): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/drafts/`, {
     method: "DELETE",
     headers: BASE_HEADERS,
   });

@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { getDraft, listDrafts } from "@/api/draftApi";
+import { getDraft, listDrafts } from "@/services/draftApi";
 import { useProposal } from "@/context/ProposalContext";
-import type { SavedDraft, DraftMetadata } from "@/types/draft.types";
+import type { SavedDraft, DraftMetadata } from "@/interfaces/draftInterfaces";
 
 interface UseDraftRecoveryOptions {
   autoRecover?: boolean;

@@ -1,6 +1,6 @@
 import React from "react";
 import { Check, X, ChevronDown, GitBranch } from "lucide-react";
-import type { ProposalVersion } from "@/types/version.types";
+import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./VersionSelector.module.scss";
 
 interface VersionSelectorProps {
