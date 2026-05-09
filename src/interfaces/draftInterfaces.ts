@@ -1,4 +1,4 @@
-import type { ProposalData, WizardStep } from "./proposal.types";
+import type { ProposalData, WizardStep } from "./proposalInterfaces";
 
 export type DraftStage = 
   | "template_selection"

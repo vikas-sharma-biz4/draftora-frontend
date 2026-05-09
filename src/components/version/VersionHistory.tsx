@@ -1,6 +1,6 @@
 import React from "react";
 import { Check, X, GitCommit, Edit, RefreshCw, Sparkles } from "lucide-react";
-import type { ProposalVersion } from "@/types/version.types";
+import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./VersionHistory.module.scss";
 
 interface VersionHistoryProps {

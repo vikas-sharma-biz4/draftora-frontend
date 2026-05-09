@@ -2,21 +2,14 @@ import Link from "next/link";
 import { FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 
-import StatusBadge from "./StatusBadge";
-import { getDownloadUrl } from "@/api/proposalApi";
-import type { ProposalListItem } from "@/types/proposal.types";
+import StatusBadge from "@/components/common/StatusBadge";
+import { getDownloadUrl } from "@/services/proposalApi";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
+import { formatDate } from "@/utils/dateUtils";
 import styles from "./ProposalCard.module.scss";
 
 interface ProposalCardProps {
   proposal: ProposalListItem;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 export default function ProposalCard({ proposal }: ProposalCardProps): JSX.Element {

@@ -10,8 +10,8 @@
  */
 
 import { create } from 'zustand';
-import type { Client, ClientWithDocuments, ClientDocument, CreateClientRequest, UpdateClientRequest } from '@/api/clientApi';
-import * as clientApi from '@/api/clientApi';
+import type { Client, ClientWithDocuments, ClientDocument, CreateClientRequest, UpdateClientRequest } from '@/services/clientApi';
+import * as clientApi from '@/services/clientApi';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 

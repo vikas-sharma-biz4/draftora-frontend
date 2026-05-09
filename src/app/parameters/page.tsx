@@ -9,15 +9,13 @@ import { toast } from "sonner";
 import { AI_MODEL_OPTIONS, LANGUAGE_OPTIONS, LENGTH_OPTIONS, SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TONE_OPTIONS } from "@/constants";
 import { useProposal } from "@/context/ProposalContext";
 import type { SectionItem } from "@/components/common/SortableSectionList";
-import SectionRecommendations from "@/components/proposal/SectionRecommendations";
+import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { SaveDraftButton } from "@/components/draft/SaveDraftButton";
+import { useRef } from "react";
 
-const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
-  ssr: false,
-  loading: () => <div className="sidebar-skeleton" />,
-});
+const PageLayout = dynamic(() => import("@/components/common/PageLayout"), { ssr: false });
 
 const DynamicPipeline = dynamic(() => import("@/components/common/DynamicPipeline"), {
   ssr: false,
@@ -104,6 +102,7 @@ export default function ParametersPage(): JSX.Element {
   const [editLabel, setEditLabel] = useState<string>("");
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
+  const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
 
   // Sync local sections state with proposalData (e.g., after localStorage rehydration)
   useEffect(() => {
@@ -190,6 +189,12 @@ export default function ParametersPage(): JSX.Element {
     setShowAddInput(false);
   }
 
+  function handleSectionAddedFromRecommendations(sectionKey: string): void {
+    // This callback is triggered when a section is added from recommendations
+    // The SectionRecommendations component handles its own state removal
+    // This can be used for additional tracking if needed
+  }
+
   function handleToneSelect(value: string): void {
     updateProposalData({ tone: value });
   }
@@ -235,9 +240,7 @@ export default function ParametersPage(): JSX.Element {
   );
 
   return (
-    <div className="app-container">
-      <MainSidebar />
-      <main className="main-content">
+    <PageLayout noPadding>
         <DynamicPipeline 
           currentStage={draftStage}
           completedSteps={completedSteps}
@@ -255,7 +258,6 @@ export default function ParametersPage(): JSX.Element {
 
         {isRecreateMode && (
           <div className="recreate-banner">
-            <span className="recreate-banner-icon">↺</span>
             <div>
               <strong>Recreate Mode</strong>
               {proposalData.exactDocumentName && (
@@ -307,6 +309,9 @@ export default function ParametersPage(): JSX.Element {
                   },
                 });
                 toast.success(`Added "${sectionTitle}" to section structure`);
+                
+                // Remove from recommendations list
+                sectionRecommendationsRef.current?.removeRecommendation(sectionKey);
               }
             }}
             onDragOver={(e) => {
@@ -397,6 +402,7 @@ export default function ParametersPage(): JSX.Element {
 
           {/* Right Column: AI Recommendations */}
           <SectionRecommendations
+            ref={sectionRecommendationsRef}
             templateId={proposalData.templateId}
             existingSections={sections.map(s => s.key)}
             context={
@@ -426,6 +432,7 @@ export default function ParametersPage(): JSX.Element {
                 },
               });
             }}
+            onSectionAdded={handleSectionAddedFromRecommendations}
           />
         </div>
 
@@ -555,7 +562,6 @@ export default function ParametersPage(): JSX.Element {
             </button>
           </div>
         </div>
-      </main>
-    </div>
+    </PageLayout>
   );
 }

@@ -1,4 +1,4 @@
-import type { ProposalData } from "./proposal.types";
+import type { ProposalData } from "./proposalInterfaces";
 
 export type VersionDecision = "accepted" | "rejected" | "pending";
 export type VersionSource = "generated" | "edited" | "regenerated";

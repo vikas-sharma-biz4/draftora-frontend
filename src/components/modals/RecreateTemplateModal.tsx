@@ -26,18 +26,18 @@ import {
   invalidateClientsCache,
   uploadDocument,
   type ClientWithDocuments,
-} from "@/api/clientApi";
+} from "@/services/clientApi";
 import { INDUSTRIES } from "@/constants";
-import type { NewClientFormData } from "@/types/client.types";
-import { useClientStore } from "@/store/clientStore";
+import type { NewClientFormData } from "@/interfaces/clientInterfaces";
+import { useClientStore } from "@/redux/features/clientStore";
 import { useProposal } from "@/context/ProposalContext";
 import { parseFiles } from "@/services/api";
 import type { ParsedFileResult } from "@/services/api";
 import {
   parseRecreateDocument,
   type RecreateExtractedSection,
-} from "@/api/proposalApi";
-import type { OriginalSection } from "@/types/proposal.types";
+} from "@/services/proposalApi";
+import type { OriginalSection } from "@/interfaces/proposalInterfaces";
 
 interface RecreateTemplateModalProps {
   onClose: () => void;

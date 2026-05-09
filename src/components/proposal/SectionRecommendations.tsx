@@ -1,11 +1,15 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { Sparkles, RefreshCw, GripVertical, Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
-import { getSectionRecommendations, type SectionRecommendation } from "@/api/proposalApi";
+import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposalApi";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
+
+export interface SectionRecommendationsRef {
+  removeRecommendation: (sectionKey: string) => void;
+}
 
 interface SectionRecommendationsProps {
   templateId?: string | null;
@@ -13,15 +17,20 @@ interface SectionRecommendationsProps {
   context: string;
   documentContext: string;
   onAddSection: (sectionKey: string, title: string) => void;
+  onSectionAdded?: (sectionKey: string) => void;
 }
 
-export default function SectionRecommendations({
-  templateId,
-  existingSections,
-  context,
-  documentContext,
-  onAddSection,
-}: SectionRecommendationsProps): JSX.Element {
+const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionRecommendationsProps>((
+  {
+    templateId,
+    existingSections,
+    context,
+    documentContext,
+    onAddSection,
+    onSectionAdded,
+  }: SectionRecommendationsProps,
+  ref
+) => {
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [hasUserRequested, setHasUserRequested] = useState<boolean>(false);
@@ -152,6 +161,11 @@ export default function SectionRecommendations({
     
     // Remove from recommendations list
     setRecommendations(prev => prev.filter((_, i) => i !== index));
+    
+    // Notify parent that section was added
+    if (onSectionAdded) {
+      onSectionAdded(sectionKey);
+    }
   };
 
   const toggleCardExpansion = (index: number): void => {
@@ -182,6 +196,21 @@ export default function SectionRecommendations({
     }
   };
 
+  // Expose removeRecommendation method to parent via ref
+  useImperativeHandle(ref, () => ({
+    removeRecommendation: (sectionKey: string) => {
+      setRecommendations((prev) => {
+        const index = prev.findIndex(
+          (rec) => rec.section_title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') === sectionKey
+        );
+        if (index !== -1) {
+          return prev.filter((_, i) => i !== index);
+        }
+        return prev;
+      });
+    },
+  }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -205,7 +234,7 @@ export default function SectionRecommendations({
               Get AI based Recommended Sections
             </button>
           )}
-          {hasUserRequested && recommendations.length > 0 && (
+          {/* {hasUserRequested && recommendations.length > 0 && (
             <button
               className={styles.regenerateBtn}
               onClick={handleRegenerate}
@@ -214,7 +243,7 @@ export default function SectionRecommendations({
             >
               <RefreshCw size={16} className={isLoading ? styles.spinning : ""} />
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -300,6 +329,9 @@ export default function SectionRecommendations({
                       e.dataTransfer.setData("recommendation_index", index.toString());
                       e.dataTransfer.effectAllowed = "copy";
                     }}
+                    onDragEnd={() => {
+                      // Clean up drag state to prevent indefinite dragging
+                    }}
                   >
                     <div className={styles.cardHeader}>
                       <div className={styles.cardDragHandle}>
@@ -357,4 +389,8 @@ export default function SectionRecommendations({
       )}
     </div>
   );
-}
+});
+
+SectionRecommendations.displayName = "SectionRecommendations";
+
+export default SectionRecommendations;

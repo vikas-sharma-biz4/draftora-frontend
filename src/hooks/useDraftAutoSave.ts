@@ -3,9 +3,9 @@
 import { useEffect } from "react";
 
 import { useProposal } from "@/context/ProposalContext";
-import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/api/draftApi";
-import { useDraftStore } from "@/store/draftStore";
-import type { DraftLocation, DraftUIState } from "@/types/draft.types";
+import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/services/draftApi";
+import { useDraftStore } from "@/redux/features/draftStore";
+import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 interface UseDraftAutoSaveOptions {
   enabled: boolean;

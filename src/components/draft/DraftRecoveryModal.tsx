@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Clock, FileText } from "lucide-react";
-import type { DraftMetadata } from "@/types/draft.types";
+import type { DraftMetadata } from "@/interfaces/draftInterfaces";
 import styles from "./DraftRecoveryModal.module.scss";
 
 interface DraftRecoveryModalProps {
