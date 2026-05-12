@@ -1,0 +1,27 @@
+// ─── Web references list ──────────────────────────────────────────────────────
+.web-ref-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.web-ref-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.web-ref-url {
+  font-size: 11px;
+  color: var(--color-primary);
+  word-break: break-all;
+  text-decoration: underline;
+  cursor: pointer;
+}

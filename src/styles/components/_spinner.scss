@@ -1,0 +1,40 @@
+// ─── Base spinner ─────────────────────────────────────────────────────────────
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid var(--color-border-dark);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+// ─── Spinner sizes ────────────────────────────────────────────────────────────
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.spinner-md {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+// ─── Spinner variants ─────────────────────────────────────────────────────────
+.spinner-white {
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: white;
+}
+
+.spinner-xs {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+
+// ─── Spin icon (Lucide icon wrapper) ─────────────────────────────────────────
+.spin-icon {
+  animation: spin 1s linear infinite;
+}

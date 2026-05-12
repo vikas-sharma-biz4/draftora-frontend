@@ -1,3 +1,5 @@
+import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
+
 export const AI_MODEL_OPTIONS = [
   {
     value: "gpt-4o",
@@ -12,8 +14,6 @@ export const AI_MODEL_OPTIONS = [
     description: "Exceptional writing quality and nuanced language.",
   },
 ] as const;
-
-export const AI_MODEL_DEFAULT = "gpt-4o";
 
 export const TONE_OPTIONS = [
   {
@@ -294,7 +294,7 @@ export const PROPOSAL_TEMPLATES = [
     gradientClass: "tmpl-preview-gradient-2",
     icon: "◉",
   },
-] as const;
+] as unknown as Array<ProposalTemplate>;
 
 // ── Static sections ──────────────────────────────────────────────────────────
 // These are automatically appended at the end of every proposal. Their content
@@ -391,3 +391,11 @@ export const CLIENT_TIERS = [
   "Mid-Market",
   "Small Business",
 ] as const;
+
+// ── Breakpoints (must match SCSS $bp-* in _variables.scss) ────────────────────
+export const BREAKPOINTS = {
+  mobile:  640,
+  tablet:  1024,
+  desktop: 1280,
+  wide:    1536,
+} as const;

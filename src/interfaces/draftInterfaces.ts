@@ -1,17 +1,17 @@
 import type { ProposalData, WizardStep } from "./proposalInterfaces";
 
-export type DraftStage = 
+export type DraftStage =
   | "template_selection"
   | "wizard_in_progress"
   | "parameters_complete"
   | "review_complete"
   | "generated";
 
-export type DraftLocation = 
-  | "WIZARD_PARAMETERS"
-  | "WIZARD_REVIEW"
-  | "WEB_VIEW"
-  | "AI_SECTIONS";
+export type DraftLocation =
+  | "wizard_parameters"
+  | "wizard_review"
+  | "web_view"
+  | "ai_sections";
 
 export interface DraftUIState {
   scrollPosition: number;
@@ -32,7 +32,7 @@ export interface SavedDraft {
   proposalId: number | null;
   title: string;
   clientName: string;
-  status: "draft" | "generating" | "completed";
+  status: "draft" | "generating" | "completed" | "pending_approval";
   lastLocation: DraftLocation;
   stage: DraftStage;
   wizardState: DraftWizardState;
@@ -48,7 +48,7 @@ export interface DraftMetadata {
   proposalId: number | null;
   title: string;
   clientName: string;
-  status: "draft" | "generating" | "completed";
+  status: "draft" | "generating" | "completed" | "pending_approval";
   lastLocation: DraftLocation;
   stage: DraftStage;
   updatedAt: string;
@@ -58,7 +58,7 @@ export interface SaveDraftPayload {
   proposalId: number | null;
   title: string;
   clientName: string;
-  status: "draft" | "generating" | "completed";
+  status: "draft" | "generating" | "completed" | "pending_approval";
   lastLocation: DraftLocation;
   stage: DraftStage;
   wizardState: DraftWizardState;

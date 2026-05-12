@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useMemo } from 'react';
-import { useProposalStore } from '@/redux/features/proposalStore';
+import { useProposalStore } from '@/store/features/proposals/proposalSlice';
 import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
 
 interface UseProposalsOptions {
