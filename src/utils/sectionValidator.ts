@@ -30,7 +30,7 @@ export function validateSimilarProjectsStructure(content: string): ValidationRes
   // Check for bold headings (project names)
   const boldHeadingPattern = /\*\*[^*]+\*\*|\<strong\>[^<]+\<\/strong\>|\<h3[^>]*\>[^<]+\<\/h3\>/g;
   const headings = content.match(boldHeadingPattern);
-  
+
   if (!headings || headings.length === 0) {
     warnings.push("No project names found. Use bold text or headings for project names.");
   }
@@ -44,7 +44,7 @@ export function validateSimilarProjectsStructure(content: string): ValidationRes
   // Check for paragraphs
   const paragraphPattern = /<p>|^[A-Z][^<\n]{30,}/gm;
   const paragraphs = content.match(paragraphPattern);
-  
+
   if (!paragraphs || paragraphs.length < 2) {
     warnings.push("Add more descriptive paragraphs for project context and conclusion.");
   }
@@ -100,7 +100,7 @@ export function validateParagraphOnlyStructure(content: string): ValidationResul
   const warnings: string[] = [];
 
   // Check for bullet points
-  const hasBullets = /[-*]\s+/.test(content) || /<li>/i.test(content) || /<ul>/i.test(content) || /<ol>/i.test(content);
+  const hasBullets = /^[-*]\s+/m.test(content) || /<li>/i.test(content) || /<ul>/i.test(content) || /<ol>/i.test(content);
   if (hasBullets) {
     errors.push("This section should use paragraphs only. Remove bullet points.");
   }
@@ -131,7 +131,7 @@ export function validateBoldUsage(content: string): ValidationResult {
   const warnings: string[] = [];
 
   const hasBold = /\*\*[^*]+\*\*/.test(content) || /<strong>/i.test(content) || /<b>/i.test(content);
-  
+
   if (!hasBold) {
     warnings.push("Consider highlighting important terms using bold text.");
   }
@@ -150,7 +150,7 @@ export function validateBoldUsage(content: string): ValidationResult {
 export function validateSectionContent(sectionKey: string, content: string): ValidationResult {
   // Sections that must be paragraph-only
   const paragraphOnlySections = ['introduction', 'project_understanding'];
-  
+
   if (paragraphOnlySections.includes(sectionKey)) {
     return validateParagraphOnlyStructure(content);
   }

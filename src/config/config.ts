@@ -1,14 +1,18 @@
-const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-if (!apiUrl) {
-  throw new Error("NEXT_PUBLIC_API_URL is required");
-}
-export const API_BASE_URL = `${apiUrl}/api/v1`;
+import { logger } from "@/utils/logger";
+
+// API_BASE_URL is now defined and exported from @/config/httpClient.ts
+// as the single source of truth. Re-export here for backward compatibility
+// with existing imports from @/config/config.
+export { API_BASE_URL } from "./httpClient";
 
 export const POLLING_INTERVAL_MS = 3000;
 export const MAX_POLL_ATTEMPTS = 120;
 
-export const DEFAULT_AI_MODEL =
-  process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL ?? "gpt-4o";
+const _defaultAiModel = process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL;
+if (!_defaultAiModel) {
+  logger.warn("[config] NEXT_PUBLIC_DEFAULT_AI_MODEL is not set — defaulting to 'gpt-4o'. This may incur higher API costs.");
+}
+export const DEFAULT_AI_MODEL = _defaultAiModel ?? "gpt-4o";
 
 // File-parsing time estimate constants (ms)
 export const PARSING_BASE_TIME_MS: Record<string, number> = {

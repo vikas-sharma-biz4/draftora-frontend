@@ -1,3 +1,3 @@
 export * from './commonConstant';
 export * from './routes';
-export * from './endpoints';
+export * from './storageKeys';

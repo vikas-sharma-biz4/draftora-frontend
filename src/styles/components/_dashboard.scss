@@ -1,0 +1,54 @@
+// ─── Dashboard content ────────────────────────────────────────────────────────
+.dashboard-content {
+  max-width: 1200px;
+  padding: 0;
+}
+
+// ─── Dashboard page header ────────────────────────────────────────────────────
+.dashboard-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+// ─── Search input ─────────────────────────────────────────────────────────────
+.search-input {
+  width: 220px;
+}
+
+// ─── Proposals grid ───────────────────────────────────────────────────────────
+.proposals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1.25rem;
+}
+
+// ─── Empty state wrapper ──────────────────────────────────────────────────────
+.empty-state-wrapper {
+  margin-top: 60px;
+}
+
+// ─── Responsive — 1024px ──────────────────────────────────────────────────────
+@media (max-width: 1024px) {
+  .proposals-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard-content {
+    padding: 0;
+  }
+}
+
+// ─── Responsive — 768px ───────────────────────────────────────────────────────
+@media (max-width: 768px) {
+  .proposals-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-page-header {
+    flex-direction: column;
+  }
+}

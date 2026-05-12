@@ -1,22 +1,30 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useRouter, usePathname } from "next/navigation";
+import { toast } from "@/utils/toast";
+import { MESSAGES } from "@/constants/messages";
 
-import { useProposal } from "@/context/ProposalContext";
-import { saveDraft as saveDraftApi, updateDraft as updateDraftApi } from "@/services/draftApi";
-import { useDraftStore } from "@/redux/features/draftStore";
-import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
-import type { DraftStage, DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
+import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
+import { updateDraft as updateDraftApi } from "@/services/draft.service";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 /**
  * Returns a `saveDraft` function that persists the current wizard state to
  * the backend database, resets the wizard, and navigates back to the root.
  */
 export function useSaveDraft(): () => Promise<void> {
-  const { proposalData, currentStep, draftStage, completedSteps, maxStepReached, resetProposal, currentProposalId, currentDraftId, setCurrentDraftId } = useProposal();
+  const { proposalData, currentStep, maxStepReached, resetProposal, currentProposalId } = useProposalWizard();
+  const { completedSteps } = useProposalDraftSession();
   const router = useRouter();
+  const pathname = usePathname();
+  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const invalidateCache = useDraftStore(state => state.invalidateCache);
+  const saveDraftToStore = useDraftStore(state => state.saveDraft);
+  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
 
   return async function saveDraft(): Promise<void> {
     const hasData =
@@ -29,13 +37,10 @@ export function useSaveDraft(): () => Promise<void> {
 
     // Determine lastLocation based on current pathname
     const lastLocation: DraftLocation = (() => {
-      if (typeof window !== "undefined") {
-        const pathname = window.location.pathname;
-        if (pathname === "/parameters") return "WIZARD_PARAMETERS";
-        if (pathname === "/review") return "WIZARD_REVIEW";
-        if (pathname.startsWith("/proposal/") || pathname === "/web-view") return "WEB_VIEW";
-      }
-      return "WIZARD_PARAMETERS";
+      if (pathname === "/parameters") return "wizard_parameters";
+      if (pathname === "/review") return "wizard_review";
+      if (pathname.startsWith("/proposal/")) return "web_view";
+      return "wizard_parameters";
     })();
 
     // Capture UI state for restoration
@@ -66,13 +71,13 @@ export function useSaveDraft(): () => Promise<void> {
 
       if (currentDraftId) {
         // Update existing draft
-        await updateDraftApi(currentDraftId, draftPayload);
-        toast.success(`Draft "${proposalData.title || "Untitled Proposal"}" updated.`);
+        await updateDraftInStore(currentDraftId, draftPayload);
+        toast.success(MESSAGES.DRAFT_SAVED);
       } else {
         // Create new draft and store ID
-        const saved = await saveDraftApi(draftPayload);
+        const saved = await saveDraftToStore(draftPayload);
         setCurrentDraftId(saved.id);
-        toast.success(`Draft "${proposalData.title || "Untitled Proposal"}" saved.`);
+        toast.success(MESSAGES.DRAFT_SAVED);
       }
 
       // Invalidate cache to force fresh fetch on drafts page
