@@ -5,7 +5,7 @@ import {
   updateVersionDecision,
   regenerateFromVersion,
   saveEditedVersion,
-} from "@/services/versionApi";
+} from "@/services/version.service";
 import type {
   ProposalVersion,
   VersionHistory,

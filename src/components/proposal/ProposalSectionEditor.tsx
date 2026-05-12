@@ -2,7 +2,7 @@
  * ═══════════════════════════════════════════════════════════════════════════
  * PROPOSAL SECTION EDITOR - PRODUCTION-GRADE ARCHITECTURE
  * ═══════════════════════════════════════════════════════════════════════════
- * 
+ *
  * PROBLEM SOLVED:
  * ---------------
  * This component architecture eliminates:
@@ -12,7 +12,7 @@
  * ✓ Markdown flickering
  * ✓ Cursor position loss
  * ✓ Selection toolbar causing UI instability
- * 
+ *
  * ROOT CAUSES FIXED:
  * ------------------
  * 1. ❌ onClick triggering state changes → ✓ Explicit "Edit" button only
@@ -21,20 +21,20 @@
  * 4. ❌ No memoization → ✓ React.memo with custom comparison
  * 5. ❌ Unstable callback props → ✓ useCallback in parent
  * 6. ❌ contentEditable on ReactMarkdown → ✓ Dedicated TipTap editor
- * 
+ *
  * ARCHITECTURE:
  * -------------
  * ProposalSectionEditor (this file)
  *   ├─ SectionViewMode (read-only, ReactMarkdown, NO state changes)
  *   └─ SectionEditMode (TipTap editor, auto-save, only when editing)
- * 
+ *
  * BEHAVIOR:
  * ---------
  * - View mode: Click does NOTHING (no re-render, no state change)
  * - Edit mode: Activated ONLY via "Edit" button
  * - Auto-save: Debounced 1.5s in edit mode
  * - Memoization: Prevents re-render when other sections update
- * 
+ *
  * DO NOT MODIFY THIS ARCHITECTURE WITHOUT READING THE DOCUMENTATION ABOVE.
  * ═══════════════════════════════════════════════════════════════════════════
  */
@@ -43,14 +43,14 @@
 
 import { memo, useEffect, useState, useCallback } from "react";
 import SectionEditMode from "./SectionEditMode";
-
+import Button from "@/components/common/Button";
+import { Input } from "@/components/common/Input";
+import { RefreshCw, X } from "lucide-react";
 
 interface ProposalSectionEditorProps {
   sectionKey: string;
   label: string;
   rawContent: string;
-  /** Mermaid diagram code — provided only for diagram-type sections. */
-  mermaidCode?: string;
   onContentChange: (key: string, html: string) => void;
   onSave: (key: string, content: string) => Promise<void>;
   onRegenerate: (key: string, instructions?: string) => Promise<string | null>;
@@ -61,7 +61,7 @@ interface ProposalSectionEditorProps {
  *
  * CRITICAL ARCHITECTURE (DO NOT MODIFY WITHOUT UNDERSTANDING):
  * ================================================================
- * 
+ *
  * This component was refactored to eliminate layout shift, re-render cascade,
  * and markdown flickering issues. The architecture is intentionally strict.
  *
@@ -96,7 +96,6 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
   sectionKey,
   label,
   rawContent,
-  mermaidCode,
   onContentChange,
   onSave,
   onRegenerate,
@@ -142,44 +141,49 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
       <div className="proposal-page-header">
         <h2 className="proposal-page-title">{label}</h2>
         <div className="proposal-page-actions">
-          <button
-            className="btn btn-ghost btn-sm"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowRegenInput((v) => !v)}
             title="Regenerate with AI"
           >
-            {isRegenerating ? (
-              <span className="spinner spinner-sm" />
+            <RefreshCw size={13} />
+            {showRegenInput ? (
+              <X size={13} />
             ) : (
-              "↻ Regenerate"
+              "Regenerate"
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
       {showRegenInput && (
         <div className="regen-bar">
-          <input
+          <Input
             className="form-input flex-1 font-13"
             placeholder="Optional instructions, e.g. focus more on ROI…"
             value={regenInstructions}
             onChange={(e) => setRegenInstructions(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleRegenerate();
+              if (e.key === "Escape") setShowRegenInput(false);
             }}
           />
-          <button
-            className="btn btn-primary btn-sm"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleRegenerate}
-            disabled={isRegenerating}
+            loading={isRegenerating}
           >
             Go
-          </button>
-          <button
-            className="btn btn-ghost btn-sm"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowRegenInput(false)}
           >
             ✕
-          </button>
+          </Button>
         </div>
       )}
 
@@ -199,8 +203,7 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
   return (
     prevProps.sectionKey === nextProps.sectionKey &&
     prevProps.label === nextProps.label &&
-    prevProps.rawContent === nextProps.rawContent &&
-    prevProps.mermaidCode === nextProps.mermaidCode
+    prevProps.rawContent === nextProps.rawContent
     // Intentionally NOT comparing callback props (onContentChange, onSave, onRegenerate)
     // because they should be stable (wrapped in useCallback in parent)
   );

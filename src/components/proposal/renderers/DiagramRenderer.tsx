@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   isGeneratedImageContent,
@@ -12,70 +12,27 @@ import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 interface DiagramRendererProps {
   content: string;
-  /** Raw Mermaid diagram code (graph TD ...) — used as fallback only */
-  mermaidCode?: string;
   sectionKey: string;
 }
 
 /**
- * Renders diagram sections with three tiers:
+ * Renders diagram sections with two tiers:
  *
  * 1. GENERATED_IMAGE:: content — renders one or more AI-generated images
  *    (Eraser.io architecture PNG or OpenAI user-flow chunks) inline.
  *    Multi-image user-flow chunks are shown in sequence with part labels.
  *    Images are constrained with max-height + click-to-expand modal.
  *
- * 2. Mermaid fallback — when no image URL is present but mermaidCode is
- *    provided, renders the Mermaid SVG client-side.
- *
- * 3. Text content — any plain-text / HTML below the diagram is rendered
+ * 2. Text content — any plain-text / HTML below the diagram is rendered
  *    using the standard block parser.
  */
 export default function DiagramRenderer({
   content,
-  mermaidCode,
   sectionKey,
 }: DiagramRendererProps): JSX.Element {
-  const mermaidRef = useRef<HTMLDivElement>(null);
   const hasGeneratedImage = isGeneratedImageContent(content);
   const imageUrls = hasGeneratedImage ? parseGeneratedImageUrls(content) : [];
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Only render Mermaid when there is no generated image to show
-    if (hasGeneratedImage || !mermaidCode || !mermaidRef.current) return;
-
-    let cancelled = false;
-
-    import("mermaid")
-      .then((mod) => {
-        if (cancelled || !mermaidRef.current) return;
-        const mermaid = mod.default;
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: "default",
-          securityLevel: "loose",
-        });
-        const id = `mermaid-${sectionKey}-${Date.now()}`;
-        mermaid
-          .render(id, mermaidCode)
-          .then(({ svg }) => {
-            if (!cancelled && mermaidRef.current) {
-              mermaidRef.current.innerHTML = svg;
-            }
-          })
-          .catch(() => {
-            if (!cancelled && mermaidRef.current) {
-              mermaidRef.current.innerHTML = `<pre style="font-size:12px;overflow-x:auto;white-space:pre-wrap">${mermaidCode}</pre>`;
-            }
-          });
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [hasGeneratedImage, mermaidCode, sectionKey]);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -216,15 +173,7 @@ export default function DiagramRenderer({
         </div>
       )}
 
-      {/* Tier 2: Mermaid fallback — only when no generated image is present */}
-      {!hasGeneratedImage && mermaidCode && (
-        <div className="mermaid-container" style={{ marginBottom: 24 }}>
-          <span className="mermaid-label">Architecture Diagram</span>
-          <div ref={mermaidRef} />
-        </div>
-      )}
-
-      {/* Tier 3: Text content — skip rendering when content IS the image URL string */}
+      {/* Text content — skip rendering when content IS the image URL string */}
       {!hasGeneratedImage && (() => {
         const htmlContent = isHtmlContent(content);
         const blocks = htmlContent ? null : parseContentBlocks(content);

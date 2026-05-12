@@ -1,0 +1,90 @@
+// ─── Upload zone ──────────────────────────────────────────────────────────────
+.upload-zone {
+  border: 2px dashed var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  padding: 40px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--color-bg);
+}
+
+.upload-zone:hover,
+.upload-zone.dragging {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.upload-zone-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.upload-zone-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.upload-zone-subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+}
+
+// ─── File list ────────────────────────────────────────────────────────────────
+.file-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.file-item-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-item-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.file-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-item-size {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.file-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}

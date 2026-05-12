@@ -151,8 +151,8 @@
   font-family: var(--font-sans);
 
   &:hover:not(:disabled) {
-    background: #dc2626;
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+    background: var(--color-danger-hover);
+    box-shadow: 0 4px 12px rgba(var(--color-danger-rgb), 0.25);
   }
 
   &:disabled {

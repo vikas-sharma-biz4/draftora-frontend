@@ -1,0 +1,134 @@
+// ─── Tone grid ────────────────────────────────────────────────────────────────
+.tone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 500px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ─── Tone card ────────────────────────────────────────────────────────────────
+.tone-card {
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--color-white);
+  text-align: left;
+}
+
+.tone-card:hover {
+  border-color: var(--color-primary-medium);
+  background: var(--color-interactive-hover);
+}
+
+.tone-card.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.tone-card-icon {
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.tone-card.selected .tone-card-icon {
+  color: var(--color-primary);
+}
+
+.tone-card-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tone-check {
+  font-size: 14px;
+  color: var(--color-primary);
+}
+
+.tone-card-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+// ─── Length selector ──────────────────────────────────────────────────────────
+.length-options {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.length-option {
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: var(--color-white);
+  transition: all 0.15s;
+}
+
+.length-option:hover:not(.selected) {
+  border-color: var(--color-primary-medium);
+  background: var(--color-primary-light);
+}
+
+.length-option.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.length-option-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.length-option-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  display: block;
+  line-height: 1.4;
+}
+
+// ─── Length display badge ─────────────────────────────────────────────────────
+.length-display-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.length-display-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary-medium);
+}
