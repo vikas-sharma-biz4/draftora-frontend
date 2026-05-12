@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { logger } from "@/utils/logger";
 
 interface UseRouteGuardOptions {
   enabled: boolean;
@@ -26,7 +27,7 @@ export function useRouteGuard(options: UseRouteGuardOptions): void {
           previousPathnameRef.current = pathname;
         })
         .catch((error) => {
-          console.error("Route guard save failed:", error);
+          logger.error("Route guard save failed:", error);
         })
         .finally(() => {
           isNavigatingRef.current = false;

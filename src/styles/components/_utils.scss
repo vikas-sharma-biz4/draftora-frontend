@@ -1,0 +1,188 @@
+// ─── Accessibility ────────────────────────────────────────────────────────────
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// ─── Divider ──────────────────────────────────────────────────────────────────
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 20px 0;
+}
+
+// ─── Text utilities ───────────────────────────────────────────────────────────
+.text-muted   { color: var(--color-text-muted); }
+.text-small   { font-size: 12px; }
+.text-center  { text-align: center; }
+.text-light   { color: var(--color-text-light); }
+.text-italic  { font-style: italic; }
+
+// ─── Font utilities ───────────────────────────────────────────────────────────
+.font-semibold { font-weight: 600; }
+.font-bold     { font-weight: 700; }
+.font-medium   { font-weight: 500; }
+
+// ─── Flex utilities ───────────────────────────────────────────────────────────
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.flex-1 { flex: 1; }
+.ml-auto { margin-left: auto; }
+.w-full  { width: 100%; }
+
+// ─── Gap utilities ────────────────────────────────────────────────────────────
+.gap-4  { gap: 4px; }
+.gap-8  { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+
+// ─── Margin utilities ─────────────────────────────────────────────────────────
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+
+// ─── Padding utilities ────────────────────────────────────────────────────────
+.p-40 { padding: 40px; }
+
+// ─── Dimension utilities ──────────────────────────────────────────────────────
+.min-h-textarea { min-height: 120px; }
+.min-h-screen   { min-height: 100vh; }
+
+// ─── Background utilities ─────────────────────────────────────────────────────
+.bg-page { background: var(--color-bg); }
+
+// ─── Cursor utilities ─────────────────────────────────────────────────────────
+.cursor-pointer  { cursor: pointer; }
+.cursor-default  { cursor: default; }
+.cursor-not-allowed { cursor: not-allowed; }
+
+// ─── Icon utilities ────────────────────────────────────────────────────────────
+.icon-only     { padding: 8px; }
+.icon-shrink-0 { flex-shrink: 0; }
+.icon-mt-1     { margin-top: 1px; }
+
+// ─── Alert base ───────────────────────────────────────────────────────────────
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.55;
+  border: 1px solid transparent;
+}
+
+.alert-error {
+  background: var(--color-danger-light);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.alert-success {
+  background: var(--color-success-light);
+  border-color: var(--color-success);
+  color: var(--color-success-dark);
+}
+
+.alert-warning {
+  background: var(--color-warning-light);
+  border-color: var(--color-warning);
+  color: var(--color-warning-dark);
+}
+
+.alert-info {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary-medium);
+  color: var(--color-primary);
+}
+
+// ─── Empty content card ───────────────────────────────────────────────────────
+.empty-content-card {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  border: 1.5px dashed var(--color-border-dark);
+  color: var(--color-text-muted);
+}
+
+// ─── AI loading hint ──────────────────────────────────────────────────────────
+.ai-loading-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 20px;
+  animation: pulse-subtle 1.8s ease-in-out infinite;
+}
+
+// ─── Feature placeholder ──────────────────────────────────────────────────────
+.feature-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.feature-placeholder-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.feature-placeholder-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.feature-placeholder-desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  max-width: 360px;
+  line-height: 1.6;
+}

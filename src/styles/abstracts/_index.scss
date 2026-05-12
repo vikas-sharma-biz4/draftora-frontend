@@ -1,0 +1,6 @@
+// ─── Abstracts barrel ────────────────────────────────────────────────────────
+// Import order matters: variables → colors → fonts → mixins
+@forward "variables";
+@forward "colors";
+@forward "fonts";
+@forward "mixins";

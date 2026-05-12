@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useCallback } from 'react';
-import { useDraftStore } from '@/redux/features/draftStore';
+import { useDraftStore } from '@/store/features/drafts/draftSlice';
 import type { DraftMetadata } from '@/interfaces/draftInterfaces';
 
 interface UseDraftsOptions {

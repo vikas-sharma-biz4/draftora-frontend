@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Edit2, FileText, Info, Save, X } from "lucide-react";
+import { logger } from "@/utils/logger";
 import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./VersionAwareCard.module.scss";
 
@@ -48,7 +49,7 @@ export function VersionAwareCard({
       await onSave(sectionKey, editedContent);
       setIsEditing(false);
     } catch (error) {
-      console.error("Failed to save:", error);
+      logger.error("Failed to save:", error);
     } finally {
       setIsSaving(false);
     }

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { toast } from "sonner";
+import { toast } from "@/utils/toast";
 
 /**
  * Shows a toast error message whenever `error` becomes truthy.

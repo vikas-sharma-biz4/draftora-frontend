@@ -48,7 +48,14 @@ const ALLOWED_TAGS = [
   "hr",
 ];
 
-/** Allowed HTML attributes (safe subset only). */
+/**
+ * Allowed HTML attributes (safe subset only).
+ *
+ * Intentionally excludes:
+ *   - "style"  → CSS injection / phishing via position:fixed overlays
+ *   - "target" → handled separately via the afterSanitizeAttributes hook
+ *                 which forces rel="noopener noreferrer" on all <a> tags
+ */
 const ALLOWED_ATTR = [
   "href",
   "src",
@@ -56,8 +63,6 @@ const ALLOWED_ATTR = [
   "title",
   "class",
   "id",
-  "style",
-  "target",
   "rel",
   "width",
   "height",
@@ -76,6 +81,20 @@ export function isServerEnvironment(): boolean {
 }
 
 /**
+ * Register DOMPurify hook at module level (runs once).
+ * Forces rel="noopener noreferrer" on every <a> to prevent tab-napping
+ * and information leakage via the Referer header.
+ */
+if (!isServerEnvironment()) {
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("rel", "noopener noreferrer");
+      node.setAttribute("target", "_blank");
+    }
+  });
+}
+
+/**
  * Returns a sanitized version of the given HTML string.
  *
  * @param html - Raw HTML string to sanitize.
@@ -85,10 +104,12 @@ export function sanitizeHtml(html: string): string {
   if (isServerEnvironment()) {
     return html;
   }
+
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
     FORCE_BODY: false,
   });
 }

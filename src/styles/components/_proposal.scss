@@ -1,0 +1,489 @@
+// ─── Proposal output page wrapper ─────────────────────────────────────────────
+.proposal-page-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+// ─── Proposal header ──────────────────────────────────────────────────────────
+.proposal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: var(--color-white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: var(--shadow-sm);
+}
+
+.proposal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.proposal-header-logo {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.proposal-header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.proposal-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+// ─── Proposal header bar (sticky bar with pipeline) ───────────────────────────
+.proposal-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.proposal-header-bar .pipelineContainer {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+
+// ─── Proposal actions bar ─────────────────────────────────────────────────────
+.proposal-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.proposal-actions-left,
+.proposal-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+// ─── Proposal layout ──────────────────────────────────────────────────────────
+.proposal-layout {
+  display: flex;
+  flex: 1;
+  position: relative;
+}
+
+// ─── Proposal sidebar ─────────────────────────────────────────────────────────
+.proposal-sidebar {
+  width: 280px;
+  min-width: 280px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  padding: 24px 0;
+  position: sticky;
+  top: 65px;
+  height: calc(100vh - 65px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  order: 2;
+  margin-top: 23px;
+  border-radius: var(--radius-xl);
+}
+
+.proposal-sidebar::-webkit-scrollbar,
+.proposal-sidebar::-webkit-scrollbar-track,
+.proposal-sidebar::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+.proposal-sidebar-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-light);
+  padding: 0 16px;
+  margin-bottom: 8px;
+}
+
+.proposal-sidebar-links {
+  list-style: none;
+}
+
+.proposal-sidebar-step-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  box-shadow: inset 2px 0 0 transparent;
+  transition: all 0.15s;
+  margin-bottom: 2px;
+}
+
+.proposal-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  box-shadow: inset 2px 0 0 transparent;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.proposal-sidebar-link:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.proposal-sidebar-link.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+// ─── Proposal sidebar dot (status indicator) ──────────────────────────────────
+.proposal-sidebar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.proposal-sidebar-dot.has-content { background: var(--color-success); }
+.proposal-sidebar-dot.empty       { background: var(--color-border-dark); }
+
+// ─── Proposal sidebar section row (enhanced) ──────────────────────────────────
+.proposal-sidebar-section-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px 7px 16px;
+  box-shadow: inset 2px 0 0 transparent;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.proposal-sidebar-section-row:hover {
+  background: var(--color-primary-light);
+  box-shadow: inset 2px 0 0 var(--color-primary-medium);
+}
+
+.proposal-sidebar-section-row.active {
+  background: var(--color-primary-light);
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+
+.proposal-sidebar-section-name {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proposal-sidebar-section-row.active .proposal-sidebar-section-name {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.proposal-sidebar-section-actions {
+  display: none;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.proposal-sidebar-section-row:hover .proposal-sidebar-section-actions {
+  display: flex;
+}
+
+.proposal-sidebar-icon-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  padding: 0;
+  transition: background 0.1s;
+}
+
+.proposal-sidebar-icon-btn:hover {
+  background: var(--color-white);
+  color: var(--color-text);
+}
+
+.proposal-sidebar-icon-btn.danger:hover {
+  color: var(--color-danger);
+}
+
+.proposal-sidebar-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.proposal-sidebar-add-btn:hover {
+  color: var(--color-primary);
+}
+
+.proposal-sidebar-section-edit-input {
+  flex: 1;
+  font-size: 12px;
+  border: 1px solid var(--color-primary);
+  border-radius: 3px;
+  padding: 2px 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.proposal-sidebar-add-wrap { padding: 8px 12px; }
+.proposal-sidebar-add-actions { display: flex; gap: 4px; }
+
+// ─── Proposal content area ────────────────────────────────────────────────────
+.proposal-content {
+  flex: 1;
+  padding: 20px 16px 20px 8px;
+  max-width: 900px;
+  margin: 0;
+  width: 100%;
+  order: 1;
+}
+
+// ─── Proposal right panel ─────────────────────────────────────────────────────
+.proposal-right-panel {
+  width: 320px;
+  min-width: 320px;
+  background: white;
+  border-left: 1px solid var(--color-border);
+  padding: 24px;
+  position: sticky;
+  top: 65px;
+  height: calc(100vh - 65px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.proposal-right-panel-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.proposal-right-panel-desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+// ─── Proposal page (A4 container) ─────────────────────────────────────────────
+.proposal-page {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  margin-bottom: 14px;
+  overflow: hidden;
+  scroll-margin-top: 80px;
+  border: 1px solid var(--color-border);
+}
+
+.proposal-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.proposal-page-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.proposal-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+// ─── View mode wrapper ────────────────────────────────────────────────────────
+.proposal-view-mode {
+  transition: background 0.15s ease;
+  border-radius: var(--radius-sm);
+}
+
+.proposal-view-mode:hover {
+  background: rgba(var(--color-primary-rgb), 0.02);
+  outline: 1px solid rgba(var(--color-primary-rgb), 0.08);
+  outline-offset: -1px;
+}
+
+.proposal-view-mode:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+// ─── Proposal section content (rendered HTML) ─────────────────────────────────
+.proposal-section-content {
+  padding: 28px 32px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text);
+  min-height: 80px;
+}
+
+.proposal-section-content p {
+  margin-bottom: 12px;
+  text-align: justify;
+}
+
+.proposal-section-content h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2f5496;
+  margin: 20px 0 8px;
+  letter-spacing: 0.01em;
+}
+
+.proposal-section-content h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2f5496;
+  margin: 16px 0 6px;
+  letter-spacing: 0.01em;
+}
+
+.proposal-section-content ul,
+.proposal-section-content ol {
+  padding-left: 24px;
+  margin-bottom: 12px;
+}
+
+.proposal-section-content li { margin-bottom: 6px; }
+.proposal-section-content strong { font-weight: 700; }
+.proposal-section-content em { font-style: italic; }
+
+.proposal-section-content [style] {
+  font-style: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background-color: inherit;
+}
+
+.proposal-section-content mark {
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+  background-color: yellow;
+}
+
+.proposal-section-content a {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.proposal-section-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.proposal-section-content table th {
+  background: #2f5496;
+  font-weight: 700;
+  text-align: left;
+  padding: 10px 14px;
+  border: 1px solid #1e3d72;
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.proposal-section-content table td {
+  padding: 10px 14px;
+  border: 1px solid #dee2e6;
+  vertical-align: top;
+}
+
+.proposal-section-content table td:first-child { font-weight: 700; }
+.proposal-section-content table tr:nth-child(even) td { background: #fafbfc; }
+
+.proposal-section-content table ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.proposal-section-content table li { margin-bottom: 2px; }
+
+.proposal-section-content img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+// ─── Responsive — 768px ───────────────────────────────────────────────────────
+@media (max-width: 768px) {
+  .proposal-layout {
+    flex-direction: column;
+  }
+
+  .proposal-sidebar {
+    width: 100%;
+    position: static;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .proposal-header-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .proposal-actions-bar {
+    justify-content: flex-end;
+  }
+}
