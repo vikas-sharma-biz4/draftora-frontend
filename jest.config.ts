@@ -3,13 +3,15 @@ import type { Config } from "jest";
 const config: Config = {
   preset: "ts-jest",
   testEnvironment: "jest-environment-jsdom",
-  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts", "<rootDir>/src/tests/setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    "\\.scss$": "<rootDir>/src/tests/__mocks__/styleMock.js",
+    "\\.css$": "<rootDir>/src/tests/__mocks__/styleMock.js",
   },
   testMatch: ["<rootDir>/src/**/*.test.(ts|tsx)"],
   collectCoverageFrom: [
-    "src/api/**/*.{ts,tsx}",
+    "src/services/**/*.{ts,tsx}",
     "src/context/**/*.{ts,tsx}",
     "src/hooks/**/*.{ts,tsx}",
     "src/utils/**/*.{ts,tsx}",

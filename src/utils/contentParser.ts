@@ -11,7 +11,7 @@
  * it to HTML (for TipTap editing) or to structured blocks (for JSX rendering).
  */
 
-/** Section keys that always render a Mermaid architecture diagram. */
+/** Section keys that always render a diagram (architecture, flowcharts, etc.). */
 export const DIAGRAM_SECTION_KEYS: string[] = [
   "system_architecture",
   "proposed_technology_stack",
@@ -200,48 +200,60 @@ export function parseMarkdownTable(content: string): ParsedTable | null {
 // ---------------------------------------------------------------------------
 
 /**
+ * Escape a string for safe use as an HTML attribute value.
+ * Prevents XSS via attribute injection (e.g. in alt or src attributes).
+ */
+function escapeHtmlAttr(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
  * Convert inline Markdown syntax to HTML.
  * Handles: **bold**, *italic*, `code`, [links](url), ![images](url), ~~strikethrough~~
- * 
+ *
  * IMPORTANT: This preserves formatting when loading Markdown content into TipTap.
  * Without this, **bold** would display literally instead of as <strong>bold</strong>.
- * 
+ *
  * Order matters: Process in order of precedence to avoid conflicts.
  */
 function convertInlineMarkdownToHtml(text: string): string {
   if (!text) return text;
-  
+
   let result = text;
-  
+
   // 0. Remove escaped backslashes (\\text\\ → text)
   result = result.replace(/\\\\([^\\]+)\\\\/g, '$1');
   result = result.replace(/\\\\/g, '');
-  
+
   // 1. Code blocks first (highest priority - don't process markdown inside code)
   result = result.replace(/`([^`]+)`/g, '<code>$1</code>');
-  
+
   // 2. Images (before links - images use ![alt](url) syntax)
   // Only match complete image markdown syntax
   result = result.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
     // Ensure URL is valid (not empty and looks like a URL or path)
     if (url && url.trim()) {
-      return `<img src="${url.trim()}" alt="${alt || ''}" style="max-width: 600px; height: auto; display: block; margin: 1rem 0;" />`;
+      return `<img src="${escapeHtmlAttr(url.trim())}" alt="${escapeHtmlAttr(alt || "")}" class="inline-md-image" />`;
     }
     return match; // Return original if invalid
   });
-  
+
   // 3. Links (before bold/italic to avoid conflicts with brackets)
   result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-  
+
   // 4. Bold (before italic to handle *** correctly)
   result = result.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
-  
+
   // 5. Italic (after bold)
   result = result.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
-  
+
   // 6. Strikethrough
   result = result.replace(/~~([^~]+?)~~/g, '<s>$1</s>');
-  
+
   return result;
 }
 
@@ -252,16 +264,16 @@ function convertInlineMarkdownToHtml(text: string): string {
  */
 export function plainTextToHtml(content: string): string {
   if (!content.trim()) return "<p></p>";
-  
+
   // Handle GENERATED_IMAGE:: prefix (architecture diagrams)
   if (isGeneratedImageContent(content)) {
     const urls = parseGeneratedImageUrls(content);
-    const images = urls.map(url => 
+    const images = urls.map(url =>
       `<img src="${url}" alt="Generated diagram" style="max-width: 600px; height: auto; display: block; margin: 1rem 0; cursor: pointer;" />`
     ).join('');
     return images || "<p>Image not available</p>";
   }
-  
+
   // If content is already HTML, return it unchanged
   // CRITICAL: Do NOT process markdown on HTML - it destroys the formatted content
   // The backend normalizes content to Markdown, so HTML here means it was

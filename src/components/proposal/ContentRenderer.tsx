@@ -10,8 +10,6 @@ import AIMarkdownRenderer from "./AIMarkdownRenderer";
 interface ContentRendererProps {
   sectionKey: string;
   content: string;
-  /** Raw Mermaid diagram code — passed only for diagram sections. */
-  mermaidCode?: string;
 }
 
 /**
@@ -39,7 +37,6 @@ const AI_CONTENT_OVERRIDE_KEYS: string[] = [
 export default function ContentRenderer({
   sectionKey,
   content,
-  mermaidCode,
 }: ContentRendererProps): JSX.Element {
   const type = detectContentType(sectionKey, content);
 
@@ -49,7 +46,6 @@ export default function ContentRenderer({
     return (
       <DiagramRenderer
         content={content}
-        mermaidCode={mermaidCode}
         sectionKey={sectionKey}
       />
     );
@@ -61,7 +57,6 @@ export default function ContentRenderer({
     return (
       <DiagramRenderer
         content={content}
-        mermaidCode={mermaidCode}
         sectionKey={sectionKey}
       />
     );

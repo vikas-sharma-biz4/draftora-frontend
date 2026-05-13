@@ -7,7 +7,6 @@ export interface ProposalVersionSnapshot {
   proposalData: ProposalData;
   generatedContent: Record<string, string>;
   sectionTypes: Record<string, string>;
-  mermaidDiagram?: string;
   metadata: {
     aiModel: string;
     tone: string;

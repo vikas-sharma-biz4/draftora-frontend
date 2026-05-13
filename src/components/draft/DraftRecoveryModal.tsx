@@ -47,13 +47,13 @@ export function DraftRecoveryModal({
 
   const getLocationLabel = (location: DraftMetadata["lastLocation"]): string => {
     switch (location) {
-      case "WIZARD_PARAMETERS":
+      case "wizard_parameters":
         return "Parameters Step";
-      case "WIZARD_REVIEW":
+      case "wizard_review":
         return "Review Step";
-      case "WEB_VIEW":
+      case "web_view":
         return "Generated Proposal";
-      case "AI_SECTIONS":
+      case "ai_sections":
         return "AI Generation";
       default:
         return "Unknown";
@@ -65,6 +65,7 @@ export function DraftRecoveryModal({
       draft: { label: "Draft", className: styles.statusDraft },
       generating: { label: "Generating", className: styles.statusGenerating },
       completed: { label: "Completed", className: styles.statusCompleted },
+      pending_approval: { label: "Pending", className: styles.statusCompleted },
     };
 
     const { label, className } = statusMap[status];
@@ -88,7 +89,7 @@ export function DraftRecoveryModal({
 
         <div className={styles.content}>
           <p className={styles.description}>
-            We found {drafts.length} unsaved draft{drafts.length > 1 ? "s" : ""}. 
+            We found {drafts.length} unsaved draft{drafts.length > 1 ? "s" : ""}.
             Would you like to continue where you left off?
           </p>
 

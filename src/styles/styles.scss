@@ -1,0 +1,61 @@
+// ─── Theme tokens ─────────────────────────────────────────────────────────────
+@use './themes/light';
+@use './themes/dark';
+
+// ─── Base reset & typography ──────────────────────────────────────────────────
+@use './base/reset';
+@use './base/typography';
+
+// ─── All keyframes & animation utility classes ───────────────────────────────
+@use './components/animations';
+
+// ─── Shared component primitives ─────────────────────────────────────────────
+@use './components/buttons';
+@use './components/cards';
+@use './components/input';
+@use './components/table';
+@use './components/skeleton';
+@use './components/spinner';
+
+// ─── Layout & navigation ─────────────────────────────────────────────────────
+@use './components/layout';
+@use './components/sidebar';
+@use './components/page-header';
+@use './components/grid';
+
+// ─── Form elements ────────────────────────────────────────────────────────────
+@use './components/forms';
+
+// ─── Wizard step components ───────────────────────────────────────────────────
+@use './components/upload';
+@use './components/tone-card';
+@use './components/sections';
+
+// ─── Review & launch ─────────────────────────────────────────────────────────
+@use './components/review';
+
+// ─── Proposal output ─────────────────────────────────────────────────────────
+@use './components/proposal';
+@use './components/section-card';
+
+// ─── Rich text editor ────────────────────────────────────────────────────────
+@use './components/rte';
+@use './components/markdown';
+
+// ─── Feedback & overlays ─────────────────────────────────────────────────────
+@use './components/toast';
+@use './components/web-ref';
+
+// ─── Page-level views ────────────────────────────────────────────────────────
+@use './components/dashboard';
+@use './components/generating';
+@use './components/template';
+@use './components/parameters';
+
+// ─── Utility classes ─────────────────────────────────────────────────────────
+@use './components/utils';
+
+// ─── Web fonts ────────────────────────────────────────────────────────────────
+// Fonts are now loaded via next/font/google in layout.tsx for better performance
+// and automatic font-display: swap. CSS variables are available:
+// --font-dm-sans and --font-dm-mono

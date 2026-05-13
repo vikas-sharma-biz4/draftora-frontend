@@ -1,0 +1,46 @@
+// ─── Page-level headings ─────────────────────────────────────────────────────
+.page-title {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.page-subtitle {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin-top: 0.25rem;
+}
+
+// ─── Section headings ────────────────────────────────────────────────────────
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.section-subtitle {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+// ─── Labels & captions ───────────────────────────────────────────────────────
+.label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.caption {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+// ─── Monospace ───────────────────────────────────────────────────────────────
+.mono {
+  font-family: var(--font-mono);
+}
+
+// Note: @keyframes fadeIn, spin, shimmer and .animate-spin are defined in components/_animations.scss

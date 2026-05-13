@@ -1,0 +1,17 @@
+.previewLines {
+  > div:nth-child(1) { width: 70%; }
+  > div:nth-child(2) { width: 50%; }
+  > div:nth-child(3) { width: 85%; }
+  > div:nth-child(4) { width: 40%; }
+}
+
+.extractedTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.pageTitle {
+  margin-top: 18px;
+}

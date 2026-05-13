@@ -34,8 +34,8 @@ export interface ProposalData {
   clientName: string;
   clientId?: number;
   description: string;
-  tone: string;
-  lengthPreference: string;
+  tone: ToneOption;
+  lengthPreference: LengthOption;
   language: string;
   aiModel: string;
   selectedSections: string[];
@@ -62,7 +62,6 @@ export interface ProposalData {
   /** Maps section_key → content type: "table" | "bullets" | "diagram" | "paragraph" */
   sectionTypes?: Record<string, string>;
   generatingSection?: string | null;
-  mermaidDiagram?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -71,23 +70,6 @@ export type ToneOption = "professional" | "persuasive" | "technical" | "creative
 export type LengthOption = "concise" | "balanced" | "comprehensive";
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
-export interface ApiSuccessResponse<T> {
-  success: true;
-  data: T;
-  message: string;
-}
-
-export interface ApiErrorResponse {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details: unknown | null;
-  };
-}
-
-export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
-
 export interface ProposalListItem {
   id: number;
   title: string;
@@ -95,21 +77,25 @@ export interface ProposalListItem {
   clientName: string;
   status: string;
   approvalStatus: "pending" | "approved" | "rejected";
-  tone: string;
-  lengthPreference: string;
+  tone: ToneOption;
+  lengthPreference: LengthOption;
   templateType: TemplateType;
+  templateId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export type TemplateCategory = "Popular" | "Business" | "Technical" | "Creative";
+export type TemplateCategory = "Popular" | "Business" | "Technical" | "Creative" | "Documentation";
 
 export interface ProposalTemplate {
   id: string;
   name: string;
+  templateType: string;
   category: TemplateCategory;
   description: string;
   sections: string[];
+  gradientClass: string;
+  icon: string;
   isCustom?: boolean;
   uploadedAt?: string;
 }
