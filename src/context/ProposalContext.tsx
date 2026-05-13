@@ -1,17 +1,52 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useEffect,
-  type ReactNode,
-} from "react";
+import React from "react";
+import type { DraftStage } from "@/interfaces/draftInterfaces";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { ProposalWizardProvider, useProposalWizard } from "./ProposalWizardContext";
+import { ProposalPipelineProvider, useProposalPipeline } from "./ProposalPipelineContext";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
-import type { DraftStage } from "@/types/draft.types";
-import { AI_MODEL_DEFAULT, DEFAULT_SELECTED_SECTIONS } from "@/constants";
+// ── Focused domain hooks ────────────────────────────────────────────────────
+// Each hook subscribes only to its own state source, preventing cross-domain
+// re-renders. Components should import the narrowest hook they need.
+
+/** Re-export wizard hook for direct consumption */
+export { useProposalWizard } from "./ProposalWizardContext";
+
+/** Re-export pipeline hook for direct consumption */
+export { useProposalPipeline } from "./ProposalPipelineContext";
+
+/**
+ * Draft session state — thin wrapper around the Zustand store
+ * with selective subscriptions to minimise re-renders.
+ */
+export function useProposalDraftSession(): {
+  draftStage: DraftStage;
+  completedSteps: number[];
+  setDraftStage: (stage: DraftStage) => void;
+  setCompletedSteps: (steps: number[]) => void;
+  markStepCompleted: (stepId: number) => void;
+  setCurrentDraftId: (id: string | null) => void;
+} {
+  const draftStage = useDraftSessionStore((s) => s.draftStage);
+  const completedSteps = useDraftSessionStore((s) => s.completedSteps);
+  const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
+  const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
+  const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
+
+  return {
+    draftStage,
+    completedSteps,
+    setDraftStage,
+    setCompletedSteps,
+    markStepCompleted,
+    setCurrentDraftId,
+  };
+}
+
+// ── Backward-compatible aggregate hook ──────────────────────────────────────
 
 interface ProposalContextType {
   proposalData: ProposalData;
@@ -31,193 +66,48 @@ interface ProposalContextType {
   maxStepReached: WizardStep;
   setMaxStepReached: (step: WizardStep) => void;
   draftStage: DraftStage;
-  setDraftStage: (stage: DraftStage) => void;
   completedSteps: number[];
+  setDraftStage: (stage: DraftStage) => void;
   setCompletedSteps: (steps: number[]) => void;
   markStepCompleted: (stepId: number) => void;
-  currentDraftId: string | null;
   setCurrentDraftId: (id: string | null) => void;
-  autoSaveEnabled: boolean;
-  setAutoSaveEnabled: (enabled: boolean) => void;
+  visitedPipelineSteps: number[];
+  syncVisitedStepsFromBackend: (proposalId: number) => Promise<void>;
+  markStepVisitedOnBackend: (proposalId: number, stepId: number) => Promise<void>;
+  shouldStartBackgroundFetch: boolean;
+  setShouldStartBackgroundFetch: (val: boolean) => void;
 }
 
-const STORAGE_KEY = "draftora_wizard_v1";
-
-const defaultProposalData: ProposalData = {
-  title: "",
-  clientName: "",
-  description: "",
-  tone: "professional",
-  lengthPreference: "balanced",
-  language: "English - US",
-  aiModel: AI_MODEL_DEFAULT,
-  selectedSections: [...DEFAULT_SELECTED_SECTIONS],
-  sectionDisplayNames: {},
-  customSections: [],
-  contextualInstructions: "",
-  webReferences: [],
-  files: [],
-  filesMeta: [],
-  templateId: null,
-  templateType: "scratch",
-};
-
-const ProposalContext = createContext<ProposalContextType | undefined>(
-  undefined
-);
-
-export function ProposalProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
-  const [proposalData, setProposalData] =
-    useState<ProposalData>(defaultProposalData);
-  const [currentStep, setCurrentStep] = useState<WizardStep>(1);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [generatedProposalId, setGeneratedProposalId] = useState<number | null>(
-    null
-  );
-  const [currentProposalId, setCurrentProposalId] = useState<number | null>(null);
-  const [hydrated, setHydrated] = useState<boolean>(false);
-  const [editMode, setEditMode] = useState<boolean>(false);
-  const [maxStepReached, setMaxStepReached] = useState<WizardStep>(1);
-  const [draftStage, setDraftStage] = useState<DraftStage>("template_selection");
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(true);
-
-  // Rehydrate from localStorage on mount (client only)
-  useEffect(() => {
-    try {
-      // Migrate data from old branding key if new key is not yet populated
-      const OLD_STORAGE_KEY = "proposely_wizard_v1";
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        const oldRaw = localStorage.getItem(OLD_STORAGE_KEY);
-        if (oldRaw) {
-          localStorage.setItem(STORAGE_KEY, oldRaw);
-          localStorage.removeItem(OLD_STORAGE_KEY);
-        }
-      }
-
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as {
-          proposalData?: Partial<ProposalData>;
-          currentStep?: WizardStep;
-          draftStage?: DraftStage;
-          completedSteps?: number[];
-        };
-        if (saved.proposalData) {
-          setProposalData({
-            ...defaultProposalData,
-            ...saved.proposalData,
-            files: [], // File objects can't be serialized — cleared on refresh
-            filesMeta: saved.proposalData.filesMeta ?? [], // metadata IS serializable
-          });
-        }
-        if (saved.currentStep) {
-          setCurrentStep(saved.currentStep);
-        }
-        if (saved.draftStage) {
-          setDraftStage(saved.draftStage);
-        }
-        if (saved.completedSteps) {
-          setCompletedSteps(saved.completedSteps);
-        }
-      }
-    } catch {
-      // Ignore corrupt/missing storage
-    }
-    setHydrated(true);
-  }, []);
-
-  // Persist to localStorage whenever state changes (after hydration)
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      const toSave = {
-        proposalData: { ...proposalData, files: [] }, // filesMeta is kept (serializable)
-        currentStep,
-        draftStage,
-        completedSteps,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-    } catch {
-      // Ignore storage quota errors
-    }
-  }, [proposalData, currentStep, hydrated, draftStage, completedSteps]);
-
-  const updateProposalData = useCallback(
-    (updates: Partial<ProposalData>): void => {
-      setProposalData((prev) => ({ ...prev, ...updates }));
-    },
-    []
-  );
-
-  const markStepCompleted = useCallback((stepId: number): void => {
-    setCompletedSteps((prev) => {
-      if (prev.includes(stepId)) return prev;
-      return [...prev, stepId];
-    });
-  }, []);
-
-  const resetProposal = useCallback((): void => {
-    setProposalData(defaultProposalData);
-    setCurrentStep(1);
-    setIsGenerating(false);
-    setGeneratedProposalId(null);
-    setCurrentProposalId(null);
-    setEditMode(false);
-    setMaxStepReached(1);
-    setDraftStage("template_selection");
-    setCompletedSteps([]);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // Ignore
-    }
-  }, []);
-
-  return (
-    <ProposalContext.Provider
-      value={{
-        proposalData,
-        updateProposalData,
-        currentStep,
-        setCurrentStep,
-        isGenerating,
-        setIsGenerating,
-        generatedProposalId,
-        setGeneratedProposalId,
-        currentProposalId,
-        setCurrentProposalId,
-        resetProposal,
-        hydrated,
-        editMode,
-        setEditMode,
-        maxStepReached,
-        setMaxStepReached,
-        draftStage,
-        setDraftStage,
-        completedSteps,
-        setCompletedSteps,
-        markStepCompleted,
-        currentDraftId,
-        setCurrentDraftId,
-        autoSaveEnabled,
-        setAutoSaveEnabled,
-      }}
-    >
-      {children}
-    </ProposalContext.Provider>
-  );
-}
-
+/**
+ * @deprecated Use the focused domain hooks instead to avoid unnecessary re-renders:
+ *   - useProposalWizard()    — proposal data, steps, generation state, edit mode
+ *   - useProposalPipeline()  — visited pipeline steps, sync/mark
+ *   - useProposalDraftSession() — draft stage, completed steps, draft ID
+ *
+ * This aggregate hook is retained for backward compatibility during migration.
+ * It composes the three focused hooks directly (no bridge context), so each
+ * sub-hook still only triggers re-renders for its own state changes.
+ */
 export function useProposal(): ProposalContextType {
-  const ctx = useContext(ProposalContext);
-  if (!ctx) {
-    throw new Error("useProposal must be used within a ProposalProvider");
-  }
-  return ctx;
+  const wizard = useProposalWizard();
+  const pipeline = useProposalPipeline();
+  const draftSession = useProposalDraftSession();
+
+  return {
+    ...wizard,
+    ...pipeline,
+    ...draftSession,
+  };
+}
+
+// ── Provider ─────────────────────────────────────────────────────────────────
+
+export function ProposalProvider({ children }: { children: React.ReactNode }): JSX.Element {
+  return (
+    <ProposalWizardProvider>
+      <ProposalPipelineProvider>
+        {children}
+      </ProposalPipelineProvider>
+    </ProposalWizardProvider>
+  );
 }

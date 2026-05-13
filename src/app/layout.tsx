@@ -1,14 +1,30 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
-import "./globals.scss";
+import { DM_Sans, DM_Mono } from "next/font/google";
+import "@/styles/styles.scss";
 import { ProposalProvider } from "@/context/ProposalContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
+
+const dmMono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-dm-mono",
+  display: "swap",
+});
 
 // Lazy load heavy components to reduce initial bundle size
-const ErrorBoundary = dynamic(() => import("@/components/shared/ErrorBoundary"), {
+const ErrorBoundary = dynamic(() => import("@/components/common/ErrorBoundary"), {
   ssr: true,
 });
 
-const ToastProvider = dynamic(() => import("@/components/shared/ToastProvider"), {
+const ToastProvider = dynamic(() => import("@/components/common/ToastProvider"), {
   ssr: false,
 });
 
@@ -23,14 +39,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }): JSX.Element {
   return (
-    <html lang="en">
+    <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`}>
       <body suppressHydrationWarning>
-        <ProposalProvider>
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
-          <ToastProvider />
-        </ProposalProvider>
+        <ThemeProvider>
+          <ProposalProvider>
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+            <ToastProvider />
+          </ProposalProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

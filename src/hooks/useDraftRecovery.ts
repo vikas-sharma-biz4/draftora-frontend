@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { getDraft, listDrafts } from "@/api/draftApi";
-import { useProposal } from "@/context/ProposalContext";
-import type { SavedDraft, DraftMetadata } from "@/types/draft.types";
+import { getDraft } from "@/services/draft.service";
+import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import type { SavedDraft, DraftMetadata } from "@/interfaces/draftInterfaces";
 
 interface UseDraftRecoveryOptions {
   autoRecover?: boolean;
@@ -24,28 +26,28 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
     updateProposalData,
     setCurrentStep,
     setMaxStepReached,
-    setCompletedSteps,
-    setDraftStage,
     setGeneratedProposalId,
-  } = useProposal();
+  } = useProposalWizard();
 
-  const [availableDrafts, setAvailableDrafts] = useState<DraftMetadata[]>([]);
-  const [isLoadingDrafts, setIsLoadingDrafts] = useState<boolean>(false);
+  const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+
+  // Use draft store for centralized draft list management
+  const drafts = useDraftStore(state => state.drafts);
+  const isLoadingDrafts = useDraftStore(state => state.isLoading);
+  const fetchDrafts = useDraftStore(state => state.fetchDrafts);
+
+  const hasAutoRecoveredRef = useRef(false);
   const [isRecovering, setIsRecovering] = useState<boolean>(false);
   const [recoveryError, setRecoveryError] = useState<Error | null>(null);
 
-  const loadAvailableDrafts = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoadingDrafts(true);
-      const drafts = await listDrafts();
-      setAvailableDrafts(drafts);
-    } catch (error) {
+  // Load drafts from store on mount
+  useEffect(() => {
+    fetchDrafts().catch((error) => {
       const err = error instanceof Error ? error : new Error("Failed to load drafts");
       setRecoveryError(err);
-    } finally {
-      setIsLoadingDrafts(false);
-    }
-  }, []);
+    });
+  }, [fetchDrafts]);
 
   const recoverDraft = useCallback(
     async (draftId: string): Promise<void> => {
@@ -66,20 +68,20 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
         }
 
         switch (draft.lastLocation) {
-          case "WIZARD_PARAMETERS":
+          case "wizard_parameters":
             router.push("/parameters");
             break;
-          case "WIZARD_REVIEW":
+          case "wizard_review":
             router.push("/review");
             break;
-          case "WEB_VIEW":
+          case "web_view":
             if (draft.proposalId) {
               router.push(`/proposal/${draft.proposalId}`);
             } else {
               router.push("/parameters");
             }
             break;
-          case "AI_SECTIONS":
+          case "ai_sections":
             router.push("/generating");
             break;
           default:
@@ -109,9 +111,9 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
       updateProposalData,
       setCurrentStep,
       setMaxStepReached,
+      setGeneratedProposalId,
       setCompletedSteps,
       setDraftStage,
-      setGeneratedProposalId,
       router,
       onRecoveryComplete,
       onRecoveryError,
@@ -119,21 +121,18 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
   );
 
   useEffect(() => {
-    loadAvailableDrafts();
-  }, [loadAvailableDrafts]);
-
-  useEffect(() => {
-    if (autoRecover && availableDrafts.length > 0) {
-      const mostRecent = availableDrafts.sort(
+    if (autoRecover && drafts.length > 0 && !hasAutoRecoveredRef.current) {
+      hasAutoRecoveredRef.current = true;
+      const mostRecent = [...drafts].sort(
         (a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       )[0];
       recoverDraft(mostRecent.id);
     }
-  }, [autoRecover, availableDrafts, recoverDraft]);
+  }, [autoRecover, drafts, recoverDraft]);
 
   return {
-    availableDrafts,
+    availableDrafts: drafts,
     isLoadingDrafts,
     recoverDraft,
     isRecovering,

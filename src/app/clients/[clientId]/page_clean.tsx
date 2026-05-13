@@ -5,12 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { Upload, Search, FileText, Edit, CheckCircle, Clock, X } from "lucide-react";
 import { toast } from "sonner";
+import Button from "@/components/common/Button";
+import { logger } from "@/utils/logger";
 
 import styles from "./page.module.scss";
 
-import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/api/clientApi";
-import { listProposals } from "@/api/proposalApi";
-import type { ProposalListItem } from "@/types/proposal.types";
+import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/services/client.service";
+import { listProposals } from "@/services/proposal.service";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 const MainSidebar = dynamic(() => import("@/components/common/MainSidebar"), {
   ssr: false,
@@ -25,7 +27,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [client, setClient] = useState<ClientWithDocuments | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
@@ -45,13 +47,13 @@ export default function ClientWorkspacePage(): JSX.Element {
 
   async function loadClientProposals(): Promise<void> {
     if (!client) return;
-    
+
     try {
       const proposals = await listProposals();
       const clientHistory = proposals.filter((p) => p.clientId === client.id);
       setClientProposals(clientHistory);
     } catch (error) {
-      console.error("Failed to load client proposals:", error);
+      logger.error("Failed to load client proposals:", error);
     }
   }
 
@@ -63,7 +65,7 @@ export default function ClientWorkspacePage(): JSX.Element {
       const loadedClient = await getClient(clientId);
       setClient(loadedClient);
     } catch (error) {
-      console.error("Failed to load client:", error);
+      logger.error("Failed to load client:", error);
       toast.error("Client not found");
       router.push("/clients");
     } finally {
@@ -73,13 +75,13 @@ export default function ClientWorkspacePage(): JSX.Element {
 
   async function handleDeleteDocument(docId: number): Promise<void> {
     if (!client) return;
-    
+
     try {
       await deleteDocument(client.id, docId);
       toast.success("Document deleted");
       await loadClient();
     } catch (error) {
-      console.error("Failed to delete document:", error);
+      logger.error("Failed to delete document:", error);
       toast.error("Failed to delete document");
     }
   }
@@ -88,7 +90,7 @@ export default function ClientWorkspacePage(): JSX.Element {
     if (!files || !client) return;
 
     const fileArray = Array.from(files);
-    
+
     for (const file of fileArray) {
       try {
         setUploadingFiles(prev => new Set(prev).add(file.name));
@@ -96,7 +98,7 @@ export default function ClientWorkspacePage(): JSX.Element {
         toast.success(`${file.name} uploaded successfully`);
         await loadClient();
       } catch (error) {
-        console.error(`Failed to upload ${file.name}:`, error);
+        logger.error(`Failed to upload ${file.name}:`, error);
         toast.error(`Failed to upload ${file.name}`);
       } finally {
         setUploadingFiles(prev => {
@@ -154,23 +156,23 @@ export default function ClientWorkspacePage(): JSX.Element {
             <h1 className="page-title">{client.name}</h1>
             <p className="page-subtitle">{client.industry}</p>
           </div>
-          <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
+          <Button variant="secondary" onClick={() => setShowEditModal(true)}>
             <Edit size={18} />
             Edit Client
-          </button>
+          </Button>
         </div>
 
         <div className={styles.documentsSection}>
           <div className={styles.sectionHeader}>
             <h2>Documents</h2>
-            <button 
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingFiles.size > 0}
             >
               <Upload size={18} />
               {uploadingFiles.size > 0 ? `Uploading ${uploadingFiles.size}...` : 'Upload Document'}
-            </button>
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
@@ -207,19 +209,22 @@ export default function ClientWorkspacePage(): JSX.Element {
                   </div>
                   <div className={styles.documentInfo}>
                     <h3>{doc.name}</h3>
-                    <p>{doc.file_type.toUpperCase()} • {Math.round(doc.size_bytes / 1024)} KB</p>
+                    <p>{doc.fileType?.toUpperCase() || 'FILE'} • {Math.round((doc.sizeBytes || 0) / 1024)} KB</p>
                     <span className={`${styles.status} ${styles[doc.status]}`}>
                       {doc.status === 'parsed' ? <CheckCircle size={14} /> : <Clock size={14} />}
                       {doc.status}
                     </span>
                   </div>
-                  <button
-                    className={styles.deleteBtn}
+                  <Button
+                    variant="ghost"
+                    iconOnly
                     onClick={() => handleDeleteDocument(doc.id)}
                     title="Delete document"
+                    aria-label="Delete document"
+                    className={styles.deleteBtn}
                   >
                     <X size={18} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

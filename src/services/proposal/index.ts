@@ -1,0 +1,70 @@
+/**
+ * Proposal service barrel
+ *
+ * Re-exports all proposal-related service functions from their
+ * single-responsibility sub-modules. Import from @/services/proposal
+ * or from the legacy path @/services/proposal.service (both resolve here).
+ *
+ * Sub-modules:
+ *   proposalCrud.service.ts     — create, get, list, download, cancel, approval
+ *   proposalSections.service.ts — add, remove, reorder, update, regenerate sections
+ *   templateParser.service.ts   — template parsing, file parsing, section suggestions, AI recommendations
+ *   proposalWizard.service.ts   — mark step visited, validate step access
+ */
+
+// CRUD
+export {
+  generateProposal,
+  getProposalStatus,
+  getProposal,
+  listProposals,
+  getDownloadUrl,
+  cancelProposal,
+  updateApprovalStatus,
+} from "./proposalCrud.service";
+
+export type { ProposalStatus, ListProposalsParams } from "./proposalCrud.service";
+
+// Sections
+export {
+  updateSection,
+  regenerateSection,
+  addProposalSection,
+  removeProposalSection,
+  reorderProposalSections,
+} from "./proposalSections.service";
+
+export type {
+  AddSectionPayload,
+  ReorderSectionsPayload,
+} from "./proposalSections.service";
+
+// Template parsing & AI recommendations
+export {
+  parseCustomTemplate,
+  parseRecreateDocument,
+  parseFiles,
+  getSupportedParseFormats,
+  suggestSections,
+  getSectionRecommendations,
+} from "./templateParser.service";
+
+export type {
+  ExtractedTemplateSection,
+  ParseTemplateResult,
+  RecreateExtractedSection,
+  ParseRecreateResult,
+  ParsedFileResult,
+  ParseFilesResponse,
+  SuggestSectionsPayload,
+  SuggestedSection,
+  SectionRecommendation,
+  ExistingSectionWithRules,
+  RecommendSectionsRequest,
+} from "./templateParser.service";
+
+// Wizard step navigation
+export {
+  markProposalStepVisited,
+  validateProposalStepAccess,
+} from "./proposalWizard.service";

@@ -1,0 +1,379 @@
+// ─── Sections grid ────────────────────────────────────────────────────────────
+.sections-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+// ─── Section checkbox items ───────────────────────────────────────────────────
+.section-checkbox-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--color-white);
+}
+
+.section-checkbox-item:hover {
+  border-color: var(--color-primary-medium);
+  background: var(--color-primary-light);
+}
+
+.section-checkbox-item.checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.section-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-dark);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-size: 10px;
+  color: white;
+}
+
+.section-checkbox.checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.section-checkbox-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.section-checkbox-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.section-checkbox-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+// ─── Section select header ────────────────────────────────────────────────────
+.section-select-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-header-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+// ─── Sections group label ─────────────────────────────────────────────────────
+.sections-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-light);
+  margin-bottom: 10px;
+  margin-top: 4px;
+}
+
+// ─── Custom sections ──────────────────────────────────────────────────────────
+.custom-sections-wrapper {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.custom-sections-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.custom-sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.custom-section-item {
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  overflow: hidden;
+}
+
+.custom-section-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.custom-section-drag-handle {
+  flex-shrink: 0;
+  margin-top: 3px;
+  opacity: 0.4;
+  cursor: grab;
+}
+
+.custom-section-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 3px;
+}
+
+.custom-section-desc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-section-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.custom-section-edit-form {
+  padding: 14px;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
+}
+
+.custom-sections-empty {
+  text-align: center;
+  padding: 28px 20px;
+  background: var(--color-bg);
+  border: 1.5px dashed var(--color-border-dark);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+}
+
+.custom-section-add-form {
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-primary-medium);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  margin-top: 8px;
+}
+
+// ─── Icon button plain ────────────────────────────────────────────────────────
+.icon-btn-plain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-btn-plain:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.icon-btn-plain.danger:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+// ─── Section structure (drag-and-drop TOC) ────────────────────────────────────
+.section-structure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-structure-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-white);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.section-structure-item:hover {
+  border-color: var(--color-primary-medium);
+  box-shadow: var(--shadow-sm);
+}
+
+.section-structure-item.dragging {
+  opacity: 0.5;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.section-structure-item.drag-over {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.section-drag-handle {
+  cursor: grab;
+  color: var(--color-text-light);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px;
+}
+
+.section-drag-handle:active {
+  cursor: grabbing;
+}
+
+.section-structure-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 0;
+}
+
+.section-name-input {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  background: var(--color-white);
+  outline: none;
+  min-width: 0;
+}
+
+.section-structure-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.section-structure-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.section-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.section-add-input {
+  flex: 1;
+  font-size: 13px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  background: var(--color-white);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.section-add-input:focus {
+  border-color: var(--color-primary);
+}
+
+.sections-ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+// ─── Hierarchical section (child indicator) ───────────────────────────────────
+.section-content-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-child-indicator {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+.section-structure-item.section-child {
+  background: linear-gradient(to right, rgba(var(--color-primary-rgb), 0.02) 0%, transparent 100%);
+  border-left: 2px solid var(--color-primary-medium);
+}
+
+.section-structure-item.section-child:hover {
+  background: linear-gradient(to right, rgba(var(--color-primary-rgb), 0.04) 0%, transparent 100%);
+  border-left-color: var(--color-primary);
+}
+
+.section-structure-item.section-child .section-structure-name {
+  color: var(--color-text);
+}
+
+.section-structure-item.section-child .section-structure-num {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+// ─── Responsive — 768px ───────────────────────────────────────────────────────
+@media (max-width: 768px) {
+  .sections-grid {
+    grid-template-columns: 1fr;
+  }
+}

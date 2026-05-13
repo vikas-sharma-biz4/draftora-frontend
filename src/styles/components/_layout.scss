@@ -1,0 +1,91 @@
+// ─── App container ────────────────────────────────────────────────────────────
+.app-container {
+  display: flex;
+  height: 100vh;
+  animation: fadeIn 0.18s ease-out both;
+  overflow: hidden;
+  position: relative;
+}
+
+// ─── Main content ─────────────────────────────────────────────────────────────
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: clamp(2rem, 4vw, 3.25rem) clamp(1.5rem, 4vw, 3.25rem) clamp(2rem, 4vw, 3.25rem);
+  background: var(--color-bg);
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: calc(100% - var(--sidebar-width));
+  height: 100vh;
+  position: relative;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.main-content.no-top-padding {
+  padding-top: 0;
+}
+
+// ─── Page footer (wizard navigation) ─────────────────────────────────────────
+.page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.page-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+// ─── Responsive — 1024px ──────────────────────────────────────────────────────
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+    padding: 24px 32px;
+    max-width: 100%;
+  }
+}
+
+// ─── Responsive — 768px ───────────────────────────────────────────────────────
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column;
+  }
+
+  .main-content {
+    padding: 20px;
+  }
+}
+
+// ─── Responsive — 640px ───────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .main-content,
+  .sidebar.collapsed + .main-content {
+    margin-left: var(--sidebar-collapsed-width) !important;
+    width: calc(100% - var(--sidebar-collapsed-width)) !important;
+  }
+}
+
+// ─── Responsive — 480px ───────────────────────────────────────────────────────
+@media (max-width: 480px) {
+  .page-footer {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .page-footer-right {
+    flex-direction: column;
+    width: 100%;
+  }
+}

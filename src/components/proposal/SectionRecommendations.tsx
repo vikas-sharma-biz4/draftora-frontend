@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
-import { Sparkles, RefreshCw, GripVertical, Plus } from "lucide-react";
-import { toast } from "sonner";
-import { getSectionRecommendations, type SectionRecommendation } from "@/api/proposalApi";
+import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { Sparkles, RefreshCw, GripVertical, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { toast } from "@/utils/toast";
+import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposal.service";
+import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
+import { logger } from "@/utils/logger";
+
+export interface SectionRecommendationsRef {
+  removeRecommendation: (sectionKey: string) => void;
+  startBackgroundFetch: () => void;
+}
 
 interface SectionRecommendationsProps {
   templateId?: string | null;
@@ -12,20 +19,28 @@ interface SectionRecommendationsProps {
   context: string;
   documentContext: string;
   onAddSection: (sectionKey: string, title: string) => void;
+  onSectionAdded?: (sectionKey: string) => void;
 }
 
-export default function SectionRecommendations({
-  templateId,
-  existingSections,
-  context,
-  documentContext,
-  onAddSection,
-}: SectionRecommendationsProps): JSX.Element {
+const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionRecommendationsProps>((
+  {
+    templateId,
+    existingSections,
+    context,
+    documentContext,
+    onAddSection,
+    onSectionAdded,
+  }: SectionRecommendationsProps,
+  ref
+) => {
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [hasUserRequested, setHasUserRequested] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState<boolean>(false);
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const hasAutoFetchedRef = useRef<boolean>(false);
 
   const contextRef = useRef(context);
   const documentContextRef = useRef(documentContext);
@@ -39,6 +54,46 @@ export default function SectionRecommendations({
     existingSectionsRef.current = existingSections;
   });
 
+  // Removed automatic background fetching - user must click Generate button
+
+  const fetchRecommendationsInBackground = async (customPrompt?: string): Promise<void> => {
+    const ctx = contextRef.current;
+    const docCtx = documentContextRef.current;
+
+    if (!ctx && !docCtx) {
+      return;
+    }
+
+    setIsBackgroundLoading(true);
+    try {
+      const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
+
+      const existingSectionsWithRules = existingSectionsRef.current.map((key) => ({
+        sectionKey: key,
+        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        include: "",
+        exclude: "",
+        purpose: "",
+      }));
+
+      const recs = await getSectionRecommendations({
+        templateId: templateIdRef.current,
+        existingSections: existingSectionsRef.current,
+        existingSectionsWithRules: existingSectionsWithRules,
+        context: fullContext,
+        userPrompt: customPrompt ?? userPrompt ?? null,
+      });
+
+      setRecommendations(recs);
+      setHasUserRequested(true);
+    } catch (error) {
+      logger.error("Failed to fetch recommendations:", error);
+      setRecommendations([]);
+    } finally {
+      setIsBackgroundLoading(false);
+    }
+  };
+
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
@@ -51,29 +106,38 @@ export default function SectionRecommendations({
     try {
       const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
 
+      const existingSectionsWithRules = existingSectionsRef.current.map((key) => ({
+        sectionKey: key,
+        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        include: "",
+        exclude: "",
+        purpose: "",
+      }));
+
       const recs = await getSectionRecommendations({
-        template_id: templateIdRef.current,
-        existing_sections: existingSectionsRef.current,
+        templateId: templateIdRef.current,
+        existingSections: existingSectionsRef.current,
+        existingSectionsWithRules: existingSectionsWithRules,
         context: fullContext,
-        user_prompt: customPrompt ?? userPrompt ?? null,
+        userPrompt: customPrompt ?? userPrompt ?? null,
       });
 
       setRecommendations(recs);
+      setHasUserRequested(true);
     } catch (error) {
-      console.error("Failed to fetch recommendations:", error);
+      logger.error("Failed to fetch recommendations:", error);
+      toast.error("Failed to generate recommendations. Please try again.");
       setRecommendations([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchRecommendations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleGetRecommendations = (): void => {
     setHasUserRequested(true);
+    setRecommendations([]);
+    fetchRecommendations();
   };
 
   const handleRegenerate = (): void => {
@@ -82,10 +146,37 @@ export default function SectionRecommendations({
     fetchRecommendations();
   };
 
-  const handleAddSection = (rec: SectionRecommendation): void => {
-    const sectionKey = rec.section_title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-    onAddSection(sectionKey, rec.section_title);
-    toast.success(`Added "${rec.section_title}" to section structure`);
+  const handleAddSection = (rec: SectionRecommendation, index: number): void => {
+    const sectionKey = rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+
+    // Check if section already exists to prevent duplicates
+    if (existingSections.includes(sectionKey)) {
+      toast.info(`"${rec.sectionTitle}" is already in your Table of Contents`);
+      return;
+    }
+
+    onAddSection(sectionKey, rec.sectionTitle);
+    toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
+
+    // Remove from recommendations list
+    setRecommendations(prev => prev.filter((_, i) => i !== index));
+
+    // Notify parent that section was added
+    if (onSectionAdded) {
+      onSectionAdded(sectionKey);
+    }
+  };
+
+  const toggleCardExpansion = (index: number): void => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
   };
 
   const handlePromptChange = (): void => {
@@ -97,35 +188,53 @@ export default function SectionRecommendations({
     }
   };
 
+  const handlePromptKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handlePromptChange();
+    }
+  };
+
+  // Expose removeRecommendation and startBackgroundFetch methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    removeRecommendation: (sectionKey: string) => {
+      setRecommendations((prev) => {
+        const index = prev.findIndex(
+          (rec) => rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') === sectionKey
+        );
+        if (index !== -1) {
+          return prev.filter((_, i) => i !== index);
+        }
+        return prev;
+      });
+    },
+    startBackgroundFetch: () => {
+      fetchRecommendationsInBackground();
+    },
+  }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.headerTitle}>
-          <Sparkles size={20} className={styles.sparkleIcon} />
           <h3>AI Section Recommendations</h3>
         </div>
-        {hasUserRequested && (
-          <button
-            className={styles.regenerateBtn}
-            onClick={handleRegenerate}
-            disabled={isLoading}
-            title="Regenerate recommendations"
-          >
-            <RefreshCw size={16} className={isLoading ? styles.spinning : ""} />
-          </button>
-        )}
+        <div className={styles.headerActions}>
+          {!hasUserRequested && (
+            <button
+              className={styles.getRecommendationsBtn}
+              onClick={handleGetRecommendations}
+              disabled={isLoading}
+            >
+              Generate
+            </button>
+          )}
+        </div>
       </div>
 
       {!hasUserRequested ? (
         <div className={styles.ctaState}>
-          <Sparkles size={28} className={styles.ctaIcon} />
-          <p className={styles.ctaText}>AI is ready to suggest the best sections for your proposal</p>
-          <button
-            className={styles.ctaBtn}
-            onClick={handleGetRecommendations}
-          >
-            ✨ Get AI Recommendations
-          </button>
+          <p className={styles.ctaText}>Click Generate to get AI-powered section recommendations</p>
         </div>
       ) : (
         <>
@@ -139,7 +248,8 @@ export default function SectionRecommendations({
                   className={styles.promptTextarea}
                   value={userPrompt}
                   onChange={(e) => setUserPrompt(e.target.value)}
-                  placeholder="e.g., Focus on technical sections, emphasize security aspects..."
+                  onKeyDown={handlePromptKeyDown}
+                  placeholder="e.g., Focus on technical sections, emphasize security aspects... (Press Enter to apply)"
                   rows={3}
                 />
                 <div className={styles.promptActions}>
@@ -174,7 +284,6 @@ export default function SectionRecommendations({
             </div>
           ) : recommendations.length === 0 ? (
             <div className={styles.emptyState}>
-              <Sparkles size={32} className={styles.emptyIcon} />
               <p>No recommendations available</p>
               <span className={styles.emptyHint}>
                 {!context && !documentContext
@@ -185,7 +294,8 @@ export default function SectionRecommendations({
           ) : (
             <div className={styles.recommendationsList}>
               {recommendations.map((rec, index) => {
-                const sectionKey = rec.section_title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                const sectionKey = rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                const isExpanded = expandedCards.has(index);
                 return (
                   <div
                     key={`${sectionKey}-${index}`}
@@ -193,54 +303,69 @@ export default function SectionRecommendations({
                     draggable
                     onDragStart={(e) => {
                       e.dataTransfer.setData("section_key", sectionKey);
-                      e.dataTransfer.setData("section_title", rec.section_title);
+                      e.dataTransfer.setData("section_title", rec.sectionTitle);
+                      e.dataTransfer.setData("recommendation_index", index.toString());
                       e.dataTransfer.effectAllowed = "copy";
                     }}
-                    title={rec.reasoning}
+                    onDragEnd={() => {
+                      // Clean up drag state to prevent indefinite dragging
+                    }}
                   >
                     <div className={styles.cardHeader}>
-                      <div className={styles.cardDragHandle}>
-                        <GripVertical size={16} />
-                      </div>
                       <div className={styles.cardTitleSection}>
-                        <h4 className={styles.cardTitle}>{rec.section_title}</h4>
+                        <h4 className={styles.cardTitle}>{rec.sectionTitle}</h4>
                         <div className={styles.relevanceScore}>
                           <div className={styles.scoreBar}>
                             <div
                               className={styles.scoreBarFill}
-                              style={{ width: `${rec.relevance_score * 100}%` }}
+                              style={{ width: `${rec.relevanceScore * 100}%` }}
                             />
                           </div>
                           <span className={styles.scoreText}>
-                            {Math.round(rec.relevance_score * 100)}%
+                            {Math.round(rec.relevanceScore * 100)}%
                           </span>
                         </div>
                       </div>
                       <button
+                        className={styles.expandBtn}
+                        onClick={() => toggleCardExpansion(index)}
+                        title={isExpanded ? "Collapse details" : "Expand details"}
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      <button
                         className={styles.addBtn}
-                        onClick={() => handleAddSection(rec)}
+                        onClick={() => handleAddSection(rec, index)}
                         title="Add to section structure"
                       >
-                        <Plus size={18} />
+                        Add
                       </button>
                     </div>
-                    <p className={styles.cardDescription}>{rec.description}</p>
-                    <p className={styles.cardReasoning}>
-                      <strong>Why:</strong> {rec.reasoning}
-                    </p>
+                    {isExpanded && (
+                      <div className={styles.cardContent}>
+                        <p className={styles.cardDescription}>{rec.description}</p>
+                        <p className={styles.cardReasoning}>
+                          <strong>Why:</strong> {rec.reasoning}
+                        </p>
+                        {rec.purpose && (
+                          <p className={styles.cardPurpose}>
+                            <strong>Purpose:</strong> {rec.purpose}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          <div className={styles.footer}>
-            <p className={styles.footerHint}>
-              💡 Drag sections to reorder or click <Plus size={14} /> to add
-            </p>
-          </div>
         </>
       )}
     </div>
   );
-}
+});
+
+SectionRecommendations.displayName = "SectionRecommendations";
+
+export default SectionRecommendations;
