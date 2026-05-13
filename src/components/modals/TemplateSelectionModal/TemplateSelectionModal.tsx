@@ -17,7 +17,8 @@ import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useModalHistory } from "@/hooks/useModalHistory";
 import type { ClientWithDocuments } from "@/services/client.service";
 import { PROPOSAL_TEMPLATES, SCRATCH_TEMPLATE_DEFAULT_SECTIONS, SECTION_DISPLAY_NAMES, INDUSTRIES } from "@/constants";
-import { useProposal } from "@/context/ProposalContext";
+import { useProposalDraftSession } from "@/context/ProposalContext";
+import { useWizardActions, useProposalData } from "@/store/features/wizard/proposalWizardSlice";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
@@ -53,7 +54,9 @@ export default function TemplateSelectionModal({
   initialView = "template_selection",
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
-  const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, setShouldStartBackgroundFetch } = useProposal();
+  const { updateProposalData, setCurrentStep, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
+  const proposalData = useProposalData();
+  const { setDraftStage, markStepCompleted } = useProposalDraftSession();
 
   const { clients: storeClients, isLoading: storeLoading } = useClients({ autoFetch: initialClients === undefined });
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
@@ -392,6 +395,10 @@ export default function TemplateSelectionModal({
    * Validates form state, persists proposal metadata to context,
    * and routes the user to the parameter wizard (step 4).
    * Triggers toast errors for missing client, name, or documents.
+   * 
+   * IMPORTANT: Triggers background prefetch of section recommendations
+   * immediately when user clicks Continue, before navigation.
+   * This is a fire-and-forget operation that does not block navigation.
    */
   function handleContinue(): void {
     if (!selectedClientId) {
@@ -444,17 +451,33 @@ export default function TemplateSelectionModal({
       });
     }
 
+    const selectedSections = isScratch ? [...SCRATCH_TEMPLATE_DEFAULT_SECTIONS] : template ? [...template.sections] : [];
+    const description = initialContextNotes ? `${initialContextNotes}\n\n${proposalDescription}` : proposalDescription;
+
     updateProposalData({
       title: proposalName,
       clientName: client.name,
-      description: initialContextNotes ? `${initialContextNotes}\n\n${proposalDescription}` : proposalDescription,
+      description,
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
       templateType: isScratch ? "scratch" : "predefined",
-      selectedSections: isScratch ? [...SCRATCH_TEMPLATE_DEFAULT_SECTIONS] : template ? [...template.sections] : [],
+      selectedSections,
       sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
+    });
+
+    // Trigger background prefetch of section recommendations IMMEDIATELY
+    // This is fire-and-forget - does not block navigation or show any UI
+    const documentContext = selectedDocsMeta.map((f) => f.name).join(", ") ?? "";
+    prefetchRecommendations({
+      templateId: isScratch ? null : finalTemplateId ?? null,
+      existingSections: selectedSections,
+      context: description,
+      documentContext,
+    }).catch((error) => {
+      // Silently handle prefetch errors - user can retry by clicking Generate
+      logger.warn("Background recommendations prefetch failed:", error);
     });
 
     setDraftStage("wizard_in_progress");

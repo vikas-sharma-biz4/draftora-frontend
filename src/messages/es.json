@@ -1,0 +1,73 @@
+{
+  "generic": {
+    "error": "Algo salió mal. Por favor, inténtelo de nuevo.",
+    "success": "Operación completada con éxito.",
+    "loading": "Cargando\u2026",
+    "saving": "Guardando\u2026",
+    "deleting": "Eliminando\u2026"
+  },
+  "auth": {
+    "loginSuccess": "Sesión iniciada correctamente.",
+    "logoutSuccess": "Sesión cerrada correctamente.",
+    "invalidCredentials": "Correo electrónico o contraseña inválidos.",
+    "sessionExpired": "Su sesión ha expirado. Por favor, inicie sesión nuevamente.",
+    "passwordResetSent": "Enlace de restablecimiento de contraseña enviado a su correo.",
+    "passwordChanged": "Contraseña cambiada correctamente."
+  },
+  "client": {
+    "created": "Cliente creado correctamente.",
+    "updated": "Cliente actualizado correctamente.",
+    "deleted": "Cliente eliminado correctamente.",
+    "notFound": "Cliente no encontrado."
+  },
+  "document": {
+    "uploaded": "Documento cargado correctamente.",
+    "deleted": "Documento eliminado correctamente.",
+    "uploadFailed": "Error al cargar el documento. Por favor, inténtelo de nuevo."
+  },
+  "proposal": {
+    "created": "Propuesta creada correctamente.",
+    "deleted": "Propuesta eliminada correctamente.",
+    "generationStarted": "Generando su propuesta\u2026",
+    "generationDone": "Propuesta generada correctamente.",
+    "generationFailed": "Error al generar la propuesta. Por favor, inténtelo de nuevo.",
+    "sectionSaved": "Sección guardada.",
+    "sectionSaveFailed": "Error al guardar la sección.",
+    "sectionRegenerated": "Sección regenerada.",
+    "sectionRegenFailed": "Error al regenerar.",
+    "sectionRemoved": "Sección eliminada.",
+    "sectionRemoveFailed": "Error al eliminar la sección.",
+    "sectionAdded": "Sección {name} añadida con contenido generado por IA!",
+    "sectionAddFailed": "Error al añadir la sección.",
+    "sectionGenerating": "Generando contenido para la nueva sección...",
+    "approved": "¡Propuesta aprobada y movida al historial!",
+    "rejected": "Propuesta rechazada y movida al historial",
+    "approveFailed": "Error al aprobar la propuesta",
+    "rejectFailed": "Error al rechazar la propuesta",
+    "downloaded": "Propuesta descargada correctamente",
+    "downloadFailed": "Error al descargar la propuesta",
+    "sectionNameEmpty": "El nombre de la sección no puede estar vacío.",
+    "sectionNameExists": "Ya existe una sección con ese nombre.",
+    "minSections": "Se requiere al menos una sección."
+  },
+  "draft": {
+    "saved": "Borrador guardado.",
+    "restored": "Borrador restaurado.",
+    "deleted": "Borrador eliminado.",
+    "allDeleted": "Todos los borradores eliminados."
+  },
+  "upload": {
+    "inProgress": "Cargando archivo\u2026",
+    "success": "Archivo cargado correctamente.",
+    "failed": "Error al cargar el archivo. Por favor, inténtelo de nuevo.",
+    "tooLarge": "El archivo es demasiado grande. El tamaño máximo es 10 MB.",
+    "invalidType": "Tipo de archivo inválido."
+  },
+  "validation": {
+    "required": "Este campo es obligatorio.",
+    "email": "Por favor, introduzca una dirección de correo válida.",
+    "minLength": "Debe tener al menos {min} caracteres.",
+    "maxLength": "No debe tener más de {max} caracteres.",
+    "passwordWeak": "La contraseña debe tener al menos 8 caracteres y contener un número."
+  }
+}

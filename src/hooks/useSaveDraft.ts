@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
 
 import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
 import { updateDraft as updateDraftApi } from "@/services/draft.service";
@@ -36,12 +37,7 @@ export function useSaveDraft(): () => Promise<void> {
     }
 
     // Determine lastLocation based on current pathname
-    const lastLocation: DraftLocation = (() => {
-      if (pathname === "/parameters") return "wizard_parameters";
-      if (pathname === "/review") return "wizard_review";
-      if (pathname.startsWith("/proposal/")) return "web_view";
-      return "wizard_parameters";
-    })();
+    const lastLocation: DraftLocation = getLastLocationFromPathname(pathname);
 
     // Capture UI state for restoration
     const uiState: DraftUIState = {

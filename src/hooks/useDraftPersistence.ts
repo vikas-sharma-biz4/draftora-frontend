@@ -30,6 +30,7 @@ import type {
 } from "@/interfaces/draftInterfaces";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
+import { DRAFTS_AUTOSAVE_FALLBACK_KEY } from "@/constants/storageKeys";
 
 // ─── Options ────────────────────────────────────────────────────────────────
 
@@ -63,11 +64,9 @@ function captureUIState(activeSection: string): DraftUIState {
   };
 }
 
-const AUTOSAVE_FALLBACK_KEY = "drafts_autosave_fallback";
-
 function saveToFallbackStore(draftItem: Record<string, unknown>): void {
   try {
-    const raw = localStorage.getItem(AUTOSAVE_FALLBACK_KEY);
+    const raw = localStorage.getItem(DRAFTS_AUTOSAVE_FALLBACK_KEY);
     const existing: Array<{ id: string }> = raw ? JSON.parse(raw) : [];
     const idx = existing.findIndex((d) => d.id === draftItem.id);
     if (idx >= 0) {
@@ -75,7 +74,7 @@ function saveToFallbackStore(draftItem: Record<string, unknown>): void {
     } else {
       existing.unshift(draftItem as typeof existing[0]);
     }
-    localStorage.setItem(AUTOSAVE_FALLBACK_KEY, JSON.stringify(existing));
+    localStorage.setItem(DRAFTS_AUTOSAVE_FALLBACK_KEY, JSON.stringify(existing));
   } catch (error) {
     logger.error("[useDraftPersistence] fallback save failed:", error);
   }

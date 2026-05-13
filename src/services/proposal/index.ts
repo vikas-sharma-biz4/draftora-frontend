@@ -23,7 +23,7 @@ export {
   updateApprovalStatus,
 } from "./proposalCrud.service";
 
-export type { ProposalStatus, ListProposalsParams } from "./proposalCrud.service";
+export type { ListProposalsParams } from "./proposalCrud.service";
 
 // Sections
 export {

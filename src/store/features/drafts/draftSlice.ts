@@ -34,10 +34,6 @@ interface DraftState {
   lastFetched: number | null;
   error: string | null;
 
-  // Computed
-  isCacheValid: () => boolean;
-  getDraftById: (id: string) => DraftMetadata | undefined;
-
   // Draft list actions
   fetchDrafts: (force?: boolean) => Promise<void>;
   setDrafts: (drafts: DraftMetadata[]) => void;
@@ -64,24 +60,15 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   lastFetched: null,
   error: null,
 
-  // Computed
-  isCacheValid: () => {
-    const { lastFetched, isInitialized } = get();
-    if (!isInitialized || lastFetched === null) return false;
-    return Date.now() - lastFetched < CACHE_TTL_MS;
-  },
-
-  getDraftById: (id: string) => {
-    return get().drafts.find(d => d.id === id);
-  },
-
   // Actions
   fetchDrafts: async (force = false) => {
-    const { isCacheValid, isLoading } = get();
+    const { lastFetched, isInitialized, isLoading } = get();
 
     // Return cached data if valid and not forced
-    if (!force && isCacheValid()) {
-      return;
+    if (!force && isInitialized && lastFetched !== null) {
+      if (Date.now() - lastFetched < CACHE_TTL_MS) {
+        return;
+      }
     }
 
     // Prevent duplicate concurrent requests
@@ -224,3 +211,44 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     }
   },
 }));
+
+// ─── Standalone Selectors ─────────────────────────────────────────────────────
+
+/**
+ * Pure selectors for derived state computations.
+ * These are framework-agnostic and can be used with Zustand's selector API.
+ */
+
+/**
+ * Selects whether the cache is still valid based on TTL.
+ */
+export const selectIsCacheValid = (state: DraftState): boolean => {
+  if (!state.isInitialized || state.lastFetched === null) return false;
+  return Date.now() - state.lastFetched < CACHE_TTL_MS;
+};
+
+/**
+ * Selects a draft by its ID.
+ */
+export const selectDraftById = (id: string) => (state: DraftState): DraftMetadata | undefined => {
+  return state.drafts.find(d => d.id === id);
+};
+
+// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
+
+/**
+ * Selector hooks for fine-grained Zustand subscriptions.
+ *
+ * Components should use these hooks to subscribe only to the specific state
+ * they need, avoiding unnecessary re-renders when unrelated state changes.
+ */
+
+/**
+ * Selects whether the cache is valid.
+ */
+export const useIsCacheValid = () => useDraftStore(selectIsCacheValid);
+
+/**
+ * Selects a draft by its ID.
+ */
+export const useDraftById = (id: string) => useDraftStore(selectDraftById(id));

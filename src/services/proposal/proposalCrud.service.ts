@@ -6,7 +6,7 @@
 
 import { DEFAULT_AI_MODEL } from "@/config/config";
 import { http, buildUrl, HttpError } from "@/config/httpClient";
-import type { ProposalData, ProposalListItem, ToneOption, LengthOption, TemplateType } from "@/interfaces/proposalInterfaces";
+import type { ProposalData, ProposalListItem, ToneOption, LengthOption, TemplateType, ProposalStatus } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
 const ALLOWED_UPLOAD_EXTENSIONS = ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt"];
@@ -66,19 +66,19 @@ export async function generateProposal(
 
   const proposalPayload: Record<string, unknown> = {
     title: data.title,
-    client_id: data.clientId || 0,
+    client_id: data.clientId ?? null,
     client_name: data.clientName,
     description: data.description,
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
     template_type: data.templateType || "scratch",
-    ai_model: data.aiModel || null,
+    ai_model: data.aiModel ?? null,
     selected_sections: allSections,
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
     contextual_instructions: contextual || null,
     web_references: data.webReferences,
-    selected_document_ids: data.selectedDocumentIds || [],
+    selected_document_ids: data.selectedDocumentIds ?? [],
   };
 
   // Recreate mode: pass original section contents for per-section rewrite prompts
@@ -104,17 +104,6 @@ export async function generateProposal(
   }
 
   return http.post<CreateProposalResponse>("/proposals/", formData);
-}
-
-export interface ProposalStatus {
-  id: number;
-  status: string;
-  generatingSection: string | null;
-  completedSections: string[];
-  selectedSections: string[] | null;
-  currentStage: string | null;
-  visitedPipelineSteps: number[];
-  highestVisitedStep: number | null;
 }
 
 interface ProposalStatusApiResponse {

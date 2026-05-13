@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback } from "react";
 import styles from "./HomePage.module.scss";
 
 import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
-import { useProposal } from "@/context/ProposalContext";
+import { useProposalDraftSession } from "@/context/ProposalContext";
+import { useProposalData, useCurrentStep, useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { useClients } from "@/hooks/useClients";
@@ -26,7 +27,10 @@ const RecreateTemplateModal = dynamic(
 type SelectionMode = "template" | "scratch" | "recreate";
 
 export default function HomePage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, proposalData, draftStage, completedSteps, setCurrentDraftId } = useProposal();
+  const proposalData = useProposalData();
+  const currentStep = useCurrentStep();
+  const { updateProposalData, setCurrentStep } = useWizardActions();
+  const { draftStage, completedSteps, setCurrentDraftId } = useProposalDraftSession();
   const router = useRouter();
 
   // Enable auto-save to localStorage drafts when user is on home page

@@ -8,6 +8,20 @@ import { logger } from "@/utils/logger";
 import {
   useProposalWizardStore,
   DEFAULT_PROPOSAL_DATA,
+  // Re-export granular selector hooks for convenience
+  useProposalData,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useCurrentStep,
+  useMaxStepReached,
+  useIsGenerating,
+  useGeneratedProposalId,
+  useCurrentProposalId,
+  useEditMode,
+  useHydrated,
+  useShouldStartBackgroundFetch,
+  useWizardActions,
 } from "@/store/features/wizard/proposalWizardSlice";
 
 interface ProposalWizardContextType {
@@ -29,6 +43,16 @@ interface ProposalWizardContextType {
   setMaxStepReached: (step: WizardStep) => void;
   shouldStartBackgroundFetch: boolean;
   setShouldStartBackgroundFetch: (val: boolean) => void;
+  // Section recommendations prefetch actions
+  prefetchRecommendations: (params: {
+    templateId: string | null;
+    existingSections: string[];
+    context: string;
+    documentContext: string;
+  }) => Promise<any[]>;
+  cancelRecommendationsFetch: () => void;
+  invalidateRecommendationsCache: () => void;
+  clearRecommendationsError: () => void;
 }
 
 /**
@@ -105,8 +129,15 @@ export function ProposalWizardProvider({
 /**
  * useProposalWizard — returns wizard state and actions from the Zustand store.
  *
- * Components subscribing to this hook re-render only when wizard state changes,
- * not when unrelated siblings update their own stores.
+ * @deprecated This hook subscribes to the entire store, causing unnecessary re-renders.
+ * Use granular selector hooks instead (e.g., useProposalData, useCurrentStep, useIsGenerating).
+ * Components subscribing to this hook re-render on any wizard state change.
+ *
+ * For optimal performance, prefer:
+ * - useProposalData() for proposal data
+ * - useCurrentStep() for current step
+ * - useIsGenerating() for generation status
+ * - useWizardActions() for actions (state-free)
  */
 export function useProposalWizard(): ProposalWizardContextType {
   return useProposalWizardStore();

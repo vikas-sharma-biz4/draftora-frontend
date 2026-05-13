@@ -102,20 +102,24 @@ export class HttpError extends Error {
  * Throws HttpError (with statusCode) if the request failed.
  */
 async function handleResponse<T>(res: Response): Promise<T> {
-  let json: ApiResponse<T> | undefined;
+  // Read response body once to avoid double-read bug
+  const rawText = await res.text();
 
-  try {
-    json = await res.json();
-  } catch (parseError) {
-    const text = await res.text().catch(() => "Unable to read response body");
-    throw new HttpError(
-      res.status,
-      `Failed to parse JSON response: ${text.substring(0, 200)}`
-    );
+  // Handle empty response bodies
+  if (!rawText || rawText.trim() === "") {
+    throw new HttpError(res.status, "Response body is empty");
   }
 
-  if (!json) {
-    throw new HttpError(res.status, "Response body is empty or invalid");
+  // Parse JSON safely from raw text
+  let json: ApiResponse<T>;
+  try {
+    json = JSON.parse(rawText) as ApiResponse<T>;
+  } catch (parseError) {
+    const truncatedPayload = rawText.substring(0, 200);
+    throw new HttpError(
+      res.status,
+      `Failed to parse JSON response: ${truncatedPayload}${rawText.length > 200 ? "..." : ""}`
+    );
   }
 
   if (!res.ok || !json.success) {

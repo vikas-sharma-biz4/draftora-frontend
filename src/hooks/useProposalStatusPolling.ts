@@ -1,7 +1,7 @@
 /**
- * useProposalStatusStream — real-time proposal generation status
+ * useProposalStatusPolling — proposal generation status polling
  *
- * Uses polling to receive status updates from the backend.
+ * Uses HTTP polling to receive status updates from the backend.
  * Implements tab synchronization via BroadcastChannel to ensure only one tab polls.
  *
  * Polling endpoint: GET /api/v1/proposals/:id/status/
@@ -11,6 +11,18 @@
  *     - generatingSection: currently generating section key
  *     - selectedSections: all sections to be generated
  *     - currentStage: current generation stage
+ *
+ * Polling behavior:
+ *   - Polls at POLLING_INTERVAL_MS intervals (from config)
+ *   - Stops after MAX_POLL_ATTEMPTS if generation takes too long
+ *   - Implements exponential backoff retry on network errors (up to MAX_RETRIES)
+ *   - Automatically stops when status is "completed", "failed", or "cancelled"
+ *
+ * Tab synchronization:
+ *   - Uses BroadcastChannel to coordinate multiple tabs
+ *   - Only the leader tab performs actual HTTP polling
+ *   - Non-leader tabs receive status updates via BroadcastChannel messages
+ *   - Leadership is claimed via heartbeat mechanism with LEADER_TIMEOUT
  */
 
 "use client";
@@ -27,7 +39,7 @@ const LEADER_TIMEOUT = 3000;
 const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 1000;
 
-interface UseProposalStatusStreamOptions {
+interface UseProposalStatusPollingOptions {
   proposalId: number;
   /** Start polling immediately (default: true) */
   autoStart?: boolean;
@@ -43,7 +55,7 @@ interface UseProposalStatusStreamOptions {
   onError?: (error: Error) => void;
 }
 
-interface UseProposalStatusStreamReturn {
+interface UseProposalStatusPollingReturn {
   status: ProposalStatus | null;
   isPolling: boolean;
   pollCount: number;
@@ -52,9 +64,9 @@ interface UseProposalStatusStreamReturn {
   stop: () => void;
 }
 
-export function useProposalStatusStream(
-  options: UseProposalStatusStreamOptions
-): UseProposalStatusStreamReturn {
+export function useProposalStatusPolling(
+  options: UseProposalStatusPollingOptions
+): UseProposalStatusPollingReturn {
   const {
     proposalId,
     autoStart = true,
@@ -151,7 +163,7 @@ export function useProposalStatusStream(
     isLeaderRef.current = true;
     lastLeaderHeartbeatRef.current = Date.now();
 
-    logger.debug("[useProposalStatusStream] This tab became the polling leader");
+    logger.debug("[useProposalStatusPolling] This tab became the polling leader");
 
     // Send heartbeat every second
     heartbeatTimerRef.current = setInterval(() => {
@@ -171,7 +183,7 @@ export function useProposalStatusStream(
       heartbeatTimerRef.current = null;
     }
 
-    logger.debug("[useProposalStatusStream] This tab resigned leadership");
+    logger.debug("[useProposalStatusPolling] This tab resigned leadership");
   }, []);
 
   // ── Polling ──────────────────────────────────────────────────────
@@ -181,13 +193,13 @@ export function useProposalStatusStream(
 
     // Prevent overlapping poll executions
     if (isPollingRef.current) {
-      logger.debug("[useProposalStatusStream] Skipping poll - already polling");
+      logger.debug("[useProposalStatusPolling] Skipping poll - already polling");
       return;
     }
 
     // Only poll if this tab is the leader
     if (!isLeaderRef.current) {
-      logger.debug("[useProposalStatusStream] Skipping poll - not leader");
+      logger.debug("[useProposalStatusPolling] Skipping poll - not leader");
       return;
     }
 
@@ -226,13 +238,13 @@ export function useProposalStatusStream(
       if (retryCountRef.current <= MAX_RETRIES) {
         const retryDelay = BASE_RETRY_DELAY_MS * Math.pow(2, retryCountRef.current - 1);
         logger.warn(
-          `[useProposalStatusStream] Polling error (attempt ${retryCountRef.current}/${MAX_RETRIES}), retrying in ${retryDelay}ms:`,
+          `[useProposalStatusPolling] Polling error (attempt ${retryCountRef.current}/${MAX_RETRIES}), retrying in ${retryDelay}ms:`,
           error
         );
         pollTimerRef.current = setTimeout(poll, retryDelay);
       } else {
         logger.error(
-          `[useProposalStatusStream] Polling failed after ${MAX_RETRIES} retries:`,
+          `[useProposalStatusPolling] Polling failed after ${MAX_RETRIES} retries:`,
           error
         );
         setErrorMessage(
@@ -286,7 +298,7 @@ export function useProposalStatusStream(
         const timeSinceLastHeartbeat = Date.now() - lastLeaderHeartbeatRef.current;
 
         if (timeSinceLastHeartbeat > LEADER_TIMEOUT && !isLeaderRef.current) {
-          logger.debug("[useProposalStatusStream] No leader detected, claiming leadership");
+          logger.debug("[useProposalStatusPolling] No leader detected, claiming leadership");
           becomeLeader();
 
           // Start polling if we should be polling
@@ -304,7 +316,7 @@ export function useProposalStatusStream(
       }, 100);
 
     } catch (error) {
-      logger.warn("[useProposalStatusStream] BroadcastChannel not supported, tab sync disabled", error);
+      logger.warn("[useProposalStatusPolling] BroadcastChannel not supported, tab sync disabled", error);
       // Fallback: just become leader if BroadcastChannel isn't supported
       becomeLeader();
     }

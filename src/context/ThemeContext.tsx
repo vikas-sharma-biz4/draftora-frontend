@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { THEME_STORAGE_KEY } from "@/constants/storageKeys";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -11,8 +12,6 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-
-const THEME_STORAGE_KEY = "app-theme";
 
 /**
  * Self-contained theme provider with localStorage persistence.

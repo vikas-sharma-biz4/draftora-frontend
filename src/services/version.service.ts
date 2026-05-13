@@ -6,6 +6,8 @@ import type {
   UpdateVersionDecisionPayload,
   RegenerateFromVersionPayload,
 } from "@/interfaces/versionInterfaces";
+import type { RawProposalVersionSnapshot } from "@/interfaces/proposalInterfaces";
+import { mapRawVersionSnapshot } from "@/interfaces/proposalInterfaces";
 
 interface RawVersionApiResponse {
   id: string;
@@ -13,7 +15,7 @@ interface RawVersionApiResponse {
   version: number;
   source: string;
   decision: string;
-  snapshot: Record<string, unknown>;
+  snapshot: RawProposalVersionSnapshot;
   created_at: string;
   created_by?: string;
   parent_version?: number;
@@ -27,7 +29,7 @@ function mapVersion(v: RawVersionApiResponse): ProposalVersion {
     version: v.version,
     source: v.source as ProposalVersion["source"],
     decision: v.decision as ProposalVersion["decision"],
-    snapshot: v.snapshot as unknown as ProposalVersion["snapshot"],
+    snapshot: mapRawVersionSnapshot(v.snapshot),
     createdAt: v.created_at,
     createdBy: v.created_by,
     parentVersion: v.parent_version,

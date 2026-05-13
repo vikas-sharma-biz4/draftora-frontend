@@ -11,6 +11,12 @@
  * New code should import from @/services/proposal instead.
  */
 
+import { generateProposal } from "./proposal/proposalCrud.service";
+import { getProposal, listProposals, getDownloadUrl, cancelProposal, updateApprovalStatus } from "./proposal/proposalCrud.service";
+import { getProposalStatus } from "./proposal/proposalCrud.service";
+import type { ListProposalsParams } from "./proposal/proposalCrud.service";
+import type { ProposalStatus } from "@/interfaces/proposalInterfaces";
+
 export {
   generateProposal,
   getProposalStatus,
@@ -21,7 +27,7 @@ export {
   updateApprovalStatus,
 } from "./proposal/proposalCrud.service";
 
-export type { ProposalStatus, ListProposalsParams } from "./proposal/proposalCrud.service";
+export type { ListProposalsParams };
 
 export {
   updateSection,

@@ -18,6 +18,18 @@ const eslintConfig = [
       "@typescript-eslint/explicit-function-return-type": "off",
       "react/display-name": "off",
       "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/context/ProposalContext",
+              importNames: ["useProposal"],
+              message: "useProposal is deprecated. Use focused domain hooks instead: useProposalWizard(), useProposalPipeline(), useProposalDraftSession(), or granular Zustand selector hooks from proposalWizardSlice.",
+            },
+          ],
+        },
+      ],
     },
   },
   {

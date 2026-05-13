@@ -1,7 +1,10 @@
 "use client";
 
 import React, { createContext, useContext } from "react";
-import { usePipelineSteps } from "@/hooks/usePipelineSteps";
+import {
+  useVisitedPipelineSteps,
+  usePipelineActions,
+} from "@/store/features/pipeline/pipelineSlice";
 
 interface ProposalPipelineContextType {
   visitedPipelineSteps: number[];
@@ -13,13 +16,23 @@ const ProposalPipelineContext = createContext<ProposalPipelineContextType | unde
   undefined
 );
 
+/**
+ * ProposalPipelineProvider — compatibility wrapper for incremental migration.
+ *
+ * @deprecated This provider now delegates to the Zustand pipeline store.
+ * New code should use granular selector hooks directly:
+ * - useVisitedPipelineSteps() for state
+ * - usePipelineActions() for actions
+ *
+ * This provider is retained for backward compatibility during migration.
+ */
 export function ProposalPipelineProvider({
   children,
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } =
-    usePipelineSteps();
+  const visitedPipelineSteps = useVisitedPipelineSteps();
+  const { syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineActions();
 
   return (
     <ProposalPipelineContext.Provider
@@ -34,6 +47,13 @@ export function ProposalPipelineProvider({
   );
 }
 
+/**
+ * useProposalPipeline — compatibility hook for incremental migration.
+ *
+ * @deprecated Use granular selector hooks instead:
+ * - useVisitedPipelineSteps() for visited steps
+ * - usePipelineActions() for actions
+ */
 export function useProposalPipeline(): ProposalPipelineContextType {
   const ctx = useContext(ProposalPipelineContext);
   if (!ctx) {
