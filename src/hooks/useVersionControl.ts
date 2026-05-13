@@ -5,13 +5,13 @@ import {
   updateVersionDecision,
   regenerateFromVersion,
   saveEditedVersion,
-} from "@/api/versionApi";
+} from "@/services/version.service";
 import type {
   ProposalVersion,
   VersionHistory,
   VersionDecision,
   RegenerateFromVersionPayload,
-} from "@/types/version.types";
+} from "@/interfaces/versionInterfaces";
 
 interface UseVersionControlOptions {
   proposalId: number | null;

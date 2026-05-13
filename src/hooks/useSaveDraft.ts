@@ -1,37 +1,32 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useRouter, usePathname } from "next/navigation";
+import { toast } from "@/utils/toast";
+import { MESSAGES } from "@/constants/messages";
 
-import { DRAFTS_STORAGE_KEY } from "@/constants";
-import { useProposal } from "@/context/ProposalContext";
-import type { ProposalData, WizardStep } from "@/types/proposal.types";
-import type { DraftStage, DraftLocation } from "@/types/draft.types";
-
-export interface SavedDraft {
-  id: string;
-  savedAt: string;
-  title: string;
-  clientName: string;
-  currentStep: WizardStep;
-  draftStage: DraftStage;
-  lastLocation: DraftLocation;
-  maxStepReached: WizardStep;
-  completedSteps: number[];
-  proposalData: Partial<ProposalData>;
-}
+import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
+import { updateDraft as updateDraftApi } from "@/services/draft.service";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
 /**
  * Returns a `saveDraft` function that persists the current wizard state to
- * localStorage, resets the wizard, and navigates back to the root.
- *
- * No draft limit is enforced — all drafts are kept.
+ * the backend database, resets the wizard, and navigates back to the root.
  */
-export function useSaveDraft(): () => void {
-  const { proposalData, currentStep, draftStage, completedSteps, maxStepReached, resetProposal } = useProposal();
+export function useSaveDraft(): () => Promise<void> {
+  const { proposalData, currentStep, maxStepReached, resetProposal, currentProposalId } = useProposalWizard();
+  const { completedSteps } = useProposalDraftSession();
   const router = useRouter();
+  const pathname = usePathname();
+  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
+  const invalidateCache = useDraftStore(state => state.invalidateCache);
+  const saveDraftToStore = useDraftStore(state => state.saveDraft);
+  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
 
-  return function saveDraft(): void {
+  return async function saveDraft(): Promise<void> {
     const hasData =
       proposalData.title.trim() !== "" || proposalData.clientName.trim() !== "";
 
@@ -42,40 +37,57 @@ export function useSaveDraft(): () => void {
 
     // Determine lastLocation based on current pathname
     const lastLocation: DraftLocation = (() => {
-      if (typeof window !== "undefined") {
-        const pathname = window.location.pathname;
-        if (pathname === "/parameters") return "WIZARD_PARAMETERS";
-        if (pathname === "/review") return "WIZARD_REVIEW";
-        if (pathname.startsWith("/proposal/") || pathname === "/web-view") return "WEB_VIEW";
-      }
-      return "WIZARD_PARAMETERS";
+      if (pathname === "/parameters") return "wizard_parameters";
+      if (pathname === "/review") return "wizard_review";
+      if (pathname.startsWith("/proposal/")) return "web_view";
+      return "wizard_parameters";
     })();
 
-    const draft: SavedDraft = {
-      id: Date.now().toString(),
-      savedAt: new Date().toISOString(),
-      title: proposalData.title || "Untitled Proposal",
-      clientName: proposalData.clientName || "",
-      currentStep,
-      draftStage,
-      lastLocation,
-      maxStepReached,
-      completedSteps,
-      proposalData: { ...proposalData, files: [] },
+    // Capture UI state for restoration
+    const uiState: DraftUIState = {
+      scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+      activeSection: null,
+      expandedSections: [],
+      lastVisibleSection: null,
     };
 
     try {
-      const raw = localStorage.getItem(DRAFTS_STORAGE_KEY);
-      const existing: SavedDraft[] = raw ? (JSON.parse(raw) as SavedDraft[]) : [];
-      const updated = [draft, ...existing];
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      toast.error("Could not save draft — storage may be full.");
-      return;
-    }
+      const draftPayload = {
+        proposalId: currentProposalId,
+        title: proposalData.title || "Untitled Proposal",
+        clientName: proposalData.clientName || "",
+        status: "draft" as const,
+        lastLocation,
+        stage: draftStage,
+        wizardState: {
+          proposalData: { ...proposalData, files: [] },
+          currentStep,
+          maxStepReached,
+          completedSteps,
+        },
+        generatedContent: {},
+        uiState,
+      };
 
-    resetProposal();
-    router.push("/");
-    toast.success(`Draft "${draft.title}" saved.`);
+      if (currentDraftId) {
+        // Update existing draft
+        await updateDraftInStore(currentDraftId, draftPayload);
+        toast.success(MESSAGES.DRAFT_SAVED);
+      } else {
+        // Create new draft and store ID
+        const saved = await saveDraftToStore(draftPayload);
+        setCurrentDraftId(saved.id);
+        toast.success(MESSAGES.DRAFT_SAVED);
+      }
+
+      // Invalidate cache to force fresh fetch on drafts page
+      invalidateCache();
+
+      resetProposal();
+      router.push("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to save draft";
+      toast.error(message);
+    }
   };
 }

@@ -1,0 +1,225 @@
+// ─── Review layout ────────────────────────────────────────────────────────────
+.review-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.review-layout-left {
+  flex: 1;
+  max-width: 100%;
+  width: 100%;
+}
+
+.review-layout-right {
+  width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+}
+
+// ─── Review cards ─────────────────────────────────────────────────────────────
+.review-card {
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: 0.875rem 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.review-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.review-card-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+// ─── Review fields ────────────────────────────────────────────────────────────
+.review-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-bottom: 0.625rem;
+}
+
+.review-field:last-child {
+  margin-bottom: 0;
+}
+
+.review-field-label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-light);
+}
+
+.review-field-value {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.review-field-value.muted {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.review-field-value.dark-bold {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+// ─── Launch panel ─────────────────────────────────────────────────────────────
+.launch-panel {
+  background: var(--color-bg-dark);
+  border-radius: var(--radius-xl);
+  padding: 28px 24px;
+  color: white;
+}
+
+.launch-panel-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+
+.launch-panel-desc {
+  font-size: 13px;
+  color: var(--color-on-dark-primary);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.launch-btn {
+  width: 100%;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 10px;
+  font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.launch-btn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.4);
+}
+
+.launch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.launch-btn-secondary {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-primary-medium);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+}
+
+.launch-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.launch-stats {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.launch-stats-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-accent);
+  margin-bottom: 12px;
+}
+
+.launch-stat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.launch-stat-label {
+  font-size: 12px;
+  color: var(--color-on-dark-muted);
+}
+
+.launch-stat-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-white);
+}
+
+// ─── Responsive — 1281px ──────────────────────────────────────────────────────
+@media (min-width: 1281px) {
+  .review-layout {
+    flex-direction: row;
+  }
+
+  .review-layout-left {
+    max-width: 900px;
+  }
+
+  .review-layout-right {
+    width: 320px;
+    min-width: 320px;
+  }
+}
+
+// ─── Responsive — 1024px ──────────────────────────────────────────────────────
+@media (max-width: 1024px) {
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-panel {
+    position: static;
+    margin-top: 24px;
+  }
+}
+
+// ─── Responsive — 640px ───────────────────────────────────────────────────────
+@media (max-width: 640px) {
+  .review-layout-left .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}

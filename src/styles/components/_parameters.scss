@@ -1,0 +1,34 @@
+// ─── Parameters page two-column layout ───────────────────────────────────────
+.parameters-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 1.5rem;
+  align-items: flex-start;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: 1fr;
+
+    > :last-child {
+      order: 2;
+      max-height: 500px;
+    }
+  }
+}
+
+// ─── Section drop zone ────────────────────────────────────────────────────────
+.section-drop-zone {
+  min-height: 100px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &:empty {
+    border: 2px dashed var(--color-border);
+    background: var(--color-background);
+  }
+}
+
+.section-drop-zone[data-drag-over="true"] {
+  background: rgba(102, 126, 234, 0.05);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}

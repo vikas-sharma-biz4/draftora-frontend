@@ -1,0 +1,811 @@
+// ─── RTE wrapper ──────────────────────────────────────────────────────────────
+.rte-wrapper {
+  position: relative;
+}
+
+// ─── Bubble menu mount point ──────────────────────────────────────────────────
+.rte-bubble-mount {
+  display: none;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.rte-bubble-mount.is-visible {
+  display: block;
+}
+
+.rte-bubble-mount > * {
+  pointer-events: auto;
+}
+
+// ─── Inline toolbar container ─────────────────────────────────────────────────
+.rte-toolbar-container {
+  position: relative;
+  z-index: 100;
+  margin-bottom: 12px;
+}
+
+// ─── Classic floating toolbar ─────────────────────────────────────────────────
+.rte-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.rte-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.rte-toolbar-label {
+  font-size: 10px;
+  color: var(--color-text-light);
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+// ─── RTE base button ──────────────────────────────────────────────────────────
+.rte-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  transition: all 0.1s;
+  font-family: var(--font-sans);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.rte-btn:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.rte-btn.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.rte-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.rte-btn-wide {
+  width: auto;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.rte-strike-btn s {
+  font-weight: 700;
+}
+
+// ─── Color swatch buttons ─────────────────────────────────────────────────────
+.rte-color-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.rte-color-swatch {
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.rte-color-swatch-empty {
+  background: transparent;
+  border: 1.5px solid var(--color-border-dark);
+}
+
+// ─── TipTap editor body ───────────────────────────────────────────────────────
+.rte-content {
+  padding: 28px 32px;
+  min-height: 200px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  position: relative;
+}
+
+.rte-content:focus-within {
+  outline: none;
+}
+
+.rte-content .ProseMirror {
+  outline: none;
+  min-height: 160px;
+}
+
+.rte-content .ProseMirror p {
+  margin-bottom: 0.75em;
+  text-align: justify;
+}
+
+.rte-content .ProseMirror h1,
+.rte-content .ProseMirror h2,
+.rte-content .ProseMirror h3,
+.rte-content .ProseMirror h4 {
+  font-weight: 700 !important;
+  line-height: 1.3;
+  margin-bottom: 0.5em;
+  margin-top: 1em;
+}
+
+.rte-content .ProseMirror h1 { font-size: 1.5em; }
+.rte-content .ProseMirror h2 { font-size: 1.25em; }
+
+.rte-content .ProseMirror h3 {
+  font-size: 1.1em;
+  color: #2f5496 !important;
+}
+
+.rte-content .ProseMirror h4 {
+  font-size: 1em;
+  color: #2f5496 !important;
+}
+
+.rte-content .ProseMirror ul,
+.rte-content .ProseMirror ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.rte-content .ProseMirror li { margin-bottom: 0.25em; }
+.rte-content .ProseMirror strong { font-weight: 700; }
+.rte-content .ProseMirror em { font-style: italic; }
+
+.rte-content .ProseMirror mark {
+  padding: 0.1em 0.2em;
+  border-radius: 2px;
+}
+
+.rte-content .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1em;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.rte-content .ProseMirror td,
+.rte-content .ProseMirror th {
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  position: relative;
+  vertical-align: top;
+  min-width: 80px;
+}
+
+.rte-content .ProseMirror th {
+  background: #2f5496 !important;
+  font-weight: 700;
+  color: #ffffff !important;
+  text-align: left;
+}
+
+.rte-content .ProseMirror td:first-child { font-weight: 700; }
+
+.rte-content .ProseMirror .selectedCell::after {
+  content: "";
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(var(--color-primary-rgb), 0.1);
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.rte-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-light);
+  pointer-events: none;
+  height: 0;
+}
+
+// ─── Bubble menu (dark floating bar) ─────────────────────────────────────────
+.bubble-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #1e1b4b;
+  border-radius: var(--radius-md);
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+}
+
+.bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #e0e7ff;
+  font-family: var(--font-sans);
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.bubble-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.bubble-btn.active {
+  background: rgba(99, 102, 241, 0.4);
+  color: #ffffff;
+}
+
+.bubble-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bubble-btn-regen {
+  color: #a5f3fc;
+  letter-spacing: 0.01em;
+}
+
+.bubble-btn-regen:hover {
+  background: rgba(165, 243, 252, 0.15);
+  color: #ffffff;
+}
+
+.bubble-separator {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+// ─── Modern floating toolbar (glassmorphism) ──────────────────────────────────
+.rte-toolbar-modern {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  animation: toolbarSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 900px;
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  z-index: 10000;
+  flex-wrap: wrap;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-group:nth-child(n+3) {
+  display: none;
+}
+
+.rte-toolbar-modern.collapsed .rte-toolbar-divider:nth-child(n+2) {
+  display: none;
+}
+
+.rte-toolbar-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-left: auto;
+}
+
+.rte-toolbar-expand-btn:hover {
+  background: rgba(var(--color-primary-rgb), 0.08);
+  color: var(--color-primary);
+}
+
+// ─── Toolbar groups & dividers ────────────────────────────────────────────────
+.rte-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+}
+
+.rte-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(0, 0, 0, 0.1) 20%,
+    rgba(0, 0, 0, 0.1) 80%,
+    transparent
+  );
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+// ─── Icon button (modern) ─────────────────────────────────────────────────────
+.rte-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rte-btn-icon:hover {
+  background: rgba(var(--color-primary-rgb), 0.08);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.rte-btn-icon:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.rte-btn-icon.active {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.25);
+}
+
+.rte-btn-icon.active:hover {
+  background: var(--color-primary-hover);
+  color: white;
+}
+
+.rte-btn-icon svg { flex-shrink: 0; }
+
+// ─── Dropdown button ──────────────────────────────────────────────────────────
+.rte-btn-dropdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rte-btn-dropdown:hover {
+  background: rgba(var(--color-primary-rgb), 0.08);
+  color: var(--color-primary);
+}
+
+.rte-btn-dropdown svg:last-child {
+  opacity: 0.5;
+  transition: transform 0.2s;
+}
+
+.rte-btn-dropdown:hover svg:last-child {
+  opacity: 1;
+}
+
+// ─── Dropdown menu ────────────────────────────────────────────────────────────
+.rte-dropdown { position: relative; }
+
+.rte-dropdown-menu {
+  min-width: 160px;
+  background: white;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+  z-index: 1001;
+  animation: dropdownSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.rte-dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: var(--font-sans);
+}
+
+.rte-dropdown-menu button:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.rte-dropdown-menu button:active { transform: scale(0.98); }
+
+// ─── Link / image input panel ─────────────────────────────────────────────────
+.rte-link-input-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 8px;
+  z-index: 1001;
+  animation: dropdownSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 280px;
+}
+
+.rte-link-input-panel input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: all 0.15s;
+}
+
+.rte-link-input-panel input:focus {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.rte-link-btn-apply {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.rte-link-btn-apply:hover {
+  background: var(--color-primary-hover);
+  transform: scale(1.05);
+}
+
+.rte-link-btn-apply:active { transform: scale(0.95); }
+
+.rte-link-btn-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-danger);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.rte-link-btn-remove:hover {
+  background: var(--color-danger-light);
+  transform: scale(1.05);
+}
+
+.rte-link-btn-remove:active { transform: scale(0.95); }
+
+// ─── Color group ──────────────────────────────────────────────────────────────
+.rte-color-group { gap: 4px; }
+
+.rte-color-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.rte-color-swatch-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.rte-color-swatch-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+  transform: scale(1.1);
+}
+
+.rte-color-swatch-btn:active { transform: scale(0.95); }
+
+.rte-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  transition: all 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.rte-color-swatch-empty {
+  background: white;
+  border: 1.5px dashed var(--color-border-dark);
+  position: relative;
+}
+
+.rte-color-swatch-empty::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 14px;
+  height: 1.5px;
+  background: var(--color-danger);
+}
+
+// ─── AI regenerate button ─────────────────────────────────────────────────────
+.rte-btn-ai {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 4px 12px rgba(102, 126, 234, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.rte-btn-ai::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.rte-btn-ai:hover::before { left: 100%; }
+
+.rte-btn-ai:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 20px rgba(102, 126, 234, 0.4),
+    0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.rte-btn-ai:active { transform: translateY(0) scale(0.98); }
+
+.rte-btn-ai:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.rte-btn-ai svg { animation: sparkle 2s ease-in-out infinite; }
+.rte-btn-ai span { position: relative; z-index: 1; }
+
+// ─── ProseMirror global styles ────────────────────────────────────────────────
+.ProseMirror {
+  outline: none;
+  min-height: 120px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.ProseMirror:focus { outline: none; }
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-light);
+  pointer-events: none;
+  height: 0;
+}
+
+.ProseMirror .proposal-image {
+  max-width: 600px;
+  height: auto;
+  display: block;
+  margin: 1rem 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ProseMirror .proposal-image:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.ProseMirror .editor-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror .editor-link:hover { color: var(--color-primary-hover); }
+
+.ProseMirror blockquote {
+  border-left: 3px solid var(--color-primary);
+  padding-left: 16px;
+  margin: 12px 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.ProseMirror code {
+  background: var(--color-bg);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--color-primary);
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid var(--color-border);
+  margin: 24px 0;
+}
+
+.ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  border: 1px solid var(--color-border);
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.ProseMirror th {
+  background: var(--color-bg);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ProseMirror td { background: white; }
+
+// ─── Responsive — 768px ───────────────────────────────────────────────────────
+@media (max-width: 768px) {
+  .rte-toolbar-modern {
+    padding: 6px 8px;
+    gap: 1px;
+  }
+
+  .rte-btn-icon,
+  .rte-btn-dropdown {
+    width: 28px;
+    height: 28px;
+  }
+
+  .rte-color-swatch-btn {
+    width: 24px;
+    height: 24px;
+  }
+
+  .rte-color-swatch {
+    width: 16px;
+    height: 16px;
+  }
+
+  .rte-toolbar-divider { margin: 0 4px; }
+
+  .rte-btn-ai {
+    padding: 0 10px;
+    font-size: 11px;
+  }
+}
