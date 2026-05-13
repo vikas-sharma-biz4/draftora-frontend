@@ -59,7 +59,8 @@ export async function createClient(
  * List all active clients
  */
 export async function listClients(): Promise<Client[]> {
-  return http.get<Client[]>("/clients");
+  const response = await http.get<{ data: Client[]; meta: unknown }>("/clients");
+  return response.data;
 }
 
 /**
@@ -94,7 +95,11 @@ export async function deleteClient(clientId: number): Promise<void> {
  * List all clients with full documents array in a single API call.
  */
 export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
-  return http.get<ClientWithDocuments[]>("/clients/full-data");
+  const response = await http.get<{ data: ClientWithDocuments[]; meta: unknown }>("/clients/full-data");
+  console.log('[client.service] API response:', response);
+  console.log('[client.service] response.data:', response.data);
+  console.log('[client.service] Is array?', Array.isArray(response.data));
+  return response.data;
 }
 
 /**
