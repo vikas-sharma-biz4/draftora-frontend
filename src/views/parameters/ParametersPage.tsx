@@ -8,6 +8,7 @@ import Button from "@/components/common/Button";
 
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
@@ -53,6 +54,7 @@ export default function ParametersPage(): JSX.Element {
     setShouldStartBackgroundFetch,
     maxStepReached,
     setMaxStepReached,
+    invalidateRecommendationsCache,
   } = useProposalWizard();
   const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = useProposalPipeline();
   const { draftStage, completedSteps, setDraftStage, markStepCompleted } = useProposalDraftSession();
@@ -89,6 +91,25 @@ export default function ParametersPage(): JSX.Element {
       )
     );
   }, [proposalData.selectedSections, proposalData.sectionDisplayNames, proposalData.originalSections]);
+
+  // Invalidate recommendations cache when template or critical context changes
+  useEffect(() => {
+    // Only invalidate if we have prefetched data and the context changed
+    // This ensures cache is invalidated when user changes template, sections, or description
+    if (proposalData.templateId !== undefined || proposalData.description !== undefined) {
+      invalidateRecommendationsCache();
+    }
+  }, [proposalData.templateId, proposalData.description, invalidateRecommendationsCache]);
+
+  // Cleanup on unmount - cancel any in-flight requests
+  useEffect(() => {
+    return () => {
+      // Cancel any in-flight recommendations fetch when navigating away
+      // This prevents memory leaks and state updates after unmount
+      const { cancelRecommendationsFetch } = useProposalWizardStore.getState();
+      cancelRecommendationsFetch();
+    };
+  }, []);
 
   // Mark step 1 as visited when this page loads
   useEffect(() => {
@@ -196,8 +217,6 @@ export default function ParametersPage(): JSX.Element {
           proposalData={proposalData}
           onUpdateProposalData={updateProposalData}
           isRecreateMode={isRecreateMode}
-          shouldStartBackgroundFetch={shouldStartBackgroundFetch}
-          onBackgroundFetchStarted={() => setShouldStartBackgroundFetch(false)}
         />
 
         <ToneSelector

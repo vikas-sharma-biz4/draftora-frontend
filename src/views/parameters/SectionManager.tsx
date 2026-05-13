@@ -24,11 +24,10 @@ const SortableSectionList = dynamic(
   () => import("@/components/common/SortableSectionList"),
   {
     ssr: false,
-    loading: () => (
-      <div className="sections-ai-loading">
-        Loading section editor…
-      </div>
-    ),
+    loading: () => {
+      const { SortableSectionListSkeleton } = require("@/components/common/SortableSectionList");
+      return <SortableSectionListSkeleton />;
+    },
   }
 );
 
@@ -38,8 +37,6 @@ interface SectionManagerProps {
   proposalData: ProposalData;
   onUpdateProposalData: (updates: Partial<ProposalData>) => void;
   isRecreateMode: boolean;
-  shouldStartBackgroundFetch: boolean;
-  onBackgroundFetchStarted: () => void;
 }
 
 export default function SectionManager({
@@ -48,20 +45,12 @@ export default function SectionManager({
   proposalData,
   onUpdateProposalData,
   isRecreateMode,
-  shouldStartBackgroundFetch,
-  onBackgroundFetchStarted,
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
-
-  // Trigger AI recommendations background fetch when flag is set
-  if (shouldStartBackgroundFetch && sectionRecommendationsRef.current) {
-    sectionRecommendationsRef.current.startBackgroundFetch();
-    onBackgroundFetchStarted();
-  }
 
   function handleStartEdit(item: SectionItem): void {
     setEditingKey(item.key);

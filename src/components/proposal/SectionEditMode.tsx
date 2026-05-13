@@ -6,11 +6,10 @@ import { isHtmlContent, plainTextToHtml } from "@/utils/contentParser";
 
 const RichEditor = dynamic(() => import("@/components/common/RichEditor"), {
   ssr: false,
-  loading: () => (
-    <div className="rte-content text-light">
-      Loading editor…
-    </div>
-  ),
+  loading: () => {
+    const { RichEditorSkeleton } = require("@/components/common/RichEditor");
+    return <RichEditorSkeleton />;
+  },
 });
 
 interface SectionEditModeProps {
@@ -24,7 +23,7 @@ interface SectionEditModeProps {
 
 /**
  * Always-editable component for proposal section content.
- * 
+ *
  * FEATURES:
  * - Always rendered (no view/edit mode switching)
  * - Auto-saves with debouncing

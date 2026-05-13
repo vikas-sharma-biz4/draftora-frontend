@@ -7,10 +7,17 @@ import { getSectionRecommendations, type SectionRecommendation } from "@/service
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
 import { logger } from "@/utils/logger";
+import {
+  usePrefetchedRecommendations,
+  useRecommendationsFetchStatus,
+  useRecommendationsError,
+  useWizardActions,
+} from "@/store/features/wizard/proposalWizardSlice";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
   startBackgroundFetch: () => void;
+  invalidateCache: () => void;
 }
 
 interface SectionRecommendationsProps {
@@ -33,19 +40,25 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   }: SectionRecommendationsProps,
   ref
 ) => {
+  // Store state for prefetched recommendations
+  const prefetchedRecommendations = usePrefetchedRecommendations();
+  const recommendationsFetchStatus = useRecommendationsFetchStatus();
+  const recommendationsError = useRecommendationsError();
+  const { prefetchRecommendations, invalidateRecommendationsCache, clearRecommendationsError } = useWizardActions();
+
+  // Local component state
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [hasUserRequested, setHasUserRequested] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
-  const [isBackgroundLoading, setIsBackgroundLoading] = useState<boolean>(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
-  const hasAutoFetchedRef = useRef<boolean>(false);
 
   const contextRef = useRef(context);
   const documentContextRef = useRef(documentContext);
   const templateIdRef = useRef(templateId);
   const existingSectionsRef = useRef(existingSections);
+  const currentCacheKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     contextRef.current = context;
@@ -54,7 +67,55 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     existingSectionsRef.current = existingSections;
   });
 
-  // Removed automatic background fetching - user must click Generate button
+  // Sync prefetched recommendations from store to local state when they become available
+  useEffect(() => {
+    if (prefetchedRecommendations && recommendationsFetchStatus === 'success' && !hasUserRequested) {
+      // Only use prefetched data if user hasn't already requested (avoid overwriting user's manual regenerations)
+      const cacheKey = JSON.stringify({
+        templateId,
+        existingSections: existingSections.sort(),
+        context,
+        documentContext,
+      });
+
+      if (currentCacheKeyRef.current !== cacheKey) {
+        setRecommendations(prefetchedRecommendations);
+        setHasUserRequested(true);
+        currentCacheKeyRef.current = cacheKey;
+        logger.debug('[SectionRecommendations] Using prefetched recommendations from store', { count: prefetchedRecommendations.length });
+      }
+    }
+  }, [prefetchedRecommendations, recommendationsFetchStatus, hasUserRequested, templateId, existingSections, context, documentContext]);
+
+  // Invalidate cache when template, context, or sections change
+  useEffect(() => {
+    const cacheKey = JSON.stringify({
+      templateId,
+      existingSections: existingSections.sort(),
+      context,
+      documentContext,
+    });
+
+    if (currentCacheKeyRef.current && currentCacheKeyRef.current !== cacheKey) {
+      // Context changed, invalidate cache
+      invalidateRecommendationsCache();
+      currentCacheKeyRef.current = cacheKey;
+      setRecommendations([]);
+      setHasUserRequested(false);
+      logger.debug('[SectionRecommendations] Context changed, cache invalidated', { oldKey: currentCacheKeyRef.current, newKey: cacheKey });
+    } else if (!currentCacheKeyRef.current) {
+      currentCacheKeyRef.current = cacheKey;
+    }
+  }, [templateId, existingSections, context, documentContext, invalidateRecommendationsCache]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cancel any in-flight fetch when component unmounts
+      // Note: We don't clear the store state here as it might be used by other components
+      logger.debug('[SectionRecommendations] Component unmounting');
+    };
+  }, []);
 
   const fetchRecommendationsInBackground = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
@@ -64,33 +125,19 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       return;
     }
 
-    setIsBackgroundLoading(true);
+    setIsLoading(true);
     try {
-      const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
-
-      const existingSectionsWithRules = existingSectionsRef.current.map((key) => ({
-        sectionKey: key,
-        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        include: "",
-        exclude: "",
-        purpose: "",
-      }));
-
-      const recs = await getSectionRecommendations({
-        templateId: templateIdRef.current,
+      await prefetchRecommendations({
+        templateId: templateIdRef.current ?? null,
         existingSections: existingSectionsRef.current,
-        existingSectionsWithRules: existingSectionsWithRules,
-        context: fullContext,
-        userPrompt: customPrompt ?? userPrompt ?? null,
+        context: ctx,
+        documentContext: docCtx,
       });
-
-      setRecommendations(recs);
-      setHasUserRequested(true);
     } catch (error) {
       logger.error("Failed to fetch recommendations:", error);
       setRecommendations([]);
     } finally {
-      setIsBackgroundLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -102,6 +149,38 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       return;
     }
 
+    // Check if prefetched data is already available
+    if (prefetchedRecommendations && recommendationsFetchStatus === 'success' && !customPrompt) {
+      logger.debug('[SectionRecommendations] Using prefetched recommendations, skipping API call');
+      setRecommendations(prefetchedRecommendations);
+      setHasUserRequested(true);
+      return;
+    }
+
+    // Check if a fetch is already in progress
+    if (recommendationsFetchStatus === 'pending' && !customPrompt) {
+      logger.debug('[SectionRecommendations] Fetch already in progress, waiting for existing promise');
+      setIsLoading(true);
+      try {
+        const recs = await prefetchRecommendations({
+          templateId: templateIdRef.current ?? null,
+          existingSections: existingSectionsRef.current,
+          context: ctx,
+          documentContext: docCtx,
+        });
+        setRecommendations(recs);
+        setHasUserRequested(true);
+      } catch (error) {
+        logger.error("Failed to fetch recommendations:", error);
+        toast.error("Failed to generate recommendations. Please try again.");
+        setRecommendations([]);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // If there's a custom prompt or cache is invalid, do a fresh fetch
     setIsLoading(true);
     try {
       const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
@@ -117,7 +196,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       const recs = await getSectionRecommendations({
         templateId: templateIdRef.current,
         existingSections: existingSectionsRef.current,
-        existingSectionsWithRules: existingSectionsWithRules,
+        existingSectionsWithRules,
         context: fullContext,
         userPrompt: customPrompt ?? userPrompt ?? null,
       });
@@ -137,12 +216,16 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const handleGetRecommendations = (): void => {
     setHasUserRequested(true);
     setRecommendations([]);
+    clearRecommendationsError();
     fetchRecommendations();
   };
 
   const handleRegenerate = (): void => {
     setHasUserRequested(true);
     setRecommendations([]);
+    clearRecommendationsError();
+    // Invalidate cache to force fresh fetch
+    invalidateRecommendationsCache();
     fetchRecommendations();
   };
 
@@ -195,7 +278,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     }
   };
 
-  // Expose removeRecommendation and startBackgroundFetch methods to parent via ref
+  // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     removeRecommendation: (sectionKey: string) => {
       setRecommendations((prev) => {
@@ -210,6 +293,11 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     },
     startBackgroundFetch: () => {
       fetchRecommendationsInBackground();
+    },
+    invalidateCache: () => {
+      invalidateRecommendationsCache();
+      setRecommendations([]);
+      setHasUserRequested(false);
     },
   }));
 
@@ -277,7 +365,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             )}
           </div>
 
-          {isLoading ? (
+          {isLoading || recommendationsFetchStatus === 'pending' ? (
             <div className={styles.loadingState}>
               <div className={styles.spinner}></div>
               <p>Loading recommendations...</p>

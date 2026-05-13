@@ -1,7 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useProposal } from "@/context/ProposalContext";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
+import { useProposalData, useCurrentStep, useCurrentProposalId } from "@/store/features/wizard/proposalWizardSlice";
+import { useProposalDraftSession } from "@/context/ProposalContext";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import type { DraftLocation } from "@/interfaces/draftInterfaces";
 
@@ -19,20 +21,15 @@ interface UseDraftAutoSaveOptions {
  */
 export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const { enabled } = options;
-  const {
-    proposalData,
-    currentStep,
-    draftStage,
-    currentProposalId,
-  } = useProposal();
+  const proposalData = useProposalData();
+  const currentStep = useCurrentStep();
+  const currentProposalId = useCurrentProposalId();
+  const { draftStage } = useProposalDraftSession();
   const pathname = usePathname();
 
   // Determine lastLocation based on current pathname
   const getLastLocation = (): DraftLocation => {
-    if (pathname === "/parameters") return "wizard_parameters";
-    if (pathname === "/review") return "wizard_review";
-    if (pathname.startsWith("/proposal/")) return "web_view";
-    return "wizard_parameters";
+    return getLastLocationFromPathname(pathname);
   };
 
   // Check if there's meaningful data to save

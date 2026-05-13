@@ -32,14 +32,6 @@ interface ProposalState {
   lastFetched: number | null;
   error: string | null;
 
-  // Computed selectors
-  isCacheValid: () => boolean;
-  getProposalById: (id: number) => ProposalListItem | undefined;
-  getApprovedProposals: () => ProposalListItem[];
-  getRejectedProposals: () => ProposalListItem[];
-  getHistoryProposals: () => ProposalListItem[];
-  getPendingProposals: () => ProposalListItem[];
-
   // Actions
   fetchProposals: (force?: boolean) => Promise<void>;
   setProposals: (proposals: ProposalListItem[]) => void;
@@ -58,42 +50,15 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   lastFetched: null,
   error: null,
 
-  // Computed selectors
-  isCacheValid: () => {
-    const { lastFetched, isInitialized } = get();
-    if (!isInitialized || lastFetched === null) return false;
-    return Date.now() - lastFetched < CACHE_TTL_MS;
-  },
-
-  getProposalById: (id: number) => {
-    return get().proposals.find(p => p.id === id);
-  },
-
-  getApprovedProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'approved');
-  },
-
-  getRejectedProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'rejected');
-  },
-
-  getHistoryProposals: () => {
-    return get().proposals.filter(
-      p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected'
-    );
-  },
-
-  getPendingProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'pending');
-  },
-
   // Actions
   fetchProposals: async (force = false) => {
-    const { isCacheValid, isLoading } = get();
+    const { lastFetched, isInitialized, isLoading } = get();
 
     // Return cached data if valid and not forced
-    if (!force && isCacheValid()) {
-      return;
+    if (!force && isInitialized && lastFetched !== null) {
+      if (Date.now() - lastFetched < CACHE_TTL_MS) {
+        return;
+      }
     }
 
     // Prevent duplicate concurrent requests
@@ -168,3 +133,94 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
   reset: () => set(INITIAL_PROPOSAL_STATE),
 }));
+
+// ─── Standalone Selectors ─────────────────────────────────────────────────────
+
+/**
+ * Pure selectors for derived state computations.
+ * These are framework-agnostic and can be used with Zustand's selector API.
+ */
+
+/**
+ * Selects whether the cache is still valid based on TTL.
+ */
+export const selectIsCacheValid = (state: ProposalState): boolean => {
+  if (!state.isInitialized || state.lastFetched === null) return false;
+  return Date.now() - state.lastFetched < CACHE_TTL_MS;
+};
+
+/**
+ * Selects a proposal by its ID.
+ */
+export const selectProposalById = (id: number) => (state: ProposalState): ProposalListItem | undefined => {
+  return state.proposals.find(p => p.id === id);
+};
+
+/**
+ * Selects only approved proposals.
+ */
+export const selectApprovedProposals = (state: ProposalState): ProposalListItem[] => {
+  return state.proposals.filter(p => p.approvalStatus === 'approved');
+};
+
+/**
+ * Selects only rejected proposals.
+ */
+export const selectRejectedProposals = (state: ProposalState): ProposalListItem[] => {
+  return state.proposals.filter(p => p.approvalStatus === 'rejected');
+};
+
+/**
+ * Selects proposals in history (approved or rejected).
+ */
+export const selectHistoryProposals = (state: ProposalState): ProposalListItem[] => {
+  return state.proposals.filter(
+    p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected'
+  );
+};
+
+/**
+ * Selects only pending proposals.
+ */
+export const selectPendingProposals = (state: ProposalState): ProposalListItem[] => {
+  return state.proposals.filter(p => p.approvalStatus === 'pending');
+};
+
+// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
+
+/**
+ * Selector hooks for fine-grained Zustand subscriptions.
+ *
+ * Components should use these hooks to subscribe only to the specific state
+ * they need, avoiding unnecessary re-renders when unrelated state changes.
+ */
+
+/**
+ * Selects whether the cache is valid.
+ */
+export const useIsProposalCacheValid = () => useProposalStore(selectIsCacheValid);
+
+/**
+ * Selects a proposal by its ID.
+ */
+export const useProposalById = (id: number) => useProposalStore(selectProposalById(id));
+
+/**
+ * Selects approved proposals.
+ */
+export const useApprovedProposals = () => useProposalStore(selectApprovedProposals);
+
+/**
+ * Selects rejected proposals.
+ */
+export const useRejectedProposals = () => useProposalStore(selectRejectedProposals);
+
+/**
+ * Selects history proposals (approved or rejected).
+ */
+export const useHistoryProposals = () => useProposalStore(selectHistoryProposals);
+
+/**
+ * Selects pending proposals.
+ */
+export const usePendingProposals = () => useProposalStore(selectPendingProposals);

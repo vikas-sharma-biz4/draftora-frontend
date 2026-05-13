@@ -1,5 +1,7 @@
 import { http } from "@/config/httpClient";
 import type { SavedDraft, SaveDraftPayload, DraftMetadata, DraftStage, DraftLocation } from "@/interfaces/draftInterfaces";
+import type { RawProposalData } from "@/interfaces/proposalInterfaces";
+import { mapRawProposalData } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
 // ─── Runtime Validation ─────────────────────────────────────────────────────
@@ -45,7 +47,7 @@ interface RawWizardState {
   current_step: number;
   max_step_reached: number;
   completed_steps: number[];
-  proposal_data: Record<string, unknown>;
+  proposal_data: RawProposalData;
 }
 
 interface RawUIState {
@@ -93,7 +95,7 @@ function mapWizardState(raw: RawWizardState): SavedDraft["wizardState"] {
     currentStep: raw.current_step as SavedDraft["wizardState"]["currentStep"],
     maxStepReached: raw.max_step_reached as SavedDraft["wizardState"]["maxStepReached"],
     completedSteps: raw.completed_steps,
-    proposalData: raw.proposal_data as unknown as SavedDraft["wizardState"]["proposalData"],
+    proposalData: mapRawProposalData(raw.proposal_data),
   };
 }
 

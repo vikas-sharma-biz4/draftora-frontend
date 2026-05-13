@@ -12,6 +12,7 @@
  *   draftSession    → src/store/features/drafts/draftSessionSlice.ts
  *   proposals       → src/store/features/proposals/proposalSlice.ts
  *   proposalWizard  → src/store/features/wizard/proposalWizardSlice.ts
+ *   pipeline        → src/store/features/pipeline/pipelineSlice.ts
  *   ui              → src/store/features/ui/uiSlice.ts
  *   notifications   → src/store/features/notifications/notificationsSlice.ts
  */
@@ -21,6 +22,7 @@ import { useDraftStore } from './features/drafts/draftSlice';
 import { useDraftSessionStore } from './features/drafts/draftSessionSlice';
 import { useProposalStore } from './features/proposals/proposalSlice';
 import { useProposalWizardStore } from './features/wizard/proposalWizardSlice';
+import { usePipelineStore } from './features/pipeline/pipelineSlice';
 import { useUIStore } from './features/ui/uiSlice';
 import { useNotificationsStore } from './features/notifications/notificationsSlice';
 
@@ -37,6 +39,7 @@ export function resetAllStores(): void {
   useDraftSessionStore.getState().reset();
   useProposalStore.getState().reset();
   useProposalWizardStore.getState().reset();
+  usePipelineStore.getState().reset();
   useUIStore.getState().reset();
   useNotificationsStore.getState().reset();
 }

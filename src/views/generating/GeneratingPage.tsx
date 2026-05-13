@@ -7,7 +7,7 @@ import { cancelProposal, getProposal } from "@/services/proposal.service";
 import { GENERATION_STEPS, DRAFTS_STORAGE_KEY } from "@/constants";
 import { useProposalWizard } from "@/context/ProposalContext";
 import { logger } from "@/utils/logger";
-import { useProposalStatusStream } from "@/hooks/useProposalStatusStream";
+import { useProposalStatusPolling } from "@/hooks/useProposalStatusPolling";
 import Button from "@/components/common/Button";
 
 export default function GeneratingPage(): JSX.Element {
@@ -70,7 +70,7 @@ export default function GeneratingPage(): JSX.Element {
     isPolling,
     pollCount,
     stop: stopStream,
-  } = useProposalStatusStream({
+  } = useProposalStatusPolling({
     proposalId,
     onStatusUpdate: (data) => {
       console.log("[GeneratingPage] Status update:", {
@@ -103,7 +103,7 @@ export default function GeneratingPage(): JSX.Element {
   // Drive progress from real backend section completion ratio
   const sectionRatio = totalSections > 0 ? completedSections / totalSections : 0;
   const progressPercent = Math.min(Math.round(sectionRatio * 90) + 5, 90);
-  
+
   console.log("[GeneratingPage] Progress calculation:", {
     totalSections,
     completedSections,

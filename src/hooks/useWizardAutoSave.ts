@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
 import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import type { DraftLocation, SaveDraftPayload, DraftUIState } from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
+import { WIZARD_AUTOSAVE_FALLBACK_KEY } from "@/constants/storageKeys";
 
 interface UseWizardAutoSaveOptions {
   enabled: boolean;
@@ -15,7 +17,7 @@ interface UseWizardAutoSaveOptions {
 
 /**
  * Production-grade auto-save hook for wizard/pipeline steps
- * 
+ *
  * Features:
  * - Debounced auto-save on state changes
  * - Save on route navigation
@@ -26,23 +28,23 @@ interface UseWizardAutoSaveOptions {
  */
 export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled: true }): void {
   const { enabled, debounceMs = 2000 } = options;
-  
+
   const {
     proposalData,
     currentStep,
     maxStepReached,
     currentProposalId,
   } = useProposalWizard();
-  
+
   const { draftStage, completedSteps } = useProposalDraftSession();
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
-  
+
   const pathname = usePathname();
   const router = useRouter();
-  
+
   // Refs to track state without causing re-renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
@@ -51,11 +53,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
   // Determine lastLocation based on current pathname
   const getLastLocation = useCallback((): DraftLocation => {
-    if (pathname === "/parameters") return "wizard_parameters";
-    if (pathname === "/review") return "wizard_review";
-    if (pathname.startsWith("/proposal/")) return "web_view";
-    if (pathname.startsWith("/generating")) return "ai_sections";
-    return "wizard_parameters";
+    return getLastLocationFromPathname(pathname);
   }, [pathname]);
 
   // Check if there's meaningful data to save
@@ -199,7 +197,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
             draftStage,
             timestamp: Date.now(),
           };
-          localStorage.setItem('wizard_autosave_fallback', JSON.stringify(fallbackData));
+          localStorage.setItem(WIZARD_AUTOSAVE_FALLBACK_KEY, JSON.stringify(fallbackData));
           logger.info('[useWizardAutoSave] Fallback save to localStorage');
         } catch (error) {
           logger.error('[useWizardAutoSave] Fallback save failed', error);

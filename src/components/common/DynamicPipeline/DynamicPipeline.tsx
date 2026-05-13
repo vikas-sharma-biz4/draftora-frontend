@@ -6,7 +6,7 @@ import { Check } from "lucide-react";
 
 import styles from "./DynamicPipeline.module.scss";
 import type { DraftStage } from "@/interfaces/draftInterfaces";
-import { PIPELINE_STEPS } from "@/interfaces/draftInterfaces";
+import { PIPELINE_STEPS } from "@/constants/pipelineConstants";
 
 interface DynamicPipelineProps {
   currentStage: DraftStage;
@@ -59,7 +59,7 @@ export default function DynamicPipeline({
   const currentStepId = getCurrentStepId();
   const isAllCompleted = currentStage === "generated";
   const allowNonLinearNav = currentStage === "generated";
-  
+
   // Determine the highest step the user has reached
   // This allows going back to Step 1 and then returning to Step 2 if they've already been there
   const highestReached = maxStepReached ?? currentStepId;
@@ -75,7 +75,7 @@ export default function DynamicPipeline({
           // A step is only "completed" (green) if it's before the current step (or fully generated).
           // This prevents stale localStorage completedSteps from showing future steps as green.
           const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
-          
+
           // Progressive navigation: Allow clicking any step up to the highest reached
           // Example: If user reached Step 2, they can go back to Step 1 and return to Step 2
           // But they cannot skip ahead to Step 3 until they've visited it

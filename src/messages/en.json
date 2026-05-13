@@ -1,0 +1,73 @@
+{
+  "generic": {
+    "error": "Something went wrong. Please try again.",
+    "success": "Operation completed successfully.",
+    "loading": "Loading\u2026",
+    "saving": "Saving\u2026",
+    "deleting": "Deleting\u2026"
+  },
+  "auth": {
+    "loginSuccess": "Signed in successfully.",
+    "logoutSuccess": "Signed out successfully.",
+    "invalidCredentials": "Invalid email or password.",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "passwordResetSent": "Password reset link sent to your email.",
+    "passwordChanged": "Password changed successfully."
+  },
+  "client": {
+    "created": "Client created successfully.",
+    "updated": "Client updated successfully.",
+    "deleted": "Client deleted successfully.",
+    "notFound": "Client not found."
+  },
+  "document": {
+    "uploaded": "Document uploaded successfully.",
+    "deleted": "Document deleted successfully.",
+    "uploadFailed": "Failed to upload document. Please try again."
+  },
+  "proposal": {
+    "created": "Proposal created successfully.",
+    "deleted": "Proposal deleted successfully.",
+    "generationStarted": "Generating your proposal\u2026",
+    "generationDone": "Proposal generated successfully.",
+    "generationFailed": "Proposal generation failed. Please try again.",
+    "sectionSaved": "Section saved.",
+    "sectionSaveFailed": "Failed to save section.",
+    "sectionRegenerated": "Section regenerated.",
+    "sectionRegenFailed": "Regeneration failed.",
+    "sectionRemoved": "Section removed.",
+    "sectionRemoveFailed": "Failed to remove section.",
+    "sectionAdded": "{name} section added with AI-generated content!",
+    "sectionAddFailed": "Failed to add section.",
+    "sectionGenerating": "Generating content for new section...",
+    "approved": "Proposal approved and moved to history!",
+    "rejected": "Proposal rejected and moved to history",
+    "approveFailed": "Failed to approve proposal",
+    "rejectFailed": "Failed to reject proposal",
+    "downloaded": "Proposal downloaded successfully",
+    "downloadFailed": "Failed to download proposal",
+    "sectionNameEmpty": "Section name cannot be empty.",
+    "sectionNameExists": "A section with that name already exists.",
+    "minSections": "At least one section is required."
+  },
+  "draft": {
+    "saved": "Draft saved.",
+    "restored": "Draft restored.",
+    "deleted": "Draft deleted.",
+    "allDeleted": "All drafts deleted."
+  },
+  "upload": {
+    "inProgress": "Uploading file\u2026",
+    "success": "File uploaded successfully.",
+    "failed": "File upload failed. Please try again.",
+    "tooLarge": "File is too large. Maximum size is 10 MB.",
+    "invalidType": "Invalid file type."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "email": "Please enter a valid email address.",
+    "minLength": "Must be at least {min} characters.",
+    "maxLength": "Must be no more than {max} characters.",
+    "passwordWeak": "Password must be at least 8 characters and contain a number."
+  }
+}

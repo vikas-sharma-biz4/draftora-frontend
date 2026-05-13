@@ -22,6 +22,7 @@ import {
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import type { DraftUIState } from "@/interfaces/draftInterfaces";
+import { DRAFT_UI_STATE_KEY } from "@/constants/storageKeys";
 
 interface UseProposalPageDataReturn {
   proposal: ProposalData | null;
@@ -152,7 +153,7 @@ export function useProposalPageData(
   // Restore scroll position and active section from draft UI state
   useEffect(() => {
     try {
-      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      const uiStateStr = sessionStorage.getItem(DRAFT_UI_STATE_KEY);
       if (uiStateStr) {
         const uiState = JSON.parse(uiStateStr) as DraftUIState;
 
@@ -171,7 +172,7 @@ export function useProposalPageData(
           }, 300);
         }
 
-        sessionStorage.removeItem("draft_ui_state");
+        sessionStorage.removeItem(DRAFT_UI_STATE_KEY);
       }
     } catch {
       // Ignore errors restoring UI state

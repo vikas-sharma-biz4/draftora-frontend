@@ -15,6 +15,8 @@ const config: Config = {
     "src/context/**/*.{ts,tsx}",
     "src/hooks/**/*.{ts,tsx}",
     "src/utils/**/*.{ts,tsx}",
+    "src/components/**/*.{ts,tsx}",
+    "src/views/**/*.{ts,tsx}",
   ],
   coverageThreshold: {
     global: {
@@ -23,6 +25,22 @@ const config: Config = {
       lines: 80,
       statements: 80,
     },
+    // Staged rollout for UI layers - incremental thresholds to avoid CI collapse
+    // Components: Starting at 40% with expectation to increase quarterly
+    "./src/components/**/*.{ts,tsx}": {
+      branches: 40,
+      functions: 40,
+      lines: 40,
+      statements: 40,
+    },
+    // Views: Optional staged rollout - currently near-zero, no enforced threshold
+    // Uncomment when view test coverage reaches measurable levels
+    // "./src/views/**/*.{ts,tsx}": {
+    //   branches: 30,
+    //   functions: 30,
+    //   lines: 30,
+    //   statements: 30,
+    // },
   },
   transform: {
     "^.+\\.(ts|tsx)$": [

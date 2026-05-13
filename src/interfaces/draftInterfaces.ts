@@ -72,9 +72,3 @@ export interface PipelineStep {
   path: string;
   stage: DraftStage;
 }
-
-export const PIPELINE_STEPS: PipelineStep[] = [
-  { id: 1, label: "Parameters", path: "/parameters", stage: "wizard_in_progress" },
-  { id: 2, label: "Review", path: "/review", stage: "parameters_complete" },
-  { id: 3, label: "Web View", path: "/web-view", stage: "review_complete" },
-];

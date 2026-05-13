@@ -1,23 +1,22 @@
 /**
- * Tests for useProposalStatusStream hook
+ * Tests for useProposalStatusPolling hook
  *
  * Coverage targets:
- *   - SSE connection is established on autoStart
- *   - Status updates are received via SSE onmessage
- *   - SSE error triggers polling fallback
  *   - Polling calls getProposalStatus at intervals
  *   - Polling stops after MAX_POLL_ATTEMPTS
- *   - Completed status stops streaming and calls onCompleted
- *   - Failed status stops streaming and calls onFailed
- *   - Cancelled status stops streaming and calls onCancelled
- *   - stop() closes EventSource and clears timers
+ *   - Completed status stops polling and calls onCompleted
+ *   - Failed status stops polling and calls onFailed
+ *   - Cancelled status stops polling and calls onCancelled
+ *   - stop() clears timers and BroadcastChannel
  *   - Cleanup on unmount closes everything
+ *   - Tab synchronization via BroadcastChannel
+ *   - Leadership election and heartbeat mechanism
  */
 
 import { renderHook, act } from "@testing-library/react";
-import { useProposalStatusStream } from "@/hooks/useProposalStatusStream";
+import { useProposalStatusPolling } from "@/hooks/useProposalStatusPolling";
+import type { ProposalStatus } from "@/interfaces/proposalInterfaces";
 import * as proposalService from "@/services/proposal.service";
-import type { ProposalStatus } from "@/services/proposal.service";
 import * as auth from "@/utils/auth";
 
 // ---------------------------------------------------------------------------
@@ -244,7 +243,7 @@ const defaultOptions = {
 // TODO: Update tests for polling + tab sync (SSE removed)
 // ---------------------------------------------------------------------------
 
-// describe("useProposalStatusStream — SSE connection", () => {
+// describe("useProposalStatusPolling — SSE connection", () => {
 //   Tests commented out - hook now uses polling with tab synchronization instead of SSE
 // });
 
@@ -252,7 +251,7 @@ const defaultOptions = {
 // SSE message handling
 // ---------------------------------------------------------------------------
 
-// describe("useProposalStatusStream — SSE message handling", () => {
+// describe("useProposalStatusPolling — SSE message handling", () => {
 //   Tests commented out - hook now uses polling with tab synchronization instead of SSE
 // });
 
@@ -260,7 +259,7 @@ const defaultOptions = {
 // SSE error → polling fallback
 // ---------------------------------------------------------------------------
 
-// describe("useProposalStatusStream — SSE error fallback to polling", () => {
+// describe("useProposalStatusPolling — SSE error fallback to polling", () => {
 //   Tests commented out - hook now uses polling with tab synchronization instead of SSE
 // });
 
@@ -268,11 +267,11 @@ const defaultOptions = {
 // Polling behavior
 // ---------------------------------------------------------------------------
 
-describe("useProposalStatusStream — polling", () => {
+describe("useProposalStatusPolling — polling", () => {
   it("schedules next poll when status is in_progress", async () => {
     mockGetProposalStatus.mockResolvedValue(inProgressStatus);
 
-    renderHook(() => useProposalStatusStream(defaultOptions));
+    renderHook(() => useProposalStatusPolling(defaultOptions));
 
     // Wait for leader election and first poll
     await act(async () => {
@@ -294,7 +293,7 @@ describe("useProposalStatusStream — polling", () => {
   it("stops polling after MAX_POLL_ATTEMPTS", async () => {
     mockGetProposalStatus.mockResolvedValue(inProgressStatus);
 
-    const { result } = renderHook(() => useProposalStatusStream(defaultOptions));
+    const { result } = renderHook(() => useProposalStatusPolling(defaultOptions));
 
     // Run through all polls
     await act(async () => {
@@ -314,7 +313,7 @@ describe("useProposalStatusStream — polling", () => {
   it("stops polling when status becomes completed", async () => {
     mockGetProposalStatus.mockResolvedValue(completedStatus);
 
-    const { result } = renderHook(() => useProposalStatusStream(defaultOptions));
+    const { result } = renderHook(() => useProposalStatusPolling(defaultOptions));
 
     await act(async () => {
       await jest.runAllTimersAsync();
@@ -329,9 +328,9 @@ describe("useProposalStatusStream — polling", () => {
 // Manual start/stop
 // ---------------------------------------------------------------------------
 
-describe("useProposalStatusStream — start/stop", () => {
+describe("useProposalStatusPolling — start/stop", () => {
   it("start() begins polling", () => {
-    const { result } = renderHook(() => useProposalStatusStream({
+    const { result } = renderHook(() => useProposalStatusPolling({
       ...defaultOptions,
       autoStart: false,
     }));
@@ -344,7 +343,7 @@ describe("useProposalStatusStream — start/stop", () => {
   });
 
   it("stop() stops polling", () => {
-    const { result } = renderHook(() => useProposalStatusStream(defaultOptions));
+    const { result } = renderHook(() => useProposalStatusPolling(defaultOptions));
 
     act(() => {
       result.current.stop();
@@ -358,10 +357,10 @@ describe("useProposalStatusStream — start/stop", () => {
 // Cleanup on unmount
 // ---------------------------------------------------------------------------
 
-describe("useProposalStatusStream — cleanup", () => {
+describe("useProposalStatusPolling — cleanup", () => {
   it("stops streaming on unmount", () => {
     const { unmount } = renderHook(() =>
-      useProposalStatusStream(defaultOptions)
+      useProposalStatusPolling(defaultOptions)
     );
 
     unmount();
@@ -377,10 +376,10 @@ describe("useProposalStatusStream — cleanup", () => {
 // Cancelled status
 // ---------------------------------------------------------------------------
 
-describe("useProposalStatusStream — cancelled", () => {
+describe("useProposalStatusPolling — cancelled", () => {
   it("calls onCancelled and stops when status is cancelled", () => {
     const onCancelled = jest.fn();
-    const { result } = renderHook(() => useProposalStatusStream({
+    const { result } = renderHook(() => useProposalStatusPolling({
       ...defaultOptions,
       onCancelled,
     }));
