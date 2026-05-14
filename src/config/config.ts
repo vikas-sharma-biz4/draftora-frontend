@@ -5,7 +5,7 @@ import { logger } from "@/utils/logger";
 // with existing imports from @/config/config.
 export { API_BASE_URL } from "./httpClient";
 
-export const POLLING_INTERVAL_MS = 3000;
+export const POLLING_INTERVAL_MS = 2000;
 export const MAX_POLL_ATTEMPTS = 120;
 
 const _defaultAiModel = process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL;

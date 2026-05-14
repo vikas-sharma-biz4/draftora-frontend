@@ -20,29 +20,30 @@ interface SectionsSelectorModalProps {
 const SECTION_CATEGORIES = {
   core: {
     label: "Core Sections",
-    sections: ["introduction", "purpose", "executive_summary"],
+    sections: ["introduction", "purpose"],
   },
   technical: {
     label: "Technical",
     sections: [
       "high_level_scope",
       "high_level_feature_list",
-      "nfrs",
-      "technology_stack",
+      "non_functional_requirements",
+      "proposed_technology_stack",
       "system_architecture",
+      "user_flow",
     ],
   },
   planning: {
     label: "Planning",
-    sections: ["timeline", "milestones", "dependencies", "user_flow_diagram"],
+    sections: ["milestone_timeline"],
   },
   risk: {
     label: "Risk & Compliance",
-    sections: ["risks_assumptions", "mitigations"],
+    sections: ["risks_assumptions"],
   },
   company: {
     label: "Company Info",
-    sections: ["similar_projects", "approach_methodology", "client_dependencies", "communication"],
+    sections: ["client_dependencies", "communication_client_cadence", "similar_projects", "our_approach_methodology"],
   },
 };
 

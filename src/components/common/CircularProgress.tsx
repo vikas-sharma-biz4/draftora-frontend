@@ -1,6 +1,5 @@
 "use client";
 
-import { log } from "console";
 import React from "react";
 
 interface CircularProgressProps {
@@ -34,8 +33,25 @@ export default function CircularProgress({
   const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
   const center = size / 2;
 
+  const containerStyle: React.CSSProperties = {
+    width: size,
+    height: size,
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
+  const contentStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+
   return (
-    <div className={`circular-progress ${className}`} style={{ width: size, height: size }}>
+    <div className={`circular-progress ${className}`} style={containerStyle}>
       <svg
         width={size}
         height={size}
@@ -67,11 +83,13 @@ export default function CircularProgress({
         />
       </svg>
       {/* Center content */}
-      <div className="circular-progress-content">
+      <div style={contentStyle}>
         {label !== undefined ? (
-          <span className="circular-progress-label">{label}</span>
+          <span style={{ fontSize: size * 0.15, fontWeight: 600, color: "#374151" }}>{label}</span>
         ) : (
-          <span className="circular-progress-percent">{Math.round(progress)}%</span>
+          <span style={{ fontSize: size * 0.22, fontWeight: 700, color: "#111827" }}>
+            {Math.round(progress)}%
+          </span>
         )}
       </div>
     </div>
