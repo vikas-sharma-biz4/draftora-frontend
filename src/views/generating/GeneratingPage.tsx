@@ -9,6 +9,7 @@ import { useProposalWizard } from "@/context/ProposalContext";
 import { logger } from "@/utils/logger";
 import { useProposalStatusStream } from "@/hooks/useProposalStatusStream";
 import Button from "@/components/common/Button";
+import CircularProgress from "@/components/common/CircularProgress";
 
 export default function GeneratingPage(): JSX.Element {
   const params = useParams();
@@ -103,7 +104,7 @@ export default function GeneratingPage(): JSX.Element {
   // Drive progress from real backend section completion ratio
   const sectionRatio = totalSections > 0 ? completedSections / totalSections : 0;
   const progressPercent = Math.min(Math.round(sectionRatio * 90) + 5, 90);
-  
+
   console.log("[GeneratingPage] Progress calculation:", {
     totalSections,
     completedSections,
@@ -193,39 +194,7 @@ export default function GeneratingPage(): JSX.Element {
         <div className="generating-content">
           {/* Left side - Progress Circle */}
           <div className="generating-progress-section">
-            <div className="generating-circle-wrap">
-              <svg
-                width="240"
-                height="240"
-                viewBox="0 0 240 240"
-                style={{ transform: "rotate(-90deg)" }}
-                aria-hidden="true"
-              >
-                <circle
-                  cx="120"
-                  cy="120"
-                  r="110"
-                  fill="transparent"
-                  stroke="#e5e7eb"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="120"
-                  cy="120"
-                  r="110"
-                  fill="transparent"
-                  stroke="#6366f1"
-                  strokeWidth="8"
-                  strokeDasharray={2 * Math.PI * 110}
-                  strokeDashoffset={2 * Math.PI * 110 - (progressPercent / 100) * 2 * Math.PI * 110}
-                  strokeLinecap="round"
-                  style={{ transition: "stroke-dashoffset 1s ease" }}
-                />
-              </svg>
-              <div className="generating-circle-content">
-                <div className="generating-percentage">{progressPercent}%</div>
-              </div>
-            </div>
+            <CircularProgress progress={progressPercent} size={240} strokeWidth={8} label={`${Math.round(progressPercent)}%`} />
             <div className="generating-time-label">TIME REMAINING</div>
             <div className="generating-time-value">30-45 seconds</div>
             {isPolling && (

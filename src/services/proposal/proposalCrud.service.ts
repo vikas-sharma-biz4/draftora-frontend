@@ -126,13 +126,29 @@ interface ProposalStatusApiResponse {
   current_stage?: string | null;
   visited_pipeline_steps?: number[];
   highest_visited_step?: number | null;
+  total_sections?: number | null;
+  progress_percent?: number;
+  progress?: number;
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
   const d = await http.get<ProposalStatusApiResponse>(`/proposals/${id}/status/`, {
     cache: "no-store",
   });
-  return {
+  const completed = d.completed_sections ?? [];
+  const total = d.total_sections ?? d.selected_sections?.length ?? 0;
+
+  // Calculate progress percentage based on completed sections
+  // Use backend's progress_percentage if available, otherwise calculate from completed_sections
+  let progressPercent = d.progress_percent ?? d.progress ?? 0;
+  if (progressPercent === 0 && total > 0 && completed.length > 0) {
+    progressPercent = Math.round((completed.length / total) * 100);
+  } else if (progressPercent === 0 && total > 0 && completed.length === 0 && d.status === "generating") {
+    // If generating but no sections completed yet, show a small initial progress
+    progressPercent = 1;
+  }
+
+  const status: ProposalStatus = {
     id: d.id,
     status: d.status,
     generatingSection: d.generating_section ?? null,
@@ -142,6 +158,8 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
     visitedPipelineSteps: d.visited_pipeline_steps ?? [],
     highestVisitedStep: d.highest_visited_step ?? null,
   };
+
+  return status;
 }
 
 /** Raw backend response shape for GET /proposals/:id/ (snake_case) */

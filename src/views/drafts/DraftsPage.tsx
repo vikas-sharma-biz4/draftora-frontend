@@ -10,7 +10,8 @@ import Button from "@/components/common/Button";
 
 import styles from "./DraftsPage.module.scss";
 
-import { useProposalDraftSession, useProposalWizard } from "@/context/ProposalContext";
+import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDrafts } from "@/hooks/useDrafts";
 import { useClients } from "@/hooks/useClients";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
@@ -34,8 +35,10 @@ const DeleteAllDraftsModal = dynamic(() => import("@/components/modals/DeleteAll
 });
 
 export default function DraftsPage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useProposalWizard();
-  const { setDraftStage, setCompletedSteps, setCurrentDraftId } = useProposalDraftSession();
+  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useWizardActions();
+  const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
+  const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
 
   const { drafts, isLoading, refetch } = useDrafts({ force: true });
@@ -54,6 +57,11 @@ export default function DraftsPage(): JSX.Element {
   } | undefined>(undefined);
   const [deleteModalData, setDeleteModalData] = useState<{ id: string; name: string } | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Force refresh drafts when page becomes visible to show updated status
   useEffect(() => {
@@ -93,8 +101,28 @@ export default function DraftsPage(): JSX.Element {
       setLoadingDraftId(draftId);
       const fullDraft: SavedDraft = await getDraftFromStore(draftId);
 
-      // Restore wizard state
-      updateProposalData(fullDraft.wizardState.proposalData as Partial<ProposalData>);
+      logger.info('[DraftsPage] Loading draft', {
+        draftId,
+        hasGeneratedContent: Object.keys(fullDraft.generatedContent || {}).length > 0,
+        sectionCount: Object.keys(fullDraft.generatedContent || {}).length,
+        stage: fullDraft.stage,
+        lastLocation: fullDraft.lastLocation,
+      });
+
+      // Restore wizard state with generated content included in proposalData
+      const restoredProposalData: Partial<ProposalData> = {
+        ...fullDraft.wizardState.proposalData as Partial<ProposalData>,
+        // Restore generated content into sections field
+        sections: fullDraft.generatedContent || {},
+        // Ensure selectedDocumentIds and filesMeta are preserved
+        selectedDocumentIds: (fullDraft.wizardState.proposalData as any).selectedDocumentIds || [],
+        filesMeta: (fullDraft.wizardState.proposalData as any).filesMeta || [],
+        // Ensure selectedSections and sectionDisplayNames are preserved
+        selectedSections: (fullDraft.wizardState.proposalData as any).selectedSections || [],
+        sectionDisplayNames: (fullDraft.wizardState.proposalData as any).sectionDisplayNames || {},
+      };
+
+      updateProposalData(restoredProposalData);
       setCurrentStep(fullDraft.wizardState.currentStep);
       setDraftStage(fullDraft.stage);
       setCompletedSteps(fullDraft.wizardState.completedSteps);
@@ -215,7 +243,12 @@ export default function DraftsPage(): JSX.Element {
         }
       />
 
-        {isLoading ? (
+        {!mounted ? (
+          <SkeletonGrid
+            className={styles.draftsGrid}
+            renderItem={() => <DraftCardSkeleton />}
+          />
+        ) : isLoading ? (
           <SkeletonGrid
             className={styles.draftsGrid}
             renderItem={() => <DraftCardSkeleton />}

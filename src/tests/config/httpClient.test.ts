@@ -30,7 +30,7 @@ process.env.NEXT_PUBLIC_API_URL = "https://api.test.example.com/api/v1";
 function mockSuccessResponse<T>(data: T): void {
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({ success: true, data }),
+    text: async () => JSON.stringify({ success: true, data }),
   });
 }
 
@@ -41,7 +41,7 @@ function mockErrorResponse(
   mockFetch.mockResolvedValueOnce({
     ok: false,
     status,
-    json: async () => ({
+    text: async () => JSON.stringify({
       success: false,
       error,
     }),
@@ -51,7 +51,7 @@ function mockErrorResponse(
 function mockEnvelopeFailure(message: string): void {
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    json: async () => ({
+    text: async () => JSON.stringify({
       success: false,
       error: { code: "VALIDATION_ERROR", message },
     }),
@@ -159,7 +159,7 @@ describe("httpClient — error responses", () => {
   it("throws generic message when both ok:true and success:false with no error", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ success: false }),
+      text: async () => JSON.stringify({ success: false }),
     });
 
     await expect(http.get("/test/")).rejects.toThrow("API request failed");

@@ -1,19 +1,72 @@
 /**
- * Zustand store for client state management with smart caching
- *
  * This store provides:
  * - Centralized client state across the application
  * - Smart caching with configurable TTL
  * - Optimistic updates for mutations
  * - Automatic cache invalidation
  * - Prevention of duplicate API calls
+ * - LocalStorage persistence for offline access
  */
 
 import { create } from 'zustand';
 import type { Client, ClientWithDocuments, ClientDocument, CreateClientRequest, UpdateClientRequest } from '@/services/client.service';
 import * as clientApi from '@/services/client.service';
+import { logger } from '@/utils/logger';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const LOCAL_STORAGE_KEY = 'draftora_clients_cache';
+const LOCAL_STORAGE_TIMESTAMP_KEY = 'draftora_clients_timestamp';
+
+// ─── LocalStorage Helpers ─────────────────────────────────────────────────────
+
+/**
+ * Check if we're in a browser environment
+ */
+const isBrowser = typeof window !== 'undefined' && typeof localStorage !== 'undefined';
+
+/**
+ * Load clients from localStorage
+ */
+function loadClientsFromLocalStorage(): ClientWithDocuments[] | null {
+  if (!isBrowser) return null;
+
+  try {
+    const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!cached) return null;
+    return JSON.parse(cached);
+  } catch (error) {
+    console.warn('[clientSlice] Failed to load clients from localStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Save clients to localStorage
+ */
+function saveClientsToLocalStorage(clients: ClientWithDocuments[]): void {
+  if (!isBrowser) return;
+
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clients));
+    localStorage.setItem(LOCAL_STORAGE_TIMESTAMP_KEY, Date.now().toString());
+  } catch (error) {
+    console.warn('[clientSlice] Failed to save clients to localStorage:', error);
+  }
+}
+
+/**
+ * Clear clients from localStorage
+ */
+function clearClientsFromLocalStorage(): void {
+  if (!isBrowser) return;
+
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_TIMESTAMP_KEY);
+  } catch (error) {
+    console.warn('[clientSlice] Failed to clear clients from localStorage:', error);
+  }
+}
 
 export const INITIAL_CLIENT_STATE = {
   clients: [] as ClientWithDocuments[],
@@ -22,6 +75,12 @@ export const INITIAL_CLIENT_STATE = {
   lastFetched: null as number | null,
   error: null as string | null,
 };
+
+// Load from localStorage on initialization
+const cachedClients = loadClientsFromLocalStorage();
+const cachedTimestamp = isBrowser ? localStorage.getItem(LOCAL_STORAGE_TIMESTAMP_KEY) : null;
+const initialClients = cachedClients || [];
+const initialLastFetched = cachedTimestamp ? parseInt(cachedTimestamp, 10) : null;
 
 interface ClientState {
   // State
@@ -58,11 +117,11 @@ interface ClientState {
 }
 
 export const useClientStore = create<ClientState>((set, get) => ({
-  // Initial state
-  clients: [],
+  // Initial state - load from localStorage if available
+  clients: initialClients,
   isLoading: false,
-  isInitialized: false,
-  lastFetched: null,
+  isInitialized: !!cachedClients,
+  lastFetched: initialLastFetched,
   error: null,
 
   // Computed
@@ -103,6 +162,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
         lastFetched: Date.now(),
         error: null,
       });
+      // Save to localStorage for persistence
+      saveClientsToLocalStorage(clients);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch clients';
       set({
@@ -119,29 +180,42 @@ export const useClientStore = create<ClientState>((set, get) => ({
       isInitialized: true,
       lastFetched: Date.now(),
     });
+    saveClientsToLocalStorage(clients);
   },
 
   addClient: (client: ClientWithDocuments) => {
-    set(state => ({
-      clients: [...state.clients, client],
-      lastFetched: Date.now(),
-    }));
+    set(state => {
+      const updatedClients = [...state.clients, client];
+      saveClientsToLocalStorage(updatedClients);
+      return ({
+        clients: updatedClients,
+        lastFetched: Date.now(),
+      });
+    });
   },
 
   updateClient: (id: number, updates: Partial<Client>) => {
-    set(state => ({
-      clients: state.clients.map(c =>
+    set(state => {
+      const updatedClients = state.clients.map(c =>
         c.id === id ? { ...c, ...updates } : c
-      ),
-      lastFetched: Date.now(),
-    }));
+      );
+      saveClientsToLocalStorage(updatedClients);
+      return ({
+        clients: updatedClients,
+        lastFetched: Date.now(),
+      });
+    });
   },
 
   removeClient: (id: number) => {
-    set(state => ({
-      clients: state.clients.filter(c => c.id !== id),
-      lastFetched: Date.now(),
-    }));
+    set(state => {
+      const updatedClients = state.clients.filter(c => c.id !== id);
+      saveClientsToLocalStorage(updatedClients);
+      return ({
+        clients: updatedClients,
+        lastFetched: Date.now(),
+      });
+    });
   },
 
   invalidateCache: () => {
@@ -151,34 +225,72 @@ export const useClientStore = create<ClientState>((set, get) => ({
     });
   },
 
-  reset: () => set(INITIAL_CLIENT_STATE),
+  reset: () => {
+    clearClientsFromLocalStorage();
+    set(INITIAL_CLIENT_STATE);
+  },
 
   // Document actions
   addDocument: (clientId: number, document: ClientDocument) => {
-    set(state => ({
-      clients: state.clients.map(c =>
-        c.id === clientId
-          ? { ...c, documents: [...c.documents, document] }
-          : c
-      ),
-      lastFetched: Date.now(),
-    }));
+    logger.debug('[clientSlice] addDocument called:', { clientId, documentId: document.id, documentName: document.name });
+    set(state => {
+      const clients = [...state.clients];
+      const clientIndex = clients.findIndex(c => c.id === clientId);
+
+      if (clientIndex >= 0) {
+        // Client exists, add document
+        clients[clientIndex] = {
+          ...clients[clientIndex],
+          documents: [...(clients[clientIndex].documents || []), document]
+        };
+        logger.debug('[clientSlice] Document added to existing client:', {
+          clientId,
+          documentId: document.id,
+          totalDocuments: clients[clientIndex].documents.length
+        });
+      } else {
+        // Client doesn't exist, create it with the document
+        const mockClient: ClientWithDocuments = {
+          id: clientId,
+          name: `Client ${clientId}`,
+          industry: 'Unknown',
+          status: 'active',
+          notes: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          documents: [document]
+        };
+        clients.push(mockClient);
+        logger.debug('[clientSlice] Mock client created with document:', { clientId, documentId: document.id });
+      }
+
+      saveClientsToLocalStorage(clients);
+      return {
+        ...state,
+        clients,
+        lastFetched: Date.now(),
+      };
+    });
   },
 
   removeDocument: (clientId: number, documentId: number) => {
-    set(state => ({
-      clients: state.clients.map(c =>
+    set(state => {
+      const updatedClients = state.clients.map(c =>
         c.id === clientId
           ? { ...c, documents: c.documents.filter(d => d.id !== documentId) }
           : c
-      ),
-      lastFetched: Date.now(),
-    }));
+      );
+      saveClientsToLocalStorage(updatedClients);
+      return {
+        clients: updatedClients,
+        lastFetched: Date.now(),
+      };
+    });
   },
 
   updateDocument: (clientId: number, documentId: number, updates: Partial<ClientDocument>) => {
-    set(state => ({
-      clients: state.clients.map(c =>
+    set(state => {
+      const updatedClients = state.clients.map(c =>
         c.id === clientId
           ? {
               ...c,
@@ -187,9 +299,13 @@ export const useClientStore = create<ClientState>((set, get) => ({
               ),
             }
           : c
-      ),
-      lastFetched: Date.now(),
-    }));
+      );
+      saveClientsToLocalStorage(updatedClients);
+      return {
+        clients: updatedClients,
+        lastFetched: Date.now(),
+      };
+    });
   },
 
   // Mutation wrappers with optimistic updates

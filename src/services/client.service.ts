@@ -95,10 +95,9 @@ export async function deleteClient(clientId: number): Promise<void> {
  * List all clients with full documents array in a single API call.
  */
 export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
-  const response = await http.get<{ data: ClientWithDocuments[]; meta: unknown }>("/clients/full-data");
-  console.log('[client.service] API response:', response);
-  console.log('[client.service] response.data:', response.data);
-  console.log('[client.service] Is array?', Array.isArray(response.data));
+  const response = await http.get<{ data: ClientWithDocuments[]; meta: any }>("/clients/full-data?page=1&per_page=50");
+  console.log('[client.service] Full data API response:', response);
+  console.log('[client.service] Clients array:', response.data);
   return response.data;
 }
 
