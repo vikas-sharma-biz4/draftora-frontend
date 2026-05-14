@@ -1,16 +1,41 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
 
-import { SECTION_DISPLAY_NAMES } from "@/constants";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import {
+  useTemplateType,
+  useTemplateId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useExactDocumentName,
+  useOriginalSections,
+  useCurrentStep,
+  useIsGenerating,
+  useCurrentProposalId,
+  useEditMode,
+  useMaxStepReached,
+  useShouldStartBackgroundFetch,
+  useWizardActions,
+  useGeneratedProposalId,
+} from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/hooks";
+import { usePipelineSteps } from "@/hooks/usePipelineSteps";
+import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
+import { useShallow } from "zustand/react/shallow";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
+import { SECTION_DISPLAY_NAMES, TEMPLATE_TOCS } from "@/constants";
 
 import SectionManager from "./SectionManager";
 import ToneSelector from "./ToneSelector";
@@ -43,23 +68,59 @@ function buildSectionItems(
   });
 }
 
+function getTemplateSections(templateType: string): SectionItem[] {
+  // Get sections from TEMPLATE_TOCS based on template type
+  if (templateType === "mvp" && TEMPLATE_TOCS.mvp) {
+    return TEMPLATE_TOCS.mvp.map((section: { key: string; label: string }) => ({
+      key: section.key,
+      label: section.label,
+    }));
+  }
+  if (templateType === "design" && TEMPLATE_TOCS.design) {
+    return TEMPLATE_TOCS.design.map((section: { key: string; label: string }) => ({
+      key: section.key,
+      label: section.label,
+    }));
+  }
+  if (templateType === "poc" && TEMPLATE_TOCS.poc) {
+    return TEMPLATE_TOCS.poc.map((section: { key: string; label: string }) => ({
+      key: section.key,
+      label: section.label,
+    }));
+  }
+  // Fallback for scratch or custom templates
+  return [];
+}
+
 export default function ParametersPage(): JSX.Element {
-  const {
-    proposalData,
-    updateProposalData,
-    setCurrentStep,
-    currentProposalId,
-    shouldStartBackgroundFetch,
-    setShouldStartBackgroundFetch,
-    maxStepReached,
-    setMaxStepReached,
-  } = useProposalWizard();
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = useProposalPipeline();
-  const { draftStage, completedSteps, setDraftStage, markStepCompleted } = useProposalDraftSession();
+  const templateType = useTemplateType();
+  const templateId = useTemplateId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const exactDocumentName = useExactDocumentName();
+  const originalSections = useOriginalSections();
+  const currentStep = useCurrentStep();
+  const isGenerating = useIsGenerating();
+  const generatedProposalId = useGeneratedProposalId();
+  const currentProposalId = useCurrentProposalId();
+  const editMode = useEditMode();
+  const maxStepReached = useMaxStepReached();
+  const shouldStartBackgroundFetch = useShouldStartBackgroundFetch();
+  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setShouldStartBackgroundFetch, invalidateRecommendationsCache } = useWizardActions();
+  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
+  const draftStage = useDraftSessionStore((s) => s.draftStage);
+  const completedSteps = useDraftSessionStore((s) => s.completedSteps);
+  const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
-  const isRecreateMode = proposalData.templateType === "recreate";
+  const isRecreateMode = templateType === "recreate";
 
   // Enable auto-save when user is in pipeline stage
   useWizardAutoSave({ enabled: true, debounceMs: 2000 });
@@ -71,24 +132,77 @@ export default function ParametersPage(): JSX.Element {
     }
   }, [currentProposalId, syncVisitedStepsFromBackend]);
 
-  const [sections, setSections] = useState<SectionItem[]>(() =>
-    buildSectionItems(
-      proposalData.selectedSections,
-      proposalData.sectionDisplayNames,
-      proposalData.originalSections
-    )
-  );
-
-  // Sync local sections state with proposalData (e.g., after localStorage rehydration)
-  useEffect(() => {
-    setSections(
-      buildSectionItems(
-        proposalData.selectedSections,
-        proposalData.sectionDisplayNames,
-        proposalData.originalSections
-      )
+  // Compute sections from templateType - DERIVED STATE (not stored)
+  const computedSections = useMemo(() => {
+    // If it's a template type with predefined TOC (mvp, design, poc), always use those sections
+    if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
+      const templateSections = getTemplateSections(templateType);
+      if (templateSections.length > 0) {
+        return templateSections;
+      }
+    }
+    // Otherwise, use the existing sections from proposalData or recreate mode
+    return buildSectionItems(
+      selectedSections,
+      sectionDisplayNames,
+      originalSections
     );
-  }, [proposalData.selectedSections, proposalData.sectionDisplayNames, proposalData.originalSections]);
+  }, [templateType, selectedSections, sectionDisplayNames, originalSections]);
+
+  const [sections, setSections] = useState<SectionItem[]>(computedSections);
+
+  // Sync local state with computed sections when templateType changes
+  useEffect(() => {
+    if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
+      const templateSections = getTemplateSections(templateType);
+      if (templateSections.length > 0) {
+        setSections(templateSections);
+      }
+    } else {
+      setSections(computedSections);
+    }
+  }, [templateType, computedSections]);
+
+  // Invalidate recommendations cache when template or critical context changes
+  useEffect(() => {
+    // Only invalidate if we have prefetched data and the context changed
+    // This ensures cache is invalidated when user changes template, sections, or description
+    if (templateId !== undefined || description !== undefined) {
+      invalidateRecommendationsCache();
+    }
+  }, [templateId, description, invalidateRecommendationsCache]);
+
+  // Sync computed sections to store when they change (only for non-template modes)
+  useEffect(() => {
+    // Only sync for non-template modes (scratch, custom, recreate)
+    if (templateType && !["mvp", "design", "poc"].includes(templateType)) {
+      const keys = sections.map((s) => s.key);
+      const displayNames: Record<string, string> = {};
+      for (const s of sections) {
+        displayNames[s.key] = s.label;
+      }
+      // Only update if different
+      const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
+      const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
+      if (keysChanged || displayNamesChanged) {
+        updateProposalData({
+          selectedSections: keys,
+          sectionDisplayNames: displayNames,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateType, sections, selectedSections, sectionDisplayNames]);
+
+  // Cleanup on unmount - cancel any in-flight requests
+  useEffect(() => {
+    return () => {
+      // Cancel any in-flight recommendations fetch when navigating away
+      // This prevents memory leaks and state updates after unmount
+      const { cancelRecommendationsFetch } = useProposalWizardStore.getState();
+      cancelRecommendationsFetch();
+    };
+  }, []);
 
   // Mark step 1 as visited when this page loads
   useEffect(() => {
@@ -140,12 +254,12 @@ export default function ParametersPage(): JSX.Element {
     markStepCompleted(1);
     setDraftStage("parameters_complete");
     setCurrentStep(5);
-    
+
     // Update maxStepReached to allow returning to Step 2 from Step 1
     if (maxStepReached < 2) {
       setMaxStepReached(2);
     }
-    
+
     router.push("/review");
 
     if (isRegenerating) {
@@ -180,11 +294,11 @@ export default function ParametersPage(): JSX.Element {
           <div className="recreate-banner">
             <div>
               <strong>Recreate Mode</strong>
-              {proposalData.exactDocumentName && (
-                <span className="recreate-banner-file"> · {proposalData.exactDocumentName}</span>
+              {exactDocumentName && (
+                <span className="recreate-banner-file"> · {exactDocumentName}</span>
               )}
               <div className="recreate-banner-hint">
-                {proposalData.originalSections?.length ?? 0} sections will be rewritten using new context.
+                {originalSections?.length ?? 0} sections will be rewritten using new context.
               </div>
             </div>
           </div>
@@ -193,7 +307,10 @@ export default function ParametersPage(): JSX.Element {
         <SectionManager
           sections={sections}
           onSectionsChange={setSections}
-          proposalData={proposalData}
+          proposalData={{
+            originalSections,
+            // Include other fields SectionManager might need
+          } as any}
           onUpdateProposalData={updateProposalData}
           isRecreateMode={isRecreateMode}
           shouldStartBackgroundFetch={shouldStartBackgroundFetch}
@@ -201,19 +318,19 @@ export default function ParametersPage(): JSX.Element {
         />
 
         <ToneSelector
-          value={proposalData.tone}
+          value={tone}
           onChange={(value) => updateProposalData({ tone: value })}
         />
 
         <LengthLanguageSelector
-          lengthPreference={proposalData.lengthPreference}
-          language={proposalData.language}
+          lengthPreference={lengthPreference}
+          language={language}
           onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
           onLanguageChange={(value) => updateProposalData({ language: value })}
         />
 
         <AIModelSelector
-          value={proposalData.aiModel ?? "gpt-4o"}
+          value={aiModel ?? "gpt-4o"}
           onChange={(value) => updateProposalData({ aiModel: value })}
         />
 

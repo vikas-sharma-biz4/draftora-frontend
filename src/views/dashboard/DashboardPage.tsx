@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 
 import { useProposals } from "@/hooks/useProposals";
 import { useErrorToast } from "@/hooks/useErrorToast";
@@ -29,6 +29,11 @@ export default function DashboardPage(): JSX.Element {
   const { proposals, isLoading, error } = useProposals();
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 200);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useErrorToast(error, "Failed to load proposals. Is the backend running?");
 
@@ -59,7 +64,12 @@ export default function DashboardPage(): JSX.Element {
         }
       />
 
-      {isLoading ? (
+      {!mounted ? (
+        <SkeletonGrid
+          className="proposals-grid"
+          renderItem={() => <SkeletonCard />}
+        />
+      ) : isLoading ? (
         <SkeletonGrid
           className="proposals-grid"
           renderItem={() => <SkeletonCard />}
