@@ -26,7 +26,7 @@ const SkeletonCard = dynamic(
 const SkeletonGrid = dynamic(() => import("@/components/common/SkeletonGrid"), { ssr: false });
 
 export default function DashboardPage(): JSX.Element {
-  const { proposals, isLoading, error } = useProposals();
+  const { proposals, isLoading, error } = useProposals({ autoFetch: true });
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 200);
 

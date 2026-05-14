@@ -31,7 +31,7 @@ export async function parseCustomTemplate(
     sections: Array<{ key: string; label: string; description: string }>;
     source_type: string;
     total_sections: number;
-  }>("/templates/parse/", formData);
+  }>("/templates/parse", formData);
   return {
     sections: data.sections,
     sourceType: data.source_type,
@@ -79,7 +79,7 @@ export async function parseRecreateDocument(
     source_type: string;
     total_sections: number;
     full_text: string;
-  }>("/templates/parse-recreate/", formData, { signal });
+  }>("/templates/parse-recreate", formData, { signal });
 
   return {
     sections: d.sections,
@@ -141,7 +141,7 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
     formData.append("files", file);
   }
 
-  const data = await http.post<RawParseFilesData>("/parse/", formData);
+  const data = await http.post<RawParseFilesData>("/parse", formData);
 
   return {
     success: true,
@@ -165,7 +165,7 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
  * Fetch the list of file extensions supported by the backend parser.
  */
 export async function getSupportedParseFormats(): Promise<string[]> {
-  const data = await http.get<{ extensions: string[] }>("/parse/supported-formats/", { cache: "no-store" });
+  const data = await http.get<{ extensions: string[] }>("/parse/supported-formats", { cache: "no-store" });
   return data.extensions ?? [];
 }
 
@@ -187,7 +187,7 @@ export interface SuggestedSection {
 export async function suggestSections(
   payload: SuggestSectionsPayload
 ): Promise<SuggestedSection[]> {
-  const data = await http.post<{ sections: SuggestedSection[] }>("/proposals/suggest-sections/", {
+  const data = await http.post<{ sections: SuggestedSection[] }>("/proposals/suggest-sections", {
     title: payload.title,
     description: payload.description,
     template_type: payload.templateType,

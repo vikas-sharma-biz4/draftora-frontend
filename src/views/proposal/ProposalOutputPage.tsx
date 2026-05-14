@@ -4,7 +4,8 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { logger } from "@/utils/logger";
-import { useProposalWizard, useProposalPipeline } from "@/context/ProposalContext";
+import { useProposalWizard } from "@/context/ProposalContext";
+import { useVisitedPipelineSteps } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import { toast } from "@/utils/toast";
 
@@ -60,12 +61,22 @@ function resolveSectionLabel(
   );
 }
 
+/** Detects when backend returned an error placeholder instead of real content */
+function isErrorContent(content: string | undefined): boolean {
+  if (!content) return true;
+  const lower = content.toLowerCase();
+  return lower.includes("could not be generated") ||
+         lower.includes("please regenerate") ||
+         lower.includes("generation failed") ||
+         lower.includes("unable to generate");
+}
+
 export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { resetProposal } = useProposalWizard();
-  const { visitedPipelineSteps } = useProposalPipeline();
+  const visitedPipelineSteps = useVisitedPipelineSteps();
   const handleSaveDraft = useSaveDraft();
   const invalidateCache = useProposalStore(state => state.invalidateCache);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
@@ -237,8 +248,13 @@ export default function ProposalOutputPage(): JSX.Element {
 
   const displayNames = proposal?.sectionDisplayNames ?? {};
   const sectionMetas: SectionMeta[] = (proposal?.selectedSections ?? []).map(
-    (key) => ({ key, label: resolveSectionLabel(key, displayNames), hasContent: Boolean(proposal?.sections?.[key]) })
+    (key) => ({
+      key,
+      label: resolveSectionLabel(key, displayNames),
+      hasContent: Boolean(proposal?.sections?.[key]) && !isErrorContent(proposal?.sections?.[key]),
+    })
   );
+  const allSectionsHaveError = sectionMetas.length > 0 && sectionMetas.every((s) => isErrorContent(proposal?.sections?.[s.key]));
 
   // Show loading state while fetching
   if (isLoading && !proposal) {
@@ -348,21 +364,27 @@ export default function ProposalOutputPage(): JSX.Element {
             />
           ))}
 
-          {proposal?.status === "completed" &&
-            sectionMetas.length > 0 &&
-            sectionMetas.every((s) => !proposal.sections?.[s.key]) && (
-              <div className="card empty-content-card">
-                <p className="text-muted font-14">
-                  No section content was generated. Please go back and try again.
-                </p>
+          {proposal?.status === "completed" && allSectionsHaveError && (
+            <div className="card empty-content-card" style={{ padding: "2rem", textAlign: "center" }}>
+              <p className="text-muted font-14" style={{ marginBottom: "1rem" }}>
+                Proposal generation completed but no content was produced. This usually means the AI generation service encountered an error.
+              </p>
+              <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
                 <button
-                  className="btn btn-primary mt-16"
+                  className="btn btn-primary"
+                  onClick={() => { window.location.reload(); }}
+                >
+                  Refresh Page
+                </button>
+                <button
+                  className="btn btn-secondary"
                   onClick={() => { resetProposal(); router.push("/"); }}
                 >
                   Start Over
                 </button>
               </div>
-            )}
+            </div>
+          )}
           </div>
         </div>
     </PageLayout>

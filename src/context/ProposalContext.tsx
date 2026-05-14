@@ -4,7 +4,7 @@ import React from "react";
 import type { DraftStage } from "@/interfaces/draftInterfaces";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { ProposalWizardProvider, useProposalWizard } from "./ProposalWizardContext";
-import { ProposalPipelineProvider, useProposalPipeline } from "./ProposalPipelineContext";
+import { useVisitedPipelineSteps, usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 
 // ── Focused domain hooks ────────────────────────────────────────────────────
@@ -14,8 +14,8 @@ import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 /** Re-export wizard hook for direct consumption */
 export { useProposalWizard } from "./ProposalWizardContext";
 
-/** Re-export pipeline hook for direct consumption */
-export { useProposalPipeline } from "./ProposalPipelineContext";
+/** Pipeline state hooks - use these directly instead of deprecated Context */
+export { useVisitedPipelineSteps, usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 
 /**
  * Draft session state — thin wrapper around the Zustand store
@@ -81,7 +81,7 @@ interface ProposalContextType {
 /**
  * @deprecated Use the focused domain hooks instead to avoid unnecessary re-renders:
  *   - useProposalWizard()    — proposal data, steps, generation state, edit mode
- *   - useProposalPipeline()  — visited pipeline steps, sync/mark
+ *   - useVisitedPipelineSteps() and usePipelineActions()  — pipeline state
  *   - useProposalDraftSession() — draft stage, completed steps, draft ID
  *
  * This aggregate hook is retained for backward compatibility during migration.
@@ -90,12 +90,15 @@ interface ProposalContextType {
  */
 export function useProposal(): ProposalContextType {
   const wizard = useProposalWizard();
-  const pipeline = useProposalPipeline();
+  const visitedPipelineSteps = useVisitedPipelineSteps();
+  const { syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineActions();
   const draftSession = useProposalDraftSession();
 
   return {
     ...wizard,
-    ...pipeline,
+    visitedPipelineSteps,
+    syncVisitedStepsFromBackend,
+    markStepVisitedOnBackend,
     ...draftSession,
   };
 }
@@ -105,9 +108,7 @@ export function useProposal(): ProposalContextType {
 export function ProposalProvider({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <ProposalWizardProvider>
-      <ProposalPipelineProvider>
-        {children}
-      </ProposalPipelineProvider>
+      {children}
     </ProposalWizardProvider>
   );
 }

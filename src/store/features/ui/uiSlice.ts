@@ -63,3 +63,44 @@ export const useUIStore = create<UIState>((set) => ({
 
   reset: () => set(INITIAL_UI_STATE),
 }));
+
+// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
+
+/**
+ * Selector hooks for fine-grained Zustand subscriptions.
+ *
+ * Components should use these hooks to subscribe only to the specific state
+ * they need, avoiding unnecessary re-renders when unrelated state changes.
+ */
+
+/**
+ * Selects sidebar open state
+ */
+export const useSidebarOpen = () => useUIStore((state) => state.sidebarOpen);
+
+/**
+ * Selects global loading state
+ */
+export const useGlobalLoading = () => useUIStore((state) => state.globalLoading);
+
+/**
+ * Selects loading message
+ */
+export const useLoadingMessage = () => useUIStore((state) => state.loadingMessage);
+
+/**
+ * Selects active modal
+ */
+export const useActiveModal = () => useUIStore((state) => state.activeModal);
+
+/**
+ * Selects all UI actions (stable reference)
+ */
+export const useUIActions = () => useUIStore((state) => ({
+  setSidebarOpen: state.setSidebarOpen,
+  toggleSidebar: state.toggleSidebar,
+  setGlobalLoading: state.setGlobalLoading,
+  openModal: state.openModal,
+  closeModal: state.closeModal,
+  reset: state.reset,
+}));

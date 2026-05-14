@@ -14,7 +14,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/utils/logger";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
+import { usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import {
   getProposal,
@@ -41,7 +42,7 @@ export function useProposalPageData(
 ): UseProposalPageDataReturn {
   const router = useRouter();
   const { setCurrentProposalId, updateProposalData } = useProposalWizard();
-  const { syncVisitedStepsFromBackend } = useProposalPipeline();
+  const { syncVisitedStepsFromBackend } = usePipelineActions();
   const { setDraftStage, setCompletedSteps, markStepCompleted } = useProposalDraftSession();
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
 

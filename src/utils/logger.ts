@@ -15,13 +15,9 @@ const isSentryEnabled =
 
 function captureToSentry(error: unknown): void {
   if (!isSentryEnabled) return;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
-    const Sentry = require("@sentry/nextjs") as { captureException: (err: unknown) => void };
-    Sentry.captureException(error instanceof Error ? error : new Error(String(error)));
-  } catch {
-    // @sentry/nextjs is not installed — add it with: npm install @sentry/nextjs
-  }
+  // Sentry integration: install @sentry/nextjs and set NEXT_PUBLIC_SENTRY_DSN in your
+  // .env file to enable automatic error forwarding to Sentry in production.
+  // Currently disabled as @sentry/nextjs is not installed.
 }
 
 export const logger = {

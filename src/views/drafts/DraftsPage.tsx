@@ -38,8 +38,8 @@ export default function DraftsPage(): JSX.Element {
   const { setDraftStage, setCompletedSteps, setCurrentDraftId } = useProposalDraftSession();
   const router = useRouter();
 
-  const { drafts, isLoading, refetch } = useDrafts({ force: true });
-  const { clients } = useClients({ autoFetch: false });
+  const { drafts, isLoading, refetch } = useDrafts({ autoFetch: true });
+  const { clients } = useClients({ autoFetch: true });
   const getDraftFromStore = useDraftStore(state => state.getDraft);
   const deleteDraftFromStore = useDraftStore(state => state.deleteDraft);
   const deleteAllDraftsFromStore = useDraftStore(state => state.deleteAllDrafts);

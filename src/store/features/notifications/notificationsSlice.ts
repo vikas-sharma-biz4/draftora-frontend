@@ -93,3 +93,46 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   clearAll: () => set({ notifications: [], unreadCount: 0 }),
   reset: () => set(INITIAL_NOTIFICATIONS_STATE),
 }));
+
+// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
+
+/**
+ * Selector hooks for fine-grained Zustand subscriptions.
+ *
+ * Components should use these hooks to subscribe only to the specific state
+ * they need, avoiding unnecessary re-renders when unrelated state changes.
+ */
+
+/**
+ * Selects all notifications
+ */
+export const useNotifications = () => useNotificationsStore((state) => state.notifications);
+
+/**
+ * Selects unread count
+ */
+export const useUnreadCount = () => useNotificationsStore((state) => state.unreadCount);
+
+/**
+ * Selects unread notifications only
+ */
+export const useUnreadNotifications = () =>
+  useNotificationsStore((state) => state.notifications.filter(n => !n.read));
+
+/**
+ * Selects notifications by type
+ */
+export const useNotificationsByType = (type: NotificationType) =>
+  useNotificationsStore((state) => state.notifications.filter(n => n.type === type));
+
+/**
+ * Selects all notification actions (stable reference)
+ */
+export const useNotificationActions = () => useNotificationsStore((state) => ({
+  addNotification: state.addNotification,
+  removeNotification: state.removeNotification,
+  markAsRead: state.markAsRead,
+  markAllAsRead: state.markAllAsRead,
+  clearAll: state.clearAll,
+  reset: state.reset,
+}));

@@ -93,7 +93,8 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         isLoading: false,
         error: errorMessage,
       });
-      throw error;
+      // Don't re-throw - silently fail and let components handle the error state
+      console.warn('[draftSlice] Failed to fetch drafts:', errorMessage);
     }
   },
 
@@ -146,7 +147,9 @@ export const useDraftStore = create<DraftState>((set, get) => ({
 
   // Mutation wrappers with optimistic updates
   saveDraft: async (payload: SaveDraftPayload) => {
+    logger.info('[draftSlice] saveDraft called:', { title: payload.title });
     const savedDraft = await draftApi.saveDraft(payload);
+    logger.info('[draftSlice] saveDraft received backend ID:', savedDraft.id);
 
     // Add to store as metadata
     const draftMetadata: DraftMetadata = {
@@ -166,6 +169,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   },
 
   updateDraftApi: async (draftId: string, payload: Partial<SaveDraftPayload>) => {
+    logger.info('[draftSlice] updateDraftApi called:', { draftId });
     const updatedDraft = await draftApi.updateDraft(draftId, payload);
 
     // Update in store
@@ -252,3 +256,42 @@ export const useIsCacheValid = () => useDraftStore(selectIsCacheValid);
  * Selects a draft by its ID.
  */
 export const useDraftById = (id: string) => useDraftStore(selectDraftById(id));
+
+/**
+ * Selects all drafts
+ */
+export const useDrafts = () => useDraftStore((state) => state.drafts);
+
+/**
+ * Selects the loading state
+ */
+export const useDraftsLoading = () => useDraftStore((state) => state.isLoading);
+
+/**
+ * Selects the initialization state
+ */
+export const useDraftsInitialized = () => useDraftStore((state) => state.isInitialized);
+
+/**
+ * Selects the error state
+ */
+export const useDraftsError = () => useDraftStore((state) => state.error);
+
+/**
+ * Selects the last fetched timestamp
+ */
+export const useDraftsLastFetched = () => useDraftStore((state) => state.lastFetched);
+
+/**
+ * Selects all draft actions (stable reference)
+ */
+export const useDraftActions = () => useDraftStore((state) => ({
+  fetchDrafts: state.fetchDrafts,
+  setDrafts: state.setDrafts,
+  addDraft: state.addDraft,
+  updateDraft: state.updateDraft,
+  removeDraft: state.removeDraft,
+  removeAllDrafts: state.removeAllDrafts,
+  deleteAllDrafts: state.deleteAllDrafts,
+  reset: state.reset,
+}));

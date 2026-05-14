@@ -102,9 +102,39 @@ export default function TemplateSelectionModal({
   useEffect(() => {
     if (selectedClientId) {
       const client = clients.find((c) => c.id === selectedClientId);
-      if (client && client.documents) {
-        const allDocIds = new Set(client.documents.filter((d) => d.status === "parsed").map((d) => d.id));
-        setSelectedDocuments(allDocIds);
+      if (client) {
+        logger.debug("[TemplateSelectionModal] Selected client:", {
+          clientId: client.id,
+          clientName: client.name,
+          documentsCount: client.documents?.length || 0,
+          documents: client.documents?.map(d => ({
+            id: d.id,
+            name: d.name,
+            status: d.status,
+            fileType: d.fileType,
+            sizeBytes: d.sizeBytes,
+          }))
+        });
+
+        if (client.documents) {
+          const parsedDocs = client.documents.filter((d) => d.status === "parsed");
+          logger.debug("[TemplateSelectionModal] Parsed documents:", {
+            totalDocs: client.documents.length,
+            parsedDocs: parsedDocs.length,
+            parsedDocIds: parsedDocs.map(d => d.id)
+          });
+
+          // Merge with existing selections instead of replacing entirely
+          setSelectedDocuments((prev) => {
+            const next = new Set(prev);
+            for (const doc of parsedDocs) {
+              next.add(doc.id);
+            }
+            return next;
+          });
+        }
+      } else {
+        logger.warn("[TemplateSelectionModal] No client found for ID:", selectedClientId);
       }
     }
   }, [selectedClientId, clients]);
@@ -262,11 +292,11 @@ export default function TemplateSelectionModal({
     const client = clients.find((c) => c.id === selectedClientId);
     if (!client || !client.documents) return;
 
-    const parsedDocs = client.documents.filter((d) => d.status === "parsed");
-    if (selectedDocuments.size === parsedDocs.length) {
+    const allDocs = client.documents;
+    if (selectedDocuments.size === allDocs.length) {
       setSelectedDocuments(new Set());
     } else {
-      setSelectedDocuments(new Set(parsedDocs.map((d) => d.id)));
+      setSelectedDocuments(new Set(allDocs.map((d) => d.id)));
     }
   }
 
@@ -331,8 +361,10 @@ export default function TemplateSelectionModal({
       );
       toast.success(`"${file.name}" parsed — ${result.word_count} words`);
 
-      // Save to the selected client so it appears in Knowledge Base list
-      await saveParsedDocumentToClient(file, fileId, result);
+      // Only save to client if one is already selected (not in new_client view)
+      if (selectedClientId) {
+        await saveParsedDocumentToClient(file, fileId, result);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Backend connection failed";
       setUploadedFiles((prev) =>
@@ -395,7 +427,7 @@ export default function TemplateSelectionModal({
    * Validates form state, persists proposal metadata to context,
    * and routes the user to the parameter wizard (step 4).
    * Triggers toast errors for missing client, name, or documents.
-   * 
+   *
    * IMPORTANT: Triggers background prefetch of section recommendations
    * immediately when user clicks Continue, before navigation.
    * This is a fire-and-forget operation that does not block navigation.
@@ -545,12 +577,24 @@ export default function TemplateSelectionModal({
       if (uploadedFiles.length > 0) {
         for (const uploaded of uploadedFiles) {
           try {
-            await uploadDocumentToStore(newClient.id, uploaded.file);
+            const uploadResult = await uploadDocumentToStore(newClient.id, uploaded.file);
+            // Auto-select newly uploaded document
+            setSelectedDocuments((prev) => {
+              const next = new Set(prev);
+              next.add(uploadResult.id);
+              return next;
+            });
           } catch (error) {
             logger.error(`Failed to upload ${uploaded.file.name}:`, error);
             toast.error(`Failed to upload ${uploaded.file.name}`);
           }
         }
+      }
+
+      // Refresh clients so newly uploaded documents appear in Knowledge Base
+      const fetchClients = useClientStore.getState().fetchClients;
+      if (fetchClients) {
+        await fetchClients();
       }
 
       toast.success(`Client "${newClientFormData.clientName}" created successfully`);
@@ -758,137 +802,137 @@ export default function TemplateSelectionModal({
           ) : (
             <>
               {(enableTemplateSelection || showTemplateSelector || (selectedClientId && !templateId && !isScratch)) && (
-            <div className={styles.section}>
-              <label className={styles.label}>Select a Template</label>
-              <div className={styles.templateGrid}>
-                {PROPOSAL_TEMPLATES.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className={`${styles.templateCard} ${selectedTemplateIdState === template.id ? styles.selected : ""}`}
-                    onClick={() => setSelectedTemplateIdState(template.id)}
-                  >
-                    <div className={styles.templateCardIcon}>{template.icon}</div>
-                    <div className={styles.templateCardInfo}>
-                      <div className={styles.templateCardTitle}>{template.name}</div>
-                      <div className={styles.templateCardDescription}>{template.description}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className={styles.section}>
-            <label className={styles.label}>Client Name</label>
-            {loading ? (
-              <div className={styles.noClients}>
-                <p>Loading clients...</p>
-              </div>
-            ) : clients.length === 0 ? (
-              <div className={styles.noClients}>
-                <p>No clients found. Create your first client to continue.</p>
-                <Button variant="primary" size="sm" onClick={handleNewClientClick}>
-                  <Plus size={16} />
-                  New Client
-                </Button>
-              </div>
-            ) : (
-              <div className={styles.searchWrapper}>
-                <div className={styles.searchInputWrapper}>
-                  <Input
-                    type="text"
-                    placeholder="Search for a client..."
-                    value={clientSearchQuery}
-                    onChange={(e) => handleClientSearchChange(e.target.value)}
-                    onFocus={handleClientSearchFocus}
-                    onBlur={handleClientSearchBlur}
-                    className={styles.searchInput}
-                  />
-                  <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
-                    <Plus size={16} />
-                    New Client
-                  </Button>
-                </div>
-
-                {showClientDropdown && filteredClients.length > 0 && (
-                  <div className={styles.clientDropdown}>
-                    {filteredClients.map((client) => (
+                <div className={styles.section}>
+                  <label className={styles.label}>Select a Template</label>
+                  <div className={styles.templateGrid}>
+                    {PROPOSAL_TEMPLATES.map((template) => (
                       <button
-                        key={client.id}
+                        key={template.id}
                         type="button"
-                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          handleClientSelect(client.id, client.name);
-                        }}
+                        className={`${styles.templateCard} ${selectedTemplateIdState === template.id ? styles.selected : ""}`}
+                        onClick={() => setSelectedTemplateIdState(template.id)}
                       >
-                        <div className={styles.clientOptionMain}>
-                          <span className={styles.clientOptionName}>{client.name}</span>
-                          <span className={styles.clientOptionIndustry}>{client.industry}</span>
-                        </div>
-                        <div className={styles.clientOptionMeta}>
-                          {client.documents?.length || 0} docs
+                        <div className={styles.templateCardIcon}>{template.icon}</div>
+                        <div className={styles.templateCardInfo}>
+                          <div className={styles.templateCardTitle}>{template.name}</div>
+                          <div className={styles.templateCardDescription}>{template.description}</div>
                         </div>
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {showClientDropdown && filteredClients.length === 0 && clientSearchQuery.trim() && (
-                  <div className={styles.clientDropdown}>
-                    <div className={styles.noResults}>
-                      No clients found matching "{clientSearchQuery}"
+              <div className={styles.section}>
+                <label className={styles.label}>Client Name</label>
+            {loading ? (
+                  <div className={styles.noClients}>
+                    <p>Loading clients...</p>
+                  </div>
+                ) : clients.length === 0 ? (
+                  <div className={styles.noClients}>
+                    <p>No clients found. Create your first client to continue.</p>
+                    <Button variant="primary" size="sm" onClick={handleNewClientClick}>
+                      <Plus size={16} />
+                      New Client
+                    </Button>
+                  </div>
+                ) : (
+                  <div className={styles.searchWrapper}>
+                    <div className={styles.searchInputWrapper}>
+                      <Input
+                        type="text"
+                        placeholder="Search for a client..."
+                        value={clientSearchQuery}
+                        onChange={(e) => handleClientSearchChange(e.target.value)}
+                        onFocus={handleClientSearchFocus}
+                        onBlur={handleClientSearchBlur}
+                        className={styles.searchInput}
+                      />
+                      <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
+                        <Plus size={16} />
+                        New Client
+                      </Button>
                     </div>
+
+                    {showClientDropdown && filteredClients.length > 0 && (
+                      <div className={styles.clientDropdown}>
+                        {filteredClients.map((client) => (
+                          <button
+                            key={client.id}
+                            type="button"
+                            className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              handleClientSelect(client.id, client.name);
+                            }}
+                          >
+                            <div className={styles.clientOptionMain}>
+                              <span className={styles.clientOptionName}>{client.name}</span>
+                              <span className={styles.clientOptionIndustry}>{client.industry}</span>
+                            </div>
+                            <div className={styles.clientOptionMeta}>
+                              {client.documents?.length || 0} docs
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {showClientDropdown && filteredClients.length === 0 && clientSearchQuery.trim() && (
+                      <div className={styles.clientDropdown}>
+                        <div className={styles.noResults}>
+                          No clients found matching "{clientSearchQuery}"
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <FormField label="Proposal Name">
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                type="text"
-                placeholder="e.g. Q4 Digital Transformation Initiative"
-                value={proposalName}
-                onChange={(e) => setProposalName(e.target.value)}
-              />
-            )}
-          </FormField>
+              <FormField label="Proposal Name">
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    type="text"
+                    placeholder="e.g. Q4 Digital Transformation Initiative"
+                    value={proposalName}
+                    onChange={(e) => setProposalName(e.target.value)}
+                  />
+                )}
+              </FormField>
 
-          {initialContextNotes && (
-            <FormField label="Initial Context & Notes">
-              {(fieldProps) => (
-                <Textarea
-                  {...fieldProps}
-                  placeholder="Initial context and notes from client creation..."
-                  value={initialContextNotes}
-                  onChange={(e) => setInitialContextNotes(e.target.value)}
-                  rows={4}
-                />
+              {initialContextNotes && (
+                <FormField label="Initial Context & Notes">
+                  {(fieldProps) => (
+                    <Textarea
+                      {...fieldProps}
+                      placeholder="Initial context and notes from client creation..."
+                      value={initialContextNotes}
+                      onChange={(e) => setInitialContextNotes(e.target.value)}
+                      rows={4}
+                    />
+                  )}
+                </FormField>
               )}
-            </FormField>
-          )}
 
-          <FormField label="Project Brief">
-            {(fieldProps) => (
-              <Textarea
-                {...fieldProps}
-                placeholder="Describe the project scope, client's core challenge, desired outcomes, technical constraints, and any specific requirements..."
-                value={proposalDescription}
-                onChange={(e) => setProposalDescription(e.target.value)}
-              />
-            )}
-          </FormField>
+              <FormField label="Project Brief">
+                {(fieldProps) => (
+                  <Textarea
+                    {...fieldProps}
+                    placeholder="Describe the project scope, client's core challenge, desired outcomes, technical constraints, and any specific requirements..."
+                    value={proposalDescription}
+                    onChange={(e) => setProposalDescription(e.target.value)}
+                  />
+                )}
+              </FormField>
 
           {selectedClient && (
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <label className={styles.label}>Knowledge Base Selection</label>
                 <Button variant="secondary" size="sm" onClick={toggleAllDocuments} className={styles.toggleAllBtn}>
-                  {selectedDocuments.size === (selectedClient.documents?.filter((d) => d.status === "parsed").length || 0)
+                  {selectedDocuments.size === (selectedClient.documents?.length || 0)
                     ? "Deselect All"
                     : "Select All"}
                 </Button>
@@ -897,42 +941,42 @@ export default function TemplateSelectionModal({
                 Choose which documents to include as context for this proposal
               </p>
 
-              <div className={styles.documentList}>
-                {(selectedClient.documents?.filter((d) => d.status === "parsed").length || 0) === 0 ? (
-                  <div className={styles.noDocuments}>
-                    No parsed documents available for this client.
-                  </div>
-                ) : (
-                  (selectedClient.documents || [])
-                    .filter((d) => d.status === "parsed")
-                    .map((doc) => (
-                      <div
-                        key={doc.id}
-                        className={`${styles.documentItem} ${selectedDocuments.has(doc.id) ? styles.selected : ""}`}
-                        onClick={() => toggleDocument(doc.id)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") toggleDocument(doc.id);
-                        }}
-                      >
-                        <div className={styles.checkbox}>
-                          {selectedDocuments.has(doc.id) ? (
-                            <CheckSquare size={18} className={styles.checkboxChecked} />
-                          ) : (
-                            <Square size={18} className={styles.checkboxUnchecked} />
+              {(!selectedClient.documents || selectedClient.documents.length === 0) ? (
+                <div className={styles.noDocuments}>
+                  No documents available for this client.
+                </div>
+              ) : (
+                (selectedClient.documents || [])
+                  .map((doc) => (
+                    <div
+                      key={doc.id}
+                      className={`${styles.documentItem} ${selectedDocuments.has(doc.id) ? styles.selected : ""}`}
+                      onClick={() => toggleDocument(doc.id)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") toggleDocument(doc.id);
+                      }}
+                    >
+                      <div className={styles.checkbox}>
+                        {selectedDocuments.has(doc.id) ? (
+                          <CheckSquare size={18} className={styles.checkboxChecked} />
+                        ) : (
+                          <Square size={18} className={styles.checkboxUnchecked} />
+                        )}
+                      </div>
+                      <div className={styles.documentInfo}>
+                        <div className={styles.documentName} title={doc.name}>{doc.name}</div>
+                        <div className={styles.documentMeta}>
+                          {formatFileSize(doc.sizeBytes)} • {formatDate(doc.createdAt)}
+                          {doc.status !== "parsed" && (
+                            <span className={styles.unparsedBadge}> • {doc.status}</span>
                           )}
                         </div>
-                        <div className={styles.documentInfo}>
-                          <div className={styles.documentName} title={doc.name}>{doc.name}</div>
-                          <div className={styles.documentMeta}>
-                            {formatFileSize(doc.sizeBytes)} • {formatDate(doc.createdAt)}
-                          </div>
-                        </div>
                       </div>
-                    ))
-                )}
-              </div>
+                    </div>
+                  ))
+              )}
 
               {selectedDocuments.size > 0 && (
                 <div className={styles.selectionSummary}>
@@ -945,116 +989,114 @@ export default function TemplateSelectionModal({
                 <div className={styles.uploadHeader}>
                   <label className={styles.label}>Upload Additional Documents</label>
                   {uploadedFiles.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={handleRemoveAllFiles} className={styles.removeAllBtn}>
-                      Remove All
-                    </Button>
-                  )}
-                </div>
-                <p className={styles.hint}>Upload new documents that will be parsed automatically</p>
+                        <Button variant="ghost" size="sm" onClick={handleRemoveAllFiles} className={styles.removeAllBtn}>
+                          Remove All
+                        </Button>
+                      )}
+                    </div>
+                    <p className={styles.hint}>Upload new documents that will be parsed automatically</p>
 
-                <label
-                  htmlFor="template-file-upload"
-                  className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
-                  onDragOver={handleDragOver}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
-                  <div className={styles.uploadText}>Click to upload or drag and drop</div>
-                  <div className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)</div>
-                  <input
-                    id="template-file-upload"
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
-                    multiple
-                    onChange={handleFileChange}
-                    className={styles.visuallyHidden}
-                  />
-                </label>
+                    <label
+                      htmlFor="template-file-upload"
+                      className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
+                      <div className={styles.uploadText}>Click to upload or drag and drop</div>
+                      <div className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)</div>
+                      <input
+                        id="template-file-upload"
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                        multiple
+                        onChange={handleFileChange}
+                        className={styles.visuallyHidden}
+                      />
+                    </label>
 
-                {uploadedFiles.length > 0 && (
-                  <div className={styles.uploadedFilesList}>
-                    {uploadedFiles.map(({ file, id, status, error, parsedData }) => (
-                      <div key={id} className={styles.uploadedFileItem}>
-                        <div className={styles.fileIconWrapper}>
-                          {status === "parsing" ? (
-                            <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
-                          ) : status === "error" ? (
-                            <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
-                          ) : status === "parsed" ? (
-                            <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
-                          ) : (
-                            <FileText size={18} className={styles.fileIcon} />
-                          )}
-                        </div>
-                        <div className={styles.fileDetails}>
-                          <div className={styles.fileName} title={file.name}>{file.name}</div>
-                          <div className={styles.fileMeta}>
-                            {formatFileSize(file.size)}
-                            {status === "parsing" && (
-                              <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
-                            )}
-                            {status === "parsed" && parsedData && (
-                              <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words</span>
-                            )}
-                            {status === "error" && error && (
-                              <span className={styles.errorStatus}> â€¢ {error}</span>
-                            )}
+                    {uploadedFiles.length > 0 && (
+                      <div className={styles.uploadedFilesList}>
+                        {uploadedFiles.map(({ file, id, status, error, parsedData }) => (
+                          <div key={id} className={styles.uploadedFileItem}>
+                            <div className={styles.fileIconWrapper}>
+                              {status === "parsing" ? (
+                                <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                              ) : status === "error" ? (
+                                <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                              ) : status === "parsed" ? (
+                                <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                              ) : (
+                                <FileText size={18} className={styles.fileIcon} />
+                              )}
+                            </div>
+                            <div className={styles.fileDetails}>
+                              <div className={styles.fileName} title={file.name}>{file.name}</div>
+                              <div className={styles.fileMeta}>
+                                {formatFileSize(file.size)}
+                                {status === "parsing" && (
+                                  <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
+                                )}
+                                {status === "parsed" && parsedData && (
+                                  <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words</span>
+                                )}
+                                {status === "error" && error && (
+                                  <span className={styles.errorStatus}> â€¢ {error}</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              className={styles.removeFileBtn}
+                              onClick={() => handleRemoveFile(id)}
+                              title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
+                              aria-label="Remove file"
+                            >
+                              <X size={16} />
+                            </button>
                           </div>
-                        </div>
-                        <button
-                          className={styles.removeFileBtn}
-                          onClick={() => handleRemoveFile(id)}
-                          title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
-                          aria-label="Remove file"
-                        >
-                          <X size={16} />
-                        </button>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-            </>
-          )}
+                </div>
+              )}
+            </>)}
+          </div>
+          <div className={styles.modalFooter}>
+            {modalView === "new_client" ? (
+              <>
+                <Button variant="secondary" onClick={handleBackToTemplateSelection}>
+                  Back
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateClient}
+                  disabled={!newClientFormData.clientName.trim() || !newClientFormData.industry}
+                  loading={isCreatingClient}
+                >
+                  Create Client
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleContinue}
+                  disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
+                >
+                  Continue to Wizard
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-
-        <div className={styles.modalFooter}>
-          {modalView === "new_client" ? (
-            <>
-              <Button variant="secondary" onClick={handleBackToTemplateSelection}>
-                Back
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateClient}
-                disabled={!newClientFormData.clientName.trim() || !newClientFormData.industry}
-                loading={isCreatingClient}
-              >
-                Create Client
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="secondary" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleContinue}
-                disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
-              >
-                Continue to Wizard
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
+      </div>,
+      document.body
+    );
 }

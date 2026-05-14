@@ -12,7 +12,8 @@ import styles from "./ReviewPage.module.scss";
 
 import { generateProposal } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
+import { useVisitedPipelineSteps, usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
@@ -58,12 +59,13 @@ export default function ReviewPage(): JSX.Element {
     maxStepReached,
     setMaxStepReached,
   } = useProposalWizard();
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = useProposalPipeline();
+  const visitedPipelineSteps = useVisitedPipelineSteps();
+  const { syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineActions();
   const { draftStage, completedSteps, setDraftStage, markStepCompleted, setCompletedSteps } = useProposalDraftSession();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
-  const { clients, refetch: refetchClients } = useClients({ autoFetch: true });
+  const { clients, refetch: refetchClients } = useClients({ autoFetch: false });
 
   // Enable auto-save when user is in pipeline stage
   useWizardAutoSave({ enabled: true, debounceMs: 2000 });
@@ -150,7 +152,7 @@ export default function ReviewPage(): JSX.Element {
       clientName: data.clientName,
       description: data.description,
     });
-    
+
     // Close modal after a brief delay to ensure state update completes
     setTimeout(() => {
       setShowScopeModal(false);
@@ -239,24 +241,30 @@ export default function ReviewPage(): JSX.Element {
       toast.info("Starting proposal generation...");
     }
 
-    // Continue API call
+    logger.debug("[ReviewPage] Starting proposal generation with data:", {
+      title: proposalData.title,
+      clientId: proposalData.clientId,
+      sectionsCount: proposalData.selectedSections.length,
+      filesCount: proposalData.files.length,
+    });
+
     try {
-      const result = await generateProposal(proposalData);
-      setGeneratedProposalId(result.id);
-
-      // Store the ID and update status
-      sessionStorage.setItem("pending_proposal_id", result.id.toString());
-      sessionStorage.setItem("generation_status", "started");
+      // CRITICAL FIX: Call the API to create the proposal BEFORE navigating
+      const response = await generateProposal(proposalData);
       
-      // Navigate to generating screen with proposal ID
-      router.push(`/generating/${result.id}`);
+      logger.debug("[ReviewPage] Proposal created successfully:", {
+        proposalId: response.id,
+        status: response.status,
+      });
 
-      // Mark Step 2 as visited when starting generation
-      if (result.id) {
-        await markStepVisitedOnBackend(result.id, 2);
-      }
+      // Store the proposal ID in sessionStorage for the generating screen
+      sessionStorage.setItem("pending_proposal_id", String(response.id));
+      sessionStorage.setItem("generation_status", "initiating");
 
-      // Mark review step completed and set stage to generated
+      // Navigate to generating screen with the proposal ID
+      router.push(`/generating/${response.id}`);
+
+      // Mark review step completed
       markStepCompleted(2);
       setDraftStage("review_complete");
 
@@ -264,15 +272,11 @@ export default function ReviewPage(): JSX.Element {
       if (maxStepReached < 3) {
         setMaxStepReached(3);
       }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to generate proposal.";
-      setErrorMessage(message);
+    } catch (error) {
+      logger.error("[ReviewPage] Failed to generate proposal:", error);
       setIsGenerating(false);
-      sessionStorage.removeItem("pending_proposal_id");
-      sessionStorage.removeItem("generation_status");
-      toast.error(message);
-      router.push("/review");
+      setErrorMessage("Failed to start proposal generation. Please try again.");
+      toast.error("Failed to start proposal generation. Please try again.");
     }
   }
 

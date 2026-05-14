@@ -152,13 +152,18 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         }
 
         if (draftId) {
+          logger.info('[useDraftPersistence] Updating existing draft:', { draftId, title: currentProposal.title });
           await updateDraftApi(draftId, draftPayload);
+          logger.info('[useDraftPersistence] Draft updated:', { draftId });
         } else {
+          logger.info('[useDraftPersistence] Creating new draft:', { title: currentProposal.title });
           const saved = await saveDraftApi(draftPayload);
+          if (!saved.id) {
+            throw new Error('saveDraft returned empty id');
+          }
           if (isMounted) draftIdRef.current = saved.id;
+          logger.info('[useDraftPersistence] Draft created, backend ID:', saved.id);
         }
-
-        logger.info("[useDraftPersistence] draft saved:", currentProposal.title);
       } catch (error) {
         logger.error("[useDraftPersistence] async save failed:", error);
       }

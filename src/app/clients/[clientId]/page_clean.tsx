@@ -10,7 +10,7 @@ import { logger } from "@/utils/logger";
 
 import styles from "./page.module.scss";
 
-import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/services/client.service";
+import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument, type Client } from "@/services/client.service";
 import { listProposals } from "@/services/proposal.service";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
@@ -233,7 +233,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
         {showEditModal && (
           <EditClientModal
-            client={client as any}
+            client={client as Client}
             onClose={() => setShowEditModal(false)}
             onClientUpdated={() => {
               loadClient();

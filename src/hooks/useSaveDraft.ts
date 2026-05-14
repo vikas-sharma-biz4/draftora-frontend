@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
 import { getLastLocationFromPathname } from "@/utils/routeUtils";
+import { logger } from "@/utils/logger";
 
 import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
 import { updateDraft as updateDraftApi } from "@/services/draft.service";
@@ -67,12 +68,18 @@ export function useSaveDraft(): () => Promise<void> {
 
       if (currentDraftId) {
         // Update existing draft
+        logger.info('[useSaveDraft] Updating draft:', { draftId: currentDraftId });
         await updateDraftInStore(currentDraftId, draftPayload);
         toast.success(MESSAGES.DRAFT_SAVED);
       } else {
-        // Create new draft and store ID
+        // Create new draft — only store backend-generated ID
+        logger.info('[useSaveDraft] Creating new draft...');
         const saved = await saveDraftToStore(draftPayload);
+        if (!saved.id) {
+          throw new Error('saveDraft returned empty id');
+        }
         setCurrentDraftId(saved.id);
+        logger.info('[useSaveDraft] Draft created, backend ID:', saved.id);
         toast.success(MESSAGES.DRAFT_SAVED);
       }
 

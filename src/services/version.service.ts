@@ -58,14 +58,14 @@ export async function getVersionHistory(
 }
 
 export async function getVersion(versionId: string): Promise<ProposalVersion> {
-  const data = await http.get<RawVersionApiResponse>(`/versions/${versionId}/`, { cache: "no-store" });
+  const data = await http.get<RawVersionApiResponse>(`/versions/${versionId}`, { cache: "no-store" });
   return mapVersion(data);
 }
 
 export async function createVersion(
   payload: CreateVersionPayload
 ): Promise<ProposalVersion> {
-  const data = await http.post<RawVersionApiResponse>("/versions/", {
+  const data = await http.post<RawVersionApiResponse>("/versions", {
     proposal_id: payload.proposalId,
     source: payload.source,
     snapshot: payload.snapshot,

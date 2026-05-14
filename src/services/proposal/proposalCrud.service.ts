@@ -103,34 +103,59 @@ export async function generateProposal(
     formData.append("files", file);
   }
 
-  return http.post<CreateProposalResponse>("/proposals/", formData);
+  return http.post<CreateProposalResponse>("/proposals", formData);
 }
 
 interface ProposalStatusApiResponse {
   id: number;
   status: string;
-  generating_section?: string | null;
+  total_sections?: number | null;
   completed_sections?: string[];
-  selected_sections?: string[] | null;
+  progress_percent?: number | null;
   current_stage?: string | null;
+  current_section?: string | null;
+  estimated_time_remaining?: number | null;
+  generating_section?: string | null;
+  selected_sections?: string[] | null;
   visited_pipeline_steps?: number[];
   highest_visited_step?: number | null;
+  progress?: number | null;
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
+  logger.info(`[proposalCrud] Fetching status for proposal ${id}`);
   const d = await http.get<ProposalStatusApiResponse>(`/proposals/${id}/status/`, {
     cache: "no-store",
   });
-  return {
+  const completed = d.completed_sections ?? [];
+  const total = d.total_sections ?? d.selected_sections?.length ?? 0;
+  const progressPercent = d.progress_percent ?? d.progress ?? (total > 0 ? Math.round((completed.length / total) * 100) : 0);
+
+  const status: ProposalStatus = {
     id: d.id,
     status: d.status,
-    generatingSection: d.generating_section ?? null,
-    completedSections: d.completed_sections ?? [],
-    selectedSections: d.selected_sections ?? null,
+    totalSections: total,
+    completedSections: completed,
+    progressPercent,
     currentStage: d.current_stage ?? null,
+    currentSection: d.current_section ?? d.generating_section ?? null,
+    estimatedTimeRemaining: d.estimated_time_remaining ?? null,
+    generatingSection: d.generating_section ?? null,
+    selectedSections: d.selected_sections ?? null,
     visitedPipelineSteps: d.visited_pipeline_steps ?? [],
     highestVisitedStep: d.highest_visited_step ?? null,
+    progress: progressPercent,
   };
+  logger.info(`[proposalCrud] Status for proposal ${id}:`, {
+    status: status.status,
+    progressPercent: status.progressPercent,
+    completedCount: status.completedSections.length,
+    totalSections: status.totalSections,
+    currentStage: status.currentStage,
+    currentSection: status.currentSection,
+    estimatedTimeRemaining: status.estimatedTimeRemaining,
+  });
+  return status;
 }
 
 /** Raw backend response shape for GET /proposals/:id/ (snake_case) */
@@ -190,10 +215,20 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
 }
 
 export async function getProposal(id: number): Promise<ProposalData> {
+  logger.info(`[proposalCrud] Fetching proposal ${id}`);
   const d = await http.get<RawProposalApiResponse>(`/proposals/${id}/`, {
     cache: "no-store",
   });
-  return mapProposal(d);
+  const mapped = mapProposal(d);
+  const sectionKeys = Object.keys(mapped.sections || {});
+  logger.info(`[proposalCrud] Proposal ${id} sections:`, {
+    count: sectionKeys.length,
+    keys: sectionKeys.slice(0, 5),
+    sampleContent: sectionKeys.length > 0 ? (mapped.sections?.[sectionKeys[0]]?.slice(0, 100) || '(empty)') : '(none)',
+    status: mapped.status,
+    generatingSection: mapped.generatingSection,
+  });
+  return mapped;
 }
 
 interface ProposalListApiItem {
@@ -239,12 +274,12 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
 }
 
 export function getDownloadUrl(id: number): string {
-  return buildUrl(`/proposals/${id}/download/`);
+  return buildUrl(`/proposals/${id}/download`);
 }
 
 export async function cancelProposal(id: number): Promise<void> {
   try {
-    await http.post<null>(`/proposals/${id}/cancel/`);
+    await http.post<null>(`/proposals/${id}/cancel`);
   } catch (error) {
     // Ignore 400 (already completed/failed) — cancellation is best-effort
     if (error instanceof HttpError && error.statusCode === 400) {
