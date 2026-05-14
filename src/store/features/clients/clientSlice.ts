@@ -94,6 +94,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
     try {
       const clients = await clientApi.listClientsFullData();
+      console.log('[clientSlice] Fetched clients:', clients);
+      console.log('[clientSlice] Is array?', Array.isArray(clients));
       set({
         clients,
         isLoading: false,
