@@ -40,7 +40,7 @@ export default function HomePage(): JSX.Element {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showRecreateModal, setShowRecreateModal] = useState<boolean>(false);
-  const { clients: preloadedClients } = useClients();
+  const { clients: preloadedClients } = useClients({ autoFetch: false });
 
 
   const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);

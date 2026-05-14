@@ -175,7 +175,31 @@ export interface RawProposalVersionSnapshot {
  * Safely maps raw backend proposal data to ProposalFormInput
  * Provides safe defaults for missing fields
  */
-export function mapRawProposalDataToFormInput(raw: RawProposalData): ProposalFormInput {
+export function mapRawProposalDataToFormInput(raw: RawProposalData | undefined): ProposalFormInput {
+  if (!raw) {
+    // Return empty form data if raw is undefined
+    return {
+      title: "",
+      clientName: "",
+      clientId: undefined,
+      description: "",
+      tone: "professional" as ToneOption,
+      lengthPreference: "balanced" as LengthOption,
+      language: "en",
+      aiModel: "gpt-4o",
+      selectedSections: [],
+      sectionDisplayNames: {},
+      customSections: [],
+      contextualInstructions: "",
+      webReferences: [],
+      files: [],
+      filesMeta: [],
+      selectedDocumentIds: undefined,
+      templateId: null,
+      templateType: "scratch" as TemplateType,
+    };
+  }
+
   return {
     title: raw.title ?? "",
     clientName: raw.client_name ?? "",
@@ -244,7 +268,20 @@ export function mapRawProposalDataToMetadata(raw: RawProposalData): ProposalMeta
  * Safely maps raw backend proposal data to full ProposalData (backward compatible)
  * Composes all domain mappers
  */
-export function mapRawProposalData(raw: RawProposalData): ProposalData {
+export function mapRawProposalData(raw: RawProposalData | undefined): ProposalData {
+  if (!raw) {
+    // Return empty proposal data if raw is undefined
+    return {
+      ...mapRawProposalDataToFormInput(undefined),
+      ...mapRawProposalDataToGenerationState({} as RawProposalData),
+      ...mapRawProposalDataToApprovalState({} as RawProposalData),
+      ...mapRawProposalDataToMetadata({} as RawProposalData),
+      originalSections: [],
+      originalSectionContents: {},
+      exactDocumentName: "",
+    };
+  }
+
   return {
     ...mapRawProposalDataToFormInput(raw),
     ...mapRawProposalDataToGenerationState(raw),
@@ -258,7 +295,7 @@ export function mapRawProposalData(raw: RawProposalData): ProposalData {
       type: os.type as "text" | "table" | "mixed",
       level: os.level,
       parentId: os.parent_id,
-    })),
+    })) ?? [],
     originalSectionContents: raw.original_section_contents,
     exactDocumentName: raw.exact_document_name,
   };
@@ -353,10 +390,15 @@ export interface ProposalTemplate {
 export interface ProposalStatus {
   id: number;
   status: string;
-  generatingSection: string | null;
+  totalSections: number;
   completedSections: string[];
-  selectedSections: string[] | null;
+  progressPercent: number; // Real-time progress percentage (0-100) from backend
   currentStage: string | null;
+  currentSection: string | null;
+  estimatedTimeRemaining: number | null;
+  generatingSection: string | null; // deprecated: use currentSection
+  selectedSections: string[] | null; // deprecated: use totalSections
   visitedPipelineSteps: number[];
   highestVisitedStep: number | null;
+  progress: number; // backward-compat alias for progressPercent
 }

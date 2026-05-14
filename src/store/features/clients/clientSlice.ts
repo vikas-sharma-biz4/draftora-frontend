@@ -107,7 +107,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
         isLoading: false,
         error: errorMessage,
       });
-      throw error;
+      // Don't re-throw - silently fail and let components handle the error state
+      console.warn('[clientSlice] Failed to fetch clients:', errorMessage);
     }
   },
 
@@ -153,14 +154,37 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
   // Document actions
   addDocument: (clientId: number, document: ClientDocument) => {
-    set(state => ({
-      clients: state.clients.map(c =>
-        c.id === clientId
-          ? { ...c, documents: [...c.documents, document] }
-          : c
-      ),
-      lastFetched: Date.now(),
-    }));
+    set(state => {
+      const clients = [...state.clients];
+      const clientIndex = clients.findIndex(c => c.id === clientId);
+
+      if (clientIndex >= 0) {
+        // Client exists, add document
+        clients[clientIndex] = {
+          ...clients[clientIndex],
+          documents: [...(clients[clientIndex].documents || []), document]
+        };
+      } else {
+        // Client doesn't exist, create it with the document
+        const mockClient: ClientWithDocuments = {
+          id: clientId,
+          name: `Client ${clientId}`,
+          industry: 'Unknown',
+          status: 'active',
+          notes: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          documents: [document]
+        };
+        clients.push(mockClient);
+      }
+
+      return {
+        ...state,
+        clients,
+        lastFetched: Date.now(),
+      };
+    });
   },
 
   removeDocument: (clientId: number, documentId: number) => {
@@ -254,4 +278,65 @@ export const useClientStore = create<ClientState>((set, get) => ({
       throw error;
     }
   },
+}));
+
+// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
+
+/**
+ * Selector hooks for fine-grained Zustand subscriptions.
+ *
+ * Components should use these hooks to subscribe only to the specific state
+ * they need, avoiding unnecessary re-renders when unrelated state changes.
+ */
+
+/**
+ * Selects the clients array
+ */
+export const useClients = () => useClientStore((state) => state.clients);
+
+/**
+ * Selects the loading state
+ */
+export const useClientsLoading = () => useClientStore((state) => state.isLoading);
+
+/**
+ * Selects the initialization state
+ */
+export const useClientsInitialized = () => useClientStore((state) => state.isInitialized);
+
+/**
+ * Selects the error state
+ */
+export const useClientsError = () => useClientStore((state) => state.error);
+
+/**
+ * Selects a client by ID
+ */
+export const useClientById = (id: number) =>
+  useClientStore((state) => state.clients.find(c => c.id === id));
+
+/**
+ * Selects cache validity
+ */
+export const useClientsCacheValid = () => useClientStore((state) => state.isCacheValid());
+
+/**
+ * Selects all client actions (stable reference)
+ */
+export const useClientActions = () => useClientStore((state) => ({
+  fetchClients: state.fetchClients,
+  setClients: state.setClients,
+  addClient: state.addClient,
+  updateClient: state.updateClient,
+  removeClient: state.removeClient,
+  invalidateCache: state.invalidateCache,
+  addDocument: state.addDocument,
+  removeDocument: state.removeDocument,
+  updateDocument: state.updateDocument,
+  createClient: state.createClient,
+  updateClientApi: state.updateClientApi,
+  deleteClient: state.deleteClient,
+  uploadDocument: state.uploadDocument,
+  deleteDocument: state.deleteDocument,
+  reset: state.reset,
 }));

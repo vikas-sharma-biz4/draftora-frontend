@@ -26,9 +26,12 @@ if (!process.env.NEXT_PUBLIC_API_URL) {
 
 /**
  * Full API base URL including the /api/v1 prefix.
+ * Strips any existing /api/v1 suffix from the env var to prevent duplication
+ * if NEXT_PUBLIC_API_URL is set to "http://localhost:8000/api/v1" in .env.local.
  * Single source of truth — used by both the HTTP client and SSE connections.
  */
-export const API_BASE_URL = `${_apiUrl}/api/v1`;
+const _baseWithoutSuffix = _apiUrl.replace(/\/api\/v1\/?$/, "");
+export const API_BASE_URL = `${_baseWithoutSuffix}/api/v1`;
 
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -139,6 +142,10 @@ async function request<T>(
   config: FetchConfig = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
+
+  // Debug: Log the actual URL being requested
+  console.log(`[HTTP] ${method} ${url}`);
+
   const isFormData = body instanceof FormData;
 
   const res = await fetch(url, {
@@ -177,6 +184,34 @@ export const http = {
 
   delete: <T>(path: string, config?: FetchConfig): Promise<T> =>
     request<T>("DELETE", path, undefined, config),
+
+  /**
+   * Download a file as a blob with proper authentication.
+   * Returns the raw Response object to allow access to headers like Content-Disposition.
+   */
+  download: (path: string, config?: FetchConfig): Promise<Response> => {
+    const url = `${API_BASE_URL}${path}`;
+
+    const headers: Record<string, string> = {
+      ...(config?.headers || {}),
+      // Add ngrok bypass header for development
+      ...(process.env.NODE_ENV === "development" ? { "ngrok-skip-browser-warning": "1" } : {}),
+    };
+
+    // Add authorization header if token exists
+    const token = getAccessToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return fetch(url, {
+      method: "GET",
+      headers,
+      credentials: "include",
+      signal: config?.signal,
+      cache: config?.cache,
+    });
+  },
 };
 
 /**

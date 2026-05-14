@@ -14,6 +14,7 @@
  *   proposalWizard  → src/store/features/wizard/proposalWizardSlice.ts
  *   pipeline        → src/store/features/pipeline/pipelineSlice.ts
  *   ui              → src/store/features/ui/uiSlice.ts
+ *   theme           → src/store/features/ui/themeSlice.ts (migrated from ThemeContext)
  *   notifications   → src/store/features/notifications/notificationsSlice.ts
  */
 
@@ -24,6 +25,7 @@ import { useProposalStore } from './features/proposals/proposalSlice';
 import { useProposalWizardStore } from './features/wizard/proposalWizardSlice';
 import { usePipelineStore } from './features/pipeline/pipelineSlice';
 import { useUIStore } from './features/ui/uiSlice';
+import { useThemeStore } from './features/ui/themeSlice';
 import { useNotificationsStore } from './features/notifications/notificationsSlice';
 
 /**
@@ -41,5 +43,6 @@ export function resetAllStores(): void {
   useProposalWizardStore.getState().reset();
   usePipelineStore.getState().reset();
   useUIStore.getState().reset();
+  useThemeStore.getState().reset();
   useNotificationsStore.getState().reset();
 }

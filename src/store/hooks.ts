@@ -15,7 +15,8 @@ export { useDraftStore } from './features/drafts/draftSlice';
 export { useDraftSessionStore } from './features/drafts/draftSessionSlice';
 export { useProposalStore } from './features/proposals/proposalSlice';
 export { useUIStore } from './features/ui/uiSlice';
+export { useThemeStore, useTheme, useIsDark, useThemeActions, useThemeState } from './features/ui/themeSlice';
 export { useNotificationsStore } from './features/notifications/notificationsSlice';
 
-export type { Theme } from './features/ui/uiSlice';
+export type { Theme } from './features/ui/themeSlice';
 export type { AppNotification, NotificationType } from './features/notifications/notificationsSlice';

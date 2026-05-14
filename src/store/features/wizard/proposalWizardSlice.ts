@@ -12,6 +12,7 @@
  */
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 import { DEFAULT_AI_MODEL } from "@/config/config";
 import { DEFAULT_SELECTED_SECTIONS, PROPOSAL_WIZARD_STORAGE_KEY } from "@/constants";
@@ -163,7 +164,7 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
    * Prefetch section recommendations in the background.
    * Implements request deduplication - if a fetch is already in progress,
    * returns the existing promise instead of firing a new request.
-   * 
+   *
    * @param params - Parameters for the recommendations API call
    * @returns Promise that resolves with the recommendations
    */
@@ -174,7 +175,7 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
     documentContext: string;
   }): Promise<SectionRecommendation[]> => {
     const state = useProposalWizardStore.getState();
-    
+
     // Generate cache key based on input parameters
     const cacheKey = JSON.stringify({
       templateId: params.templateId,
@@ -203,7 +204,7 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
 
     // Create new AbortController for this request
     const abortController = new AbortController();
-    
+
     set({
       recommendationsFetchStatus: 'pending',
       recommendationsAbortController: abortController,
@@ -263,7 +264,7 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
         recommendationsAbortController: null,
         recommendationsFetchPromise: null,
       });
-      
+
       logger.error('[proposalWizardSlice] Failed to prefetch recommendations', error);
       throw errorObj;
     }
@@ -418,7 +419,7 @@ export const useRecommendationsError = () =>
  * Use this when you need multiple actions without subscribing to state changes.
  */
 export const useWizardActions = () =>
-  useProposalWizardStore((state) => ({
+  useProposalWizardStore(useShallow((state) => ({
     updateProposalData: state.updateProposalData,
     setCurrentStep: state.setCurrentStep,
     setIsGenerating: state.setIsGenerating,
@@ -434,4 +435,4 @@ export const useWizardActions = () =>
     cancelRecommendationsFetch: state.cancelRecommendationsFetch,
     invalidateRecommendationsCache: state.invalidateRecommendationsCache,
     clearRecommendationsError: state.clearRecommendationsError,
-  }));
+  })));

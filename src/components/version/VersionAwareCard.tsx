@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Edit2, FileText, Info, Save, X } from "lucide-react";
 import { logger } from "@/utils/logger";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import type { ProposalVersion } from "@/interfaces/versionInterfaces";
 import styles from "./VersionAwareCard.module.scss";
 
@@ -126,7 +127,7 @@ export function VersionAwareCard({
         ) : (
           <div
             className={styles.viewMode}
-            dangerouslySetInnerHTML={{ __html: content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
           />
         )}
       </div>

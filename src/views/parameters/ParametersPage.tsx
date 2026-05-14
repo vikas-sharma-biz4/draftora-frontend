@@ -7,7 +7,8 @@ import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
 
 import { SECTION_DISPLAY_NAMES } from "@/constants";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
+import { useVisitedPipelineSteps, usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
@@ -56,7 +57,8 @@ export default function ParametersPage(): JSX.Element {
     setMaxStepReached,
     invalidateRecommendationsCache,
   } = useProposalWizard();
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = useProposalPipeline();
+  const visitedPipelineSteps = useVisitedPipelineSteps();
+  const { syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineActions();
   const { draftStage, completedSteps, setDraftStage, markStepCompleted } = useProposalDraftSession();
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
@@ -161,12 +163,12 @@ export default function ParametersPage(): JSX.Element {
     markStepCompleted(1);
     setDraftStage("parameters_complete");
     setCurrentStep(5);
-    
+
     // Update maxStepReached to allow returning to Step 2 from Step 1
     if (maxStepReached < 2) {
       setMaxStepReached(2);
     }
-    
+
     router.push("/review");
 
     if (isRegenerating) {

@@ -127,13 +127,18 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
       if (currentDraftId) {
         // Update existing draft
+        logger.info('[useWizardAutoSave] Updating existing draft:', { draftId: currentDraftId });
         await updateDraftInStore(currentDraftId, draftPayload);
         logger.info('[useWizardAutoSave] Draft updated', { draftId: currentDraftId });
       } else {
-        // Create new draft
+        // Create new draft — only store backend-generated ID on success
+        logger.info('[useWizardAutoSave] Creating new draft...');
         const saved = await saveDraftToStore(draftPayload);
+        if (!saved.id) {
+          throw new Error('saveDraft returned empty id');
+        }
         setCurrentDraftId(saved.id);
-        logger.info('[useWizardAutoSave] Draft created', { draftId: saved.id });
+        logger.info('[useWizardAutoSave] Draft created, backend ID:', saved.id);
       }
 
       // Update last saved data hash

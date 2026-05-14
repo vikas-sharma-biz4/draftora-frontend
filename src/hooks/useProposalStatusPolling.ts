@@ -88,6 +88,16 @@ export function useProposalStatusPolling(
   const retryCountRef = useRef<number>(0);
   const isPollingRef = useRef<boolean>(false);
 
+  // Stabilize callbacks in refs so poll() doesn't recreate on every render
+  const callbacksRef = useRef({
+    onStatusUpdate,
+    onCompleted,
+    onFailed,
+    onCancelled,
+    onError,
+  });
+  callbacksRef.current = { onStatusUpdate, onCompleted, onFailed, onCancelled, onError };
+
   // Tab synchronization
   const channelRef = useRef<BroadcastChannel | null>(null);
   const isLeaderRef = useRef<boolean>(false);
@@ -131,28 +141,28 @@ export function useProposalStatusPolling(
   const handleStatusData = useCallback(
     (data: ProposalStatus) => {
       setStatus(data);
-      onStatusUpdate?.(data);
+      callbacksRef.current.onStatusUpdate?.(data);
 
       if (data.status === "completed") {
         stop();
-        onCompleted?.(data);
+        callbacksRef.current.onCompleted?.(data);
         return;
       }
 
       if (data.status === "failed") {
         stop();
         setErrorMessage("Proposal generation failed. Please go back and try again.");
-        onFailed?.(data);
+        callbacksRef.current.onFailed?.(data);
         return;
       }
 
       if (data.status === "cancelled") {
         stop();
-        onCancelled?.();
+        callbacksRef.current.onCancelled?.();
         return;
       }
     },
-    [onStatusUpdate, onCompleted, onFailed, onCancelled, stop]
+    [stop]
   );
 
   // ── Tab Synchronization ──────────────────────────────────────────
@@ -250,13 +260,13 @@ export function useProposalStatusPolling(
         setErrorMessage(
           "Unable to check proposal status. Please refresh the page and try again."
         );
-        onError?.(error as Error);
+        callbacksRef.current.onError?.(error as Error);
         stop();
       }
     } finally {
       isPollingRef.current = false;
     }
-  }, [proposalId, handleStatusData, onError, stop]);
+  }, [proposalId, handleStatusData]);
 
   const start = useCallback(() => {
     stoppedRef.current = false;
@@ -312,6 +322,9 @@ export function useProposalStatusPolling(
       setTimeout(() => {
         if (!isLeaderRef.current) {
           becomeLeader();
+          if (autoStart && !stoppedRef.current) {
+            void poll();
+          }
         }
       }, 100);
 

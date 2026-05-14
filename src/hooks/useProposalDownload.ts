@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { getDownloadUrl } from "@/services/proposal.service";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import { MESSAGES } from "@/constants/messages";
+import { http } from "@/config/httpClient";
 
 interface UseProposalDownloadReturn {
   isDownloading: boolean;
@@ -28,10 +28,10 @@ export function useProposalDownload(): UseProposalDownloadReturn {
   const downloadProposal = useCallback(async (proposalId: number): Promise<void> => {
     setIsDownloading(true);
     try {
-      const url = getDownloadUrl(proposalId);
-      logger.debug("[useProposalDownload] Downloading from:", url);
+      const path = `/proposals/${proposalId}/download`;
+      logger.debug("[useProposalDownload] Downloading from path:", path);
 
-      const response = await fetch(url);
+      const response = await http.download(path);
 
       if (!response.ok) {
         const errorText = await response.text();

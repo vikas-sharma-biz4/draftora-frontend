@@ -11,6 +11,7 @@
  */
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import {
   getProposalStatus,
   markProposalStepVisited,
@@ -138,7 +139,7 @@ export const useHighestVisitedStep = () =>
  * Use this when you need multiple actions without subscribing to state changes.
  */
 export const usePipelineActions = () =>
-  usePipelineStore((state) => ({
+  usePipelineStore(useShallow((state) => ({
     setVisitedPipelineSteps: state.setVisitedPipelineSteps,
     setHighestVisitedStep: state.setHighestVisitedStep,
     syncVisitedStepsFromBackend: state.syncVisitedStepsFromBackend,
@@ -146,4 +147,4 @@ export const usePipelineActions = () =>
     canAccessStep: state.canAccessStep,
     resetPipeline: state.resetPipeline,
     reset: state.reset,
-  }));
+  })));

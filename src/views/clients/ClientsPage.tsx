@@ -29,7 +29,7 @@ const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClient
 
 export default function ClientsPage(): JSX.Element {
   const router = useRouter();
-  const { clients, isLoading: loading, refetch } = useClients();
+  const { clients, isLoading: loading, refetch } = useClients({ autoFetch: true });
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);

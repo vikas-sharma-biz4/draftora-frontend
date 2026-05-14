@@ -135,7 +135,9 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
 // ─── API Functions ───────────────────────────────────────────────────────────
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
-  const data = await http.post<RawSavedDraft>("/drafts/", {
+  logger.info('[draft.service] Creating draft:', { title: payload.title, clientName: payload.clientName });
+
+  const data = await http.post<RawSavedDraft>("/drafts", {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -146,13 +148,23 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     generated_content: payload.generatedContent,
     ui_state: payload.uiState,
   });
-  return mapSavedDraft(data);
+
+  const saved = mapSavedDraft(data);
+  logger.info('[draft.service] Draft created, backend ID:', saved.id);
+  return saved;
 }
 
 export async function updateDraft(
   draftId: string,
   payload: Partial<SaveDraftPayload>
 ): Promise<SavedDraft> {
+  if (!draftId) {
+    logger.error('[draft.service] updateDraft called without draftId');
+    throw new Error('Cannot update draft: missing draftId');
+  }
+
+  logger.info('[draft.service] Updating draft:', { draftId, title: payload.title });
+
   const data = await http.put<RawSavedDraft>(`/drafts/${draftId}/`, {
     proposal_id: payload.proposalId,
     title: payload.title,
@@ -164,7 +176,10 @@ export async function updateDraft(
     generated_content: payload.generatedContent,
     ui_state: payload.uiState,
   });
-  return mapSavedDraft(data);
+
+  const updated = mapSavedDraft(data);
+  logger.info('[draft.service] Draft updated:', { draftId: updated.id });
+  return updated;
 }
 
 export async function getDraft(draftId: string): Promise<SavedDraft> {
@@ -224,9 +239,9 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
 }
 
 export async function deleteDraft(draftId: string): Promise<void> {
-  await http.delete<null>(`/drafts/${draftId}/`);
+  await http.delete<null>(`/drafts/${draftId}`);
 }
 
 export async function deleteAllDrafts(): Promise<void> {
-  await http.delete<null>("/drafts/");
+  await http.delete<null>("/drafts");
 }

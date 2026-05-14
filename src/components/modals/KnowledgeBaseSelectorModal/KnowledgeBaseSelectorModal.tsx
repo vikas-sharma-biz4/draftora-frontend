@@ -57,23 +57,24 @@ export default function KnowledgeBaseSelectorModal({
     }
   }, [mounted, selectedDocumentIds]);
 
-  // Auto-select newly uploaded documents when they appear in availableDocuments
+  // Auto-select newly uploaded documents when they are parsed
   useEffect(() => {
-    if (mounted && availableDocuments.length > 0) {
-      const uploadedDocIds = new Set(uploadedFiles.filter(f => f.uploadedDocId).map(f => f.uploadedDocId));
-      const newlyAvailableDocs = availableDocuments.filter(d => uploadedDocIds.has(d.id));
+    if (mounted) {
+      const newlyParsedFiles = uploadedFiles.filter(f => f.status === "parsed" && f.uploadedDocId);
 
-      if (newlyAvailableDocs.length > 0) {
+      if (newlyParsedFiles.length > 0) {
         setSelected(prev => {
           const next = new Set(prev);
-          newlyAvailableDocs.forEach(doc => {
-            next.add(doc.id);
+          newlyParsedFiles.forEach(f => {
+            if (f.uploadedDocId) {
+              next.add(f.uploadedDocId);
+            }
           });
           return next;
         });
       }
     }
-  }, [availableDocuments, uploadedFiles, mounted]);
+  }, [uploadedFiles, mounted]);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
@@ -230,19 +231,14 @@ export default function KnowledgeBaseSelectorModal({
     try {
       const uploadResult = await uploadDocumentToStore(clientId, file);
 
-      // Auto-select newly uploaded document
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.add(String(uploadResult.id));
-        return next;
-      });
-
       // Update the uploaded file with the real document ID
       setUploadedFiles((prev) =>
         prev.map((f) =>
           f.id === fileId ? { ...f, status: "parsed", parsedData: result, uploadedDocId: String(uploadResult.id) } : f
         )
       );
+
+      // Auto-selection is handled by the useEffect that watches uploadedFiles
 
       // Don't call onRefreshDocuments here - it overwrites the local store state
       // The document is already in the store via uploadDocumentToStore's addDocument call

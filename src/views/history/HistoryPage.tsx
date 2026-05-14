@@ -18,7 +18,7 @@ import HistoryCardSkeleton from "@/components/common/skeletons/HistoryCardSkelet
 
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const { proposals: historyItems, isLoading: loading, error } = useProposals({ filter: 'history' });
+  const { proposals: historyItems, isLoading: loading, error } = useProposals({ filter: 'history', autoFetch: true });
   const { downloadProposal } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
 

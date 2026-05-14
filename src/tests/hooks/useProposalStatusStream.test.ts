@@ -204,34 +204,49 @@ afterEach(() => {
 const inProgressStatus: ProposalStatus = {
   id: 1,
   status: "in_progress",
-  generatingSection: "executive_summary",
+  totalSections: 5,
   completedSections: [],
-  selectedSections: null,
-  currentStage: null,
+  progressPercent: 10,
+  currentStage: "generating",
+  currentSection: "executive_summary",
+  estimatedTimeRemaining: 30,
+  generatingSection: "executive_summary",
+  selectedSections: ["executive_summary", "proposed_solution", "pricing", "timeline", "conclusion"],
   visitedPipelineSteps: [],
   highestVisitedStep: null,
+  progress: 10,
 };
 
 const completedStatus: ProposalStatus = {
   id: 1,
   status: "completed",
+  totalSections: 5,
+  completedSections: ["executive_summary", "proposed_solution", "pricing", "timeline", "conclusion"],
+  progressPercent: 100,
+  currentStage: "finalizing",
+  currentSection: null,
+  estimatedTimeRemaining: null,
   generatingSection: null,
-  completedSections: ["executive_summary", "proposed_solution"],
-  selectedSections: null,
-  currentStage: null,
+  selectedSections: ["executive_summary", "proposed_solution", "pricing", "timeline", "conclusion"],
   visitedPipelineSteps: [],
   highestVisitedStep: null,
+  progress: 100,
 };
 
 const failedStatus: ProposalStatus = {
   id: 1,
   status: "failed",
-  generatingSection: null,
+  totalSections: 5,
   completedSections: [],
-  selectedSections: null,
+  progressPercent: 0,
   currentStage: null,
+  currentSection: null,
+  estimatedTimeRemaining: null,
+  generatingSection: null,
+  selectedSections: null,
   visitedPipelineSteps: [],
   highestVisitedStep: null,
+  progress: 0,
 };
 
 const defaultOptions = {

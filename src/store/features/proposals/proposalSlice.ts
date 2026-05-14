@@ -32,6 +32,14 @@ interface ProposalState {
   lastFetched: number | null;
   error: string | null;
 
+  // Computed
+  isCacheValid: () => boolean;
+  getProposalById: (id: number) => ProposalListItem | undefined;
+  getHistoryProposals: () => ProposalListItem[];
+  getApprovedProposals: () => ProposalListItem[];
+  getRejectedProposals: () => ProposalListItem[];
+  getPendingProposals: () => ProposalListItem[];
+
   // Actions
   fetchProposals: (force?: boolean) => Promise<void>;
   setProposals: (proposals: ProposalListItem[]) => void;
@@ -49,6 +57,35 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   isInitialized: false,
   lastFetched: null,
   error: null,
+
+  // Computed
+  isCacheValid: () => {
+    const { lastFetched, isInitialized } = get();
+    if (!isInitialized || lastFetched === null) return false;
+    return Date.now() - lastFetched < CACHE_TTL_MS;
+  },
+
+  getProposalById: (id: number) => {
+    return get().proposals.find(p => p.id === id);
+  },
+
+  getHistoryProposals: () => {
+    return get().proposals.filter(
+      p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected'
+    );
+  },
+
+  getApprovedProposals: () => {
+    return get().proposals.filter(p => p.approvalStatus === 'approved');
+  },
+
+  getRejectedProposals: () => {
+    return get().proposals.filter(p => p.approvalStatus === 'rejected');
+  },
+
+  getPendingProposals: () => {
+    return get().proposals.filter(p => p.approvalStatus === 'pending');
+  },
 
   // Actions
   fetchProposals: async (force = false) => {
@@ -89,7 +126,8 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         isLoading: false,
         error: errorMessage,
       });
-      throw error;
+      // Don't re-throw - silently fail and let components handle the error state
+      console.warn('[proposalSlice] Failed to fetch proposals:', errorMessage);
     }
   },
 
@@ -224,3 +262,40 @@ export const useHistoryProposals = () => useProposalStore(selectHistoryProposals
  * Selects pending proposals.
  */
 export const usePendingProposals = () => useProposalStore(selectPendingProposals);
+
+/**
+ * Selects all proposals
+ */
+export const useProposals = () => useProposalStore((state) => state.proposals);
+
+/**
+ * Selects the loading state
+ */
+export const useProposalsLoading = () => useProposalStore((state) => state.isLoading);
+
+/**
+ * Selects the initialization state
+ */
+export const useProposalsInitialized = () => useProposalStore((state) => state.isInitialized);
+
+/**
+ * Selects the error state
+ */
+export const useProposalsError = () => useProposalStore((state) => state.error);
+
+/**
+ * Selects the last fetched timestamp
+ */
+export const useProposalsLastFetched = () => useProposalStore((state) => state.lastFetched);
+
+/**
+ * Selects all proposal actions (stable reference)
+ */
+export const useProposalActions = () => useProposalStore((state) => ({
+  fetchProposals: state.fetchProposals,
+  setProposals: state.setProposals,
+  updateProposal: state.updateProposal,
+  removeProposal: state.removeProposal,
+  invalidateCache: state.invalidateCache,
+  reset: state.reset,
+}));
