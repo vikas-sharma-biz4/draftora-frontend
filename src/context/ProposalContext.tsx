@@ -17,6 +17,9 @@ export { useProposalWizard } from "./ProposalWizardContext";
 /** Pipeline state hooks - use these directly instead of deprecated Context */
 export { useVisitedPipelineSteps, usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
 
+/** Backward-compatible re-export for code still importing from ProposalContext */
+export { useProposalPipeline } from "./ProposalPipelineContext";
+
 /**
  * Draft session state — thin wrapper around the Zustand store
  * with selective subscriptions to minimise re-renders.
