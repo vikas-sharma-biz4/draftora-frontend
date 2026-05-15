@@ -2,8 +2,8 @@ import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
 export const AI_MODEL_OPTIONS = [
   {
-    value: "gpt-4o",
-    label: "GPT-4o",
+    value: "gpt-5.4",
+    label: "GPT-5.4",
     provider: "OpenAI",
     description: "Fast, highly capable model. Best for most proposals.",
   },

@@ -17,6 +17,8 @@ import { updateDraft as updateDraftApi, getDraftByProposalId, getDraft } from "@
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
 
+const DRAFT_SAVE_LOCK_KEY = "draft_save_lock";
+
 /**
  * Returns a `saveDraft` function that persists the current wizard state to
  * the backend database, resets the wizard, and navigates back to the root.
@@ -38,6 +40,13 @@ export function useSaveDraft(): () => Promise<void> {
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
 
   return async function saveDraft(): Promise<void> {
+    // Use localStorage-based lock to prevent concurrent saves across page navigations
+    const lockValue = localStorage.getItem(DRAFT_SAVE_LOCK_KEY);
+    if (lockValue === 'locked') {
+      logger.debug('[useSaveDraft] Save already locked, skipping');
+      return;
+    }
+
     const { title, clientName } = proposalData;
     const hasData = title.trim() !== "" || clientName.trim() !== "";
 
@@ -51,23 +60,26 @@ export function useSaveDraft(): () => Promise<void> {
       return;
     }
 
-    // Determine lastLocation based on current pathname
-    const lastLocation: DraftLocation = (() => {
-      if (pathname === "/parameters") return "wizard_parameters";
-      if (pathname === "/review") return "wizard_review";
-      if (pathname.startsWith("/proposal/")) return "web_view";
-      return "wizard_parameters";
-    })();
-
-    // Capture UI state for restoration
-    const uiState: DraftUIState = {
-      scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
-      activeSection: null,
-      expandedSections: [],
-      lastVisibleSection: null,
-    };
+    // Set localStorage lock immediately
+    localStorage.setItem(DRAFT_SAVE_LOCK_KEY, 'locked');
 
     try {
+      // Determine lastLocation based on current pathname
+      const lastLocation: DraftLocation = (() => {
+        if (pathname === "/parameters") return "wizard_parameters";
+        if (pathname === "/review") return "wizard_review";
+        if (pathname.startsWith("/proposal/")) return "web_view";
+        return "wizard_parameters";
+      })();
+
+      // Capture UI state for restoration
+      const uiState: DraftUIState = {
+        scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+        activeSection: null,
+        expandedSections: [],
+        lastVisibleSection: null,
+      };
+
       // Fetch existing draft to preserve generated content if proposal exists
       let existingGeneratedContent: Record<string, string> = {};
       if (currentProposalId) {
@@ -146,6 +158,9 @@ export function useSaveDraft(): () => Promise<void> {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save draft";
       toast.error(message);
+      throw error;
+    } finally {
+      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
     }
   };
 }
