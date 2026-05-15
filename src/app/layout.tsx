@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { DM_Sans, DM_Mono } from "next/font/google";
 import "@/styles/styles.scss";
-import { ProposalProvider } from "@/context/ProposalContext";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { ProposalWizardProvider } from "@/context/ProposalWizardContext";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -41,14 +40,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`}>
       <body suppressHydrationWarning>
-        <ThemeProvider>
-          <ProposalProvider>
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-            <ToastProvider />
-          </ProposalProvider>
-        </ThemeProvider>
+        <ProposalWizardProvider>
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+          <ToastProvider />
+        </ProposalWizardProvider>
       </body>
     </html>
   );

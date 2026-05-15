@@ -12,7 +12,32 @@ import styles from "./ReviewPage.module.scss";
 
 import { generateProposal } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import {
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useTemplateId,
+  useTemplateType,
+  useCurrentStep,
+  useIsGenerating,
+  useGeneratedProposalId,
+  useCurrentProposalId,
+  useEditMode,
+  useMaxStepReached,
+  useWizardActions,
+  useFilesMeta,
+  useWebReferences,
+  useSelectedDocumentIds,
+} from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
@@ -47,19 +72,59 @@ const TemplateSelectorModal = dynamic(() => import("@/components/modals/Template
 });
 
 export default function ReviewPage(): JSX.Element {
-  const {
-    proposalData,
-    updateProposalData,
-    setCurrentStep,
-    isGenerating,
-    setIsGenerating,
-    setGeneratedProposalId,
-    currentProposalId,
-    maxStepReached,
-    setMaxStepReached,
-  } = useProposalWizard();
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = useProposalPipeline();
-  const { draftStage, completedSteps, setDraftStage, markStepCompleted, setCompletedSteps } = useProposalDraftSession();
+  // Use granular selectors for minimal re-renders
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateId = useTemplateId();
+  const templateType = useTemplateType();
+  const filesMeta = useFilesMeta();
+  const webReferences = useWebReferences();
+  const selectedDocumentIds = useSelectedDocumentIds();
+  const currentStep = useCurrentStep();
+  const isGenerating = useIsGenerating();
+  const generatedProposalId = useGeneratedProposalId();
+  const currentProposalId = useCurrentProposalId();
+  const editMode = useEditMode();
+  const maxStepReached = useMaxStepReached();
+  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setCurrentProposalId, setEditMode, setMaxStepReached } = useWizardActions();
+
+  // Reconstruct proposalData object for backward compatibility with existing code
+  // This is a temporary measure - the component should eventually use granular selectors directly
+  const proposalData = {
+    title,
+    clientName,
+    clientId,
+    description,
+    selectedSections,
+    sectionDisplayNames,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId,
+    templateType,
+    files: [],
+    filesMeta,
+    selectedDocumentIds,
+    customSections: [],
+    contextualInstructions: "",
+    webReferences,
+  } as any;
+
+  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
+  const draftStage = useDraftSessionStore((s) => s.draftStage);
+  const completedSteps = useDraftSessionStore((s) => s.completedSteps);
+  const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
+  const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
   const router = useRouter();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
@@ -85,12 +150,14 @@ export default function ReviewPage(): JSX.Element {
   // Reset isGenerating when landing on review page
   useEffect(() => {
     setIsGenerating(false);
-  }, [setIsGenerating]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mark step 2 as visited when this page loads
   useEffect(() => {
     markStepCompleted(2);
-  }, [markStepCompleted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Restore scroll position from draft UI state
   useEffect(() => {
@@ -133,7 +200,7 @@ export default function ReviewPage(): JSX.Element {
           .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
           .map((doc) => ({
             name: doc.name,
-            size: doc.sizeBytes || 0,
+            size: doc.sizeBytes > 0 ? doc.sizeBytes : 0,
             type: doc.fileType || "application/pdf",
           }));
         if (rebuiltMeta.length > 0) {
@@ -150,7 +217,7 @@ export default function ReviewPage(): JSX.Element {
       clientName: data.clientName,
       description: data.description,
     });
-    
+
     // Close modal after a brief delay to ensure state update completes
     setTimeout(() => {
       setShowScopeModal(false);
@@ -169,7 +236,7 @@ export default function ReviewPage(): JSX.Element {
           .filter((doc) => selectedIds.includes(String(doc.id)))
           .map((doc) => ({
             name: doc.name,
-            size: doc.sizeBytes || 0,
+            size: doc.sizeBytes > 0 ? doc.sizeBytes : 0,
             type: doc.fileType || "application/pdf",
           }))
       : [];
@@ -222,13 +289,24 @@ export default function ReviewPage(): JSX.Element {
   const clientDocuments = (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),
     name: doc.name,
-    size: String(doc.sizeBytes || 0),
+    size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
     date: doc.createdAt ? formatDate(doc.createdAt) : "",
     status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
     fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
   }));
 
   async function handleGenerate(): Promise<void> {
+    // Check if sections are selected
+    if (proposalData.selectedSections.length === 0) {
+      toast.error("Please select at least one section before generating the proposal");
+      return;
+    }
+
+    if (!proposalData.clientId || proposalData.clientId === 0) {
+      toast.error("Please select a client before generating the proposal");
+      return;
+    }
+
     setIsGenerating(true);
     setErrorMessage("");
 
@@ -239,21 +317,38 @@ export default function ReviewPage(): JSX.Element {
       toast.info("Starting proposal generation...");
     }
 
-    // Continue API call
-    try {
-      const result = await generateProposal(proposalData);
-      setGeneratedProposalId(result.id);
+    logger.debug("[ReviewPage] Starting proposal generation with data:", {
+      title: proposalData.title,
+      clientId: proposalData.clientId,
+      sectionsCount: proposalData.selectedSections.length,
+      filesCount: proposalData.files.length,
+      templateType: proposalData.templateType,
+      templateId: proposalData.templateId,
+    });
 
-      // Store the ID and update status
-      sessionStorage.setItem("pending_proposal_id", result.id.toString());
-      sessionStorage.setItem("generation_status", "started");
-      
-      // Navigate to generating screen with proposal ID
-      router.push(`/generating/${result.id}`);
+    const generateStartTime = Date.now();
+
+    try {
+      // CRITICAL FIX: Call the API to create the proposal
+      logger.info("[ReviewPage] Calling generateProposal API at", new Date().toISOString());
+      const response = await generateProposal(proposalData);
+
+      const generateEndTime = Date.now();
+      const generateDuration = generateEndTime - generateStartTime;
+
+      logger.info("[ReviewPage] Proposal created successfully at", new Date().toISOString(), ":", {
+        proposalId: response.id,
+        status: response.status,
+        generateDurationMs: generateDuration,
+      });
+
+      if (generateDuration > 2000) {
+        logger.warn("[ReviewPage] WARNING: API call took", generateDuration, "ms - Backend is likely doing synchronous generation instead of returning immediately");
+      }
 
       // Mark Step 2 as visited when starting generation
-      if (result.id) {
-        await markStepVisitedOnBackend(result.id, 2);
+      if (response.id) {
+        await markStepVisitedOnBackend(response.id, 2);
       }
 
       // Mark review step completed and set stage to generated
@@ -264,15 +359,16 @@ export default function ReviewPage(): JSX.Element {
       if (maxStepReached < 3) {
         setMaxStepReached(3);
       }
+
+      // Navigate to Generating screen to show real-time progress
+      logger.info("[ReviewPage] Navigating to generating page at", new Date().toISOString(), "with proposalId:", response.id);
+      router.push(`/generating/${response.id}`);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to generate proposal.";
       setErrorMessage(message);
       setIsGenerating(false);
-      sessionStorage.removeItem("pending_proposal_id");
-      sessionStorage.removeItem("generation_status");
       toast.error(message);
-      router.push("/review");
     }
   }
 
@@ -282,10 +378,10 @@ export default function ReviewPage(): JSX.Element {
     : "No description provided.";
 
   const selectedSectionLabels = proposalData.selectedSections.map(
-    (key) =>
+    (key: string) =>
       (proposalData.sectionDisplayNames ?? {})[key] ??
       SECTION_DISPLAY_NAMES[key] ??
-      key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
   );
 
   const estimatedPages = `${proposalData.selectedSections.length * 2}–${proposalData.selectedSections.length * 3} Pages`;
@@ -402,7 +498,7 @@ export default function ReviewPage(): JSX.Element {
               </div>
               {proposalData.filesMeta.length > 0 ? (
                 <ul className={styles.fileList}>
-                  {proposalData.filesMeta.map((f, i) => (
+                  {proposalData.filesMeta.map((f: { name: string; size: number }, i: number) => (
                     <li key={i} className={styles.fileItem}>
                       <span className={styles.fileItemName}>{f.name}</span>
                       <span className={styles.fileItemSize}>
@@ -421,7 +517,7 @@ export default function ReviewPage(): JSX.Element {
                   <span className={`review-field-label ${styles.webRefsLabel}`}>
                     Web References
                   </span>
-                  {proposalData.webReferences.map((r) => (
+                  {proposalData.webReferences.map((r: string) => (
                     <div key={r} className={styles.webRefUrl}>{r}</div>
                   ))}
                 </div>
@@ -442,7 +538,7 @@ export default function ReviewPage(): JSX.Element {
                 </button>
               </div>
               <div className={`flex-row ${styles.sectionsBadgeRow}`}>
-                {selectedSectionLabels.map((label) => (
+                {selectedSectionLabels.map((label: string) => (
                   <span key={label} className="badge badge-primary">
                     {label}
                   </span>

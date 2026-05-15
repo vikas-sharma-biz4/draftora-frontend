@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { History, Download, Eye } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import styles from "./HistoryPage.module.scss";
 import { useProposals } from "@/hooks/useProposals";
@@ -21,6 +21,11 @@ export default function HistoryPage(): JSX.Element {
   const { proposals: historyItems, isLoading: loading, error } = useProposals({ filter: 'history' });
   const { downloadProposal } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useErrorToast(error, "Failed to load history");
 
@@ -44,7 +49,12 @@ export default function HistoryPage(): JSX.Element {
         subtitle="View all completed, approved, and rejected proposals."
       />
 
-      {loading ? (
+      {!mounted ? (
+        <SkeletonGrid
+          className={styles.historyGrid}
+          renderItem={() => <HistoryCardSkeleton />}
+        />
+      ) : loading ? (
         <SkeletonGrid
           className={styles.historyGrid}
           renderItem={() => <HistoryCardSkeleton />}

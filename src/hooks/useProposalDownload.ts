@@ -56,7 +56,9 @@ export function useProposalDownload(): UseProposalDownloadReturn {
       }
       logger.debug("[useProposalDownload] Using filename:", filename);
 
-      const downloadUrl = window.URL.createObjectURL(blob);
+      // Create blob with correct MIME type for Word documents
+      const docxBlob = new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const downloadUrl = window.URL.createObjectURL(docxBlob);
       const a = document.createElement("a");
       a.href = downloadUrl;
       a.download = filename;
@@ -66,14 +68,11 @@ export function useProposalDownload(): UseProposalDownloadReturn {
       // Trigger download
       a.click();
 
-      // Wait a moment before cleanup to ensure download starts
-      // Use requestIdleCallback when available for more reliable cleanup;
-      // fall back to setTimeout on older browsers.
-      const scheduleCleanup = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1000));
-      scheduleCleanup(() => {
+      // Cleanup after a longer delay to ensure download starts
+      setTimeout(() => {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(downloadUrl);
-      });
+      }, 500);
 
       toast.success(MESSAGES.PROPOSAL_DOWNLOADED);
     } catch (error) {
