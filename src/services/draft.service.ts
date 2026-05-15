@@ -133,7 +133,7 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
 // ─── API Functions ───────────────────────────────────────────────────────────
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
-  const data = await http.post<RawSavedDraft>("/drafts/", {
+  const data = await http.post<RawSavedDraft>("/drafts", {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -151,7 +151,7 @@ export async function updateDraft(
   draftId: string,
   payload: Partial<SaveDraftPayload>
 ): Promise<SavedDraft> {
-  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}/`, {
+  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}`, {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -166,7 +166,7 @@ export async function updateDraft(
 }
 
 export async function getDraft(draftId: string): Promise<SavedDraft> {
-  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}/`, { cache: "no-store" });
+  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}`, { cache: "no-store" });
   return mapSavedDraft(data);
 }
 
@@ -202,7 +202,7 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
  */
 export async function getDraftByProposalId(proposalId: number): Promise<DraftMetadata | null> {
   const data = await http.get<RawDraftListItem[]>(
-    `/drafts/?proposal_id=${proposalId}`,
+    `/drafts?proposal_id=${proposalId}`,
     { cache: "no-store" },
   );
 
@@ -222,9 +222,9 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
 }
 
 export async function deleteDraft(draftId: string): Promise<void> {
-  await http.delete<null>(`/drafts/${draftId}/`);
+  await http.delete<null>(`/drafts/${draftId}`);
 }
 
 export async function deleteAllDrafts(): Promise<void> {
-  await http.delete<null>("/drafts/");
+  await http.delete<null>("/drafts");
 }

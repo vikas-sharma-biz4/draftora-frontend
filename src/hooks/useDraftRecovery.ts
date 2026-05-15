@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getDraft } from "@/services/draft.service";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import type { SavedDraft, DraftMetadata } from "@/interfaces/draftInterfaces";
+import { logger } from "@/utils/logger";
 
 interface UseDraftRecoveryOptions {
   autoRecover?: boolean;
@@ -22,13 +23,7 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
   const { autoRecover = false, onRecoveryComplete, onRecoveryError } = options;
 
   const router = useRouter();
-  const {
-    updateProposalData,
-    setCurrentStep,
-    setMaxStepReached,
-    setGeneratedProposalId,
-  } = useProposalWizard();
-
+  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useWizardActions();
   const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
   const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
 
@@ -57,7 +52,22 @@ export function useDraftRecovery(options: UseDraftRecoveryOptions = {}): {
 
         const draft: SavedDraft = await getDraft(draftId);
 
-        updateProposalData(draft.wizardState.proposalData);
+        logger.info('[useDraftRecovery] Recovering draft', {
+          draftId,
+          hasGeneratedContent: Object.keys(draft.generatedContent || {}).length > 0,
+          sectionCount: Object.keys(draft.generatedContent || {}).length,
+          stage: draft.stage,
+          lastLocation: draft.lastLocation,
+        });
+
+        // Restore wizard state with generated content included in proposalData
+        const restoredProposalData = {
+          ...draft.wizardState.proposalData,
+          // Restore generated content into sections field
+          sections: draft.generatedContent || {},
+        };
+
+        updateProposalData(restoredProposalData);
         setCurrentStep(draft.wizardState.currentStep);
         setMaxStepReached(draft.wizardState.maxStepReached);
         setCompletedSteps(draft.wizardState.completedSteps);

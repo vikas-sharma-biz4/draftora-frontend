@@ -17,7 +17,22 @@ import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useModalHistory } from "@/hooks/useModalHistory";
 import type { ClientWithDocuments } from "@/services/client.service";
 import { PROPOSAL_TEMPLATES, SCRATCH_TEMPLATE_DEFAULT_SECTIONS, SECTION_DISPLAY_NAMES, INDUSTRIES } from "@/constants";
-import { useProposal } from "@/context/ProposalContext";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import {
+  useWizardActions,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useTemplateId,
+  useTemplateType,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
@@ -53,7 +68,47 @@ export default function TemplateSelectionModal({
   initialView = "template_selection",
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
-  const { updateProposalData, setCurrentStep, setDraftStage, markStepCompleted, setShouldStartBackgroundFetch } = useProposal();
+  const { updateProposalData, setCurrentStep, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
+
+  // Use granular selectors for minimal re-renders
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateIdFromStore = useTemplateId();
+  const templateTypeFromStore = useTemplateType();
+
+  // Reconstruct proposalData object for backward compatibility with existing code
+  const proposalData = {
+    title,
+    clientName,
+    clientId,
+    description,
+    selectedSections,
+    sectionDisplayNames,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId: templateIdFromStore,
+    templateType: templateTypeFromStore,
+    files: [],
+    filesMeta: [],
+    selectedDocumentIds: [],
+    customSections: [],
+    contextualInstructions: "",
+    webReferences: [],
+  } as any;
+
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
 
   const { clients: storeClients, isLoading: storeLoading } = useClients({ autoFetch: initialClients === undefined });
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
@@ -69,6 +124,7 @@ export default function TemplateSelectionModal({
   const [selectedTemplateIdState, setSelectedTemplateIdState] = useState<string | null>(templateId ?? null);
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [uploadedFiles, setUploadedFiles] = useState<
     { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
   >([]);
@@ -230,6 +286,7 @@ export default function TemplateSelectionModal({
   function handleClientSearchChange(value: string): void {
     setClientSearchQuery(value);
     setShowClientDropdown(true);
+    setHighlightedIndex(-1);
     if (!value.trim()) {
       setSelectedClientId(null);
     }
@@ -240,7 +297,47 @@ export default function TemplateSelectionModal({
   }
 
   function handleClientSearchBlur(): void {
-    setTimeout(() => setShowClientDropdown(false), 300);
+    setTimeout(() => {
+      setShowClientDropdown(false);
+      setHighlightedIndex(-1);
+    }, 300);
+  }
+
+  function handleClientKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (!showClientDropdown || filteredClients.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev < filteredClients.length - 1) {
+            return prev + 1;
+          }
+          return prev;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev > 0) {
+            return prev - 1;
+          }
+          return 0;
+        });
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredClients.length) {
+          const client = filteredClients[highlightedIndex];
+          handleClientSelect(client.id, client.name);
+          setHighlightedIndex(-1);
+        }
+        break;
+      case "Escape":
+        setShowClientDropdown(false);
+        setHighlightedIndex(-1);
+        break;
+    }
   }
 
   function toggleDocument(docId: number): void {
@@ -341,11 +438,9 @@ export default function TemplateSelectionModal({
 
   async function saveParsedDocumentToClient(file: File, fileId: string, result: ParsedFileResult): Promise<void> {
     if (!selectedClientId) {
-      logger.warn("Cannot upload document: No client selected");
-      setUploadedFiles((prev) =>
-        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: "No client selected" } : f))
-      );
-      toast.error(`Cannot upload "${file.name}": Please select a client first`);
+      logger.info("No client selected, keeping parsed file in uploaded list for later use");
+      // Keep the file as parsed but don't upload to client yet
+      // The user can upload it later or use it directly in proposal generation
       return;
     }
 
@@ -450,8 +545,8 @@ export default function TemplateSelectionModal({
       description: initialContextNotes ? `${initialContextNotes}\n\n${proposalDescription}` : proposalDescription,
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
-      templateType: isScratch ? "scratch" : "predefined",
-      selectedSections: isScratch ? [...SCRATCH_TEMPLATE_DEFAULT_SECTIONS] : template ? [...template.sections] : [],
+      templateType: isScratch ? "scratch" : (template?.templateType ?? "predefined"),
+      selectedSections,
       sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
@@ -460,6 +555,10 @@ export default function TemplateSelectionModal({
     setDraftStage("wizard_in_progress");
     setCurrentStep(4);
     setShouldStartBackgroundFetch(true);
+    
+    // Trigger AI-based recommendations prefetch
+    void prefetchRecommendations();
+    
     router.push("/parameters");
     onClose();
   }
@@ -780,6 +879,7 @@ export default function TemplateSelectionModal({
                     onChange={(e) => handleClientSearchChange(e.target.value)}
                     onFocus={handleClientSearchFocus}
                     onBlur={handleClientSearchBlur}
+                    onKeyDown={handleClientKeyDown}
                     className={styles.searchInput}
                   />
                   <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
@@ -790,11 +890,11 @@ export default function TemplateSelectionModal({
 
                 {showClientDropdown && filteredClients.length > 0 && (
                   <div className={styles.clientDropdown}>
-                    {filteredClients.map((client) => (
+                    {filteredClients.map((client, index) => (
                       <button
                         key={client.id}
                         type="button"
-                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
+                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""} ${index === highlightedIndex ? styles.highlighted : ""}`}
                         onPointerDown={(e) => {
                           e.preventDefault();
                           handleClientSelect(client.id, client.name);

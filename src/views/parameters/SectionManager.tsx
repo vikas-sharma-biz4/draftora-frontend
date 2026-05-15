@@ -11,7 +11,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Check, X, Plus, Lock } from "lucide-react";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -19,6 +19,7 @@ import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import { logger } from "@/utils/logger";
 
 const SortableSectionList = dynamic(
   () => import("@/components/common/SortableSectionList"),
@@ -56,45 +57,60 @@ export default function SectionManager({
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
+  const isAddingSectionRef = useRef<boolean>(false);
 
   // Trigger AI recommendations background fetch when flag is set
-  if (shouldStartBackgroundFetch && sectionRecommendationsRef.current) {
-    sectionRecommendationsRef.current.startBackgroundFetch();
-    onBackgroundFetchStarted();
-  }
+  useEffect(() => {
+    if (shouldStartBackgroundFetch && sectionRecommendationsRef.current) {
+      sectionRecommendationsRef.current.startBackgroundFetch();
+      onBackgroundFetchStarted();
+    }
+  }, [shouldStartBackgroundFetch, onBackgroundFetchStarted]);
 
-  function handleStartEdit(item: SectionItem): void {
+  const handleStartEdit = useCallback((item: SectionItem): void => {
     setEditingKey(item.key);
     setEditLabel(item.label);
-  }
+  }, []);
 
-  function handleSaveEdit(key: string): void {
-    const label = editLabel.trim();
-    if (!label) {
-      toast.error("Section name cannot be empty.");
-      return;
-    }
-    onSectionsChange((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, label } : s))
-    );
+  const handleSaveEdit = useCallback((key: string): void => {
+    setEditingKey((prev) => {
+      const label = editLabel.trim();
+      if (!label) {
+        toast.error("Section name cannot be empty.");
+        return prev;
+      }
+      onSectionsChange((sections) =>
+        sections.map((s) => (s.key === key ? { ...s, label } : s))
+      );
+      return null;
+    });
+  }, [editLabel, onSectionsChange]);
+
+  const handleCancelEdit = useCallback((): void => {
     setEditingKey(null);
-  }
+  }, []);
 
-  function handleCancelEdit(): void {
-    setEditingKey(null);
-  }
+  const handleRemove = useCallback((key: string): void => {
+    onSectionsChange((prev) => {
+      if (prev.length <= 1) {
+        toast.error("At least one section is required.");
+        return prev;
+      }
+      return prev.filter((s) => s.key !== key);
+    });
+  }, [onSectionsChange]);
 
-  function handleRemove(key: string): void {
-    if (sections.length <= 1) {
-      toast.error("At least one section is required.");
-      return;
-    }
-    onSectionsChange((prev) => prev.filter((s) => s.key !== key));
-  }
+  const handleAddSection = useCallback((): void => {
+    // Prevent duplicate calls
+    if (isAddingSectionRef.current) return;
+    isAddingSectionRef.current = true;
 
-  function handleAddSection(): void {
     const label = addLabel.trim();
-    if (!label) return;
+    if (!label) {
+      isAddingSectionRef.current = false;
+      return;
+    }
+
     const key =
       "custom_" +
       label
@@ -102,37 +118,74 @@ export default function SectionManager({
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_|_$/g, "")
         .slice(0, 40);
-    if (sections.some((s) => s.key === key)) {
-      toast.error("A section with this name already exists.");
-      return;
-    }
-    onSectionsChange((prev) => [...prev, { key, label }]);
-    setAddLabel("");
-    setShowAddInput(false);
-  }
 
-  function addSectionToProposal(sectionKey: string, sectionTitle: string): void {
+    onSectionsChange((prev) => {
+      // Check for duplicates using the actual previous state from the callback
+      if (prev.some((s) => s.label.toLowerCase() === label.toLowerCase())) {
+        toast.error("A section with this name already exists.");
+        isAddingSectionRef.current = false;
+        return prev;
+      }
+      // Clear input and hide input field only on success
+      setShowAddInput(false);
+      setAddLabel("");
+      isAddingSectionRef.current = false;
+      return [...prev, { key, label }];
+    });
+  }, [addLabel, onSectionsChange]);
+
+  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
+    logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
+    
+    // Check if section already exists before attempting to add
     if (sections.some(s => s.key === sectionKey)) {
       toast.error(`"${sectionTitle}" is already in the structure`);
+      logger.warn('[SectionManager] Section already exists, skipping add', { sectionKey });
       return;
     }
-
+    
     const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
-    onSectionsChange([...sections, newSection]);
+    const updatedSections = [...sections, newSection];
+    
+    logger.info('[SectionManager] Updating local sections state', { 
+      before: sections.map(s => s.key),
+      after: updatedSections.map(s => s.key)
+    });
+    
+    // Update local state first
+    onSectionsChange(updatedSections);
+    
+    // Then update store
     onUpdateProposalData({
-      selectedSections: [...sections.map(s => s.key), sectionKey],
+      selectedSections: updatedSections.map(s => s.key),
       sectionDisplayNames: {
         ...proposalData.sectionDisplayNames,
         [sectionKey]: sectionTitle,
       },
     });
-  }
+    
+    logger.info('[SectionManager] Section added successfully', { sectionKey, totalSections: updatedSections.length });
+  }, [sections, onUpdateProposalData, proposalData.sectionDisplayNames, onSectionsChange]);
 
-  function handleDropFromRecommendations(sectionKey: string, sectionTitle: string): void {
+  const handleDropFromRecommendations = useCallback((sectionKey: string, sectionTitle: string): void => {
     addSectionToProposal(sectionKey, sectionTitle);
     toast.success(`Added "${sectionTitle}" to section structure`);
     sectionRecommendationsRef.current?.removeRecommendation(sectionKey);
-  }
+  }, [addSectionToProposal]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const sectionKey = e.dataTransfer.getData("section_key");
+    const sectionTitle = e.dataTransfer.getData("section_title");
+    if (sectionKey && sectionTitle) {
+      handleDropFromRecommendations(sectionKey, sectionTitle);
+    }
+  }, [handleDropFromRecommendations]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
 
   return (
     <div className="parameters-layout mb-14">
@@ -148,18 +201,8 @@ export default function SectionManager({
         </div>
 
         <div
-          onDrop={(e) => {
-            e.preventDefault();
-            const sectionKey = e.dataTransfer.getData("section_key");
-            const sectionTitle = e.dataTransfer.getData("section_title");
-            if (sectionKey && sectionTitle) {
-              handleDropFromRecommendations(sectionKey, sectionTitle);
-            }
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
-          }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
           className="section-drop-zone"
         >
           {sections.length === 0 ? (
@@ -210,14 +253,17 @@ export default function SectionManager({
               onChange={(e) => setAddLabel(e.target.value)}
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddSection();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddSection();
+                }
                 if (e.key === "Escape") {
                   setShowAddInput(false);
                   setAddLabel("");
                 }
               }}
             />
-            <Button variant="primary" size="sm" onClick={handleAddSection}>
+            <Button variant="primary" size="sm" type="button" onClick={handleAddSection}>
               <Check size={13} />
             </Button>
             <Button

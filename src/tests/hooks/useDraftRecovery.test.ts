@@ -32,14 +32,14 @@ jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-// Mock ProposalContext with controlled setters
+// Mock Zustand wizard store with controlled actions
 const mockUpdateProposalData = jest.fn();
 const mockSetCurrentStep = jest.fn();
 const mockSetMaxStepReached = jest.fn();
 const mockSetGeneratedProposalId = jest.fn();
 
-jest.mock("@/context/ProposalContext", () => ({
-  useProposal: () => ({
+jest.mock("@/store/features/wizard/proposalWizardSlice", () => ({
+  useWizardActions: () => ({
     updateProposalData: mockUpdateProposalData,
     setCurrentStep: mockSetCurrentStep,
     setMaxStepReached: mockSetMaxStepReached,
