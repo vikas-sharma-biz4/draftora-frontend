@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
+import { logger } from "@/utils/logger";
 
 import {
   useTemplateType,
@@ -138,18 +139,25 @@ export default function ParametersPage(): JSX.Element {
     if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
       const templateSections = getTemplateSections(templateType);
       if (templateSections.length > 0) {
+        logger.info('[ParametersPage] computedSections: using template sections', { templateType, count: templateSections.length });
         return templateSections;
       }
     }
     // Otherwise, use the existing sections from proposalData or recreate mode
-    return buildSectionItems(
+    const built = buildSectionItems(
       selectedSections,
       sectionDisplayNames,
       originalSections
     );
+    logger.info('[ParametersPage] computedSections: built from store', { 
+      selectedSectionsCount: selectedSections.length,
+      builtCount: built.length 
+    });
+    return built;
   }, [templateType, selectedSections, sectionDisplayNames, originalSections]);
 
   const [sections, setSections] = useState<SectionItem[]>(computedSections);
+  const [hasModifiedSections, setHasModifiedSections] = useState<boolean>(false);
 
   // Memoize sections to prevent unnecessary re-renders of SortableSectionList
   const memoizedSections = useMemo(() => sections, [sections]);
@@ -160,15 +168,28 @@ export default function ParametersPage(): JSX.Element {
     if (!selectedSections || selectedSections.length === 0) {
       return;
     }
+    // Only sync from computedSections if templateType is a predefined template
+    // For scratch/custom modes, trust the local sections state completely
     if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
       const templateSections = getTemplateSections(templateType);
       if (templateSections.length > 0) {
-        setSections(templateSections);
+        // Only sync if sections is empty (initial load) or if templateType just changed
+        // AND the user hasn't made manual modifications
+        if (sections.length === 0 || (!hasModifiedSections && JSON.stringify(sections.map(s => s.key)) !== JSON.stringify(templateSections.map(s => s.key)))) {
+          logger.info('[ParametersPage] Syncing from template sections', { 
+            templateType, 
+            templateCount: templateSections.length,
+            currentCount: sections.length,
+            hasModifiedSections
+          });
+          setSections(templateSections);
+          setHasModifiedSections(false);
+        }
       }
-    } else {
-      setSections(computedSections);
     }
-  }, [templateType, computedSections, selectedSections]);
+    // For non-template modes, DO NOT sync - trust local state completely
+    // This prevents overwriting manual additions
+  }, [templateType, selectedSections, sections, hasModifiedSections]);
 
   // Invalidate recommendations cache when template or critical context changes
   useEffect(() => {
@@ -180,34 +201,36 @@ export default function ParametersPage(): JSX.Element {
   }, [templateId, description, invalidateRecommendationsCache]);
 
   // Sync computed sections to store when they change (only for non-template modes)
-  useEffect(() => {
-    // Only sync for non-template modes (scratch, custom, recreate)
-    // Skip syncing if we're in the process of resetting (sections are empty or selectedSections are empty)
-    if (!templateType || ["mvp", "design", "poc"].includes(templateType)) {
-      return;
-    }
-    if (!selectedSections || selectedSections.length === 0) {
-      return;
-    }
-    if (!sections || sections.length === 0) {
-      return;
-    }
-    const keys = sections.map((s) => s.key);
-    const displayNames: Record<string, string> = {};
-    for (const s of sections) {
-      displayNames[s.key] = s.label;
-    }
-    // Only update if different
-    const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
-    const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
-    if (keysChanged || displayNamesChanged) {
-      updateProposalData({
-        selectedSections: keys,
-        sectionDisplayNames: displayNames,
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [templateType, sections, selectedSections, sectionDisplayNames]);
+  // DISABLED: This causes race conditions with manual section additions
+  // SectionManager now handles store updates directly via onUpdateProposalData
+  // useEffect(() => {
+  //   // Only sync for non-template modes (scratch, custom, recreate)
+  //   // Skip syncing if we're in the process of resetting (sections are empty or selectedSections are empty)
+  //   if (!templateType || ["mvp", "design", "poc"].includes(templateType)) {
+  //     return;
+  //   }
+  //   if (!selectedSections || selectedSections.length === 0) {
+  //     return;
+  //   }
+  //   if (!sections || sections.length === 0) {
+  //     return;
+  //   }
+  //   const keys = sections.map((s) => s.key);
+  //   const displayNames: Record<string, string> = {};
+  //   for (const s of sections) {
+  //     displayNames[s.key] = s.label;
+  //   }
+  //   // Only update if different
+  //   const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
+  //   const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
+  //   if (keysChanged || displayNamesChanged) {
+  //     updateProposalData({
+  //       selectedSections: keys,
+  //       sectionDisplayNames: displayNames,
+  //     });
+  //   }
+  // // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [templateType, sections, selectedSections, sectionDisplayNames]);
 
   // Cleanup on unmount - cancel any in-flight requests
   useEffect(() => {
@@ -311,8 +334,14 @@ export default function ParametersPage(): JSX.Element {
   }, [setShouldStartBackgroundFetch]);
 
   const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
+    logger.info('[ParametersPage] handleSectionsChange called', { 
+      isFunction: typeof newSections === 'function',
+      currentLength: sections.length 
+    });
+    // Mark that user has made manual modifications
+    setHasModifiedSections(true);
     setSections(newSections);
-  }, []);
+  }, [sections.length]);
 
   return (
     <PageLayout noPadding>

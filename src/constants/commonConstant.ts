@@ -10,8 +10,20 @@
  *   - @/constants/pipelineConstants
  */
 
-// Proposal-related constants
-export * from "./proposalConstants";
+export const AI_MODEL_OPTIONS = [
+  {
+    value: "gpt-5.4",
+    label: "GPT-5.4",
+    provider: "OpenAI",
+    description: "Fast, highly capable model. Best for most proposals.",
+  },
+  {
+    value: "claude-sonnet-4-6",
+    label: "Claude Sonnet 4.6",
+    provider: "Anthropic",
+    description: "Exceptional writing quality and nuanced language.",
+  },
+] as const;
 
 // Template-related constants
 export * from "./templateConstants";

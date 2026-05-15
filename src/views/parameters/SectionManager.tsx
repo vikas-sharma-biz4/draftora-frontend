@@ -19,6 +19,7 @@ import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import { logger } from "@/utils/logger";
 
 const SortableSectionList = dynamic(
   () => import("@/components/common/SortableSectionList"),
@@ -51,6 +52,7 @@ export default function SectionManager({
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
+  const isAddingSectionRef = useRef<boolean>(false);
 
   // Trigger AI recommendations background fetch when flag is set
   useEffect(() => {
@@ -94,46 +96,71 @@ export default function SectionManager({
   }, [onSectionsChange]);
 
   const handleAddSection = useCallback((): void => {
-    setAddLabel((prev) => {
-      const label = prev.trim();
-      if (!label) return prev;
-      const key =
-        "custom_" +
-        label
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "_")
-          .replace(/^_|_$/g, "")
-          .slice(0, 40);
-      onSectionsChange((prev) => {
-        if (prev.some((s) => s.key === key)) {
-          toast.error("A section with this name already exists.");
-          return prev;
-        }
-        return [...prev, { key, label }];
-      });
-      setShowAddInput(false);
-      return "";
-    });
-  }, [onSectionsChange]);
+    // Prevent duplicate calls
+    if (isAddingSectionRef.current) return;
+    isAddingSectionRef.current = true;
 
-  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
+    const label = addLabel.trim();
+    if (!label) {
+      isAddingSectionRef.current = false;
+      return;
+    }
+
+    const key =
+      "custom_" +
+      label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 40);
+
     onSectionsChange((prev) => {
-      if (prev.some(s => s.key === sectionKey)) {
-        toast.error(`"${sectionTitle}" is already in the structure`);
+      // Check for duplicates using the actual previous state from the callback
+      if (prev.some((s) => s.label.toLowerCase() === label.toLowerCase())) {
+        toast.error("A section with this name already exists.");
+        isAddingSectionRef.current = false;
         return prev;
       }
-      const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
-      const updatedSections = [...prev, newSection];
-      onUpdateProposalData({
-        selectedSections: updatedSections.map(s => s.key),
-        sectionDisplayNames: {
-          ...proposalData.sectionDisplayNames,
-          [sectionKey]: sectionTitle,
-        },
-      });
-      return updatedSections;
+      // Clear input and hide input field only on success
+      setShowAddInput(false);
+      setAddLabel("");
+      isAddingSectionRef.current = false;
+      return [...prev, { key, label }];
     });
-  }, [onSectionsChange, onUpdateProposalData, proposalData.sectionDisplayNames]);
+  }, [addLabel, onSectionsChange]);
+
+  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
+    logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
+    
+    // Check if section already exists before attempting to add
+    if (sections.some(s => s.key === sectionKey)) {
+      toast.error(`"${sectionTitle}" is already in the structure`);
+      logger.warn('[SectionManager] Section already exists, skipping add', { sectionKey });
+      return;
+    }
+    
+    const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
+    const updatedSections = [...sections, newSection];
+    
+    logger.info('[SectionManager] Updating local sections state', { 
+      before: sections.map(s => s.key),
+      after: updatedSections.map(s => s.key)
+    });
+    
+    // Update local state first
+    onSectionsChange(updatedSections);
+    
+    // Then update store
+    onUpdateProposalData({
+      selectedSections: updatedSections.map(s => s.key),
+      sectionDisplayNames: {
+        ...proposalData.sectionDisplayNames,
+        [sectionKey]: sectionTitle,
+      },
+    });
+    
+    logger.info('[SectionManager] Section added successfully', { sectionKey, totalSections: updatedSections.length });
+  }, [sections, onUpdateProposalData, proposalData.sectionDisplayNames, onSectionsChange]);
 
   const handleDropFromRecommendations = useCallback((sectionKey: string, sectionTitle: string): void => {
     addSectionToProposal(sectionKey, sectionTitle);
@@ -221,14 +248,17 @@ export default function SectionManager({
               onChange={(e) => setAddLabel(e.target.value)}
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddSection();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddSection();
+                }
                 if (e.key === "Escape") {
                   setShowAddInput(false);
                   setAddLabel("");
                 }
               }}
             />
-            <Button variant="primary" size="sm" onClick={handleAddSection}>
+            <Button variant="primary" size="sm" type="button" onClick={handleAddSection}>
               <Check size={13} />
             </Button>
             <Button
