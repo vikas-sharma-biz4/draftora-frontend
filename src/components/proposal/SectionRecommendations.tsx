@@ -7,6 +7,7 @@ import { getSectionRecommendations, type SectionRecommendation } from "@/service
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
 import { logger } from "@/utils/logger";
+import { usePrefetchedRecommendations, useRecommendationsFetchStatus } from "@/store/features/wizard/proposalWizardSlice";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
@@ -42,6 +43,10 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const hasAutoFetchedRef = useRef<boolean>(false);
 
+  // Load prefetched recommendations from store
+  const prefetchedRecommendations = usePrefetchedRecommendations();
+  const recommendationsFetchStatus = useRecommendationsFetchStatus();
+
   const contextRef = useRef(context);
   const documentContextRef = useRef(documentContext);
   const templateIdRef = useRef(templateId);
@@ -54,13 +59,24 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     existingSectionsRef.current = existingSections;
   });
 
+  // Load prefetched recommendations when available
+  useEffect(() => {
+    if (prefetchedRecommendations && prefetchedRecommendations.length > 0 && !hasUserRequested) {
+      logger.info('[SectionRecommendations] Loading prefetched recommendations from store', { count: prefetchedRecommendations.length });
+      setRecommendations(prefetchedRecommendations);
+      setHasUserRequested(true);
+    }
+  }, [prefetchedRecommendations, hasUserRequested]);
+
   // Removed automatic background fetching - user must click Generate button
 
   const fetchRecommendationsInBackground = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
+    const prompt = customPrompt ?? userPrompt;
 
-    if (!ctx && !docCtx) {
+    // Allow API call if there's either context/document context OR a user prompt
+    if (!ctx && !docCtx && !prompt) {
       return;
     }
 
@@ -81,7 +97,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         existingSections: existingSectionsRef.current,
         existingSectionsWithRules: existingSectionsWithRules,
         context: fullContext,
-        userPrompt: customPrompt ?? userPrompt ?? null,
+        userPrompt: prompt || null,
       });
 
       setRecommendations(recs);
@@ -97,8 +113,10 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
+    const prompt = customPrompt ?? userPrompt;
 
-    if (!ctx && !docCtx) {
+    // Allow API call if there's either context/document context OR a user prompt
+    if (!ctx && !docCtx && !prompt) {
       return;
     }
 
@@ -119,7 +137,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         existingSections: existingSectionsRef.current,
         existingSectionsWithRules: existingSectionsWithRules,
         context: fullContext,
-        userPrompt: customPrompt ?? userPrompt ?? null,
+        userPrompt: prompt || null,
       });
 
       setRecommendations(recs);
@@ -154,6 +172,8 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       toast.info(`"${rec.sectionTitle}" is already in your Table of Contents`);
       return;
     }
+
+    logger.info('[SectionRecommendations] Adding section to TOC', { sectionKey, sectionTitle: rec.sectionTitle });
 
     onAddSection(sectionKey, rec.sectionTitle);
     toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
@@ -277,17 +297,17 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             )}
           </div>
 
-          {isLoading ? (
+          {isLoading || recommendationsFetchStatus === 'loading' ? (
             <div className={styles.loadingState}>
               <div className={styles.spinner}></div>
               <p>Loading recommendations...</p>
             </div>
-          ) : recommendations.length === 0 ? (
+          ) : hasUserRequested && recommendations.length === 0 ? (
             <div className={styles.emptyState}>
               <p>No recommendations available</p>
               <span className={styles.emptyHint}>
-                {!context && !documentContext
-                  ? "Add context or upload documents to get AI recommendations"
+                {!context && !documentContext && !userPrompt
+                  ? "Add context, upload documents, or enter a custom prompt to get AI recommendations"
                   : "All relevant sections are already selected"}
               </span>
             </div>
