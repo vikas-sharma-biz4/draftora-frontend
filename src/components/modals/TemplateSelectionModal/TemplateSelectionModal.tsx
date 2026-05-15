@@ -396,11 +396,9 @@ export default function TemplateSelectionModal({
 
   async function saveParsedDocumentToClient(file: File, fileId: string, result: ParsedFileResult): Promise<void> {
     if (!selectedClientId) {
-      logger.warn("Cannot upload document: No client selected");
-      setUploadedFiles((prev) =>
-        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: "No client selected" } : f))
-      );
-      toast.error(`Cannot upload "${file.name}": Please select a client first`);
+      logger.info("No client selected, keeping parsed file in uploaded list for later use");
+      // Keep the file as parsed but don't upload to client yet
+      // The user can upload it later or use it directly in proposal generation
       return;
     }
 

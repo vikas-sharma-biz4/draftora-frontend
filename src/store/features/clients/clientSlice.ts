@@ -170,7 +170,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
         isLoading: false,
         error: errorMessage,
       });
-      throw error;
+      // Don't re-throw - silently fail and let components handle the error state
+      console.warn('[clientSlice] Failed to fetch clients:', errorMessage);
     }
   },
 
@@ -351,13 +352,22 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
   uploadDocument: async (clientId: number, file: File) => {
     try {
+      console.log('[clientSlice] Uploading document:', { clientId, fileName: file.name, fileSize: file.size });
       const document = await clientApi.uploadDocument(clientId, file);
+      console.log('[clientSlice] Document uploaded successfully:', { clientId, documentId: document.id, documentName: document.name, backendSize: document.sizeBytes });
+
+      // Ensure sizeBytes is set correctly - use backend value if available, otherwise use file.size
+      const documentWithSize = {
+        ...document,
+        sizeBytes: document.sizeBytes || file.size,
+      };
 
       // Add to store
-      get().addDocument(clientId, document);
+      get().addDocument(clientId, documentWithSize);
 
-      return document;
+      return documentWithSize;
     } catch (error) {
+      console.error('[clientSlice] Failed to upload document:', error);
       throw error;
     }
   },
@@ -372,4 +382,4 @@ export const useClientStore = create<ClientState>((set, get) => ({
       throw error;
     }
   },
-}));
+}))

@@ -109,7 +109,7 @@ export default function KnowledgeBaseSelectorModal({
   const storeDocuments = (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),
     name: doc.name,
-    size: String(doc.sizeBytes || 0),
+    size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
     date: doc.createdAt ? formatDate(doc.createdAt) : "",
     status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
     fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
@@ -179,6 +179,7 @@ export default function KnowledgeBaseSelectorModal({
       status: "pending" as const,
     }));
 
+    logger.debug('[KnowledgeBaseSelectorModal] Adding files to uploadedFiles:', newFiles.map(f => ({ name: f.file.name, id: f.id })));
     setUploadedFiles((prev) => [...prev, ...newFiles]);
     newFiles.forEach((f) => startRealParsing(f.file, f.id));
   }
@@ -213,15 +214,18 @@ export default function KnowledgeBaseSelectorModal({
   }
 
   async function startRealParsing(file: File, fileId: string): Promise<void> {
+    logger.debug('[KnowledgeBaseSelectorModal] Starting parsing for file:', { fileId, fileName: file.name });
     setUploadedFiles((prev) =>
       prev.map((f) => (f.id === fileId ? { ...f, status: "parsing" } : f))
     );
 
     try {
       const response = await parseFiles([file]);
+      logger.debug('[KnowledgeBaseSelectorModal] Parse response:', { fileId, fileName: file.name, hasErrors: response.errors.length > 0, hasResults: response.results.length > 0 });
 
       if (response.errors.length > 0) {
         const errMsg = response.errors[0].error;
+        logger.error('[KnowledgeBaseSelectorModal] Parse error:', { fileId, fileName: file.name, error: errMsg });
         setUploadedFiles((prev) =>
           prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: errMsg } : f))
         );
@@ -230,6 +234,7 @@ export default function KnowledgeBaseSelectorModal({
       }
 
       const result = response.results[0];
+      logger.debug('[KnowledgeBaseSelectorModal] Parse success:', { fileId, fileName: file.name, wordCount: result.word_count });
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
@@ -239,6 +244,7 @@ export default function KnowledgeBaseSelectorModal({
       await saveParsedDocumentToClient(file, fileId, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Backend connection failed";
+      logger.error('[KnowledgeBaseSelectorModal] Backend error:', { fileId, fileName: file.name, error: message });
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: message } : f))
       );
@@ -247,15 +253,25 @@ export default function KnowledgeBaseSelectorModal({
   }
 
   async function saveParsedDocumentToClient(file: File, fileId: string, result: ParsedFileResult): Promise<void> {
-    if (!clientId) return;
+    if (!clientId) {
+      logger.warn('[KnowledgeBaseSelectorModal] No clientId provided, skipping document save');
+      toast.error("No client selected. Please select a client first to upload documents.");
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: "No client selected" } : f))
+      );
+      return;
+    }
 
     try {
+      logger.debug('[KnowledgeBaseSelectorModal] Uploading document to client:', { clientId, fileName: file.name });
       const uploadResult = await uploadDocumentToStore(clientId, file);
+      logger.debug('[KnowledgeBaseSelectorModal] Document uploaded to client:', { clientId, documentId: uploadResult.id, fileName: file.name });
 
       // Auto-select newly uploaded document
       setSelected((prev) => {
         const next = new Set(prev);
         next.add(String(uploadResult.id));
+        logger.debug('[KnowledgeBaseSelectorModal] Auto-selected document:', { documentId: uploadResult.id, totalSelected: next.size });
         return next;
       });
 
@@ -367,12 +383,11 @@ export default function KnowledgeBaseSelectorModal({
             />
           </label>
 
-          {/* Uploaded Files List - Only show parsing/error files */}
-          {uploadedFiles.filter((f) => f.status !== "parsed").length > 0 && (
+          {/* Uploaded Files List - Show all uploaded files (pending, parsing, parsed, error) */}
+          {uploadedFiles.length > 0 && (
             <div className={styles.uploadedFilesList}>
               {uploadedFiles
-                .filter((f) => f.status !== "parsed")
-                .map(({ file, id, status, error, parsedData }) => (
+                .map(({ file, id, status, error, parsedData, uploadedDocId }) => (
                 <div key={id} className={styles.uploadedFileItem}>
                   <div className={styles.fileIconWrapper}>
                     {status === "parsing" ? (
@@ -389,11 +404,17 @@ export default function KnowledgeBaseSelectorModal({
                     <div className={styles.fileName} title={file.name}>{file.name}</div>
                     <div className={styles.fileMeta}>
                       {formatFileSize(file.size)}
+                      {status === "pending" && (
+                        <span className={styles.parsingStatus}> â€¢ Waiting to upload...</span>
+                      )}
                       {status === "parsing" && (
                         <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
                       )}
-                      {status === "parsed" && parsedData && (
-                        <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words</span>
+                      {status === "parsed" && parsedData && uploadedDocId && (
+                        <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words â€¢ Added to list</span>
+                      )}
+                      {status === "parsed" && !parsedData && (
+                        <span className={styles.parsedStatus}> â€¢ Parsed successfully</span>
                       )}
                       {status === "error" && error && (
                         <span className={styles.errorStatus}> â€¢ {error}</span>

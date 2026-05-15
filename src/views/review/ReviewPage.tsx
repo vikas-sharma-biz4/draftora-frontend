@@ -94,7 +94,7 @@ export default function ReviewPage(): JSX.Element {
   const currentProposalId = useCurrentProposalId();
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
-  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached } = useWizardActions();
+  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setCurrentProposalId, setEditMode, setMaxStepReached } = useWizardActions();
 
   // Reconstruct proposalData object for backward compatibility with existing code
   // This is a temporary measure - the component should eventually use granular selectors directly
@@ -200,7 +200,7 @@ export default function ReviewPage(): JSX.Element {
           .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
           .map((doc) => ({
             name: doc.name,
-            size: doc.sizeBytes || 0,
+            size: doc.sizeBytes > 0 ? doc.sizeBytes : 0,
             type: doc.fileType || "application/pdf",
           }));
         if (rebuiltMeta.length > 0) {
@@ -236,7 +236,7 @@ export default function ReviewPage(): JSX.Element {
           .filter((doc) => selectedIds.includes(String(doc.id)))
           .map((doc) => ({
             name: doc.name,
-            size: doc.sizeBytes || 0,
+            size: doc.sizeBytes > 0 ? doc.sizeBytes : 0,
             type: doc.fileType || "application/pdf",
           }))
       : [];
@@ -289,7 +289,7 @@ export default function ReviewPage(): JSX.Element {
   const clientDocuments = (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),
     name: doc.name,
-    size: String(doc.sizeBytes || 0),
+    size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
     date: doc.createdAt ? formatDate(doc.createdAt) : "",
     status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
     fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
@@ -299,6 +299,11 @@ export default function ReviewPage(): JSX.Element {
     // Check if sections are selected
     if (proposalData.selectedSections.length === 0) {
       toast.error("Please select at least one section before generating the proposal");
+      return;
+    }
+
+    if (!proposalData.clientId || proposalData.clientId === 0) {
+      toast.error("Please select a client before generating the proposal");
       return;
     }
 
@@ -321,15 +326,25 @@ export default function ReviewPage(): JSX.Element {
       templateId: proposalData.templateId,
     });
 
+    const generateStartTime = Date.now();
+
     try {
-      // CRITICAL FIX: Call the API to create the proposal BEFORE navigating
-      logger.info("[ReviewPage] Calling generateProposal API...");
+      // CRITICAL FIX: Call the API to create the proposal
+      logger.info("[ReviewPage] Calling generateProposal API at", new Date().toISOString());
       const response = await generateProposal(proposalData);
 
-      logger.info("[ReviewPage] Proposal created successfully:", {
+      const generateEndTime = Date.now();
+      const generateDuration = generateEndTime - generateStartTime;
+
+      logger.info("[ReviewPage] Proposal created successfully at", new Date().toISOString(), ":", {
         proposalId: response.id,
         status: response.status,
+        generateDurationMs: generateDuration,
       });
+
+      if (generateDuration > 2000) {
+        logger.warn("[ReviewPage] WARNING: API call took", generateDuration, "ms - Backend is likely doing synchronous generation instead of returning immediately");
+      }
 
       // Mark Step 2 as visited when starting generation
       if (response.id) {
@@ -344,6 +359,10 @@ export default function ReviewPage(): JSX.Element {
       if (maxStepReached < 3) {
         setMaxStepReached(3);
       }
+
+      // Navigate to Generating screen to show real-time progress
+      logger.info("[ReviewPage] Navigating to generating page at", new Date().toISOString(), "with proposalId:", response.id);
+      router.push(`/generating/${response.id}`);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Failed to generate proposal.";

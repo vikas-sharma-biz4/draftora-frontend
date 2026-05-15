@@ -6,17 +6,7 @@ import { MESSAGES } from "@/constants/messages";
 import { logger } from "@/utils/logger";
 
 import {
-  useProposalTitle,
-  useClientName,
-  useProposalDescription,
-  useSelectedSections,
-  useSectionDisplayNames,
-  useTone,
-  useLengthPreference,
-  useLanguage,
-  useAiModel,
-  useTemplateId,
-  useTemplateType,
+  useProposalData,
   useCurrentStep,
   useMaxStepReached,
   useCurrentProposalId,
@@ -32,17 +22,7 @@ import type { DraftLocation, DraftUIState } from "@/interfaces/draftInterfaces";
  * the backend database, resets the wizard, and navigates back to the root.
  */
 export function useSaveDraft(): () => Promise<void> {
-  const title = useProposalTitle();
-  const clientName = useClientName();
-  const description = useProposalDescription();
-  const selectedSections = useSelectedSections();
-  const sectionDisplayNames = useSectionDisplayNames();
-  const tone = useTone();
-  const lengthPreference = useLengthPreference();
-  const language = useLanguage();
-  const aiModel = useAiModel();
-  const templateId = useTemplateId();
-  const templateType = useTemplateType();
+  const proposalData = useProposalData();
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
   const currentProposalId = useCurrentProposalId();
@@ -58,10 +38,16 @@ export function useSaveDraft(): () => Promise<void> {
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
 
   return async function saveDraft(): Promise<void> {
+    const { title, clientName } = proposalData;
     const hasData = title.trim() !== "" || clientName.trim() !== "";
 
     if (!hasData) {
       toast.error("Nothing to save — add a title or client name first.");
+      return;
+    }
+
+    if (clientName.trim() === "") {
+      toast.error("Please enter a client name before saving the draft.");
       return;
     }
 
@@ -102,37 +88,24 @@ export function useSaveDraft(): () => Promise<void> {
       // Include sections from proposalData if available (for completed proposals)
       const sectionsContent: Record<string, string> = {};
 
-      // Construct minimal proposalData object for backward compatibility
-      const proposalData = {
-        title,
-        clientName,
-        description,
-        selectedSections,
-        sectionDisplayNames,
-        tone,
-        lengthPreference,
-        language,
-        aiModel,
-        templateId,
-        templateType,
+      // Use the entire proposalData object to preserve all fields
+      const draftProposalData = {
+        ...proposalData,
+        // Override files with empty array to avoid circular serialization
         files: [],
-        filesMeta: [],
-        selectedDocumentIds: [],
-        customSections: [],
-        contextualInstructions: "",
-        webReferences: [],
+        // Override sections with generated content if available
         sections: sectionsContent,
-      } as any;
+      };
 
       const draftPayload = {
         proposalId: currentProposalId,
-        title: title || "Untitled Proposal",
-        clientName: clientName || "",
+        title: proposalData.title || "Untitled Proposal",
+        clientName: proposalData.clientName || "",
         status: "draft" as const,
         lastLocation,
         stage: draftStage,
         wizardState: {
-          proposalData: { ...proposalData, files: [] },
+          proposalData: draftProposalData,
           currentStep,
           maxStepReached,
           completedSteps,
@@ -163,8 +136,13 @@ export function useSaveDraft(): () => Promise<void> {
       // Invalidate cache to force fresh fetch on drafts page
       invalidateCache();
 
-      resetProposal();
+      // Navigate first, then reset to avoid infinite re-render loop
       router.push("/");
+
+      // Reset after navigation to prevent @dnd-kit infinite loop
+      setTimeout(() => {
+        resetProposal();
+      }, 100);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save draft";
       toast.error(message);

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
@@ -151,8 +151,15 @@ export default function ParametersPage(): JSX.Element {
 
   const [sections, setSections] = useState<SectionItem[]>(computedSections);
 
+  // Memoize sections to prevent unnecessary re-renders of SortableSectionList
+  const memoizedSections = useMemo(() => sections, [sections]);
+
   // Sync local state with computed sections when templateType changes
   useEffect(() => {
+    // Skip syncing if we're in the process of resetting (selectedSections are empty)
+    if (!selectedSections || selectedSections.length === 0) {
+      return;
+    }
     if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
       const templateSections = getTemplateSections(templateType);
       if (templateSections.length > 0) {
@@ -161,7 +168,7 @@ export default function ParametersPage(): JSX.Element {
     } else {
       setSections(computedSections);
     }
-  }, [templateType, computedSections]);
+  }, [templateType, computedSections, selectedSections]);
 
   // Invalidate recommendations cache when template or critical context changes
   useEffect(() => {
@@ -175,21 +182,29 @@ export default function ParametersPage(): JSX.Element {
   // Sync computed sections to store when they change (only for non-template modes)
   useEffect(() => {
     // Only sync for non-template modes (scratch, custom, recreate)
-    if (templateType && !["mvp", "design", "poc"].includes(templateType)) {
-      const keys = sections.map((s) => s.key);
-      const displayNames: Record<string, string> = {};
-      for (const s of sections) {
-        displayNames[s.key] = s.label;
-      }
-      // Only update if different
-      const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
-      const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
-      if (keysChanged || displayNamesChanged) {
-        updateProposalData({
-          selectedSections: keys,
-          sectionDisplayNames: displayNames,
-        });
-      }
+    // Skip syncing if we're in the process of resetting (sections are empty or selectedSections are empty)
+    if (!templateType || ["mvp", "design", "poc"].includes(templateType)) {
+      return;
+    }
+    if (!selectedSections || selectedSections.length === 0) {
+      return;
+    }
+    if (!sections || sections.length === 0) {
+      return;
+    }
+    const keys = sections.map((s) => s.key);
+    const displayNames: Record<string, string> = {};
+    for (const s of sections) {
+      displayNames[s.key] = s.label;
+    }
+    // Only update if different
+    const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
+    const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
+    if (keysChanged || displayNamesChanged) {
+      updateProposalData({
+        selectedSections: keys,
+        sectionDisplayNames: displayNames,
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateType, sections, selectedSections, sectionDisplayNames]);
@@ -230,7 +245,12 @@ export default function ParametersPage(): JSX.Element {
     }
   }, []);
 
-  async function handleNext(): Promise<void> {
+  const handleBack = useCallback((): void => {
+    setCurrentStep(1);
+    router.push("/");
+  }, [setCurrentStep, router]);
+
+  const handleNext = useCallback(async (): Promise<void> => {
     if (sections.length === 0) {
       toast.error("Please add at least one section.");
       return;
@@ -265,12 +285,15 @@ export default function ParametersPage(): JSX.Element {
     if (isRegenerating) {
       toast.info("Parameters updated. Review and regenerate to apply changes.");
     }
-  }
+  }, [sections, updateProposalData, currentProposalId, markStepVisitedOnBackend, markStepCompleted, setDraftStage, setCurrentStep, maxStepReached, setMaxStepReached, router, isRegenerating]);
 
-  function handleBack(): void {
-    setCurrentStep(1);
-    router.push("/");
-  }
+  const onBackgroundFetchStarted = useCallback((): void => {
+    setShouldStartBackgroundFetch(false);
+  }, [setShouldStartBackgroundFetch]);
+
+  const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
+    setSections(newSections);
+  }, []);
 
   return (
     <PageLayout noPadding>
@@ -305,8 +328,8 @@ export default function ParametersPage(): JSX.Element {
         )}
 
         <SectionManager
-          sections={sections}
-          onSectionsChange={setSections}
+          sections={memoizedSections}
+          onSectionsChange={handleSectionsChange}
           proposalData={{
             originalSections,
             // Include other fields SectionManager might need
@@ -314,7 +337,7 @@ export default function ParametersPage(): JSX.Element {
           onUpdateProposalData={updateProposalData}
           isRecreateMode={isRecreateMode}
           shouldStartBackgroundFetch={shouldStartBackgroundFetch}
-          onBackgroundFetchStarted={() => setShouldStartBackgroundFetch(false)}
+          onBackgroundFetchStarted={onBackgroundFetchStarted}
         />
 
         <ToneSelector
