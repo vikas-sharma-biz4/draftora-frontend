@@ -38,6 +38,8 @@ interface SectionManagerProps {
   proposalData: ProposalData;
   onUpdateProposalData: (updates: Partial<ProposalData>) => void;
   isRecreateMode: boolean;
+  shouldStartBackgroundFetch: boolean;
+  onBackgroundFetchStarted: () => void;
 }
 
 export default function SectionManager({
@@ -46,13 +48,15 @@ export default function SectionManager({
   proposalData,
   onUpdateProposalData,
   isRecreateMode,
+  shouldStartBackgroundFetch,
+  onBackgroundFetchStarted,
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const [addLabel, setAddLabel] = useState<string>("");
   const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
-  const isAddingSectionRef = useRef<boolean>(false);
+  const isAddingSectionRef = useRef(false);
 
   // Trigger AI recommendations background fetch when flag is set
   useEffect(() => {
@@ -96,23 +100,35 @@ export default function SectionManager({
   }, [onSectionsChange]);
 
   const handleAddSection = useCallback((): void => {
-    // Prevent duplicate calls
     if (isAddingSectionRef.current) return;
     isAddingSectionRef.current = true;
 
-    const label = addLabel.trim();
-    if (!label) {
-      isAddingSectionRef.current = false;
-      return;
-    }
-
-    const key =
-      "custom_" +
-      label
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_|_$/g, "")
-        .slice(0, 40);
+    setAddLabel((prev) => {
+      const label = prev.trim();
+      if (!label) {
+        isAddingSectionRef.current = false;
+        return prev;
+      }
+      const key =
+        "custom_" +
+        label
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_|_$/g, "")
+          .slice(0, 40);
+      onSectionsChange((prevSections) => {
+        if (prevSections.some((s) => s.key === key)) {
+          toast.error("A section with this name already exists.");
+          isAddingSectionRef.current = false;
+          return prevSections;
+        }
+        isAddingSectionRef.current = false;
+        return [...prevSections, { key, label }];
+      });
+      setShowAddInput(false);
+      return "";
+    });
+  }, [onSectionsChange]);
 
     onSectionsChange((prev) => {
       // Check for duplicates using the actual previous state from the callback
@@ -131,25 +147,25 @@ export default function SectionManager({
 
   const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
-    
+
     // Check if section already exists before attempting to add
     if (sections.some(s => s.key === sectionKey)) {
       toast.error(`"${sectionTitle}" is already in the structure`);
       logger.warn('[SectionManager] Section already exists, skipping add', { sectionKey });
       return;
     }
-    
+
     const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
     const updatedSections = [...sections, newSection];
-    
-    logger.info('[SectionManager] Updating local sections state', { 
+
+    logger.info('[SectionManager] Updating local sections state', {
       before: sections.map(s => s.key),
       after: updatedSections.map(s => s.key)
     });
-    
+
     // Update local state first
     onSectionsChange(updatedSections);
-    
+
     // Then update store
     onUpdateProposalData({
       selectedSections: updatedSections.map(s => s.key),
@@ -158,7 +174,7 @@ export default function SectionManager({
         [sectionKey]: sectionTitle,
       },
     });
-    
+
     logger.info('[SectionManager] Section added successfully', { sectionKey, totalSections: updatedSections.length });
   }, [sections, onUpdateProposalData, proposalData.sectionDisplayNames, onSectionsChange]);
 

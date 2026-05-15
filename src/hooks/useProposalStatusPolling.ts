@@ -104,6 +104,7 @@ export function useProposalStatusPolling(
   const lastLeaderHeartbeatRef = useRef<number>(Date.now());
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const leaderCheckTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tabIdRef = useRef<string>(Math.random().toString(36).slice(2));
 
   const stop = useCallback(() => {
     stoppedRef.current = true;
@@ -178,7 +179,7 @@ export function useProposalStatusPolling(
     // Send heartbeat every second
     heartbeatTimerRef.current = setInterval(() => {
       if (channelRef.current && isLeaderRef.current) {
-        channelRef.current.postMessage({ type: "heartbeat", timestamp: Date.now() });
+        channelRef.current.postMessage({ type: "heartbeat", timestamp: Date.now(), tabId: tabIdRef.current });
       }
     }, LEADER_HEARTBEAT_INTERVAL);
   }, []);
@@ -268,6 +269,9 @@ export function useProposalStatusPolling(
     }
   }, [proposalId, handleStatusData]);
 
+  const pollRef = useRef(poll);
+  pollRef.current = poll;
+
   const start = useCallback(() => {
     stoppedRef.current = false;
     setErrorMessage("");
@@ -275,8 +279,8 @@ export function useProposalStatusPolling(
     pollCountRef.current = 0;
     retryCountRef.current = 0;
     setIsPolling(true);
-    void poll();
-  }, [poll]);
+    void pollRef.current();
+  }, []);
 
   // Initialize BroadcastChannel for tab synchronization
   useEffect(() => {
@@ -287,9 +291,12 @@ export function useProposalStatusPolling(
 
       // Listen for messages from other tabs
       channelRef.current.onmessage = (event) => {
-        const { type, data, timestamp } = event.data;
+        const { type, data, timestamp, tabId } = event.data;
 
         if (type === "heartbeat") {
+          // Ignore our own heartbeats
+          if (tabId === tabIdRef.current) return;
+
           // Another tab is the leader
           lastLeaderHeartbeatRef.current = timestamp;
 
@@ -313,7 +320,7 @@ export function useProposalStatusPolling(
 
           // Start polling if we should be polling
           if (autoStart && !stoppedRef.current) {
-            void poll();
+            void pollRef.current();
           }
         }
       }, 1000);
@@ -323,7 +330,7 @@ export function useProposalStatusPolling(
         if (!isLeaderRef.current) {
           becomeLeader();
           if (autoStart && !stoppedRef.current) {
-            void poll();
+            void pollRef.current();
           }
         }
       }, 100);
@@ -347,7 +354,7 @@ export function useProposalStatusPolling(
         channelRef.current = null;
       }
     };
-  }, [proposalId, becomeLeader, resignLeadership, handleStatusData, autoStart, poll]);
+  }, [proposalId, becomeLeader, resignLeadership, handleStatusData, autoStart]);
 
   // Auto-start
   useEffect(() => {

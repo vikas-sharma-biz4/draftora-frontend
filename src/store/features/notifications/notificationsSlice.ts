@@ -8,6 +8,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
@@ -128,11 +129,14 @@ export const useNotificationsByType = (type: NotificationType) =>
 /**
  * Selects all notification actions (stable reference)
  */
-export const useNotificationActions = () => useNotificationsStore((state) => ({
-  addNotification: state.addNotification,
-  removeNotification: state.removeNotification,
-  markAsRead: state.markAsRead,
-  markAllAsRead: state.markAllAsRead,
-  clearAll: state.clearAll,
-  reset: state.reset,
-}));
+export const useNotificationActions = () =>
+  useNotificationsStore(
+    useShallow((state) => ({
+      addNotification: state.addNotification,
+      removeNotification: state.removeNotification,
+      markAsRead: state.markAsRead,
+      markAllAsRead: state.markAllAsRead,
+      clearAll: state.clearAll,
+      reset: state.reset,
+    }))
+  );

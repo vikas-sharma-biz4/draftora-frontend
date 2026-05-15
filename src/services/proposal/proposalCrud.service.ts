@@ -145,6 +145,7 @@ interface ProposalStatusApiResponse {
   total_sections?: number | null;
   completed_sections?: string[];
   progress_percent?: number | null;
+  progress?: number;
   current_stage?: string | null;
   current_section?: string | null;
   estimated_time_remaining?: number | null;
@@ -152,12 +153,10 @@ interface ProposalStatusApiResponse {
   selected_sections?: string[] | null;
   visited_pipeline_steps?: number[];
   highest_visited_step?: number | null;
-  total_sections?: number | null;
-  progress_percent?: number;
-  progress?: number;
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
+  logger.info(`[proposalCrud] Fetching status for proposal ${id}`);
   const d = await http.get<ProposalStatusApiResponse>(`/proposals/${id}/status`, {
     cache: "no-store",
   });
@@ -177,7 +176,7 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
   const status: ProposalStatus = {
     id: d.id,
     status: d.status,
-    totalSections: total,
+    totalSections: totalSections,
     completedSections: completed,
     progressPercent,
     currentStage: d.current_stage ?? null,

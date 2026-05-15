@@ -18,7 +18,6 @@ import { DEFAULT_AI_MODEL } from "@/config/config";
 import { DEFAULT_SELECTED_SECTIONS, PROPOSAL_WIZARD_STORAGE_KEY } from "@/constants";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
-import type { SectionRecommendation } from "@/services/proposal.service";
 import { getSectionRecommendations } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 
@@ -83,7 +82,12 @@ interface ProposalWizardState {
   setShouldStartBackgroundFetch: (val: boolean) => void;
   resetProposal: () => void;
   reset: () => void;
-  prefetchRecommendations: () => void;
+  prefetchRecommendations: (params: {
+    templateId: string | null;
+    existingSections: string[];
+    context: string;
+    documentContext: string;
+  }) => Promise<any[]>;
   cancelRecommendationsFetch: () => void;
   invalidateRecommendationsCache: () => void;
   clearRecommendationsError: () => void;
@@ -145,46 +149,34 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
     set(INITIAL_WIZARD_STATE);
   },
 
-  prefetchRecommendations: async (): Promise<void> => {
-    const state = useProposalWizardStore.getState();
-    const { proposalData } = state;
-
-    // Allow prefetch even without description/documents - the backend can handle empty context
-    logger.debug('[proposalWizardSlice] Prefetching recommendations | has_description=%s | has_documents=%s',
-      !!proposalData.description,
-      !!proposalData.selectedDocumentIds?.length
-    );
-
-    set({ recommendationsFetchStatus: 'loading' });
-
+  prefetchRecommendations: async (params: {
+    templateId: string | null;
+    existingSections: string[];
+    context: string;
+    documentContext: string;
+  }) => {
+    set({ recommendationsFetchStatus: 'loading', recommendationsError: null });
     try {
-      const existingSectionsWithRules = proposalData.selectedSections.map((key) => ({
-        sectionKey: key,
-        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        include: "",
-        exclude: "",
-        purpose: "",
+      const fullContext = [params.context, params.documentContext].filter(Boolean).join('\n\n');
+      const existingSectionsWithRules = params.existingSections.map((sectionKey) => ({
+        sectionKey,
+        sectionName: SECTION_DISPLAY_NAMES[sectionKey] ?? sectionKey.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        include: '',
+        exclude: '',
+        purpose: '',
       }));
-
-      const recs = await getSectionRecommendations({
-        templateId: proposalData.templateId,
-        existingSections: proposalData.selectedSections,
+      const recommendations = await getSectionRecommendations({
+        templateId: params.templateId,
+        existingSections: params.existingSections,
         existingSectionsWithRules,
-        context: proposalData.description || "",
-        userPrompt: null,
+        context: fullContext,
       });
-
-      set({
-        prefetchedRecommendations: recs,
-        recommendationsFetchStatus: 'success'
-      });
-      logger.info('[proposalWizardSlice] Recommendations prefetched successfully', { count: recs.length });
+      set({ prefetchedRecommendations: recommendations, recommendationsFetchStatus: 'success' });
+      return recommendations;
     } catch (error) {
-      logger.error('[proposalWizardSlice] Failed to prefetch recommendations', error);
-      set({
-        recommendationsFetchStatus: 'error',
-        recommendationsError: error instanceof Error ? error.message : 'Failed to fetch recommendations'
-      });
+      const message = error instanceof Error ? error.message : 'Failed to fetch recommendations';
+      set({ recommendationsFetchStatus: 'error', recommendationsError: message });
+      throw error;
     }
   },
 
@@ -394,20 +386,22 @@ export const useRecommendationsError = () =>
  * Use this when you need multiple actions without subscribing to state changes.
  */
 export const useWizardActions = () =>
-  useProposalWizardStore(useShallow((state) => ({
-    updateProposalData: state.updateProposalData,
-    setCurrentStep: state.setCurrentStep,
-    setIsGenerating: state.setIsGenerating,
-    setGeneratedProposalId: state.setGeneratedProposalId,
-    setCurrentProposalId: state.setCurrentProposalId,
-    setHydrated: state.setHydrated,
-    setEditMode: state.setEditMode,
-    setMaxStepReached: state.setMaxStepReached,
-    setShouldStartBackgroundFetch: state.setShouldStartBackgroundFetch,
-    resetProposal: state.resetProposal,
-    reset: state.reset,
-    prefetchRecommendations: state.prefetchRecommendations,
-    cancelRecommendationsFetch: state.cancelRecommendationsFetch,
-    invalidateRecommendationsCache: state.invalidateRecommendationsCache,
-    clearRecommendationsError: state.clearRecommendationsError,
-  })));
+  useProposalWizardStore(
+    useShallow((state) => ({
+      updateProposalData: state.updateProposalData,
+      setCurrentStep: state.setCurrentStep,
+      setIsGenerating: state.setIsGenerating,
+      setGeneratedProposalId: state.setGeneratedProposalId,
+      setCurrentProposalId: state.setCurrentProposalId,
+      setHydrated: state.setHydrated,
+      setEditMode: state.setEditMode,
+      setMaxStepReached: state.setMaxStepReached,
+      setShouldStartBackgroundFetch: state.setShouldStartBackgroundFetch,
+      resetProposal: state.resetProposal,
+      reset: state.reset,
+      prefetchRecommendations: state.prefetchRecommendations,
+      cancelRecommendationsFetch: state.cancelRecommendationsFetch,
+      invalidateRecommendationsCache: state.invalidateRecommendationsCache,
+      clearRecommendationsError: state.clearRecommendationsError,
+    }))
+  );

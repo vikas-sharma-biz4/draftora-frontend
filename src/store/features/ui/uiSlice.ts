@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 export type Theme = 'light' | 'dark' | 'system';
 
@@ -96,11 +97,14 @@ export const useActiveModal = () => useUIStore((state) => state.activeModal);
 /**
  * Selects all UI actions (stable reference)
  */
-export const useUIActions = () => useUIStore((state) => ({
-  setSidebarOpen: state.setSidebarOpen,
-  toggleSidebar: state.toggleSidebar,
-  setGlobalLoading: state.setGlobalLoading,
-  openModal: state.openModal,
-  closeModal: state.closeModal,
-  reset: state.reset,
-}));
+export const useUIActions = () =>
+  useUIStore(
+    useShallow((state) => ({
+      setSidebarOpen: state.setSidebarOpen,
+      toggleSidebar: state.toggleSidebar,
+      setGlobalLoading: state.setGlobalLoading,
+      openModal: state.openModal,
+      closeModal: state.closeModal,
+      reset: state.reset,
+    }))
+  );

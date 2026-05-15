@@ -193,7 +193,7 @@ export default function ReviewPage(): JSX.Element {
 
   // Rebuild filesMeta if empty but we have selectedDocumentIds (using Zustand store)
   useEffect(() => {
-    if (proposalData.clientId && clients.length > 0) {
+    if (proposalData.clientId && Array.isArray(clients) && clients.length > 0) {
       const currentClient = clients.find((c) => c.id === proposalData.clientId);
       if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
         const rebuiltMeta = currentClient.documents
@@ -230,7 +230,7 @@ export default function ReviewPage(): JSX.Element {
     await refetchClients();
 
     // Then rebuild filesMeta from selected documents using refreshed client data
-    const currentClient = clients.find((c) => c.id === proposalData.clientId);
+    const currentClient = Array.isArray(clients) ? clients.find((c) => c.id === proposalData.clientId) : undefined;
     const newFilesMeta = currentClient
       ? currentClient.documents
           .filter((doc) => selectedIds.includes(String(doc.id)))
@@ -284,7 +284,7 @@ export default function ReviewPage(): JSX.Element {
     setShowTemplateModal(false);
   }
 
-  const currentClient = clients.find((c) => c.id === proposalData.clientId);
+  const currentClient = Array.isArray(clients) ? clients.find((c) => c.id === proposalData.clientId) : undefined;
   // Map API ClientDocument to the shape expected by KnowledgeBaseSelectorModal
   const clientDocuments = (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),

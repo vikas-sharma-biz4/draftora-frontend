@@ -113,7 +113,7 @@ async function handleResponse<T>(res: Response, method: string): Promise<T> {
   // Read response body once to avoid double-read bug
   const rawText = await res.text();
 
-  let json: ApiResponse<T> | undefined;
+  let json: ApiResponse<T>;
 
   // Handle empty response bodies
   if (!rawText || rawText.trim() === "") {
@@ -127,18 +127,6 @@ async function handleResponse<T>(res: Response, method: string): Promise<T> {
     throw new HttpError(
       res.status,
       `Failed to parse JSON response: ${rawText.substring(0, 200)}`
-    );
-  }
-
-  // Parse JSON safely from raw text
-  let json: ApiResponse<T>;
-  try {
-    json = JSON.parse(rawText) as ApiResponse<T>;
-  } catch (parseError) {
-    const truncatedPayload = rawText.substring(0, 200);
-    throw new HttpError(
-      res.status,
-      `Failed to parse JSON response: ${truncatedPayload}${rawText.length > 200 ? "..." : ""}`
     );
   }
 

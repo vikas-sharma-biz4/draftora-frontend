@@ -8,6 +8,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark' | 'system';
@@ -140,17 +141,23 @@ export const useOsPrefersDark = () => useThemeStore((state) => state.osPrefersDa
 /**
  * Selects theme actions (stable reference)
  */
-export const useThemeActions = () => useThemeStore((state) => ({
-  setTheme: state.setTheme,
-  setOsPrefersDark: state.setOsPrefersDark,
-  reset: state.reset,
-}));
+export const useThemeActions = () =>
+  useThemeStore(
+    useShallow((state) => ({
+      setTheme: state.setTheme,
+      setOsPrefersDark: state.setOsPrefersDark,
+      reset: state.reset,
+    }))
+  );
 
 /**
  * Selects complete theme state
  */
-export const useThemeState = () => useThemeStore((state) => ({
-  theme: state.theme,
-  osPrefersDark: state.osPrefersDark,
-  isDark: state.theme === 'system' ? state.osPrefersDark : state.theme === 'dark',
-}));
+export const useThemeState = () =>
+  useThemeStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      osPrefersDark: state.osPrefersDark,
+      isDark: state.theme === 'system' ? state.osPrefersDark : state.theme === 'dark',
+    }))
+  );

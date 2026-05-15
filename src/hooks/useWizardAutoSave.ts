@@ -25,11 +25,8 @@ import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import { getDraftByProposalId, getDraft } from "@/services/draft.service";
 import type { DraftLocation, SaveDraftPayload, DraftUIState } from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
 import { WIZARD_AUTOSAVE_FALLBACK_KEY } from "@/constants/storageKeys";
-
-const WIZARD_AUTOSAVE_FALLBACK_KEY = "wizard_autosave_fallback";
-const DRAFT_SAVE_LOCK_KEY = "draft_save_lock";
-const DRAFT_DEDUP_KEY = "draft_dedup";
 
 interface UseWizardAutoSaveOptions {
   enabled: boolean;

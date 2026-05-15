@@ -11,6 +11,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
 import * as proposalApi from '@/services/proposal.service';
 
@@ -291,11 +292,14 @@ export const useProposalsLastFetched = () => useProposalStore((state) => state.l
 /**
  * Selects all proposal actions (stable reference)
  */
-export const useProposalActions = () => useProposalStore((state) => ({
-  fetchProposals: state.fetchProposals,
-  setProposals: state.setProposals,
-  updateProposal: state.updateProposal,
-  removeProposal: state.removeProposal,
-  invalidateCache: state.invalidateCache,
-  reset: state.reset,
-}));
+export const useProposalActions = () =>
+  useProposalStore(
+    useShallow((state) => ({
+      fetchProposals: state.fetchProposals,
+      setProposals: state.setProposals,
+      updateProposal: state.updateProposal,
+      removeProposal: state.removeProposal,
+      invalidateCache: state.invalidateCache,
+      reset: state.reset,
+    }))
+  );

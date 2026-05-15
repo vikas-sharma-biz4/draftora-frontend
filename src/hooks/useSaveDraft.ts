@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
 import { logger } from "@/utils/logger";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
 
 import {
   useProposalData,

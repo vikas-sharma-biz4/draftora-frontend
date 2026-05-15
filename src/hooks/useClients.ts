@@ -7,7 +7,7 @@
  * - Memoized selectors for performance
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useClientStore } from '@/store/features/clients/clientSlice';
 import type { ClientWithDocuments } from '@/services/client.service';
 
@@ -33,11 +33,13 @@ export function useClients(options: UseClientsOptions = {}): UseClientsReturn {
   const fetchClients = useClientStore(state => state.fetchClients);
   const getClientById = useClientStore(state => state.getClientById);
 
+  const fetchClientsRef = useRef(fetchClients);
+  fetchClientsRef.current = fetchClients;
+
   useEffect(() => {
     if (autoFetch) {
-      fetchClients(force);
+      fetchClientsRef.current(force);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFetch, force]);
 
   const refetch = async () => {
@@ -66,8 +68,7 @@ export function useClient(clientId: number): {
 
   useEffect(() => {
     fetchClients();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchClients]);
 
   const client = getClientById(clientId);
 

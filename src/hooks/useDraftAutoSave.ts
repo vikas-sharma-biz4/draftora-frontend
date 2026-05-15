@@ -19,6 +19,7 @@ import {
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
+import { getLastLocationFromPathname } from "@/utils/routeUtils";
 import type { DraftLocation } from "@/interfaces/draftInterfaces";
 
 interface UseDraftAutoSaveOptions {

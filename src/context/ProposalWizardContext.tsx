@@ -102,6 +102,9 @@ export function ProposalWizardProvider({
               // Explicitly preserve section fields to ensure they're not overridden
               selectedSections: saved.proposalData.selectedSections ?? DEFAULT_PROPOSAL_DATA.selectedSections,
               sectionDisplayNames: saved.proposalData.sectionDisplayNames ?? DEFAULT_PROPOSAL_DATA.sectionDisplayNames,
+              customSections: saved.proposalData.customSections ?? [],
+              webReferences: saved.proposalData.webReferences ?? [],
+              contextualInstructions: saved.proposalData.contextualInstructions ?? "",
             });
           }
         }
@@ -113,7 +116,11 @@ export function ProposalWizardProvider({
       logger.warn("[ProposalWizardProvider] Failed to restore draft from localStorage:", err);
     }
     // Set hydrated flag after all updates are complete
-    setHydrated(true);
+    try {
+      setHydrated(true);
+    } catch (hydrationErr) {
+      logger.error("[ProposalWizardProvider] Error setting hydrated flag:", hydrationErr);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -9,6 +9,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import type { Client, ClientWithDocuments, ClientDocument, CreateClientRequest, UpdateClientRequest } from '@/services/client.service';
 import * as clientApi from '@/services/client.service';
 import { logger } from '@/utils/logger';
@@ -235,7 +236,7 @@ export const useClientStore = create<ClientState>((set, get) => ({
   addDocument: (clientId: number, document: ClientDocument) => {
     logger.debug('[clientSlice] addDocument called:', { clientId, documentId: document.id, documentName: document.name });
     set(state => {
-      const clients = [...state.clients];
+      const clients = [...(Array.isArray(state.clients) ? state.clients : [])];
       const clientIndex = clients.findIndex(c => c.id === clientId);
 
       if (clientIndex >= 0) {

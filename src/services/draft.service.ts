@@ -137,7 +137,7 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
   logger.info('[draft.service] Creating draft:', { title: payload.title, clientName: payload.clientName });
 
-  const data = await http.post<RawSavedDraft>("/drafts", {
+  const data = await http.post<RawSavedDraft>("/drafts/", {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -232,9 +232,9 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
 }
 
 export async function deleteDraft(draftId: string): Promise<void> {
-  await http.delete<null>(`/drafts/${draftId}`);
+  await http.delete<null>(`/drafts/${draftId}/`);
 }
 
 export async function deleteAllDrafts(): Promise<void> {
-  await http.delete<null>("/drafts");
+  await http.delete<null>("/drafts/");
 }

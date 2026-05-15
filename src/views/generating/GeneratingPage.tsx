@@ -1,13 +1,14 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef, useMemo } from "react";
 
 import { cancelProposal, getProposal } from "@/services/proposal.service";
 import { GENERATION_STEPS, DRAFTS_STORAGE_KEY } from "@/constants";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { logger } from "@/utils/logger";
 import { useProposalStatusPolling } from "@/hooks/useProposalStatusPolling";
+import type { ProposalStatus } from "@/interfaces/proposalInterfaces";
 import {
   useGenerationProgress,
   useGenerationError,
@@ -15,6 +16,8 @@ import {
   useGenerationCurrentSection,
   useGenerationCurrentStage,
   useGenerationEstimatedTime,
+  useGenerationTotalSections,
+  useGenerationCompletedSections,
   useGenerationActions,
 } from "@/store/features/generation/generationSlice";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
@@ -43,11 +46,10 @@ export default function GeneratingPage(): JSX.Element {
   const currentSection = useGenerationCurrentSection();
   const currentStage = useGenerationCurrentStage();
   const estimatedTimeRemaining = useGenerationEstimatedTime();
+  const totalSections = useGenerationTotalSections();
+  const completedSections = useGenerationCompletedSections();
   const { startGeneration, updateFromStatus, setPolling, setError, completeGeneration, failGeneration } = useGenerationActions();
 
-  // Wizard store actions (no React Context)
-  const setIsGenerating = useProposalWizardStore((state) => state.setIsGenerating);
-  const resetProposal = useProposalWizardStore((state) => state.resetProposal);
 
   const completedRef = useRef<boolean>(false);
 
@@ -151,62 +153,70 @@ export default function GeneratingPage(): JSX.Element {
     stop: stopPolling,
   } = useProposalStatusPolling({
     proposalId,
-    disableTabSync: true,
-    onStatusUpdate: (data) => {
-      console.log("[GeneratingPage] Status update received:", {
-        timestamp: new Date().toISOString(),
+    onStatusUpdate: (data: ProposalStatus) => {
+      logger.debug("[GeneratingPage] Status update", {
         status: data.status,
-        currentStage: data.currentStage,
-        generatingSection: data.generatingSection,
-        completedSections: data.completedSections,
-        completedSectionsCount: data.completedSections.length,
-        selectedSections: data.selectedSections,
-        selectedSectionsCount: data.selectedSections?.length,
-        totalSections: data.totalSections,
         progressPercent: data.progressPercent,
-      });
-      setGeneratingSection(data.generatingSection ?? null);
-      setCurrentStage(data.currentStage ?? null);
-      setTotalSections(data.totalSections);
-      setCompletedSections(data.completedSections.length);
-      console.log("[GeneratingPage] Local state updated:", {
-        generatingSection: data.generatingSection ?? null,
-        currentStage: data.currentStage ?? null,
+        currentStage: data.currentStage,
+        currentSection: data.currentSection,
+        completedCount: data.completedSections.length,
         totalSections: data.totalSections,
-        completedSections: data.completedSections.length,
       });
+      updateFromStatus(data);
     },
     onCompleted: () => {
-      console.log("[GeneratingPage] Generation completed");
       void handleCompleted();
     },
     onFailed: () => {
-      console.log("[GeneratingPage] Generation failed");
-      completedRef.current = true;
+      handleFailed();
     },
     onCancelled: () => {
-      console.log("[GeneratingPage] Generation cancelled");
-      completedRef.current = true;
-      setIsGenerating(false);
-      router.push("/review");
+      handleCancelled();
+    },
+    onError: (error: Error) => {
+      logger.error("[GeneratingPage] Polling error:", error);
+      setError("Unable to check proposal status. Please refresh and try again.");
     },
   });
 
-  // Use backend's progressPercent directly for accurate real-time progress
-  const progressPercent = status?.progressPercent ?? 0;
+  // Stabilize callbacks in refs so effects don't loop on reference changes
+  const startGenerationRef = useRef(startGeneration);
+  startGenerationRef.current = startGeneration;
+  const setIsGeneratingRef = useRef(setIsGenerating);
+  setIsGeneratingRef.current = setIsGenerating;
+  const setPollingRef = useRef(setPolling);
+  setPollingRef.current = setPolling;
+  const setErrorRef = useRef(setError);
+  setErrorRef.current = setError;
+  const stopPollingRef = useRef(stopPolling);
+  stopPollingRef.current = stopPolling;
 
-  console.log("[GeneratingPage] Render state:", {
-    timestamp: new Date().toISOString(),
-    status: status?.status,
-    progressPercent,
-    totalSections,
-    completedSections,
-    currentStage,
-    generatingSection,
-    isPolling,
-    pollCount,
-    hasStatus: !!status,
-  });
+  // Sync hook polling state into Zustand store
+  useEffect(() => {
+    setPollingRef.current(hookIsPolling);
+  }, [hookIsPolling]);
+
+  // Sync hook error into Zustand store
+  useEffect(() => {
+    if (pollingError) {
+      setErrorRef.current(pollingError);
+    }
+  }, [pollingError]);
+
+  // Initialize generation state on mount
+  useEffect(() => {
+    startGenerationRef.current(proposalId);
+    setIsGeneratingRef.current(true);
+
+    return () => {
+      stopPollingRef.current();
+      if (!completedRef.current) {
+        setIsGeneratingRef.current(false);
+      }
+    };
+  }, [proposalId]);
+
+  // ── Render helpers ──
 
   const getActiveStepIndex = (): number => {
     if (!currentStage) {
@@ -319,24 +329,15 @@ export default function GeneratingPage(): JSX.Element {
               GENERATING SECTIONS ({completedSections}/{totalSections})
             </div>
             <ul className="generating-sequence-list">
-              {status?.selectedSections?.map((section, index) => {
-                const isDone = status?.completedSections?.includes(section);
-                const isActive = status?.generatingSection === section;
-                return (
-                  <li
-                    key={section}
-                    className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}`}
-                  >
-                    <span className="generating-sequence-icon">
-                      {isDone ? "✓" : isActive ? "◐" : "○"}
-                    </span>
-                    <span className="generating-sequence-text">
-                      {section}
-                      {isActive && <span className="generating-sequence-status"> - Generating...</span>}
-                    </span>
-                  </li>
-                );
-              }) || (
+              {currentSection ? (
+                <li className="generating-sequence-item active">
+                  <span className="generating-sequence-icon">◐</span>
+                  <span className="generating-sequence-text">
+                    {currentSection.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    <span className="generating-sequence-status"> - Generating...</span>
+                  </span>
+                </li>
+              ) : (
                 <li className="generating-sequence-item">
                   <span className="generating-sequence-icon">○</span>
                   <span className="generating-sequence-text">Loading sections...</span>

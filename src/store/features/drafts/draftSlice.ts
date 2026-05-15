@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 import type { DraftMetadata, SavedDraft, SaveDraftPayload, DraftStage } from '@/interfaces/draftInterfaces';
 import * as draftApi from '@/services/draft.service';
 import { logger } from '@/utils/logger';
@@ -285,13 +286,16 @@ export const useDraftsLastFetched = () => useDraftStore((state) => state.lastFet
 /**
  * Selects all draft actions (stable reference)
  */
-export const useDraftActions = () => useDraftStore((state) => ({
-  fetchDrafts: state.fetchDrafts,
-  setDrafts: state.setDrafts,
-  addDraft: state.addDraft,
-  updateDraft: state.updateDraft,
-  removeDraft: state.removeDraft,
-  removeAllDrafts: state.removeAllDrafts,
-  deleteAllDrafts: state.deleteAllDrafts,
-  reset: state.reset,
-}));
+export const useDraftActions = () =>
+  useDraftStore(
+    useShallow((state) => ({
+      fetchDrafts: state.fetchDrafts,
+      setDrafts: state.setDrafts,
+      addDraft: state.addDraft,
+      updateDraft: state.updateDraft,
+      removeDraft: state.removeDraft,
+      removeAllDrafts: state.removeAllDrafts,
+      deleteAllDrafts: state.deleteAllDrafts,
+      reset: state.reset,
+    }))
+  );
