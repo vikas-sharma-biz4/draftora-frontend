@@ -162,7 +162,6 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   invalidateCache: () => {
     set({
       lastFetched: null,
-      isInitialized: false,
     });
   },
 

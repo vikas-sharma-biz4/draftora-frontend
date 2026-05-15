@@ -12,6 +12,7 @@ import styles from "./ClientDetailPage.module.scss";
 import { useClient } from "@/hooks/useClients";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useProposalDownload } from "@/hooks/useProposalDownload";
 import type { ClientDocument } from "@/services/client.service";
 import { listProposals } from "@/services/proposal.service";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
@@ -23,7 +24,7 @@ const EditClientModal = dynamic(() => import("@/components/modals/EditClientModa
   ssr: false,
 });
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"), {
   ssr: false,
 });
 
@@ -52,21 +53,37 @@ export default function ClientWorkspacePage(): JSX.Element {
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
   const deleteDocumentFromStore = useClientStore(state => state.deleteDocument);
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
+  const { downloadProposal } = useProposalDownload();
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [proposalSearchQuery, setProposalSearchQuery] = useState<string>("");
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [clientProposals, setClientProposals] = useState<ProposalListItem[]>([]);
   const [isLoadingProposals, setIsLoadingProposals] = useState<boolean>(true);
+  const [downloadingProposalId, setDownloadingProposalId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
   const [deleteDocModalData, setDeleteDocModalData] = useState<{ id: number; name: string } | null>(null);
   const [deleteAllDocsModalOpen, setDeleteAllDocsModalOpen] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function handleNewProposal(): void {
     setCurrentDraftId(null); // Clear draft ID for new proposal
     setShowTemplateModal(true);
+  }
+
+  async function handleDownloadProposal(proposalId: number): Promise<void> {
+    setDownloadingProposalId(proposalId);
+    try {
+      await downloadProposal(proposalId);
+    } finally {
+      setDownloadingProposalId(null);
+    }
   }
 
 
@@ -154,6 +171,10 @@ export default function ClientWorkspacePage(): JSX.Element {
 
         const uploadedDoc = await uploadDocumentToStore(client.id, file);
 
+        if (!uploadedDoc) {
+          throw new Error('Failed to upload document: uploadedDoc is undefined');
+        }
+
         // Show parsing status
         if (uploadedDoc.status === 'processing') {
           toast.info(`${file.name} is being parsed...`);
@@ -209,7 +230,7 @@ export default function ClientWorkspacePage(): JSX.Element {
     }
   }
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <PageLayout>
         <ClientDetailSkeleton />
@@ -447,28 +468,28 @@ export default function ClientWorkspacePage(): JSX.Element {
                           </div>
                         </td>
                         <td className={styles.actionsCol}>
-                          <div className={styles.actionButtons}>
+                          <div className={styles.actionsCol}>
                             <button
                               className={styles.actionBtn}
+                              style={{ minWidth: '80px' }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(`/api/proposals/${proposal.id}/download?format=pdf`, '_blank');
+                                void handleDownloadProposal(proposal.id);
                               }}
-                              title="Download as PDF"
-                            >
-                              <Download size={16} />
-                              <span className={styles.actionLabel}>PDF</span>
-                            </button>
-                            <button
-                              className={styles.actionBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(`/api/proposals/${proposal.id}/download?format=docx`, '_blank');
-                              }}
+                              disabled={downloadingProposalId === proposal.id}
                               title="Download as Word Document"
                             >
-                              <FileDown size={16} />
-                              <span className={styles.actionLabel}>DOCX</span>
+                              {downloadingProposalId === proposal.id ? (
+                                <div className="flex items-center gap-2 justify-center">
+                                  <span className="spinner spinner-white" style={{ width: 14, height: 14 }} />
+                                  <span className={styles.actionLabel}>Downloading...</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <FileDown size={16} />
+                                  <span className={styles.actionLabel}>DOCX</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         </td>

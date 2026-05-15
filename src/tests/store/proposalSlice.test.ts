@@ -53,7 +53,7 @@ const mockProposals: ProposalListItem[] = [
     status: "in_progress",
     approvalStatus: "pending",
     tone: "technical",
-    lengthPreference: "detailed",
+    lengthPreference: "comprehensive",
     templateType: "scratch",
     createdAt: "2025-01-03T00:00:00Z",
     updatedAt: "2025-01-03T00:00:00Z",
@@ -321,7 +321,7 @@ describe("proposalSlice — CRUD operations", () => {
 // ---------------------------------------------------------------------------
 
 describe("proposalSlice — invalidateCache", () => {
-  it("resets lastFetched and isInitialized", () => {
+  it("resets lastFetched but preserves isInitialized", () => {
     useProposalStore.setState({
       isInitialized: true,
       lastFetched: Date.now(),
@@ -330,6 +330,6 @@ describe("proposalSlice — invalidateCache", () => {
     useProposalStore.getState().invalidateCache();
 
     expect(useProposalStore.getState().lastFetched).toBeNull();
-    expect(useProposalStore.getState().isInitialized).toBe(false);
+    expect(useProposalStore.getState().isInitialized).toBe(true);
   });
 });

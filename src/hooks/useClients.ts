@@ -1,6 +1,6 @@
 /**
  * Custom hook for accessing client state
- * 
+ *
  * This hook provides a clean interface to the client store with:
  * - Automatic data fetching on mount
  * - Loading and error states
@@ -26,23 +26,24 @@ interface UseClientsReturn {
 
 export function useClients(options: UseClientsOptions = {}): UseClientsReturn {
   const { autoFetch = true, force = false } = options;
-  
+
   const clients = useClientStore(state => state.clients);
   const isLoading = useClientStore(state => state.isLoading);
   const error = useClientStore(state => state.error);
   const fetchClients = useClientStore(state => state.fetchClients);
   const getClientById = useClientStore(state => state.getClientById);
-  
+
   useEffect(() => {
     if (autoFetch) {
       fetchClients(force);
     }
-  }, [autoFetch, force, fetchClients]);
-  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch, force]);
+
   const refetch = async () => {
     await fetchClients(true);
   };
-  
+
   return {
     clients,
     isLoading,
@@ -62,17 +63,18 @@ export function useClient(clientId: number): {
   const isLoading = useClientStore(state => state.isLoading);
   const error = useClientStore(state => state.error);
   const fetchClients = useClientStore(state => state.fetchClients);
-  
+
   useEffect(() => {
     fetchClients();
-  }, [fetchClients]);
-  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const client = getClientById(clientId);
-  
+
   const refetch = async () => {
     await fetchClients(true);
   };
-  
+
   return {
     client,
     isLoading,

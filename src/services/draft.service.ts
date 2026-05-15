@@ -39,6 +39,32 @@ function parseDraftStatus(raw: string): DraftStatus {
 // ─── Shared Types & Mappers ──────────────────────────────────────────────────
 
 /**
+ * Converts camelCase object keys to snake_case (recursive)
+ */
+function camelToSnakeCase(obj: unknown): unknown {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => camelToSnakeCase(item));
+  }
+
+  if (typeof obj === 'object' && obj !== null) {
+    const result: Record<string, unknown> = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        result[snakeKey] = camelToSnakeCase((obj as Record<string, unknown>)[key]);
+      }
+    }
+    return result;
+  }
+
+  return obj;
+}
+
+/**
  * Raw API response types for saved draft (snake_case from backend)
  */
 interface RawWizardState {
@@ -89,6 +115,11 @@ interface RawSavedDraft {
  * Maps raw wizard state from API to typed DraftWizardState
  */
 function mapWizardState(raw: RawWizardState): SavedDraft["wizardState"] {
+  console.log('[draft.service] mapWizardState called with:', {
+    rawProposalData: raw.proposal_data,
+    rawProposalDataKeys: raw.proposal_data ? Object.keys(raw.proposal_data) : [],
+  });
+
   return {
     currentStep: raw.current_step as SavedDraft["wizardState"]["currentStep"],
     maxStepReached: raw.max_step_reached as SavedDraft["wizardState"]["maxStepReached"],
@@ -133,6 +164,34 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
 // ─── API Functions ───────────────────────────────────────────────────────────
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
+  logger.info('[draft.service] Saving draft to backend', {
+    proposalId: payload.proposalId,
+    title: payload.title,
+    clientName: payload.clientName,
+    stage: payload.stage,
+    lastLocation: payload.lastLocation,
+    // Log wizardState structure
+    wizardStateKeys: Object.keys(payload.wizardState),
+    proposalDataKeys: payload.wizardState.proposalData ? Object.keys(payload.wizardState.proposalData) : [],
+    selectedSections: payload.wizardState.proposalData?.selectedSections,
+    filesMeta: payload.wizardState.proposalData?.filesMeta,
+    selectedDocumentIds: payload.wizardState.proposalData?.selectedDocumentIds,
+    webReferences: payload.wizardState.proposalData?.webReferences,
+    sectionDisplayNames: payload.wizardState.proposalData?.sectionDisplayNames,
+  });
+
+  console.log('[draft.service] Sending to backend (without snake_case conversion):', {
+    title: payload.title,
+    clientName: payload.clientName,
+    wizardState: payload.wizardState,
+    selectedSections: payload.wizardState.proposalData?.selectedSections,
+    filesMeta: payload.wizardState.proposalData?.filesMeta,
+    selectedDocumentIds: payload.wizardState.proposalData?.selectedDocumentIds,
+    webReferences: payload.wizardState.proposalData?.webReferences,
+    sectionDisplayNames: payload.wizardState.proposalData?.sectionDisplayNames,
+  });
+
+  // TEMPORARILY DISABLE snake_case conversion to test
   const data = await http.post<RawSavedDraft>("/drafts/", {
     proposal_id: payload.proposalId,
     title: payload.title,
@@ -144,6 +203,29 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     generated_content: payload.generatedContent,
     ui_state: payload.uiState,
   });
+
+  console.log('[draft.service] Received from backend:', {
+    id: data.id,
+    wizardState: data.wizard_state,
+    proposalData: data.wizard_state.proposal_data,
+    selectedSections: data.wizard_state.proposal_data?.selected_sections,
+    filesMeta: data.wizard_state.proposal_data?.filesMeta,
+    selectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
+    webReferences: data.wizard_state.proposal_data?.web_references,
+    sectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+  });
+
+  logger.info('[draft.service] Draft saved successfully', {
+    draftId: data.id,
+    responseWizardStateKeys: Object.keys(data.wizard_state),
+    responseProposalDataKeys: data.wizard_state.proposal_data ? Object.keys(data.wizard_state.proposal_data) : [],
+    responseSelectedSections: data.wizard_state.proposal_data?.selected_sections,
+    responseFilesMeta: data.wizard_state.proposal_data?.filesMeta,
+    responseSelectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
+    responseWebReferences: data.wizard_state.proposal_data?.web_references,
+    responseSectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+  });
+
   return mapSavedDraft(data);
 }
 
@@ -151,7 +233,8 @@ export async function updateDraft(
   draftId: string,
   payload: Partial<SaveDraftPayload>
 ): Promise<SavedDraft> {
-  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}/`, {
+  // TEMPORARILY DISABLE snake_case conversion to test
+  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}`, {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -166,7 +249,34 @@ export async function updateDraft(
 }
 
 export async function getDraft(draftId: string): Promise<SavedDraft> {
-  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}/`, { cache: "no-store" });
+  console.log('[draft.service] Fetching draft from backend:', { draftId });
+
+  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}`, { cache: "no-store" });
+
+  console.log('[draft.service] Received draft from backend:', {
+    id: data.id,
+    title: data.title,
+    clientName: data.client_name,
+    wizardState: data.wizard_state,
+    proposalData: data.wizard_state.proposal_data,
+    selectedSections: data.wizard_state.proposal_data?.selected_sections,
+    filesMeta: data.wizard_state.proposal_data?.filesMeta,
+    selectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
+    webReferences: data.wizard_state.proposal_data?.web_references,
+    sectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+  });
+
+  logger.info('[draft.service] Draft fetched successfully', {
+    draftId: data.id,
+    responseWizardStateKeys: Object.keys(data.wizard_state),
+    responseProposalDataKeys: data.wizard_state.proposal_data ? Object.keys(data.wizard_state.proposal_data) : [],
+    responseSelectedSections: data.wizard_state.proposal_data?.selected_sections,
+    responseFilesMeta: data.wizard_state.proposal_data?.filesMeta,
+    responseSelectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
+    responseWebReferences: data.wizard_state.proposal_data?.web_references,
+    responseSectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+  });
+
   return mapSavedDraft(data);
 }
 
@@ -199,30 +309,42 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
 /**
  * Fetch a single draft by its associated proposalId.
  * Avoids the N+1 pattern of calling listDrafts() and then .find().
+ * Returns null if no draft exists (404 is not an error — it means "no draft yet").
  */
 export async function getDraftByProposalId(proposalId: number): Promise<DraftMetadata | null> {
-  const data = await http.get<RawDraftListItem[]>(
-    `/drafts/?proposal_id=${proposalId}`,
-    { cache: "no-store" },
-  );
+  try {
+    const data = await http.get<RawDraftListItem[]>(
+      `/drafts?proposal_id=${proposalId}`,
+      { cache: "no-store" },
+    );
 
-  const first = data[0];
-  if (!first) return null;
+    const first = data[0];
+    if (!first) return null;
 
-  return {
-    id: first.id,
-    proposalId: first.proposal_id,
-    title: first.title,
-    clientName: first.client_name,
-    status: parseDraftStatus(first.status),
-    lastLocation: parseDraftLocation(first.last_location),
-    stage: parseDraftStage(first.stage),
-    updatedAt: first.updated_at,
-  };
+    return {
+      id: first.id,
+      proposalId: first.proposal_id,
+      title: first.title,
+      clientName: first.client_name,
+      status: parseDraftStatus(first.status),
+      lastLocation: parseDraftLocation(first.last_location),
+      stage: parseDraftStage(first.stage),
+      updatedAt: first.updated_at,
+    };
+  } catch (error: unknown) {
+    // 404 means "no draft exists yet" — not a fatal error
+    if (error instanceof Error && "statusCode" in error && (error as any).statusCode === 404) {
+      logger.info("[draft.service] No draft found for proposal_id=%d (404)", proposalId);
+      return null;
+    }
+    // Other errors (network, 500, etc.) — log but don't crash
+    logger.warn("[draft.service] Failed to fetch draft for proposal_id=%d", proposalId, error);
+    return null;
+  }
 }
 
 export async function deleteDraft(draftId: string): Promise<void> {
-  await http.delete<null>(`/drafts/${draftId}/`);
+  await http.delete<null>(`/drafts/${draftId}`);
 }
 
 export async function deleteAllDrafts(): Promise<void> {
