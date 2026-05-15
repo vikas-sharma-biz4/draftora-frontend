@@ -13,7 +13,7 @@ export async function markProposalStepVisited(
   proposalId: number,
   stepId: number
 ): Promise<void> {
-  await http.post<null>(`/proposals/${proposalId}/mark-step-visited/`, {
+  await http.post<null>(`/proposals/${proposalId}/mark-step-visited`, {
     target_step: stepId,
   });
 }
@@ -26,7 +26,7 @@ export async function validateProposalStepAccess(
   proposalId: number,
   stepId: number
 ): Promise<boolean> {
-  const data = await http.post<{ can_access: boolean }>(`/proposals/${proposalId}/validate-step-access/`, {
+  const data = await http.post<{ can_access: boolean }>(`/proposals/${proposalId}/validate-step-access`, {
     target_step: stepId,
   });
   return data.can_access === true;

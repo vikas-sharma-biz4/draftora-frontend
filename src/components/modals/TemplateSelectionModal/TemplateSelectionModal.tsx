@@ -124,6 +124,7 @@ export default function TemplateSelectionModal({
   const [selectedTemplateIdState, setSelectedTemplateIdState] = useState<string | null>(templateId ?? null);
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [uploadedFiles, setUploadedFiles] = useState<
     { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
   >([]);
@@ -285,6 +286,7 @@ export default function TemplateSelectionModal({
   function handleClientSearchChange(value: string): void {
     setClientSearchQuery(value);
     setShowClientDropdown(true);
+    setHighlightedIndex(-1);
     if (!value.trim()) {
       setSelectedClientId(null);
     }
@@ -295,7 +297,47 @@ export default function TemplateSelectionModal({
   }
 
   function handleClientSearchBlur(): void {
-    setTimeout(() => setShowClientDropdown(false), 300);
+    setTimeout(() => {
+      setShowClientDropdown(false);
+      setHighlightedIndex(-1);
+    }, 300);
+  }
+
+  function handleClientKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (!showClientDropdown || filteredClients.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev < filteredClients.length - 1) {
+            return prev + 1;
+          }
+          return prev;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev > 0) {
+            return prev - 1;
+          }
+          return 0;
+        });
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredClients.length) {
+          const client = filteredClients[highlightedIndex];
+          handleClientSelect(client.id, client.name);
+          setHighlightedIndex(-1);
+        }
+        break;
+      case "Escape":
+        setShowClientDropdown(false);
+        setHighlightedIndex(-1);
+        break;
+    }
   }
 
   function toggleDocument(docId: number): void {
@@ -513,6 +555,10 @@ export default function TemplateSelectionModal({
     setDraftStage("wizard_in_progress");
     setCurrentStep(4);
     setShouldStartBackgroundFetch(true);
+    
+    // Trigger AI-based recommendations prefetch
+    void prefetchRecommendations();
+    
     router.push("/parameters");
     onClose();
   }
@@ -833,6 +879,7 @@ export default function TemplateSelectionModal({
                     onChange={(e) => handleClientSearchChange(e.target.value)}
                     onFocus={handleClientSearchFocus}
                     onBlur={handleClientSearchBlur}
+                    onKeyDown={handleClientKeyDown}
                     className={styles.searchInput}
                   />
                   <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
@@ -843,11 +890,11 @@ export default function TemplateSelectionModal({
 
                 {showClientDropdown && filteredClients.length > 0 && (
                   <div className={styles.clientDropdown}>
-                    {filteredClients.map((client) => (
+                    {filteredClients.map((client, index) => (
                       <button
                         key={client.id}
                         type="button"
-                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""}`}
+                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""} ${index === highlightedIndex ? styles.highlighted : ""}`}
                         onPointerDown={(e) => {
                           e.preventDefault();
                           handleClientSelect(client.id, client.name);

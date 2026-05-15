@@ -27,6 +27,8 @@ import type { DraftLocation, SaveDraftPayload, DraftUIState } from "@/interfaces
 import { logger } from "@/utils/logger";
 
 const WIZARD_AUTOSAVE_FALLBACK_KEY = "wizard_autosave_fallback";
+const DRAFT_SAVE_LOCK_KEY = "draft_save_lock";
+const DRAFT_DEDUP_KEY = "draft_dedup";
 
 interface UseWizardAutoSaveOptions {
   enabled: boolean;
@@ -76,8 +78,8 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   // Refs to track state without causing re-renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
-  const isSavingRef = useRef<boolean>(false);
   const isUnmountingRef = useRef<boolean>(false);
+  const previousPathnameRef = useRef<string>("");
 
   // Determine lastLocation based on current pathname
   const getLastLocation = useCallback((): DraftLocation => {
@@ -111,9 +113,37 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
   // Core save function
   const saveDraft = useCallback(async (force: boolean = false): Promise<void> => {
-    if (!enabled || isSavingRef.current) return;
+    // Use localStorage-based lock to prevent concurrent saves across page navigations
+    const lockValue = localStorage.getItem(DRAFT_SAVE_LOCK_KEY);
+    if (!enabled || lockValue === 'locked') {
+      logger.debug('[useWizardAutoSave] Save already locked, skipping');
+      return;
+    }
+    
+    // Check for duplicate draft creation within last 5 seconds
+    const dedupValue = localStorage.getItem(DRAFT_DEDUP_KEY);
+    if (dedupValue) {
+      const dedupData = JSON.parse(dedupValue);
+      const timeDiff = Date.now() - dedupData.timestamp;
+      const isSameData = dedupData.title === title && dedupData.clientName === clientName;
+      
+      // If same data was saved within last 5 seconds, skip to prevent duplicate
+      if (isSameData && timeDiff < 5000) {
+        logger.debug('[useWizardAutoSave] Duplicate draft detected, skipping', {
+          timeDiff,
+          title,
+          clientName
+        });
+        return;
+      }
+    }
+    
+    // Set localStorage lock immediately
+    localStorage.setItem(DRAFT_SAVE_LOCK_KEY, 'locked');
+    
     if (!hasData()) {
       logger.debug('[useWizardAutoSave] No data to save');
+      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
       return;
     }
 
@@ -131,10 +161,9 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     // Skip if data hasn't changed (unless forced)
     if (!force && currentDataHash === lastSavedDataRef.current) {
       logger.debug('[useWizardAutoSave] No changes detected, skipping save');
+      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
       return;
     }
-
-    isSavingRef.current = true;
 
     try {
       const uiState = captureUIState();
@@ -215,6 +244,14 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         // Create new draft
         const saved = await saveDraftToStore(draftPayload);
         setCurrentDraftId(saved.id);
+        
+        // Store deduplication data to prevent duplicate creation
+        localStorage.setItem(DRAFT_DEDUP_KEY, JSON.stringify({
+          title,
+          clientName,
+          timestamp: Date.now()
+        }));
+        
         logger.info('[useWizardAutoSave] Draft created', { draftId: saved.id });
       }
 
@@ -223,7 +260,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     } catch (error) {
       logger.error('[useWizardAutoSave] Save failed', error);
     } finally {
-      isSavingRef.current = false;
+      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
     }
   }, [
     enabled,
@@ -339,31 +376,44 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [enabled, hasData, saveDraft]);
 
-  // Save on component unmount
-  useEffect(() => {
-    return () => {
-      isUnmountingRef.current = true;
-      if (hasData()) {
-        logger.info('[useWizardAutoSave] Component unmounting, saving draft');
-        void saveDraft(true);
-      }
-    };
-  }, [hasData, saveDraft]);
+  // Save on component unmount - DISABLED to prevent duplicate drafts on navigation
+  // useEffect(() => {
+  //   return () => {
+  //     isUnmountingRef.current = true;
+  //     if (hasData()) {
+  //       logger.info('[useWizardAutoSave] Component unmounting, saving draft');
+  //       void saveDraft(true);
+  //     }
+  //   };
+  // }, [hasData, saveDraft]);
 
   // Save on route change (Next.js navigation)
   useEffect(() => {
     if (!enabled) return;
 
-    // Save when pathname changes (user navigates away)
+    // Only save when navigating AWAY from wizard pages (parameters, review, generating)
+    // Don't save when navigating TO wizard pages or between wizard pages
     const handleRouteChange = (): void => {
-      if (hasData() && !isUnmountingRef.current) {
-        logger.info('[useWizardAutoSave] Route changing, saving draft');
+      const isLeavingWizardPage = 
+        (previousPathnameRef.current === "/parameters" || 
+         previousPathnameRef.current === "/review" ||
+         previousPathnameRef.current?.startsWith("/generating")) &&
+        (pathname !== "/parameters" && 
+         pathname !== "/review" && 
+         !pathname.startsWith("/generating"));
+
+      if (isLeavingWizardPage && hasData() && !isUnmountingRef.current) {
+        logger.info('[useWizardAutoSave] Leaving wizard page, saving draft', {
+          from: previousPathnameRef.current,
+          to: pathname
+        });
         void saveDraft(true);
       }
+
+      // Update previous pathname for next comparison
+      previousPathnameRef.current = pathname;
     };
 
-    // Next.js doesn't expose a direct route change event, but pathname changes trigger this effect
-    // We save on pathname change as a proxy for route navigation
     handleRouteChange();
   }, [pathname, enabled, hasData, saveDraft]);
 }
