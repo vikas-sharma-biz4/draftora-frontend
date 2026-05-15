@@ -265,6 +265,11 @@ export default function KnowledgeBaseSelectorModal({
     try {
       logger.debug('[KnowledgeBaseSelectorModal] Uploading document to client:', { clientId, fileName: file.name });
       const uploadResult = await uploadDocumentToStore(clientId, file);
+
+      if (!uploadResult) {
+        throw new Error('Failed to upload document: uploadResult is undefined');
+      }
+
       logger.debug('[KnowledgeBaseSelectorModal] Document uploaded to client:', { clientId, documentId: uploadResult.id, fileName: file.name });
 
       // Auto-select newly uploaded document

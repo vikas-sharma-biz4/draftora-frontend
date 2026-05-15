@@ -20,7 +20,7 @@ import { useClients } from "@/hooks/useClients";
 
 const PageLayout = dynamic(() => import("@/layouts/AppLayout"), { ssr: false });
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"), {
   ssr: false,
 });
 
@@ -91,7 +91,7 @@ export default function HomePage(): JSX.Element {
         visible={false}
       />
       <h1 className={`page-title ${styles.pageTitle}`}>Choose Your Proposal Type</h1>
-        <p className="page-subtitle">
+        <p className={`page-subtitle ${styles.pageSubtitle}`}>
           Select a template that matches your project needs, or start from scratch with AI-powered guidance.
         </p>
 
@@ -101,7 +101,7 @@ export default function HomePage(): JSX.Element {
             return (
               <article
                 key={template.id}
-                className={`tmpl-card${isSelected ? " tmpl-selected" : ""}`}
+                className={`tmpl-card-new${isSelected ? " tmpl-card-selected" : ""}`}
                 onClick={() => handleSelectTemplate(template.id)}
                 role="button"
                 tabIndex={0}
@@ -110,39 +110,32 @@ export default function HomePage(): JSX.Element {
                 }}
                 aria-pressed={isSelected}
               >
-                {isSelected && (
-                  <div className="tmpl-selected-badge" aria-hidden="true">
-                    ✓
-                  </div>
-                )}
+                <div className="tmpl-card-top-bar"></div>
 
-                <div className={`tmpl-preview ${template.gradientClass}`}>
-                  <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
-                    <div className="tmpl-preview-line" />
-                    <div className="tmpl-preview-line" />
-                    <div className="tmpl-preview-line" />
-                    <div className="tmpl-preview-line" />
-                  </div>
-                  <span className="tmpl-preview-icon" aria-hidden="true">
-                    {template.name}
-                  </span>
+                <div className="tmpl-card-header">
+                  <span className="tmpl-card-badge">{template.category}</span>
                 </div>
 
-                <div className="tmpl-body">
-                  <div className="tmpl-desc">{template.description}</div>
-                  <div className="tmpl-sections-preview">
+                <h3 className="tmpl-card-title">{template.name}</h3>
+                <p className="tmpl-card-description">{template.description}</p>
+
+                <div className="tmpl-card-architecture">
+                  <p className="tmpl-card-architecture-label">Architecture</p>
+                  <div className="tmpl-card-tags">
                     {template.sections.slice(0, 3).map((key) => (
-                      <span key={key} className="badge badge-muted">
+                      <span key={key} className="tmpl-card-tag">
                         {SECTION_DISPLAY_NAMES[key] ?? key}
                       </span>
                     ))}
                     {template.sections.length > 3 && (
-                      <span className="badge badge-muted">
+                      <span className="tmpl-card-tag">
                         +{template.sections.length - 3} more
                       </span>
                     )}
                   </div>
                 </div>
+
+                <button className="tmpl-card-button">Select Template</button>
               </article>
             );
           })}

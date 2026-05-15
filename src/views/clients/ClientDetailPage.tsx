@@ -24,7 +24,7 @@ const EditClientModal = dynamic(() => import("@/components/modals/EditClientModa
   ssr: false,
 });
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"), {
   ssr: false,
 });
 
@@ -170,6 +170,10 @@ export default function ClientWorkspacePage(): JSX.Element {
         toast.info(`Uploading ${file.name}...`);
 
         const uploadedDoc = await uploadDocumentToStore(client.id, file);
+
+        if (!uploadedDoc) {
+          throw new Error('Failed to upload document: uploadedDoc is undefined');
+        }
 
         // Show parsing status
         if (uploadedDoc.status === 'processing') {

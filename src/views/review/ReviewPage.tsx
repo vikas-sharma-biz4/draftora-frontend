@@ -130,8 +130,8 @@ export default function ReviewPage(): JSX.Element {
   const isRegenerating = currentProposalId !== null;
   const { clients, refetch: refetchClients } = useClients({ autoFetch: true });
 
-  // Enable auto-save when user is in pipeline stage
-  useWizardAutoSave({ enabled: true, debounceMs: 2000 });
+  // Enable auto-save when user is in pipeline stage (but NOT during generation)
+  useWizardAutoSave({ enabled: !isGenerating, debounceMs: 2000 });
 
   // Sync visited steps from backend on mount
   useEffect(() => {
@@ -208,7 +208,7 @@ export default function ReviewPage(): JSX.Element {
         }
       }
     }
-  }, [proposalData.clientId, clients]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [proposalData.clientId, proposalData.selectedDocumentIds, proposalData.filesMeta.length, clients]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSaveScope(data: { title: string; clientName: string; description: string }): void {
     logger.info('[ReviewPage] handleSaveScope called', data);

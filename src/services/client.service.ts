@@ -115,18 +115,17 @@ export async function createClient(
  * List all active clients
  */
 export async function listClients(): Promise<Client[]> {
-  const response = await http.get<{ data: ClientApiResponse[]; meta: unknown }>("/clients");
-  return response.data.map(transformClient);
+  const clients = await http.get<ClientApiResponse[]>("/clients");
+  return clients.map(transformClient);
 }
 
 /**
  * Get a single client with documents
  */
 export async function getClient(clientId: number): Promise<ClientWithDocuments> {
-  const response = await http.get<{
-    data: ClientApiResponse & { documents: ClientDocumentApiResponse[] };
-  }>(`/clients/${clientId}`);
-  const clientData = response.data;
+  const clientData = await http.get<
+    ClientApiResponse & { documents: ClientDocumentApiResponse[] }
+  >(`/clients/${clientId}`);
   return {
     ...transformClient(clientData),
     documents: clientData.documents.map(transformClientDocument),
@@ -160,12 +159,24 @@ export async function deleteClient(clientId: number): Promise<void> {
  */
 export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
   const response = await http.get<{
-    data: (ClientApiResponse & { documents: ClientDocumentApiResponse[] })[];
-    meta: any;
+    success: boolean;
+    data: {
+      success: boolean;
+      data: (ClientApiResponse & { documents: ClientDocumentApiResponse[] })[];
+      meta: {
+        page: number;
+        per_page: number;
+        total: number;
+        total_pages: number;
+      };
+      message: string;
+    };
+    message: string;
   }>("/clients/full-data?page=1&per_page=50");
   console.log('[client.service] Full data API response:', response);
-  console.log('[client.service] Clients array:', response.data);
-  return response.data.map(clientData => ({
+  const clients = response.data.data;
+  console.log('[client.service] Clients array:', clients);
+  return clients.map(clientData => ({
     ...transformClient(clientData),
     documents: clientData.documents.map(transformClientDocument),
   }));

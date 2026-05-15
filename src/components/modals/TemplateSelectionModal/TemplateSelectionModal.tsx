@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 
-import styles from "../TemplateSelectionModal.module.scss";
+import styles from "./TemplateSelectionModal.module.scss";
 import Button from "@/components/common/Button";
 import { Input, Select, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";
@@ -447,6 +447,10 @@ export default function TemplateSelectionModal({
     try {
       const uploadResult = await uploadDocumentToStore(selectedClientId, file);
 
+      if (!uploadResult) {
+        throw new Error('Failed to upload document: uploadResult is undefined');
+      }
+
       // Auto-select newly uploaded document
       setSelectedDocuments((prev) => {
         const next = new Set(prev);
@@ -555,10 +559,10 @@ export default function TemplateSelectionModal({
     setDraftStage("wizard_in_progress");
     setCurrentStep(4);
     setShouldStartBackgroundFetch(true);
-    
+
     // Trigger AI-based recommendations prefetch
     void prefetchRecommendations();
-    
+
     router.push("/parameters");
     onClose();
   }
