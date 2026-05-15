@@ -919,62 +919,6 @@ export default function TemplateSelectionModal({
             </div>
           )}
 
-          <div className={styles.section}>
-            <label className={styles.label}>Client Name</label>
-            {loading ? (
-              <div className={styles.noClients}>
-                <p>Loading clients...</p>
-              </div>
-            ) : clients.length === 0 ? (
-              <div className={styles.noClients}>
-                <p>No clients found. Create your first client to continue.</p>
-                <Button variant="primary" size="sm" onClick={handleNewClientClick}>
-                  <Plus size={16} />
-                  New Client
-                </Button>
-              </div>
-            ) : (
-              <div className={styles.searchWrapper}>
-                <div className={styles.searchInputWrapper}>
-                  <Input
-                    type="text"
-                    placeholder="Search for a client..."
-                    value={clientSearchQuery}
-                    onChange={(e) => handleClientSearchChange(e.target.value)}
-                    onFocus={handleClientSearchFocus}
-                    onBlur={handleClientSearchBlur}
-                    onKeyDown={handleClientKeyDown}
-                    className={styles.searchInput}
-                  />
-                  <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
-                    <Plus size={16} />
-                    New Client
-                  </Button>
-                </div>
-
-                {showClientDropdown && filteredClients.length > 0 && (
-                  <div className={styles.clientDropdown}>
-                    {filteredClients.map((client, index) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""} ${index === highlightedIndex ? styles.highlighted : ""}`}
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          handleClientSelect(client.id, client.name);
-                        }}
-                      >
-                        <div className={styles.templateCardIcon}>{template.icon}</div>
-                        <div className={styles.templateCardInfo}>
-                          <div className={styles.templateCardTitle}>{template.name}</div>
-                          <div className={styles.templateCardDescription}>{template.description}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div className={styles.section}>
                 <label className={styles.label}>Client Name</label>
             {loading ? (

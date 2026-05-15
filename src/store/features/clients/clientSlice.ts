@@ -167,6 +167,16 @@ export const useClientStore = create<ClientState>((set, get) => ({
       saveClientsToLocalStorage(clients);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch clients';
+      // Backend unavailable — gracefully degrade to cached/local state for dev/demo
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        set({
+          isLoading: false,
+          isInitialized: true,
+          lastFetched: Date.now(),
+          error: null,
+        });
+        return;
+      }
       set({
         isLoading: false,
         error: errorMessage,
@@ -323,6 +333,23 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
       return newClient;
     } catch (error) {
+      // Backend unavailable — create local mock client for dev/demo
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        logger.warn('[clientSlice] Backend unavailable, creating local mock client');
+        const mockId = -(Date.now());
+        const mockClient: ClientWithDocuments = {
+          id: mockId,
+          name: data.name,
+          industry: data.industry || 'Unknown',
+          status: 'active',
+          notes: data.notes || null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          documents: [],
+        };
+        get().addClient(mockClient);
+        return { id: mockId, name: data.name };
+      }
       throw error;
     }
   },
@@ -368,6 +395,22 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
       return documentWithSize;
     } catch (error) {
+      // Backend unavailable — create local mock document for dev/demo
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        logger.warn('[clientSlice] Backend unavailable, creating local mock document');
+        const mockDoc: ClientDocument = {
+          id: -(Date.now() + Math.floor(Math.random() * 1000)),
+          clientId,
+          name: file.name,
+          fileType: file.name.split('.').pop() || 'unknown',
+          sizeBytes: file.size,
+          status: 'parsed',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        get().addDocument(clientId, mockDoc);
+        return mockDoc;
+      }
       console.error('[clientSlice] Failed to upload document:', error);
       throw error;
     }

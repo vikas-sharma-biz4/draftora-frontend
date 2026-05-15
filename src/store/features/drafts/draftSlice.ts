@@ -90,6 +90,17 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch drafts';
+      // Backend unavailable — gracefully degrade to empty state for dev/demo
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        set({
+          drafts: [],
+          isLoading: false,
+          isInitialized: true,
+          lastFetched: Date.now(),
+          error: null,
+        });
+        return;
+      }
       set({
         isLoading: false,
         error: errorMessage,

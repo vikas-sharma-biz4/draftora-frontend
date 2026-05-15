@@ -130,21 +130,6 @@ export default function SectionManager({
     });
   }, [onSectionsChange]);
 
-    onSectionsChange((prev) => {
-      // Check for duplicates using the actual previous state from the callback
-      if (prev.some((s) => s.label.toLowerCase() === label.toLowerCase())) {
-        toast.error("A section with this name already exists.");
-        isAddingSectionRef.current = false;
-        return prev;
-      }
-      // Clear input and hide input field only on success
-      setShowAddInput(false);
-      setAddLabel("");
-      isAddingSectionRef.current = false;
-      return [...prev, { key, label }];
-    });
-  }, [addLabel, onSectionsChange]);
-
   const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
 
