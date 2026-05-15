@@ -40,6 +40,9 @@ interface CreateProposalResponse {
 export async function generateProposal(
   data: ProposalData
 ): Promise<CreateProposalResponse> {
+  logger.info("[generateProposal] Starting proposal generation request at", new Date().toISOString());
+  const startTime = Date.now();
+
   const formData = new FormData();
 
   // Build contextual instructions — append custom section descriptions so the AI
@@ -103,7 +106,37 @@ export async function generateProposal(
     formData.append("files", file);
   }
 
-  return http.post<CreateProposalResponse>("/proposals", formData);
+  logger.info("[generateProposal] Sending POST request to /proposals/ at", new Date().toISOString());
+  const requestStartTime = Date.now();
+  const response = await http.post<CreateProposalResponse>("/proposals/", formData);
+  const requestDuration = Date.now() - requestStartTime;
+  const totalDuration = Date.now() - startTime;
+
+  logger.info("[generateProposal] API call completed at", new Date().toISOString(), {
+    requestDurationMs: requestDuration,
+    totalDurationMs: totalDuration,
+    proposalId: response.id,
+    status: response.status,
+  });
+
+  if (requestDuration > 1000) {
+    logger.warn("[generateProposal] API call took longer than 1 second:", requestDuration, "ms - Backend may be doing synchronous generation");
+  }
+
+  return response;
+}
+
+export interface ProposalStatus {
+  id: number;
+  status: string;
+  generatingSection: string | null;
+  completedSections: string[];
+  selectedSections: string[] | null;
+  currentStage: string | null;
+  visitedPipelineSteps: number[];
+  highestVisitedStep: number | null;
+  totalSections: number;
+  progressPercent: number;
 }
 
 interface ProposalStatusApiResponse {
@@ -119,7 +152,9 @@ interface ProposalStatusApiResponse {
   selected_sections?: string[] | null;
   visited_pipeline_steps?: number[];
   highest_visited_step?: number | null;
-  progress?: number | null;
+  total_sections?: number | null;
+  progress_percent?: number;
+  progress?: number;
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
@@ -128,8 +163,17 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
     cache: "no-store",
   });
   const completed = d.completed_sections ?? [];
-  const total = d.total_sections ?? d.selected_sections?.length ?? 0;
-  const progressPercent = d.progress_percent ?? d.progress ?? (total > 0 ? Math.round((completed.length / total) * 100) : 0);
+  const totalSections = d.total_sections ?? d.selected_sections?.length ?? 0;
+
+  // Calculate progress percentage based on completed sections
+  // Use backend's progress_percentage if available, otherwise calculate from completed_sections
+  let progressPercent = d.progress_percent ?? d.progress ?? 0;
+  if (progressPercent === 0 && totalSections > 0 && completed.length > 0) {
+    progressPercent = Math.round((completed.length / totalSections) * 100);
+  } else if (progressPercent === 0 && totalSections > 0 && completed.length === 0 && d.status === "generating") {
+    // If generating but no sections completed yet, show a small initial progress
+    progressPercent = 1;
+  }
 
   const status: ProposalStatus = {
     id: d.id,

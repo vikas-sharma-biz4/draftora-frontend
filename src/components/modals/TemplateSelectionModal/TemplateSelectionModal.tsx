@@ -17,8 +17,22 @@ import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useModalHistory } from "@/hooks/useModalHistory";
 import type { ClientWithDocuments } from "@/services/client.service";
 import { PROPOSAL_TEMPLATES, SCRATCH_TEMPLATE_DEFAULT_SECTIONS, SECTION_DISPLAY_NAMES, INDUSTRIES } from "@/constants";
-import { useProposalDraftSession } from "@/context/ProposalContext";
-import { useWizardActions, useProposalData } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import {
+  useWizardActions,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useTemplateId,
+  useTemplateType,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
@@ -55,8 +69,46 @@ export default function TemplateSelectionModal({
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
-  const proposalData = useProposalData();
-  const { setDraftStage, markStepCompleted } = useProposalDraftSession();
+
+  // Use granular selectors for minimal re-renders
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateIdFromStore = useTemplateId();
+  const templateTypeFromStore = useTemplateType();
+
+  // Reconstruct proposalData object for backward compatibility with existing code
+  const proposalData = {
+    title,
+    clientName,
+    clientId,
+    description,
+    selectedSections,
+    sectionDisplayNames,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId: templateIdFromStore,
+    templateType: templateTypeFromStore,
+    files: [],
+    filesMeta: [],
+    selectedDocumentIds: [],
+    customSections: [],
+    contextualInstructions: "",
+    webReferences: [],
+  } as any;
+
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
 
   const { clients: storeClients, isLoading: storeLoading } = useClients({ autoFetch: initialClients === undefined });
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
@@ -376,11 +428,9 @@ export default function TemplateSelectionModal({
 
   async function saveParsedDocumentToClient(file: File, fileId: string, result: ParsedFileResult): Promise<void> {
     if (!selectedClientId) {
-      logger.warn("Cannot upload document: No client selected");
-      setUploadedFiles((prev) =>
-        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: "No client selected" } : f))
-      );
-      toast.error(`Cannot upload "${file.name}": Please select a client first`);
+      logger.info("No client selected, keeping parsed file in uploaded list for later use");
+      // Keep the file as parsed but don't upload to client yet
+      // The user can upload it later or use it directly in proposal generation
       return;
     }
 
@@ -492,7 +542,7 @@ export default function TemplateSelectionModal({
       description,
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
-      templateType: isScratch ? "scratch" : "predefined",
+      templateType: isScratch ? "scratch" : (template?.templateType ?? "predefined"),
       selectedSections,
       sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,

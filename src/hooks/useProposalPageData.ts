@@ -14,8 +14,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/utils/logger";
-import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
-import { usePipelineActions } from "@/store/features/pipeline/pipelineSlice";
+import { useCurrentStep, useMaxStepReached, useCurrentProposalId, useEditMode, useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import {
   getProposal,
@@ -41,9 +42,11 @@ export function useProposalPageData(
   searchParams: URLSearchParams
 ): UseProposalPageDataReturn {
   const router = useRouter();
-  const { setCurrentProposalId, updateProposalData } = useProposalWizard();
-  const { syncVisitedStepsFromBackend } = usePipelineActions();
-  const { setDraftStage, setCompletedSteps, markStepCompleted } = useProposalDraftSession();
+  const { setCurrentProposalId, updateProposalData } = useWizardActions();
+  const { syncVisitedStepsFromBackend } = usePipelineSteps();
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
+  const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);

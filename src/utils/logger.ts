@@ -4,9 +4,6 @@
  * Provides logging methods that respect the NODE_ENV environment variable.
  * Debug and info logs are suppressed in production to prevent information leakage
  * and reduce performance overhead.
- *
- * Sentry integration: install @sentry/nextjs and set NEXT_PUBLIC_SENTRY_DSN in your
- * .env file to enable automatic error forwarding to Sentry in production.
  */
 
 const isDevelopment = process.env.NODE_ENV === "development";
@@ -52,10 +49,8 @@ export const logger = {
   /**
    * Error-level logging (all environments)
    * Use for error events that might still allow the application to continue.
-   * Automatically forwarded to Sentry in production when NEXT_PUBLIC_SENTRY_DSN is set.
    */
   error: (...args: unknown[]): void => {
     console.error(...args);
-    captureToSentry(args[0]);
   },
 };

@@ -1,9 +1,23 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { getLastLocationFromPathname } from "@/utils/routeUtils";
-import { useProposalData, useCurrentStep, useCurrentProposalId } from "@/store/features/wizard/proposalWizardSlice";
-import { useProposalDraftSession } from "@/context/ProposalContext";
+import { useMemo } from "react";
+import {
+  useProposalTitle,
+  useClientName,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useTemplateId,
+  useTemplateType,
+  useCurrentStep,
+  useCurrentProposalId,
+} from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import type { DraftLocation } from "@/interfaces/draftInterfaces";
 
@@ -21,10 +35,20 @@ interface UseDraftAutoSaveOptions {
  */
 export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const { enabled } = options;
-  const proposalData = useProposalData();
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateId = useTemplateId();
+  const templateType = useTemplateType();
   const currentStep = useCurrentStep();
   const currentProposalId = useCurrentProposalId();
-  const { draftStage } = useProposalDraftSession();
+  const draftStage = useDraftSessionStore(state => state.draftStage);
   const pathname = usePathname();
 
   // Determine lastLocation based on current pathname
@@ -36,11 +60,32 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const hasData =
     enabled &&
     currentProposalId != null &&
-    (proposalData.title.trim() !== "" ||
-      proposalData.clientName.trim() !== "" ||
-      proposalData.description.trim() !== "" ||
-      (proposalData.selectedSections && proposalData.selectedSections.length > 0) ||
+    clientName.trim() !== "" &&
+    (title.trim() !== "" ||
+      description.trim() !== "" ||
+      (selectedSections && selectedSections.length > 0) ||
       draftStage !== "template_selection");
+
+  // Memoize proposalData object to prevent reference changes on every render
+  const proposalData = useMemo(() => ({
+    title,
+    clientName,
+    description,
+    selectedSections,
+    sectionDisplayNames,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId,
+    templateType,
+    files: [],
+    filesMeta: [],
+    selectedDocumentIds: [],
+    customSections: [],
+    contextualInstructions: "",
+    webReferences: [],
+  }), [title, clientName, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType]);
 
   useDraftPersistence({
     enabled: hasData,

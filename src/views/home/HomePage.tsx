@@ -2,13 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 import styles from "./HomePage.module.scss";
 
 import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
-import { useProposalDraftSession } from "@/context/ProposalContext";
-import { useProposalData, useCurrentStep, useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import {
+  useProposalTitle,
+  useClientId,
+  useCurrentStep,
+  useWizardActions,
+} from "@/store/features/wizard/proposalWizardSlice";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
 import { useClients } from "@/hooks/useClients";
@@ -27,23 +32,34 @@ const RecreateTemplateModal = dynamic(
 type SelectionMode = "template" | "scratch" | "recreate";
 
 export default function HomePage(): JSX.Element {
-  const proposalData = useProposalData();
+  const title = useProposalTitle();
+  const clientId = useClientId();
   const currentStep = useCurrentStep();
   const { updateProposalData, setCurrentStep } = useWizardActions();
-  const { draftStage, completedSteps, setCurrentDraftId } = useProposalDraftSession();
+  const draftStage = useDraftSessionStore((s) => s.draftStage);
+  const completedSteps = useDraftSessionStore((s) => s.completedSteps);
+  const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
 
-  // Enable auto-save to localStorage drafts when user is on home page
-  useDraftAutoSave({ enabled: true });
+  const hasMeaningfulData = Boolean(title && clientId);
+  useDraftAutoSave({ enabled: hasMeaningfulData });
 
   const [selectionMode, setSelectionMode] = useState<SelectionMode | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showRecreateModal, setShowRecreateModal] = useState<boolean>(false);
-  const { clients: preloadedClients } = useClients({ autoFetch: true });
+  const { clients: preloadedClients, refetch: refetchClients } = useClients({ autoFetch: false });
+  const hasFetchedClients = useRef(false);
 
+  // Fetch clients on home page load (only once)
+  useEffect(() => {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      refetchClients();
+    }
+  }, []);
 
-  const showPipeline = draftStage !== "template_selection" && Boolean(proposalData.title && proposalData.clientId);
+  const showPipeline = draftStage !== "template_selection" && Boolean(title && clientId);
 
   function handleSelectTemplate(id: string): void {
     setSelectedTemplateId(id);
@@ -69,13 +85,12 @@ export default function HomePage(): JSX.Element {
 
   return (
     <PageLayout noPadding>
-        <DynamicPipeline
-          currentStage={draftStage}
-          completedSteps={completedSteps}
-          visible={false}
-        />
-
-        <h1 className={`page-title ${styles.pageTitle}`}>Choose Your Proposal Type</h1>
+      <DynamicPipeline
+        currentStage={draftStage}
+        completedSteps={completedSteps}
+        visible={false}
+      />
+      <h1 className={`page-title ${styles.pageTitle}`}>Choose Your Proposal Type</h1>
         <p className="page-subtitle">
           Select a template that matches your project needs, or start from scratch with AI-powered guidance.
         </p>
