@@ -19,6 +19,9 @@ import {
   useClientName,
   useClientId,
   useWizardActions,
+  useFilesMeta,
+  useSelectedDocumentIds,
+  useWebReferences,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
@@ -55,12 +58,16 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   const clientId = useClientId();
   const description = useProposalDescription();
   const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
   const tone = useTone();
   const lengthPreference = useLengthPreference();
   const language = useLanguage();
   const aiModel = useAiModel();
   const templateId = useTemplateId();
   const templateType = useTemplateType();
+  const filesMeta = useFilesMeta();
+  const selectedDocumentIds = useSelectedDocumentIds();
+  const webReferences = useWebReferences();
 
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
@@ -80,6 +87,8 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   const lastSavedDataRef = useRef<string>("");
   const isUnmountingRef = useRef<boolean>(false);
   const previousPathnameRef = useRef<string>("");
+  const pendingDraftIdRef = useRef<string | null>(null);
+  const isSavingRef = useRef<boolean>(false);
 
   // Determine lastLocation based on current pathname
   const getLastLocation = useCallback((): DraftLocation => {
@@ -113,37 +122,42 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
   // Core save function
   const saveDraft = useCallback(async (force: boolean = false): Promise<void> => {
-    // Use localStorage-based lock to prevent concurrent saves across page navigations
-    const lockValue = localStorage.getItem(DRAFT_SAVE_LOCK_KEY);
-    if (!enabled || lockValue === 'locked') {
-      logger.debug('[useWizardAutoSave] Save already locked, skipping');
+    // Prevent concurrent saves using ref (more reliable than localStorage for same-tab races)
+    if (!enabled || isSavingRef.current) {
+      logger.debug('[useWizardAutoSave] Save already in progress, skipping');
       return;
     }
-    
-    // Check for duplicate draft creation within last 5 seconds
-    const dedupValue = localStorage.getItem(DRAFT_DEDUP_KEY);
-    if (dedupValue) {
-      const dedupData = JSON.parse(dedupValue);
-      const timeDiff = Date.now() - dedupData.timestamp;
-      const isSameData = dedupData.title === title && dedupData.clientName === clientName;
-      
-      // If same data was saved within last 5 seconds, skip to prevent duplicate
-      if (isSameData && timeDiff < 5000) {
-        logger.debug('[useWizardAutoSave] Duplicate draft detected, skipping', {
-          timeDiff,
-          title,
-          clientName
-        });
-        return;
+
+    // Never save drafts while on the generating page — generation mutates proposal state
+    if (pathname.startsWith("/generating")) {
+      logger.debug('[useWizardAutoSave] On generating page, skipping save');
+      return;
+    }
+
+    isSavingRef.current = true;
+
+    // Use the pendingDraftIdRef to catch newly created IDs before React re-renders
+    const effectiveDraftId = currentDraftId || pendingDraftIdRef.current;
+
+    // Skip if we just created a draft with this exact data (prevents rapid duplicate creation)
+    if (!effectiveDraftId) {
+      const dedupValue = localStorage.getItem(DRAFT_DEDUP_KEY);
+      if (dedupValue) {
+        const dedupData = JSON.parse(dedupValue);
+        const timeDiff = Date.now() - dedupData.timestamp;
+        const isSameData = dedupData.title === title && dedupData.clientName === clientName;
+
+        if (isSameData && timeDiff < 10000) {
+          logger.debug('[useWizardAutoSave] Duplicate draft detected, skipping', { timeDiff, title, clientName });
+          isSavingRef.current = false;
+          return;
+        }
       }
     }
     
-    // Set localStorage lock immediately
-    localStorage.setItem(DRAFT_SAVE_LOCK_KEY, 'locked');
-    
     if (!hasData()) {
       logger.debug('[useWizardAutoSave] No data to save');
-      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
+      isSavingRef.current = false;
       return;
     }
 
@@ -161,7 +175,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     // Skip if data hasn't changed (unless forced)
     if (!force && currentDataHash === lastSavedDataRef.current) {
       logger.debug('[useWizardAutoSave] No changes detected, skipping save');
-      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
+      isSavingRef.current = false;
       return;
     }
 
@@ -196,7 +210,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         clientId,
         description,
         selectedSections,
-        sectionDisplayNames: {}, // Will be fetched from store if needed
+        sectionDisplayNames,
         tone,
         lengthPreference,
         language,
@@ -204,11 +218,11 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         templateId,
         templateType,
         files: [],
-        filesMeta: [],
-        selectedDocumentIds: [],
+        filesMeta,
+        selectedDocumentIds,
         customSections: [],
         contextualInstructions: "",
-        webReferences: [],
+        webReferences,
       } as any; // Type assertion for backward compatibility
 
       const draftPayload: SaveDraftPayload = {
@@ -236,22 +250,25 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         lastLocation,
       });
 
-      if (currentDraftId) {
+      if (effectiveDraftId) {
         // Update existing draft
-        await updateDraftInStore(currentDraftId, draftPayload);
-        logger.info('[useWizardAutoSave] Draft updated', { draftId: currentDraftId });
+        await updateDraftInStore(effectiveDraftId, draftPayload);
+        logger.info('[useWizardAutoSave] Draft updated', { draftId: effectiveDraftId });
       } else {
         // Create new draft
         const saved = await saveDraftToStore(draftPayload);
+
+        // Immediately set the pending ref so the next save call updates instead of creating
+        pendingDraftIdRef.current = saved.id;
         setCurrentDraftId(saved.id);
-        
+
         // Store deduplication data to prevent duplicate creation
         localStorage.setItem(DRAFT_DEDUP_KEY, JSON.stringify({
           title,
           clientName,
           timestamp: Date.now()
         }));
-        
+
         logger.info('[useWizardAutoSave] Draft created', { draftId: saved.id });
       }
 
@@ -260,22 +277,27 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     } catch (error) {
       logger.error('[useWizardAutoSave] Save failed', error);
     } finally {
-      localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
+      isSavingRef.current = false;
     }
   }, [
     enabled,
+    pathname,
     hasData,
     title,
     clientName,
     clientId,
     description,
     selectedSections,
+    sectionDisplayNames,
     tone,
     lengthPreference,
     language,
     aiModel,
     templateId,
     templateType,
+    filesMeta,
+    selectedDocumentIds,
+    webReferences,
     currentStep,
     maxStepReached,
     completedSteps,
@@ -308,7 +330,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [enabled, hasData, saveDraft, debounceMs, title, clientName, clientId, description, selectedSections, currentStep, draftStage]);
+  }, [enabled, hasData, saveDraft, debounceMs, title, clientName, clientId, description, selectedSections, sectionDisplayNames, filesMeta, selectedDocumentIds, webReferences, currentStep, draftStage]);
 
   // Save on beforeunload (browser close/refresh)
   useEffect(() => {
@@ -325,6 +347,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
               clientId,
               description,
               selectedSections,
+              sectionDisplayNames,
               tone,
               lengthPreference,
               language,
@@ -332,11 +355,11 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
               templateId,
               templateType,
               files: [],
-              filesMeta: [],
-              selectedDocumentIds: [],
+              filesMeta,
+              selectedDocumentIds,
               customSections: [],
               contextualInstructions: "",
-              webReferences: [],
+              webReferences,
             },
             currentStep,
             maxStepReached,
@@ -359,7 +382,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [enabled, hasData, saveDraft, title, clientName, clientId, description, selectedSections, tone, lengthPreference, language, aiModel, templateId, templateType, currentStep, maxStepReached, completedSteps, draftStage]);
+  }, [enabled, hasData, saveDraft, title, clientName, clientId, description, selectedSections, sectionDisplayNames, filesMeta, selectedDocumentIds, webReferences, tone, lengthPreference, language, aiModel, templateId, templateType, currentStep, maxStepReached, completedSteps, draftStage]);
 
   // Save on visibility change (tab switch)
   useEffect(() => {

@@ -22,7 +22,7 @@ import PageLayout from "@/layouts/AppLayout";
 import PageHeader from "@/components/common/PageHeader";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
-import TemplateSelectionModal from "@/components/modals/TemplateSelectionModal";
+import TemplateSelectionModal from "@/components/modals/TemplateSelectionModal/TemplateSelectionModal";
 import NewClientModal from "@/components/modals/NewClientModal";
 import DraftCardSkeleton from "@/components/common/skeletons/DraftCardSkeleton";
 
@@ -41,7 +41,7 @@ export default function DraftsPage(): JSX.Element {
   const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
 
-  const { drafts, isLoading, refetch } = useDrafts({ force: true });
+  const { drafts, isLoading, refetch } = useDrafts();
   const { clients } = useClients({ autoFetch: false });
   const getDraftFromStore = useDraftStore(state => state.getDraft);
   const deleteDraftFromStore = useDraftStore(state => state.deleteDraft);
@@ -63,11 +63,14 @@ export default function DraftsPage(): JSX.Element {
     setMounted(true);
   }, []);
 
-  // Force refresh drafts when page becomes visible to show updated status
+  // Refresh drafts when page becomes visible only if cache is stale
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        refetch();
+        const isCacheValid = useDraftStore.getState().isCacheValid();
+        if (!isCacheValid) {
+          refetch();
+        }
       }
     };
 
@@ -103,16 +106,24 @@ export default function DraftsPage(): JSX.Element {
       const fullDraft: SavedDraft = await getDraftFromStore(draftId);
       console.log('[DraftsPage] Draft loaded successfully:', fullDraft);
 
+      // Restore wizard state with generated content included in proposalData
+      const proposalData = fullDraft.wizardState.proposalData as any;
+
       logger.info('[DraftsPage] Loading draft', {
         draftId,
         hasGeneratedContent: Object.keys(fullDraft.generatedContent || {}).length > 0,
         sectionCount: Object.keys(fullDraft.generatedContent || {}).length,
         stage: fullDraft.stage,
         lastLocation: fullDraft.lastLocation,
+        // Log the critical fields from the saved draft
+        savedTitle: fullDraft.title,
+        savedClientName: fullDraft.clientName,
+        savedSelectedSections: proposalData?.selectedSections,
+        savedFilesMeta: proposalData?.filesMeta,
+        savedSelectedDocumentIds: proposalData?.selectedDocumentIds,
+        savedWebReferences: proposalData?.webReferences,
+        savedSectionDisplayNames: proposalData?.sectionDisplayNames,
       });
-
-      // Restore wizard state with generated content included in proposalData
-      const proposalData = fullDraft.wizardState.proposalData as any;
       const restoredProposalData: Partial<ProposalData> = {
         ...(proposalData || {}),
         // Restore generated content into sections field

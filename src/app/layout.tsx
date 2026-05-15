@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
-import { DM_Sans, DM_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "@/styles/styles.scss";
 import { ProposalWizardProvider } from "@/context/ProposalWizardContext";
 
-const dmSans = DM_Sans({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-dm-sans",
+  variable: "--font-inter",
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
 });
 
-const dmMono = DM_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
-  variable: "--font-dm-mono",
+  variable: "--font-jetbrains-mono",
   display: "swap",
 });
 
@@ -38,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }): JSX.Element {
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
         <ProposalWizardProvider>
           <ErrorBoundary>

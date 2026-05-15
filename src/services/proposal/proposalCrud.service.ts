@@ -35,6 +35,7 @@ function parseTemplateType(raw: string | null): TemplateType {
 interface CreateProposalResponse {
   id: number;
   status: string;
+  jobId?: string | null;
 }
 
 export async function generateProposal(
@@ -117,6 +118,7 @@ export async function generateProposal(
     totalDurationMs: totalDuration,
     proposalId: response.id,
     status: response.status,
+    jobId: response.jobId,
   });
 
   if (requestDuration > 1000) {
