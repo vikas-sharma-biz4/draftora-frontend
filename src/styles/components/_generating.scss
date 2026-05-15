@@ -1,13 +1,12 @@
 // ─── Generating page wrapper ──────────────────────────────────────────────────
 .generating-page {
   min-height: 100vh;
-  background: #f8f9fa;
+  background: #f5f5f7;
   display: flex;
   flex-direction: column;
   position: relative;
+  padding: 80px 24px 48px;
 }
-
-// ─── Header (removed) ─────────────────────────────────────────────────────────
 
 // ─── Container ────────────────────────────────────────────────────────────────
 .generating-container {
@@ -15,46 +14,45 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  padding: 48px 24px 24px;
-  max-width: 1000px;
+  justify-content: center;
+  max-width: 900px;
   margin: 0 auto;
   width: 100%;
-  transform: scale(0.85);
-  transform-origin: top center;
 }
 
 // ─── Main title ───────────────────────────────────────────────────────────────
 .generating-main-title {
-  font-size: 2.25rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: #000000;
   text-align: center;
-  margin-bottom: 12px;
-  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .generating-main-subtitle {
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: #6b7280;
   text-align: center;
-  max-width: 600px;
-  margin-bottom: 36px;
+  max-width: 640px;
+  margin-bottom: 48px;
   line-height: 1.6;
+  font-weight: 400;
 }
 
 // ─── Content layout ───────────────────────────────────────────────────────────
 .generating-content {
   display: flex;
-  gap: 48px;
-  align-items: center;
+  gap: 64px;
+  align-items: flex-start;
   justify-content: center;
   width: 100%;
-  max-width: 700px;
+  max-width: 800px;
   background: white;
-  padding: 36px;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 48px 56px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 // ─── Progress section (left) ──────────────────────────────────────────────────
@@ -113,16 +111,16 @@
 // ─── Sequence section (right) ─────────────────────────────────────────────────
 .generating-sequence-section {
   flex: 1;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .generating-sequence-header {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
   color: #9ca3af;
   text-transform: uppercase;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .generating-sequence-list {
@@ -131,32 +129,33 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .generating-sequence-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 14px;
+  padding: 14px 18px;
   border-radius: 8px;
-  transition: all 0.2s;
-  background: #f9fafb;
+  transition: all 0.25s ease;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .generating-sequence-item.active {
   background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  border-color: #e0e7ff;
 }
 
 .generating-sequence-item.done {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .generating-sequence-icon {
-  font-size: 16px;
-  color: #9ca3af;
-  min-width: 20px;
+  font-size: 18px;
+  color: #d1d5db;
+  min-width: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -164,49 +163,50 @@
 
 .generating-sequence-item.active .generating-sequence-icon {
   color: #6366f1;
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: spin 1.2s linear infinite;
 }
 
 .generating-sequence-item.done .generating-sequence-icon {
-  color: #10b981;
+  color: #9ca3af;
 }
 
 .generating-sequence-text {
-  font-size: 14px;
-  color: #4b5563;
+  font-size: 14.5px;
+  color: #9ca3af;
   line-height: 1.5;
+  font-weight: 400;
 }
 
 .generating-sequence-item.active .generating-sequence-text {
-  color: #1a1a1a;
+  color: #1f2937;
   font-weight: 500;
+}
+
+.generating-sequence-item.done .generating-sequence-text {
+  color: #9ca3af;
 }
 
 // ─── Cancel button ────────────────────────────────────────────────────────────
 .generating-cancel-btn {
-  margin-top: 32px;
+  margin-top: 40px;
   font-size: 14px;
-  font-weight: 600;
-  color: white;
-  background: #ef4444;
-  border: 2px solid #ef4444;
-  border-radius: 8px;
+  font-weight: 400;
+  color: #6b7280;
+  background: transparent;
+  border: none;
   cursor: pointer;
   transition: all 0.2s;
-  padding: 10px 24px;
-  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  padding: 0;
+  text-decoration: none;
 }
 
 .generating-cancel-btn:hover {
-  background: #dc2626;
-  border-color: #dc2626;
-  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
-  transform: translateY(-1px);
+  color: #374151;
+  text-decoration: underline;
 }
 
 .generating-cancel-btn:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.2);
+  color: #1f2937;
 }
 
 // ─── Error state ──────────────────────────────────────────────────────────────
@@ -247,6 +247,27 @@
   justify-content: center;
 }
 
+// ─── Circular Progress Component ──────────────────────────────────────────────
+.circular-progress {
+  position: relative;
+  display: inline-block;
+}
+
+.circular-progress-svg {
+  display: block;
+}
+
+.circular-progress-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  pointer-events: none;
+}
+
 // ─── Animations ───────────────────────────────────────────────────────────────
 @keyframes pulse {
   0%, 100% {
@@ -255,6 +276,25 @@
   50% {
     opacity: 0.5;
   }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.generating-connection-badge {
+  font-size: 11px;
+  color: #10b981;
+  padding: 6px 12px;
+  background: #d1fae5;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-weight: 500;
 }
 
 // ─── Responsive ───────────────────────────────────────────────────────────────
