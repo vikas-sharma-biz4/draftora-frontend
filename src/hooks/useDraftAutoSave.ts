@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
-import { getLastLocationFromPathname } from "@/utils/routeUtils";
 import {
   useProposalTitle,
   useClientName,
@@ -64,8 +63,8 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const hasData =
     enabled &&
     currentProposalId != null &&
+    clientName.trim() !== "" &&
     (title.trim() !== "" ||
-      clientName.trim() !== "" ||
       description.trim() !== "" ||
       (selectedSections && selectedSections.length > 0) ||
       draftStage !== "template_selection");
