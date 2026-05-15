@@ -19,7 +19,7 @@ import EmptyState from "@/components/common/EmptyState";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
 import ClientCardSkeleton from "@/components/common/skeletons/ClientCardSkeleton";
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal"), {
+const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"), {
   ssr: false,
 });
 

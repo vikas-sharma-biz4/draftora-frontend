@@ -18,7 +18,7 @@ import HistoryCardSkeleton from "@/components/common/skeletons/HistoryCardSkelet
 
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const { proposals: historyItems, isLoading: loading, error } = useProposals({ filter: 'history' });
+  const { proposals: historyItems, isLoading: loading, isInitialized, error } = useProposals({ filter: 'history' });
   const { downloadProposal } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
   const [mounted, setMounted] = useState<boolean>(false);
@@ -49,12 +49,7 @@ export default function HistoryPage(): JSX.Element {
         subtitle="View all completed, approved, and rejected proposals."
       />
 
-      {!mounted ? (
-        <SkeletonGrid
-          className={styles.historyGrid}
-          renderItem={() => <HistoryCardSkeleton />}
-        />
-      ) : loading ? (
+      {!mounted || (loading && !isInitialized) ? (
         <SkeletonGrid
           className={styles.historyGrid}
           renderItem={() => <HistoryCardSkeleton />}

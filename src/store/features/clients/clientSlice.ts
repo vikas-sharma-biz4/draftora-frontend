@@ -111,7 +111,7 @@ interface ClientState {
   createClient: (data: CreateClientRequest) => Promise<{ id: number; name: string }>;
   updateClientApi: (clientId: number, data: UpdateClientRequest) => Promise<Client>;
   deleteClient: (clientId: number) => Promise<void>;
-  uploadDocument: (clientId: number, file: File) => Promise<ClientDocument>;
+  uploadDocument: (clientId: number, file: File) => Promise<ClientDocument | undefined>;
   deleteDocument: (clientId: number, documentId: number) => Promise<void>;
   reset: () => void;
 }
@@ -346,6 +346,12 @@ export const useClientStore = create<ClientState>((set, get) => ({
       // Remove from store
       get().removeClient(clientId);
     } catch (error) {
+      // If client not found (404), it was likely already deleted - just remove from store
+      if (error instanceof Error && 'statusCode' in error && (error as any).statusCode === 404) {
+        logger.warn('[clientSlice] Client not found on delete (likely already deleted), removing from store:', clientId);
+        get().removeClient(clientId);
+        return;
+      }
       throw error;
     }
   },
@@ -367,6 +373,11 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
       return documentWithSize;
     } catch (error) {
+      // If client not found (404), it was likely already deleted - just log a warning
+      if (error instanceof Error && 'statusCode' in error && (error as any).statusCode === 404) {
+        logger.warn('[clientSlice] Client not found for document upload (likely already deleted), cannot upload document:', clientId);
+        return;
+      }
       console.error('[clientSlice] Failed to upload document:', error);
       throw error;
     }

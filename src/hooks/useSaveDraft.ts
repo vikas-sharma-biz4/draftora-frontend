@@ -11,6 +11,21 @@ import {
   useMaxStepReached,
   useCurrentProposalId,
   useWizardActions,
+  useFilesMeta,
+  useSelectedDocumentIds,
+  useWebReferences,
+  useSectionDisplayNames,
+  useSelectedSections,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useProposalDescription,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useTemplateId,
+  useTemplateType,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { updateDraft as updateDraftApi, getDraftByProposalId, getDraft } from "@/services/draft.service";
@@ -24,7 +39,23 @@ const DRAFT_SAVE_LOCK_KEY = "draft_save_lock";
  * the backend database, resets the wizard, and navigates back to the root.
  */
 export function useSaveDraft(): () => Promise<void> {
-  const proposalData = useProposalData();
+  // Use granular selectors to get current values (same as auto-save)
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateId = useTemplateId();
+  const templateType = useTemplateType();
+  const filesMeta = useFilesMeta();
+  const selectedDocumentIds = useSelectedDocumentIds();
+  const webReferences = useWebReferences();
+
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
   const currentProposalId = useCurrentProposalId();
@@ -35,7 +66,6 @@ export function useSaveDraft(): () => Promise<void> {
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
   const draftStage = useDraftSessionStore(state => state.draftStage);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
-  const invalidateCache = useDraftStore(state => state.invalidateCache);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
 
@@ -47,7 +77,6 @@ export function useSaveDraft(): () => Promise<void> {
       return;
     }
 
-    const { title, clientName } = proposalData;
     const hasData = title.trim() !== "" || clientName.trim() !== "";
 
     if (!hasData) {
@@ -100,19 +129,33 @@ export function useSaveDraft(): () => Promise<void> {
       // Include sections from proposalData if available (for completed proposals)
       const sectionsContent: Record<string, string> = {};
 
-      // Use the entire proposalData object to preserve all fields
+      // Construct proposalData object using granular selectors
       const draftProposalData = {
-        ...proposalData,
-        // Override files with empty array to avoid circular serialization
+        title,
+        clientName,
+        clientId,
+        description,
+        selectedSections,
+        sectionDisplayNames,
+        tone,
+        lengthPreference,
+        language,
+        aiModel,
+        templateId,
+        templateType,
         files: [],
-        // Override sections with generated content if available
+        filesMeta,
+        selectedDocumentIds,
+        customSections: [],
+        contextualInstructions: "",
+        webReferences,
         sections: sectionsContent,
-      };
+      } as any;
 
       const draftPayload = {
         proposalId: currentProposalId,
-        title: proposalData.title || "Untitled Proposal",
-        clientName: proposalData.clientName || "",
+        title: title || "Untitled Proposal",
+        clientName: clientName || "",
         status: "draft" as const,
         lastLocation,
         stage: draftStage,
@@ -132,6 +175,33 @@ export function useSaveDraft(): () => Promise<void> {
         sectionCount: Object.keys(draftPayload.generatedContent).length,
         stage: draftStage,
         lastLocation,
+        // Log the critical fields to verify they're being saved
+        title,
+        clientName,
+        selectedSectionsCount: selectedSections.length,
+        filesMetaCount: filesMeta.length,
+        selectedDocumentIdsCount: selectedDocumentIds?.length || 0,
+        webReferencesCount: webReferences.length,
+        sectionDisplayNamesKeys: Object.keys(sectionDisplayNames).length,
+      });
+
+      console.log('[useSaveDraft] Draft payload being saved:', {
+        proposalId: currentProposalId,
+        title,
+        clientName,
+        selectedSections,
+        sectionDisplayNames,
+        filesMeta,
+        selectedDocumentIds,
+        webReferences,
+        tone,
+        lengthPreference,
+        language,
+        aiModel,
+        templateId,
+        templateType,
+        stage: draftStage,
+        lastLocation,
       });
 
       if (currentDraftId) {
@@ -144,9 +214,6 @@ export function useSaveDraft(): () => Promise<void> {
         setCurrentDraftId(saved.id);
         toast.success(MESSAGES.DRAFT_SAVED);
       }
-
-      // Invalidate cache to force fresh fetch on drafts page
-      invalidateCache();
 
       // Navigate first, then reset to avoid infinite re-render loop
       router.push("/");

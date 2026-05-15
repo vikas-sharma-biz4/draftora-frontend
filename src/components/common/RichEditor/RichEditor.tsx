@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
-import { BubbleMenuPlugin } from "@tiptap/extension-bubble-menu";
 import StarterKit from "@tiptap/starter-kit";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Color } from "@tiptap/extension-color";

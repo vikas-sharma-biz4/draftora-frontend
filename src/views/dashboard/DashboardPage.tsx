@@ -26,7 +26,7 @@ const SkeletonCard = dynamic(
 const SkeletonGrid = dynamic(() => import("@/components/common/SkeletonGrid"), { ssr: false });
 
 export default function DashboardPage(): JSX.Element {
-  const { proposals, isLoading, error } = useProposals();
+  const { proposals, isLoading, isInitialized, error } = useProposals();
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 200);
   const [mounted, setMounted] = useState<boolean>(false);
@@ -64,12 +64,7 @@ export default function DashboardPage(): JSX.Element {
         }
       />
 
-      {!mounted ? (
-        <SkeletonGrid
-          className="proposals-grid"
-          renderItem={() => <SkeletonCard />}
-        />
-      ) : isLoading ? (
+      {!mounted || (isLoading && !isInitialized) ? (
         <SkeletonGrid
           className="proposals-grid"
           renderItem={() => <SkeletonCard />}
