@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { FileText, Clock, Trash2, Loader2 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
@@ -10,7 +10,8 @@ import Button from "@/components/common/Button";
 
 import styles from "./DraftsPage.module.scss";
 
-import { useProposalDraftSession, useProposalWizard } from "@/context/ProposalContext";
+import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDrafts } from "@/hooks/useDrafts";
 import { useClients } from "@/hooks/useClients";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
@@ -34,8 +35,10 @@ const DeleteAllDraftsModal = dynamic(() => import("@/components/modals/DeleteAll
 });
 
 export default function DraftsPage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useProposalWizard();
-  const { setDraftStage, setCompletedSteps, setCurrentDraftId } = useProposalDraftSession();
+  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useWizardActions();
+  const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
+  const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
 
   const { drafts, isLoading, refetch } = useDrafts({ autoFetch: true });
@@ -54,6 +57,11 @@ export default function DraftsPage(): JSX.Element {
   } | undefined>(undefined);
   const [deleteModalData, setDeleteModalData] = useState<{ id: string; name: string } | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Force refresh drafts when page becomes visible to show updated status
   useEffect(() => {
@@ -71,30 +79,53 @@ export default function DraftsPage(): JSX.Element {
   }, [refetch]);
 
 
-  function handleNewProposalClick(): void {
+  const handleNewProposalClick = useCallback((): void => {
     // Clear draft ID to ensure new proposal doesn't update existing draft
     setCurrentDraftId(null);
     setShowTemplateModal(true);
-  }
+  }, [setCurrentDraftId]);
 
-  function handleNewClientFromModal(): void {
+  const handleNewClientFromModal = useCallback((): void => {
     setShowTemplateModal(false);
     setShowNewClientModal(true);
-  }
+  }, []);
 
-  function handleClientCreated(client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void {
+  const handleClientCreated = useCallback((client: { id: number; name: string }, notes: string, uploadedFiles: File[]): void => {
     setNewClientData({ client, notes, uploadedFiles });
     setShowNewClientModal(false);
     setShowTemplateModal(true);
-  }
+  }, []);
 
-  async function handleLoadDraft(draftId: string): Promise<void> {
+  const handleLoadDraft = useCallback(async (draftId: string): Promise<void> => {
     try {
       setLoadingDraftId(draftId);
+      console.log('[DraftsPage] Loading draft:', draftId);
       const fullDraft: SavedDraft = await getDraftFromStore(draftId);
+      console.log('[DraftsPage] Draft loaded successfully:', fullDraft);
 
-      // Restore wizard state
-      updateProposalData(fullDraft.wizardState.proposalData as Partial<ProposalData>);
+      logger.info('[DraftsPage] Loading draft', {
+        draftId,
+        hasGeneratedContent: Object.keys(fullDraft.generatedContent || {}).length > 0,
+        sectionCount: Object.keys(fullDraft.generatedContent || {}).length,
+        stage: fullDraft.stage,
+        lastLocation: fullDraft.lastLocation,
+      });
+
+      // Restore wizard state with generated content included in proposalData
+      const proposalData = fullDraft.wizardState.proposalData as any;
+      const restoredProposalData: Partial<ProposalData> = {
+        ...(proposalData || {}),
+        // Restore generated content into sections field
+        sections: fullDraft.generatedContent || {},
+        // Ensure selectedDocumentIds and filesMeta are preserved
+        selectedDocumentIds: (proposalData?.selectedDocumentIds) || [],
+        filesMeta: (proposalData?.filesMeta) || [],
+        // Ensure selectedSections and sectionDisplayNames are preserved
+        selectedSections: (proposalData?.selectedSections) || [],
+        sectionDisplayNames: (proposalData?.sectionDisplayNames) || {},
+      };
+
+      updateProposalData(restoredProposalData);
       setCurrentStep(fullDraft.wizardState.currentStep);
       setDraftStage(fullDraft.stage);
       setCompletedSteps(fullDraft.wizardState.completedSteps);
@@ -139,19 +170,20 @@ export default function DraftsPage(): JSX.Element {
           router.push("/parameters");
       }
     } catch (error) {
+      console.error('[DraftsPage] Failed to load draft:', error);
       logger.error("Failed to load draft:", error);
       toast.error("Failed to load draft");
     } finally {
       setLoadingDraftId(null);
     }
-  }
+  }, [getDraftFromStore, updateProposalData, setCurrentStep, setDraftStage, setCompletedSteps, setMaxStepReached, setCurrentDraftId, setGeneratedProposalId, router]);
 
-  function handleDeleteDraft(id: string, name: string, e: React.MouseEvent): void {
+  const handleDeleteDraft = useCallback((id: string, name: string, e: React.MouseEvent): void => {
     e.stopPropagation();
     setDeleteModalData({ id, name });
-  }
+  }, []);
 
-  async function confirmDeleteDraft(): Promise<void> {
+  const confirmDeleteDraft = useCallback(async (): Promise<void> => {
     if (!deleteModalData) return;
 
     try {
@@ -162,9 +194,9 @@ export default function DraftsPage(): JSX.Element {
       logger.error("Failed to delete draft:", error);
       toast.error("Failed to delete draft");
     }
-  }
+  }, [deleteModalData, deleteDraftFromStore]);
 
-  async function confirmDeleteAllDrafts(): Promise<void> {
+  const confirmDeleteAllDrafts = useCallback(async (): Promise<void> => {
     try {
       await deleteAllDraftsFromStore();
       toast.success("All drafts deleted");
@@ -173,16 +205,16 @@ export default function DraftsPage(): JSX.Element {
       logger.error("Failed to delete all drafts:", error);
       toast.error("Failed to delete all drafts");
     }
-  }
+  }, [deleteAllDraftsFromStore]);
 
-  function getStatusLabel(status: string): string {
+  const getStatusLabel = useCallback((status: string): string => {
     if (status === "draft") return "Draft";
     if (status === "generating") return "Generating";
     if (status === "completed") return "Completed";
     return "In Progress";
-  }
+  }, []);
 
-  function getLocationLabel(location: string): string {
+  const getLocationLabel = useCallback((location: string): string => {
     switch (location) {
       case "wizard_parameters":
         return "Parameters";
@@ -195,7 +227,7 @@ export default function DraftsPage(): JSX.Element {
       default:
         return "Unknown";
     }
-  }
+  }, []);
 
   return (
     <PageLayout>
@@ -215,7 +247,12 @@ export default function DraftsPage(): JSX.Element {
         }
       />
 
-        {isLoading ? (
+        {!mounted ? (
+          <SkeletonGrid
+            className={styles.draftsGrid}
+            renderItem={() => <DraftCardSkeleton />}
+          />
+        ) : isLoading ? (
           <SkeletonGrid
             className={styles.draftsGrid}
             renderItem={() => <DraftCardSkeleton />}

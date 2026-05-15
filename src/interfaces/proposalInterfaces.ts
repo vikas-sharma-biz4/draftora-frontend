@@ -10,7 +10,7 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch" | "recreate";
+export type TemplateType = "predefined" | "custom" | "scratch" | "recreate" | "mvp" | "poc" | "design" | "brd" | "frd" | "srs" | "architecture" | "sow";
 
 export interface OriginalSection {
   id: string;
@@ -373,7 +373,7 @@ export type TemplateCategory = "Popular" | "Business" | "Technical" | "Creative"
 export interface ProposalTemplate {
   id: string;
   name: string;
-  templateType: string;
+  templateType: TemplateType;
   category: TemplateCategory;
   description: string;
   sections: string[];

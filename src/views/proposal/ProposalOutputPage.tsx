@@ -2,9 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { logger } from "@/utils/logger";
-import { useProposalWizard } from "@/context/ProposalContext";
+import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { useVisitedPipelineSteps } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import { toast } from "@/utils/toast";
@@ -75,12 +75,17 @@ export default function ProposalOutputPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { resetProposal } = useProposalWizard();
+  const resetProposal = useProposalWizardStore((s) => s.resetProposal);
   const visitedPipelineSteps = useVisitedPipelineSteps();
   const handleSaveDraft = useSaveDraft();
   const invalidateCache = useProposalStore(state => state.invalidateCache);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
   const proposalId = Number(params.id);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Data fetching + auto-save hook
   const {
@@ -257,7 +262,7 @@ export default function ProposalOutputPage(): JSX.Element {
   const allSectionsHaveError = sectionMetas.length > 0 && sectionMetas.every((s) => isErrorContent(proposal?.sections?.[s.key]));
 
   // Show loading state while fetching
-  if (isLoading && !proposal) {
+  if (!mounted || (isLoading && !proposal)) {
     return (
       <PageLayout noPadding>
         <div className="proposal-content" style={{ padding: "2rem" }}>

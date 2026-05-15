@@ -104,13 +104,30 @@ export class HttpError extends Error {
  * Validates the response status and success flag, then extracts the data.
  * Throws HttpError (with statusCode) if the request failed.
  */
-async function handleResponse<T>(res: Response): Promise<T> {
+async function handleResponse<T>(res: Response, method: string): Promise<T> {
+  // Handle OPTIONS requests (CORS preflight) - no JSON body expected
+  if (method === "OPTIONS" || res.status === 204) {
+    return undefined as T;
+  }
+
   // Read response body once to avoid double-read bug
   const rawText = await res.text();
+
+  let json: ApiResponse<T> | undefined;
 
   // Handle empty response bodies
   if (!rawText || rawText.trim() === "") {
     throw new HttpError(res.status, "Response body is empty");
+  }
+
+  // Parse JSON safely from raw text (not res.json() since stream was already consumed)
+  try {
+    json = JSON.parse(rawText);
+  } catch (parseError) {
+    throw new HttpError(
+      res.status,
+      `Failed to parse JSON response: ${rawText.substring(0, 200)}`
+    );
   }
 
   // Parse JSON safely from raw text
@@ -166,7 +183,7 @@ async function request<T>(
     credentials: config.credentials,
   });
 
-  return handleResponse<T>(res);
+  return handleResponse<T>(res, method);
 }
 
 export const http = {

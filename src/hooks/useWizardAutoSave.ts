@@ -2,13 +2,32 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { getLastLocationFromPathname } from "@/utils/routeUtils";
-import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
-import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import {
+  useTemplateType,
+  useTemplateId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useCurrentStep,
+  useMaxStepReached,
+  useCurrentProposalId,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useWizardActions,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import { getDraftByProposalId, getDraft } from "@/services/draft.service";
 import type { DraftLocation, SaveDraftPayload, DraftUIState } from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
 import { WIZARD_AUTOSAVE_FALLBACK_KEY } from "@/constants/storageKeys";
+
+const WIZARD_AUTOSAVE_FALLBACK_KEY = "wizard_autosave_fallback";
 
 interface UseWizardAutoSaveOptions {
   enabled: boolean;
@@ -29,14 +48,24 @@ interface UseWizardAutoSaveOptions {
 export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled: true }): void {
   const { enabled, debounceMs = 2000 } = options;
 
-  const {
-    proposalData,
-    currentStep,
-    maxStepReached,
-    currentProposalId,
-  } = useProposalWizard();
+  // Use granular selectors instead of entire proposalData object
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateId = useTemplateId();
+  const templateType = useTemplateType();
 
-  const { draftStage, completedSteps } = useProposalDraftSession();
+  const currentStep = useCurrentStep();
+  const maxStepReached = useMaxStepReached();
+  const currentProposalId = useCurrentProposalId();
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const completedSteps = useDraftSessionStore(state => state.completedSteps);
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
@@ -59,13 +88,13 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   // Check if there's meaningful data to save
   const hasData = useCallback((): boolean => {
     return (
-      proposalData.title.trim() !== "" ||
-      proposalData.clientName.trim() !== "" ||
-      proposalData.description.trim() !== "" ||
-      (proposalData.selectedSections && proposalData.selectedSections.length > 0) ||
-      proposalData.clientId !== undefined
+      title.trim() !== "" ||
+      clientName.trim() !== "" ||
+      description.trim() !== "" ||
+      (selectedSections && selectedSections.length > 0) ||
+      clientId !== undefined
     );
-  }, [proposalData]);
+  }, [title, clientName, description, selectedSections, clientId]);
 
   // Capture UI state for restoration
   const captureUIState = useCallback((): DraftUIState => {
@@ -87,13 +116,13 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
     // Create a hash of current data to detect changes
     const currentDataHash = JSON.stringify({
-      title: proposalData.title,
-      clientName: proposalData.clientName,
-      clientId: proposalData.clientId,
-      description: proposalData.description,
-      selectedSections: proposalData.selectedSections,
-      tone: proposalData.tone,
-      lengthPreference: proposalData.lengthPreference,
+      title,
+      clientName,
+      clientId,
+      description,
+      selectedSections,
+      tone,
+      lengthPreference,
     });
 
     // Skip if data hasn't changed (unless forced)
@@ -108,22 +137,72 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
       const uiState = captureUIState();
       const lastLocation = getLastLocation();
 
+      // Fetch existing draft to preserve generated content if proposal exists
+      let existingGeneratedContent: Record<string, string> = {};
+      if (currentProposalId) {
+        try {
+          const existingDraft = await getDraftByProposalId(currentProposalId);
+          if (existingDraft) {
+            const fullDraft = await getDraft(existingDraft.id);
+            existingGeneratedContent = fullDraft.generatedContent || {};
+            logger.debug('[useWizardAutoSave] Preserved existing generated content', {
+              sectionCount: Object.keys(existingGeneratedContent).length
+            });
+          }
+        } catch (error) {
+          logger.warn('[useWizardAutoSave] Failed to fetch existing draft for content preservation', error);
+        }
+      }
+
+      // Include sections from proposalData if available (for completed proposals)
+      const sectionsContent: Record<string, string> = {}; // Will be populated from API response
+
+      // Construct minimal proposalData object for backward compatibility
+      const proposalDataForSave = {
+        title,
+        clientName,
+        clientId,
+        description,
+        selectedSections,
+        sectionDisplayNames: {}, // Will be fetched from store if needed
+        tone,
+        lengthPreference,
+        language,
+        aiModel,
+        templateId,
+        templateType,
+        files: [],
+        filesMeta: [],
+        selectedDocumentIds: [],
+        customSections: [],
+        contextualInstructions: "",
+        webReferences: [],
+      } as any; // Type assertion for backward compatibility
+
       const draftPayload: SaveDraftPayload = {
         proposalId: currentProposalId,
-        title: proposalData.title || "Untitled Proposal",
-        clientName: proposalData.clientName || "",
+        title: title || "Untitled Proposal",
+        clientName: clientName || "",
         status: "draft",
         lastLocation,
         stage: draftStage,
         wizardState: {
-          proposalData: { ...proposalData, files: [] },
+          proposalData: proposalDataForSave,
           currentStep,
           maxStepReached,
           completedSteps,
         },
-        generatedContent: {},
+        generatedContent: Object.keys(sectionsContent).length > 0 ? sectionsContent : existingGeneratedContent,
         uiState,
       };
+
+      logger.info('[useWizardAutoSave] Saving draft', {
+        proposalId: currentProposalId,
+        hasGeneratedContent: Object.keys(draftPayload.generatedContent).length > 0,
+        sectionCount: Object.keys(draftPayload.generatedContent).length,
+        stage: draftStage,
+        lastLocation,
+      });
 
       if (currentDraftId) {
         // Update existing draft
@@ -151,7 +230,17 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   }, [
     enabled,
     hasData,
-    proposalData,
+    title,
+    clientName,
+    clientId,
+    description,
+    selectedSections,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId,
+    templateType,
     currentStep,
     maxStepReached,
     completedSteps,
@@ -184,7 +273,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [enabled, hasData, saveDraft, debounceMs, proposalData, currentStep, draftStage]);
+  }, [enabled, hasData, saveDraft, debounceMs, title, clientName, clientId, description, selectedSections, currentStep, draftStage]);
 
   // Save on beforeunload (browser close/refresh)
   useEffect(() => {
@@ -195,15 +284,35 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         // Attempt synchronous save to localStorage as fallback
         try {
           const fallbackData = {
-            proposalData: { ...proposalData, files: [] },
+            proposalData: {
+              title,
+              clientName,
+              clientId,
+              description,
+              selectedSections,
+              tone,
+              lengthPreference,
+              language,
+              aiModel,
+              templateId,
+              templateType,
+              files: [],
+              filesMeta: [],
+              selectedDocumentIds: [],
+              customSections: [],
+              contextualInstructions: "",
+              webReferences: [],
+            },
             currentStep,
             maxStepReached,
             completedSteps,
             draftStage,
             timestamp: Date.now(),
           };
-          localStorage.setItem(WIZARD_AUTOSAVE_FALLBACK_KEY, JSON.stringify(fallbackData));
-          logger.info('[useWizardAutoSave] Fallback save to localStorage');
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            localStorage.setItem(WIZARD_AUTOSAVE_FALLBACK_KEY, JSON.stringify(fallbackData));
+            logger.info('[useWizardAutoSave] Fallback save to localStorage');
+          }
         } catch (error) {
           logger.error('[useWizardAutoSave] Fallback save failed', error);
         }
@@ -215,7 +324,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [enabled, hasData, saveDraft, proposalData, currentStep, maxStepReached, completedSteps, draftStage]);
+  }, [enabled, hasData, saveDraft, title, clientName, clientId, description, selectedSections, tone, lengthPreference, language, aiModel, templateId, templateType, currentStep, maxStepReached, completedSteps, draftStage]);
 
   // Save on visibility change (tab switch)
   useEffect(() => {

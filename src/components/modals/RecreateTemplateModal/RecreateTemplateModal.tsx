@@ -34,7 +34,7 @@ import {
 import { INDUSTRIES } from "@/constants";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
 import { useClientStore } from "@/store/features/clients/clientSlice";
-import { useProposalDraftSession } from "@/context/ProposalContext";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
@@ -65,7 +65,8 @@ export default function RecreateTemplateModal({
 }: RecreateTemplateModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep } = useWizardActions();
-  const { setDraftStage, markStepCompleted } = useProposalDraftSession();
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+  const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
 
   const [mounted, setMounted] = useState<boolean>(false);
   const [clients, setClients] = useState<ClientWithDocuments[]>([]);
