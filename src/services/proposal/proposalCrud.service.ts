@@ -106,9 +106,9 @@ export async function generateProposal(
     formData.append("files", file);
   }
 
-  logger.info("[generateProposal] Sending POST request to /proposals/ at", new Date().toISOString());
+  logger.info("[generateProposal] Sending POST request to /proposals at", new Date().toISOString());
   const requestStartTime = Date.now();
-  const response = await http.post<CreateProposalResponse>("/proposals/", formData);
+  const response = await http.post<CreateProposalResponse>("/proposals", formData);
   const requestDuration = Date.now() - requestStartTime;
   const totalDuration = Date.now() - startTime;
 
@@ -154,7 +154,7 @@ interface ProposalStatusApiResponse {
 }
 
 export async function getProposalStatus(id: number): Promise<ProposalStatus> {
-  const d = await http.get<ProposalStatusApiResponse>(`/proposals/${id}/status/`, {
+  const d = await http.get<ProposalStatusApiResponse>(`/proposals/${id}/status`, {
     cache: "no-store",
   });
   const completed = d.completed_sections ?? [];
@@ -243,7 +243,7 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
 }
 
 export async function getProposal(id: number): Promise<ProposalData> {
-  const d = await http.get<RawProposalApiResponse>(`/proposals/${id}/`, {
+  const d = await http.get<RawProposalApiResponse>(`/proposals/${id}`, {
     cache: "no-store",
   });
   return mapProposal(d);
@@ -273,7 +273,7 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
   if (params?.limit) queryParams.set("limit", String(params.limit));
   if (params?.offset) queryParams.set("offset", String(params.offset));
   const qs = queryParams.toString();
-  const url = `/proposals/${qs ? `?${qs}` : ""}`;
+  const url = qs ? `/proposals?${qs}` : "/proposals";
 
   const items = await http.get<ProposalListApiItem[]>(url, { cache: "no-store" });
   return items.map((item) => ({
@@ -292,12 +292,12 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
 }
 
 export function getDownloadUrl(id: number): string {
-  return buildUrl(`/proposals/${id}/download/`);
+  return buildUrl(`/proposals/${id}/download`);
 }
 
 export async function cancelProposal(id: number): Promise<void> {
   try {
-    await http.post<null>(`/proposals/${id}/cancel/`);
+    await http.post<null>(`/proposals/${id}/cancel`);
   } catch (error) {
     // Ignore 400 (already completed/failed) — cancellation is best-effort
     if (error instanceof HttpError && error.statusCode === 400) {
@@ -312,7 +312,7 @@ export async function updateApprovalStatus(
   status: "pending" | "approved" | "rejected"
 ): Promise<ProposalData> {
   const raw = await http.patch<RawProposalApiResponse>(
-    `/proposals/${proposalId}/approval-status/`,
+    `/proposals/${proposalId}/approval-status`,
     { approval_status: status }
   );
   return mapProposal(raw);

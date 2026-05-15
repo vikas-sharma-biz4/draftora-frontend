@@ -18,6 +18,8 @@ import { DEFAULT_AI_MODEL } from "@/config/config";
 import { DEFAULT_SELECTED_SECTIONS, PROPOSAL_WIZARD_STORAGE_KEY } from "@/constants";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
+import { getSectionRecommendations } from "@/services/proposal.service";
+import { SECTION_DISPLAY_NAMES } from "@/constants";
 
 export const DEFAULT_PROPOSAL_DATA: ProposalData = {
   title: "",
@@ -142,9 +144,47 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
     set(INITIAL_WIZARD_STATE);
   },
 
-  prefetchRecommendations: (): void => {
-    // Implementation for prefetching recommendations
+  prefetchRecommendations: async (): Promise<void> => {
+    const state = useProposalWizardStore.getState();
+    const { proposalData } = state;
+
+    // Allow prefetch even without description/documents - the backend can handle empty context
+    logger.debug('[proposalWizardSlice] Prefetching recommendations | has_description=%s | has_documents=%s', 
+      !!proposalData.description, 
+      !!proposalData.selectedDocumentIds?.length
+    );
+
     set({ recommendationsFetchStatus: 'loading' });
+
+    try {
+      const existingSectionsWithRules = proposalData.selectedSections.map((key) => ({
+        sectionKey: key,
+        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        include: "",
+        exclude: "",
+        purpose: "",
+      }));
+
+      const recs = await getSectionRecommendations({
+        templateId: proposalData.templateId,
+        existingSections: proposalData.selectedSections,
+        existingSectionsWithRules,
+        context: proposalData.description || "",
+        userPrompt: null,
+      });
+
+      set({ 
+        prefetchedRecommendations: recs, 
+        recommendationsFetchStatus: 'success' 
+      });
+      logger.info('[proposalWizardSlice] Recommendations prefetched successfully', { count: recs.length });
+    } catch (error) {
+      logger.error('[proposalWizardSlice] Failed to prefetch recommendations', error);
+      set({ 
+        recommendationsFetchStatus: 'error',
+        recommendationsError: error instanceof Error ? error.message : 'Failed to fetch recommendations'
+      });
+    }
   },
 
   cancelRecommendationsFetch: (): void => {

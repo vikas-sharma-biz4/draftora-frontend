@@ -16,6 +16,17 @@ export interface Client {
   updatedAt: string;
 }
 
+// Raw API response interface (snake_case)
+interface ClientApiResponse {
+  id: number;
+  name: string;
+  industry: string;
+  status: "active" | "inactive";
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClientDocument {
   id: number;
   clientId: number;
@@ -25,6 +36,51 @@ export interface ClientDocument {
   status: "processing" | "parsed" | "error";
   createdAt: string;
   updatedAt: string;
+}
+
+// Raw API response interface for document (snake_case)
+interface ClientDocumentApiResponse {
+  id: number;
+  client_id: number;
+  name: string;
+  file_type: string;
+  size_bytes: number;
+  status: "processing" | "parsed" | "error";
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Data Transformation Helpers ─────────────────────────────────────────────────
+
+/**
+ * Transform API response (snake_case) to frontend model (camelCase)
+ */
+function transformClient(apiClient: ClientApiResponse): Client {
+  return {
+    id: apiClient.id,
+    name: apiClient.name,
+    industry: apiClient.industry,
+    status: apiClient.status,
+    notes: apiClient.notes,
+    createdAt: apiClient.created_at,
+    updatedAt: apiClient.updated_at,
+  };
+}
+
+/**
+ * Transform API document response (snake_case) to frontend model (camelCase)
+ */
+function transformClientDocument(apiDoc: ClientDocumentApiResponse): ClientDocument {
+  return {
+    id: apiDoc.id,
+    clientId: apiDoc.client_id,
+    name: apiDoc.name,
+    fileType: apiDoc.file_type,
+    sizeBytes: apiDoc.size_bytes,
+    status: apiDoc.status,
+    createdAt: apiDoc.created_at,
+    updatedAt: apiDoc.updated_at,
+  };
 }
 
 export interface ClientWithDocuments extends Client {
@@ -59,15 +115,22 @@ export async function createClient(
  * List all active clients
  */
 export async function listClients(): Promise<Client[]> {
-  const response = await http.get<{ data: Client[]; meta: unknown }>("/clients");
-  return response.data;
+  const response = await http.get<{ data: ClientApiResponse[]; meta: unknown }>("/clients");
+  return response.data.map(transformClient);
 }
 
 /**
  * Get a single client with documents
  */
 export async function getClient(clientId: number): Promise<ClientWithDocuments> {
-  return http.get<ClientWithDocuments>(`/clients/${clientId}`);
+  const response = await http.get<{
+    data: ClientApiResponse & { documents: ClientDocumentApiResponse[] };
+  }>(`/clients/${clientId}`);
+  const clientData = response.data;
+  return {
+    ...transformClient(clientData),
+    documents: clientData.documents.map(transformClientDocument),
+  };
 }
 
 /**
@@ -77,7 +140,8 @@ export async function updateClient(
   clientId: number,
   data: UpdateClientRequest
 ): Promise<Client> {
-  return http.patch<Client>(`/clients/${clientId}`, data);
+  const response = await http.patch<ClientApiResponse>(`/clients/${clientId}`, data);
+  return transformClient(response);
 }
 
 /**
@@ -95,10 +159,16 @@ export async function deleteClient(clientId: number): Promise<void> {
  * List all clients with full documents array in a single API call.
  */
 export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
-  const response = await http.get<{ data: ClientWithDocuments[]; meta: any }>("/clients/full-data?page=1&per_page=50");
+  const response = await http.get<{
+    data: (ClientApiResponse & { documents: ClientDocumentApiResponse[] })[];
+    meta: any;
+  }>("/clients/full-data?page=1&per_page=50");
   console.log('[client.service] Full data API response:', response);
   console.log('[client.service] Clients array:', response.data);
-  return response.data;
+  return response.data.map(clientData => ({
+    ...transformClient(clientData),
+    documents: clientData.documents.map(transformClientDocument),
+  }));
 }
 
 /**
@@ -128,7 +198,8 @@ export async function uploadDocument(
   const formData = new FormData();
   formData.append("file", file);
 
-  return http.post<ClientDocument>(`/clients/${clientId}/documents`, formData);
+  const response = await http.post<ClientDocumentApiResponse>(`/clients/${clientId}/documents`, formData);
+  return transformClientDocument(response);
 }
 
 /**

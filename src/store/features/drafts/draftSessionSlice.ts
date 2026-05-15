@@ -20,6 +20,7 @@ export const INITIAL_DRAFT_SESSION_STATE = {
   autoSaveEnabled: true,
   draftStage: "template_selection" as DraftStage,
   completedSteps: [] as number[],
+  isSaving: false as boolean,
 };
 
 interface DraftSessionState {
@@ -27,12 +28,14 @@ interface DraftSessionState {
   autoSaveEnabled: boolean;
   draftStage: DraftStage;
   completedSteps: number[];
+  isSaving: boolean;
 
   setCurrentDraftId: (id: string | null) => void;
   setAutoSaveEnabled: (enabled: boolean) => void;
   setDraftStage: (stage: DraftStage) => void;
   setCompletedSteps: (steps: number[]) => void;
   markStepCompleted: (stepId: number) => void;
+  setIsSaving: (saving: boolean) => void;
   resetDraftSession: () => void;
   reset: () => void;
 }
@@ -42,6 +45,7 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   autoSaveEnabled: true,
   draftStage: "template_selection",
   completedSteps: [],
+  isSaving: false,
 
   setCurrentDraftId: (id: string | null) => {
     set({ currentDraftId: id });
@@ -68,6 +72,10 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
           : [...currentSteps, stepId],
       };
     });
+  },
+
+  setIsSaving: (saving: boolean) => {
+    set({ isSaving: saving });
   },
 
   resetDraftSession: () => {
