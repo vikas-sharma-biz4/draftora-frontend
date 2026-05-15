@@ -2,11 +2,36 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useProposalWizard, useProposalDraftSession } from "@/context/ProposalContext";
-import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import {
+  useTemplateType,
+  useTemplateId,
+  useProposalDescription,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useCurrentStep,
+  useMaxStepReached,
+  useCurrentProposalId,
+  useProposalTitle,
+  useClientName,
+  useClientId,
+  useWizardActions,
+  useFilesMeta,
+  useSelectedDocumentIds,
+  useWebReferences,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import { getDraftByProposalId, getDraft } from "@/services/draft.service";
 import type { DraftLocation, SaveDraftPayload, DraftUIState } from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
+
+const WIZARD_AUTOSAVE_FALLBACK_KEY = "wizard_autosave_fallback";
+const DRAFT_SAVE_LOCK_KEY = "draft_save_lock";
+const DRAFT_DEDUP_KEY = "draft_dedup";
 
 interface UseWizardAutoSaveOptions {
   enabled: boolean;
@@ -15,7 +40,7 @@ interface UseWizardAutoSaveOptions {
 
 /**
  * Production-grade auto-save hook for wizard/pipeline steps
- * 
+ *
  * Features:
  * - Debounced auto-save on state changes
  * - Save on route navigation
@@ -26,28 +51,44 @@ interface UseWizardAutoSaveOptions {
  */
 export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled: true }): void {
   const { enabled, debounceMs = 2000 } = options;
-  
-  const {
-    proposalData,
-    currentStep,
-    maxStepReached,
-    currentProposalId,
-  } = useProposalWizard();
-  
-  const { draftStage, completedSteps } = useProposalDraftSession();
+
+  // Use granular selectors instead of entire proposalData object
+  const title = useProposalTitle();
+  const clientName = useClientName();
+  const clientId = useClientId();
+  const description = useProposalDescription();
+  const selectedSections = useSelectedSections();
+  const sectionDisplayNames = useSectionDisplayNames();
+  const tone = useTone();
+  const lengthPreference = useLengthPreference();
+  const language = useLanguage();
+  const aiModel = useAiModel();
+  const templateId = useTemplateId();
+  const templateType = useTemplateType();
+  const filesMeta = useFilesMeta();
+  const selectedDocumentIds = useSelectedDocumentIds();
+  const webReferences = useWebReferences();
+
+  const currentStep = useCurrentStep();
+  const maxStepReached = useMaxStepReached();
+  const currentProposalId = useCurrentProposalId();
+  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const completedSteps = useDraftSessionStore(state => state.completedSteps);
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
-  
+
   const pathname = usePathname();
   const router = useRouter();
-  
+
   // Refs to track state without causing re-renders
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>("");
-  const isSavingRef = useRef<boolean>(false);
   const isUnmountingRef = useRef<boolean>(false);
+  const previousPathnameRef = useRef<string>("");
+  const pendingDraftIdRef = useRef<string | null>(null);
+  const isSavingRef = useRef<boolean>(false);
 
   // Determine lastLocation based on current pathname
   const getLastLocation = useCallback((): DraftLocation => {
@@ -61,13 +102,13 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   // Check if there's meaningful data to save
   const hasData = useCallback((): boolean => {
     return (
-      proposalData.title.trim() !== "" ||
-      proposalData.clientName.trim() !== "" ||
-      proposalData.description.trim() !== "" ||
-      (proposalData.selectedSections && proposalData.selectedSections.length > 0) ||
-      proposalData.clientId !== undefined
+      title.trim() !== "" ||
+      clientName.trim() !== "" ||
+      description.trim() !== "" ||
+      (selectedSections && selectedSections.length > 0) ||
+      clientId !== undefined
     );
-  }, [proposalData]);
+  }, [title, clientName, description, selectedSections, clientId]);
 
   // Capture UI state for restoration
   const captureUIState = useCallback((): DraftUIState => {
@@ -81,60 +122,153 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
   // Core save function
   const saveDraft = useCallback(async (force: boolean = false): Promise<void> => {
-    if (!enabled || isSavingRef.current) return;
-    if (!hasData()) {
-      logger.debug('[useWizardAutoSave] No data to save');
+    // Prevent concurrent saves using ref (more reliable than localStorage for same-tab races)
+    if (!enabled || isSavingRef.current) {
+      logger.debug('[useWizardAutoSave] Save already in progress, skipping');
       return;
     }
 
-    // Create a hash of current data to detect changes
-    const currentDataHash = JSON.stringify({
-      title: proposalData.title,
-      clientName: proposalData.clientName,
-      clientId: proposalData.clientId,
-      description: proposalData.description,
-      selectedSections: proposalData.selectedSections,
-      tone: proposalData.tone,
-      lengthPreference: proposalData.lengthPreference,
-    });
-
-    // Skip if data hasn't changed (unless forced)
-    if (!force && currentDataHash === lastSavedDataRef.current) {
-      logger.debug('[useWizardAutoSave] No changes detected, skipping save');
+    // Never save drafts while on the generating page — generation mutates proposal state
+    if (pathname.startsWith("/generating")) {
+      logger.debug('[useWizardAutoSave] On generating page, skipping save');
       return;
     }
 
     isSavingRef.current = true;
 
+    // Use the pendingDraftIdRef to catch newly created IDs before React re-renders
+    const effectiveDraftId = currentDraftId || pendingDraftIdRef.current;
+
+    // Skip if we just created a draft with this exact data (prevents rapid duplicate creation)
+    if (!effectiveDraftId) {
+      const dedupValue = localStorage.getItem(DRAFT_DEDUP_KEY);
+      if (dedupValue) {
+        const dedupData = JSON.parse(dedupValue);
+        const timeDiff = Date.now() - dedupData.timestamp;
+        const isSameData = dedupData.title === title && dedupData.clientName === clientName;
+
+        if (isSameData && timeDiff < 10000) {
+          logger.debug('[useWizardAutoSave] Duplicate draft detected, skipping', { timeDiff, title, clientName });
+          isSavingRef.current = false;
+          return;
+        }
+      }
+    }
+    
+    if (!hasData()) {
+      logger.debug('[useWizardAutoSave] No data to save');
+      isSavingRef.current = false;
+      return;
+    }
+
+    // Create a hash of current data to detect changes
+    const currentDataHash = JSON.stringify({
+      title,
+      clientName,
+      clientId,
+      description,
+      selectedSections,
+      tone,
+      lengthPreference,
+    });
+
+    // Skip if data hasn't changed (unless forced)
+    if (!force && currentDataHash === lastSavedDataRef.current) {
+      logger.debug('[useWizardAutoSave] No changes detected, skipping save');
+      isSavingRef.current = false;
+      return;
+    }
+
     try {
       const uiState = captureUIState();
       const lastLocation = getLastLocation();
 
+      // Fetch existing draft to preserve generated content if proposal exists
+      let existingGeneratedContent: Record<string, string> = {};
+      if (currentProposalId) {
+        try {
+          const existingDraft = await getDraftByProposalId(currentProposalId);
+          if (existingDraft) {
+            const fullDraft = await getDraft(existingDraft.id);
+            existingGeneratedContent = fullDraft.generatedContent || {};
+            logger.debug('[useWizardAutoSave] Preserved existing generated content', {
+              sectionCount: Object.keys(existingGeneratedContent).length
+            });
+          }
+        } catch (error) {
+          logger.warn('[useWizardAutoSave] Failed to fetch existing draft for content preservation', error);
+        }
+      }
+
+      // Include sections from proposalData if available (for completed proposals)
+      const sectionsContent: Record<string, string> = {}; // Will be populated from API response
+
+      // Construct minimal proposalData object for backward compatibility
+      const proposalDataForSave = {
+        title,
+        clientName,
+        clientId,
+        description,
+        selectedSections,
+        sectionDisplayNames,
+        tone,
+        lengthPreference,
+        language,
+        aiModel,
+        templateId,
+        templateType,
+        files: [],
+        filesMeta,
+        selectedDocumentIds,
+        customSections: [],
+        contextualInstructions: "",
+        webReferences,
+      } as any; // Type assertion for backward compatibility
+
       const draftPayload: SaveDraftPayload = {
         proposalId: currentProposalId,
-        title: proposalData.title || "Untitled Proposal",
-        clientName: proposalData.clientName || "",
+        title: title || "Untitled Proposal",
+        clientName: clientName || "",
         status: "draft",
         lastLocation,
         stage: draftStage,
         wizardState: {
-          proposalData: { ...proposalData, files: [] },
+          proposalData: proposalDataForSave,
           currentStep,
           maxStepReached,
           completedSteps,
         },
-        generatedContent: {},
+        generatedContent: Object.keys(sectionsContent).length > 0 ? sectionsContent : existingGeneratedContent,
         uiState,
       };
 
-      if (currentDraftId) {
+      logger.info('[useWizardAutoSave] Saving draft', {
+        proposalId: currentProposalId,
+        hasGeneratedContent: Object.keys(draftPayload.generatedContent).length > 0,
+        sectionCount: Object.keys(draftPayload.generatedContent).length,
+        stage: draftStage,
+        lastLocation,
+      });
+
+      if (effectiveDraftId) {
         // Update existing draft
-        await updateDraftInStore(currentDraftId, draftPayload);
-        logger.info('[useWizardAutoSave] Draft updated', { draftId: currentDraftId });
+        await updateDraftInStore(effectiveDraftId, draftPayload);
+        logger.info('[useWizardAutoSave] Draft updated', { draftId: effectiveDraftId });
       } else {
         // Create new draft
         const saved = await saveDraftToStore(draftPayload);
+
+        // Immediately set the pending ref so the next save call updates instead of creating
+        pendingDraftIdRef.current = saved.id;
         setCurrentDraftId(saved.id);
+
+        // Store deduplication data to prevent duplicate creation
+        localStorage.setItem(DRAFT_DEDUP_KEY, JSON.stringify({
+          title,
+          clientName,
+          timestamp: Date.now()
+        }));
+
         logger.info('[useWizardAutoSave] Draft created', { draftId: saved.id });
       }
 
@@ -147,8 +281,23 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     }
   }, [
     enabled,
+    pathname,
     hasData,
-    proposalData,
+    title,
+    clientName,
+    clientId,
+    description,
+    selectedSections,
+    sectionDisplayNames,
+    tone,
+    lengthPreference,
+    language,
+    aiModel,
+    templateId,
+    templateType,
+    filesMeta,
+    selectedDocumentIds,
+    webReferences,
     currentStep,
     maxStepReached,
     completedSteps,
@@ -181,7 +330,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [enabled, hasData, saveDraft, debounceMs, proposalData, currentStep, draftStage]);
+  }, [enabled, hasData, saveDraft, debounceMs, title, clientName, clientId, description, selectedSections, sectionDisplayNames, filesMeta, selectedDocumentIds, webReferences, currentStep, draftStage]);
 
   // Save on beforeunload (browser close/refresh)
   useEffect(() => {
@@ -192,15 +341,36 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         // Attempt synchronous save to localStorage as fallback
         try {
           const fallbackData = {
-            proposalData: { ...proposalData, files: [] },
+            proposalData: {
+              title,
+              clientName,
+              clientId,
+              description,
+              selectedSections,
+              sectionDisplayNames,
+              tone,
+              lengthPreference,
+              language,
+              aiModel,
+              templateId,
+              templateType,
+              files: [],
+              filesMeta,
+              selectedDocumentIds,
+              customSections: [],
+              contextualInstructions: "",
+              webReferences,
+            },
             currentStep,
             maxStepReached,
             completedSteps,
             draftStage,
             timestamp: Date.now(),
           };
-          localStorage.setItem('wizard_autosave_fallback', JSON.stringify(fallbackData));
-          logger.info('[useWizardAutoSave] Fallback save to localStorage');
+          if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+            localStorage.setItem(WIZARD_AUTOSAVE_FALLBACK_KEY, JSON.stringify(fallbackData));
+            logger.info('[useWizardAutoSave] Fallback save to localStorage');
+          }
         } catch (error) {
           logger.error('[useWizardAutoSave] Fallback save failed', error);
         }
@@ -212,7 +382,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [enabled, hasData, saveDraft, proposalData, currentStep, maxStepReached, completedSteps, draftStage]);
+  }, [enabled, hasData, saveDraft, title, clientName, clientId, description, selectedSections, sectionDisplayNames, filesMeta, selectedDocumentIds, webReferences, tone, lengthPreference, language, aiModel, templateId, templateType, currentStep, maxStepReached, completedSteps, draftStage]);
 
   // Save on visibility change (tab switch)
   useEffect(() => {
@@ -229,31 +399,44 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [enabled, hasData, saveDraft]);
 
-  // Save on component unmount
-  useEffect(() => {
-    return () => {
-      isUnmountingRef.current = true;
-      if (hasData()) {
-        logger.info('[useWizardAutoSave] Component unmounting, saving draft');
-        void saveDraft(true);
-      }
-    };
-  }, [hasData, saveDraft]);
+  // Save on component unmount - DISABLED to prevent duplicate drafts on navigation
+  // useEffect(() => {
+  //   return () => {
+  //     isUnmountingRef.current = true;
+  //     if (hasData()) {
+  //       logger.info('[useWizardAutoSave] Component unmounting, saving draft');
+  //       void saveDraft(true);
+  //     }
+  //   };
+  // }, [hasData, saveDraft]);
 
   // Save on route change (Next.js navigation)
   useEffect(() => {
     if (!enabled) return;
 
-    // Save when pathname changes (user navigates away)
+    // Only save when navigating AWAY from wizard pages (parameters, review, generating)
+    // Don't save when navigating TO wizard pages or between wizard pages
     const handleRouteChange = (): void => {
-      if (hasData() && !isUnmountingRef.current) {
-        logger.info('[useWizardAutoSave] Route changing, saving draft');
+      const isLeavingWizardPage = 
+        (previousPathnameRef.current === "/parameters" || 
+         previousPathnameRef.current === "/review" ||
+         previousPathnameRef.current?.startsWith("/generating")) &&
+        (pathname !== "/parameters" && 
+         pathname !== "/review" && 
+         !pathname.startsWith("/generating"));
+
+      if (isLeavingWizardPage && hasData() && !isUnmountingRef.current) {
+        logger.info('[useWizardAutoSave] Leaving wizard page, saving draft', {
+          from: previousPathnameRef.current,
+          to: pathname
+        });
         void saveDraft(true);
       }
+
+      // Update previous pathname for next comparison
+      previousPathnameRef.current = pathname;
     };
 
-    // Next.js doesn't expose a direct route change event, but pathname changes trigger this effect
-    // We save on pathname change as a proxy for route navigation
     handleRouteChange();
   }, [pathname, enabled, hasData, saveDraft]);
 }

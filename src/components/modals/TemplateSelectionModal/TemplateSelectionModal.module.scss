@@ -343,6 +343,10 @@
   background: var(--color-primary-light);
 }
 
+.clientOption.highlighted {
+  background: var(--color-primary-light);
+}
+
 .clientOptionMain {
   display: flex;
   align-items: center;

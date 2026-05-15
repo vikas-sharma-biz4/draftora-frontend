@@ -14,7 +14,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/utils/logger";
-import { useProposalWizard, useProposalPipeline, useProposalDraftSession } from "@/context/ProposalContext";
+import { useCurrentStep, useMaxStepReached, useCurrentProposalId, useEditMode, useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import {
   getProposal,
@@ -39,9 +41,11 @@ export function useProposalPageData(
   searchParams: URLSearchParams
 ): UseProposalPageDataReturn {
   const router = useRouter();
-  const { setCurrentProposalId, updateProposalData } = useProposalWizard();
-  const { syncVisitedStepsFromBackend } = useProposalPipeline();
-  const { setDraftStage, setCompletedSteps, markStepCompleted } = useProposalDraftSession();
+  const { setCurrentProposalId, updateProposalData } = useWizardActions();
+  const { syncVisitedStepsFromBackend } = usePipelineSteps();
+  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
+  const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -52,6 +56,7 @@ export function useProposalPageData(
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeSectionRef = useRef<string>(activeSection);
+  const hasSyncedStepsRef = useRef<boolean>(false);
 
   useEffect(() => {
     activeSectionRef.current = activeSection;
@@ -68,10 +73,16 @@ export function useProposalPageData(
     markStepCompleted(3);
   }, [markStepCompleted]);
 
-  // Sync visited steps from backend on mount
+  // Sync visited steps from backend after proposal is fetched
   useEffect(() => {
-    if (proposalId) {
+    // Reset sync flag when proposalId changes
+    hasSyncedStepsRef.current = false;
+  }, [proposalId]);
+
+  useEffect(() => {
+    if (proposalId && proposal && !hasSyncedStepsRef.current) {
       syncVisitedStepsFromBackend(proposalId);
+      hasSyncedStepsRef.current = true;
     }
   }, [proposalId, syncVisitedStepsFromBackend]);
 

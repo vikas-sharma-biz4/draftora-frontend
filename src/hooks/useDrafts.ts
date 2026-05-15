@@ -1,6 +1,6 @@
 /**
  * Custom hook for accessing draft state
- * 
+ *
  * Provides automatic data fetching and memoized selectors
  */
 
@@ -23,23 +23,24 @@ interface UseDraftsReturn {
 
 export function useDrafts(options: UseDraftsOptions = {}): UseDraftsReturn {
   const { autoFetch = true, force = false } = options;
-  
+
   const drafts = useDraftStore(state => state.drafts);
   const isLoading = useDraftStore(state => state.isLoading);
   const error = useDraftStore(state => state.error);
   const fetchDrafts = useDraftStore(state => state.fetchDrafts);
-  const getDraftById = useDraftStore(state => state.getDraftById);
-  
+  const getDraftById = (id: string) => useDraftStore(state => state.getDraftById(id));
+
   useEffect(() => {
     if (autoFetch) {
       fetchDrafts(force);
     }
-  }, [autoFetch, force, fetchDrafts]);
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const refetch = useCallback(async () => {
     await fetchDrafts(true);
   }, [fetchDrafts]);
-  
+
   return {
     drafts,
     isLoading,

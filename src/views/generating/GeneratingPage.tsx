@@ -1,160 +1,178 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { cancelProposal, getProposal } from "@/services/proposal.service";
-import { GENERATION_STEPS, DRAFTS_STORAGE_KEY } from "@/constants";
-import { useProposalWizard } from "@/context/ProposalContext";
+import { cancelProposal } from "@/services/proposal.service";
+import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { logger } from "@/utils/logger";
-import { useProposalStatusStream } from "@/hooks/useProposalStatusStream";
+import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";
+import { useGenerationStore } from "@/store/features/generation/generationSlice";
 import Button from "@/components/common/Button";
+import CircularProgress from "@/components/common/CircularProgress";
 
 export default function GeneratingPage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
   const proposalId = Number(params.id);
-  const { setIsGenerating, resetProposal } = useProposalWizard();
 
-  const [generatingSection, setGeneratingSection] = useState<string | null>(null);
-  const [totalSections, setTotalSections] = useState<number>(0);
-  const [completedSections, setCompletedSections] = useState<number>(0);
-  const [currentStage, setCurrentStage] = useState<string | null>(null);
-  // Tracks whether the proposal finished normally — prevents cancel call on
-  // the successful redirect to the proposal page.
-  const completedRef = useRef<boolean>(false);
+  const { setIsGenerating, resetProposal } = useWizardActions();
 
-  const handleCompleted = useCallback(async () => {
-    completedRef.current = true;
-    setIsGenerating(false);
-
-    // Clean up sessionStorage
-    sessionStorage.removeItem("pending_proposal_id");
-    sessionStorage.removeItem("generation_status");
-
-    // Fetch the full proposal and save as draft
-    try {
-      const proposalData = await getProposal(proposalId);
-
-      const draftItem = {
-        id: proposalId.toString(),
-        title: proposalData.title,
-        clientName: proposalData.clientName,
-        stage: "generated" as const,
-        status: "pending_approval" as const,
-        createdAt: proposalData.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        data: proposalData,
-      };
-
-      const drafts: Array<{ id: string }> = JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) || "[]");
-      const existingIndex = drafts.findIndex((d) => d.id === draftItem.id);
-
-      if (existingIndex >= 0) {
-        drafts[existingIndex] = draftItem;
-      } else {
-        drafts.unshift(draftItem);
-      }
-
-      localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
-    } catch (error) {
-      logger.error("Failed to save draft:", error);
-    }
-
-    router.push(`/proposal/${proposalId}`);
-  }, [proposalId, router, setIsGenerating]);
-
+  // Zustand store for generation state
   const {
     status,
-    errorMessage,
-    isPolling,
-    pollCount,
-    stop: stopStream,
-  } = useProposalStatusStream({
-    proposalId,
-    onStatusUpdate: (data) => {
-      console.log("[GeneratingPage] Status update:", {
-        status: data.status,
-        currentStage: data.currentStage,
-        generatingSection: data.generatingSection,
-        completedSections: data.completedSections,
-        selectedSections: data.selectedSections,
-      });
-      setGeneratingSection(data.generatingSection ?? null);
-      setCurrentStage(data.currentStage ?? null);
-      const total = data.selectedSections?.length ?? 0;
-      const completed = data.completedSections.length;
-      setTotalSections(total);
-      setCompletedSections(completed);
-    },
-    onCompleted: () => {
-      void handleCompleted();
-    },
-    onFailed: () => {
-      completedRef.current = true;
-    },
-    onCancelled: () => {
-      completedRef.current = true;
-      setIsGenerating(false);
-      router.push("/review");
-    },
-  });
-
-  // Drive progress from real backend section completion ratio
-  const sectionRatio = totalSections > 0 ? completedSections / totalSections : 0;
-  const progressPercent = Math.min(Math.round(sectionRatio * 90) + 5, 90);
-  
-  console.log("[GeneratingPage] Progress calculation:", {
+    currentStage,
+    progressPercent,
     totalSections,
     completedSections,
-    sectionRatio,
-    progressPercent,
-    currentStage,
-    generatingSection,
+    currentSection,
+    selectedSections,
+    completedSectionKeys,
+    isConnected,
+    isConnecting,
+    error,
+    setProposalId,
+    setJobId,
+    setStatus,
+    setCurrentStage,
+    setProgressPercent,
+    setCurrentSection,
+    setSelectedSections,
+    addCompletedSection,
+    setTotalSections,
+    setConnectionState,
+    setError,
+    setStartedAt,
+    setCompletedAt,
+    reset: resetGenerationState,
+  } = useGenerationStore();
+
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setProposalId(proposalId);
+    setStartedAt(new Date().toISOString());
+  }, [proposalId, setProposalId, setStartedAt]);
+
+  const handleCompleted = useCallback(() => {
+    logger.info("[GeneratingPage] Generation completed, navigating to proposal view", { proposalId });
+    setIsGenerating(false);
+    setCompletedAt(new Date().toISOString());
+    
+    // Navigate to proposal view
+    router.push(`/proposal/${proposalId}`);
+  }, [proposalId, router, setIsGenerating, setCompletedAt]);
+
+  const handleFailed = useCallback((message: string) => {
+    logger.error("[GeneratingPage] Generation failed", { message, proposalId });
+    setIsGenerating(false);
+    setError(message);
+  }, [proposalId, setIsGenerating, setError]);
+
+  const handleCancelled = useCallback(() => {
+    logger.info("[GeneratingPage] Generation cancelled", { proposalId });
+    setIsGenerating(false);
+    router.push("/review");
+  }, [proposalId, router, setIsGenerating]);
+
+  const handleStageChanged = useCallback((stage: string) => {
+    logger.info("[GeneratingPage] Stage changed", { stage, proposalId });
+    setCurrentStage(stage);
+  }, [proposalId, setCurrentStage]);
+
+  const handleSectionStarted = useCallback((section: string) => {
+    logger.info("[GeneratingPage] Section started", { section, proposalId });
+    setCurrentSection(section);
+  }, [proposalId, setCurrentSection]);
+
+  const handleSectionCompleted = useCallback((section: string, completed: number, total: number) => {
+    logger.info("[GeneratingPage] Section completed", { section, completed, total, proposalId });
+    addCompletedSection(section);
+    // Calculate and set progress percentage
+    const progress = total > 0 ? (completed / total) * 100 : 0;
+    setProgressPercent(progress);
+  }, [proposalId, addCompletedSection, setProgressPercent]);
+
+  const handleProgress = useCallback((percent: number) => {
+    setProgressPercent(percent);
+  }, [setProgressPercent]);
+
+  const handleError = useCallback((err: Error) => {
+    logger.error("[GeneratingPage] Stream error", { error: err.message, proposalId });
+    setError(err.message);
+    // If the SSE endpoint is unavailable (fatal error), mark status as failed
+    // so the error UI renders instead of the infinite connecting spinner
+    if (err.message.includes("unavailable") || err.message.includes("rejected")) {
+      setStatus("failed");
+    }
+  }, [proposalId, setError, setStatus]);
+
+  // SSE streaming hook
+  const { disconnect, isConnected: sseConnected, error: sseError } = useProposalGenerationStream({
+    proposalId,
+    enabled: mounted && !isNaN(proposalId),
+    onConnected: (data: { selectedSections: string[]; totalSections: number; proposalStatus: string }) => {
+      logger.info("[GeneratingPage] SSE connected", { proposalId, ...data });
+      setConnectionState(true, false);
+      // Populate section list from connected event metadata
+      if (data.selectedSections.length > 0) {
+        setSelectedSections(data.selectedSections);
+      }
+      if (data.totalSections > 0) {
+        setTotalSections(data.totalSections);
+      }
+      // If proposal is already completed by the time we connect, navigate directly
+      if (data.proposalStatus === "completed") {
+        handleCompleted();
+      }
+    },
+    onStageChanged: handleStageChanged,
+    onSectionStarted: handleSectionStarted,
+    onSectionCompleted: handleSectionCompleted,
+    onProgress: handleProgress,
+    onCompleted: handleCompleted,
+    onFailed: handleFailed,
+    onCancelled: handleCancelled,
+    onError: handleError,
+    onLegacy: (proposalStatus: string) => {
+      // Legacy proposal without SSE streaming — navigate to proposal view
+      // if it's already completed, otherwise show a message
+      logger.info("[GeneratingPage] Legacy proposal detected", { proposalId, proposalStatus });
+      if (proposalStatus === "completed") {
+        router.push(`/proposal/${proposalId}`);
+      } else {
+        // Proposal is still generating but without SSE support.
+        // Show a simplified waiting state and poll.
+        setError("This proposal was created before real-time streaming was enabled. Please wait...");
+        setStatus("queued");
+      }
+    },
   });
 
-  // Map current stage to step index for accurate progress display
-  const getActiveStepIndex = (): number => {
-    if (!currentStage) {
-      if (sectionRatio < 0.05) return 0;
-      if (sectionRatio < 0.20) return 1;
-      if (sectionRatio < 0.85) return 2;
-      if (sectionRatio < 0.97) return 3;
-      return GENERATION_STEPS.length - 1;
+  const handleCancel = useCallback(async () => {
+    logger.info("[GeneratingPage] Cancelling generation", { proposalId });
+    disconnect();
+    
+    try {
+      await cancelProposal(proposalId);
+      setIsGenerating(false);
+      router.push("/review");
+    } catch (err) {
+      logger.error("[GeneratingPage] Failed to cancel generation", err);
+      setError("Failed to cancel generation");
     }
+  }, [proposalId, disconnect, setIsGenerating, router, setError]);
 
-    switch (currentStage) {
-      case "parsing":
-        return 0;
-      case "validating":
-        return 1;
-      case "generating":
-        if (sectionRatio < 0.33) return 2;
-        if (sectionRatio < 0.90) return 3;
-        return 4;
-      case "finalizing":
-        return 5;
-      default:
-        return 0;
-    }
-  };
-
-  const activeStepIndex = getActiveStepIndex();
-
-  const radius = 88;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset =
-    circumference - (progressPercent / 100) * circumference;
-
-  if (errorMessage) {
-    completedRef.current = true;
+  // Error state
+  if (error && status === "failed") {
     return (
       <div className="generating-page">
         <div className="generating-container">
           <div className="generating-error-state">
             <div className="generating-error-icon">✗</div>
             <h2 className="generating-error-title">Generation Failed</h2>
-            <p className="generating-error-desc">{errorMessage}</p>
+            <p className="generating-error-desc">{error}</p>
             <div className="generating-error-actions">
               <button
                 className="btn btn-primary"
@@ -169,6 +187,7 @@ export default function GeneratingPage(): JSX.Element {
                 className="btn btn-ghost"
                 onClick={() => {
                   resetProposal();
+                  resetGenerationState();
                   router.push("/");
                 }}
               >
@@ -176,6 +195,21 @@ export default function GeneratingPage(): JSX.Element {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Connecting state
+  if (!mounted || isConnecting) {
+    return (
+      <div className="generating-page">
+        <div className="generating-container">
+          <h1 className="generating-main-title">Connecting to Generation Stream...</h1>
+          <p className="generating-main-subtitle">
+            Establishing real-time connection to track progress.
+          </p>
+          <CircularProgress progress={0} size={240} strokeWidth={8} label="Connecting..." />
         </div>
       </div>
     );
@@ -193,91 +227,57 @@ export default function GeneratingPage(): JSX.Element {
         <div className="generating-content">
           {/* Left side - Progress Circle */}
           <div className="generating-progress-section">
-            <div className="generating-circle-wrap">
-              <svg
-                width="240"
-                height="240"
-                viewBox="0 0 240 240"
-                style={{ transform: "rotate(-90deg)" }}
-                aria-hidden="true"
-              >
-                <circle
-                  cx="120"
-                  cy="120"
-                  r="110"
-                  fill="transparent"
-                  stroke="#e5e7eb"
-                  strokeWidth="8"
-                />
-                <circle
-                  cx="120"
-                  cy="120"
-                  r="110"
-                  fill="transparent"
-                  stroke="#6366f1"
-                  strokeWidth="8"
-                  strokeDasharray={2 * Math.PI * 110}
-                  strokeDashoffset={2 * Math.PI * 110 - (progressPercent / 100) * 2 * Math.PI * 110}
-                  strokeLinecap="round"
-                  style={{ transition: "stroke-dashoffset 1s ease" }}
-                />
-              </svg>
-              <div className="generating-circle-content">
-                <div className="generating-percentage">{progressPercent}%</div>
-              </div>
-            </div>
+            <CircularProgress progress={progressPercent} size={240} strokeWidth={8} label={`${Math.round(progressPercent)}%`} />
             <div className="generating-time-label">TIME REMAINING</div>
             <div className="generating-time-value">30-45 seconds</div>
-            {isPolling && (
-              <div className="generating-poll-badge">
-                Polling ({pollCount}/{120})
+            {isConnected && (
+              <div className="generating-connection-badge">
+                ✓ Connected via SSE
               </div>
             )}
           </div>
 
           {/* Right side - Build Sequence */}
           <div className="generating-sequence-section">
-            <div className="generating-sequence-header">BUILD SEQUENCE</div>
+            <div className="generating-sequence-header">
+              GENERATING SECTIONS ({completedSections}/{totalSections})
+            </div>
             <ul className="generating-sequence-list">
-              {[
-                "Analyzing source materials...",
-                "Mapping strategic objectives...",
-                "Generating executive summary...",
-                "Drafting technical specifications...",
-                "Polishing final document structure."
-              ].map((step, index) => {
-                const isDone = index < Math.floor(progressPercent / 20);
-                const isActive = index === Math.floor(progressPercent / 20);
-                return (
-                  <li
-                    key={index}
-                    className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}`}
-                  >
-                    <span className="generating-sequence-icon">
-                      {isDone ? "✓" : isActive ? "◐" : "○"}
-                    </span>
-                    <span className="generating-sequence-text">{step}</span>
-                  </li>
-                );
-              })}
+              {selectedSections.length > 0 ? (
+                selectedSections.map((section) => {
+                  const isDone = completedSectionKeys.includes(section);
+                  const isActive = currentSection === section;
+                  return (
+                    <li
+                      key={section}
+                      className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}`}
+                    >
+                      <span className="generating-sequence-icon">
+                        {isDone ? "✓" : isActive ? "◐" : "○"}
+                      </span>
+                      <span className="generating-sequence-text">
+                        {section}
+                        {isActive && <span className="generating-sequence-status"> - Generating...</span>}
+                      </span>
+                    </li>
+                  );
+                })
+              ) : (
+                <li className="generating-sequence-item">
+                  <span className="generating-sequence-icon">○</span>
+                  <span className="generating-sequence-text">Loading sections...</span>
+                </li>
+              )}
             </ul>
           </div>
         </div>
 
-        <Button
-          variant="danger"
-          size="md"
-          onClick={async () => {
-            completedRef.current = true;
-            stopStream();
-            await cancelProposal(proposalId).catch(() => undefined);
-            setIsGenerating(false);
-            router.push("/review");
-          }}
+        <button
+          onClick={handleCancel}
           className="generating-cancel-btn"
         >
           Cancel Generation
-        </Button>
+        </button>
       </div>
     </div>
   );
