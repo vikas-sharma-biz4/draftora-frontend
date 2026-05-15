@@ -124,6 +124,7 @@ export default function TemplateSelectionModal({
   const [selectedTemplateIdState, setSelectedTemplateIdState] = useState<string | null>(templateId ?? null);
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [showClientDropdown, setShowClientDropdown] = useState<boolean>(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [uploadedFiles, setUploadedFiles] = useState<
     { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
   >([]);
@@ -315,6 +316,7 @@ export default function TemplateSelectionModal({
   function handleClientSearchChange(value: string): void {
     setClientSearchQuery(value);
     setShowClientDropdown(true);
+    setHighlightedIndex(-1);
     if (!value.trim()) {
       setSelectedClientId(null);
     }
@@ -325,7 +327,47 @@ export default function TemplateSelectionModal({
   }
 
   function handleClientSearchBlur(): void {
-    setTimeout(() => setShowClientDropdown(false), 300);
+    setTimeout(() => {
+      setShowClientDropdown(false);
+      setHighlightedIndex(-1);
+    }, 300);
+  }
+
+  function handleClientKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+    if (!showClientDropdown || filteredClients.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev < filteredClients.length - 1) {
+            return prev + 1;
+          }
+          return prev;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => {
+          if (prev > 0) {
+            return prev - 1;
+          }
+          return 0;
+        });
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < filteredClients.length) {
+          const client = filteredClients[highlightedIndex];
+          handleClientSelect(client.id, client.name);
+          setHighlightedIndex(-1);
+        }
+        break;
+      case "Escape":
+        setShowClientDropdown(false);
+        setHighlightedIndex(-1);
+        break;
+    }
   }
 
   function toggleDocument(docId: number): void {
@@ -565,6 +607,10 @@ export default function TemplateSelectionModal({
     setDraftStage("wizard_in_progress");
     setCurrentStep(4);
     setShouldStartBackgroundFetch(true);
+
+    // Trigger AI-based recommendations prefetch
+    void prefetchRecommendations();
+
     router.push("/parameters");
     onClose();
   }
@@ -852,15 +898,71 @@ export default function TemplateSelectionModal({
           ) : (
             <>
               {(enableTemplateSelection || showTemplateSelector || (selectedClientId && !templateId && !isScratch)) && (
-                <div className={styles.section}>
-                  <label className={styles.label}>Select a Template</label>
-                  <div className={styles.templateGrid}>
-                    {PROPOSAL_TEMPLATES.map((template) => (
+            <div className={styles.section}>
+              <label className={styles.label}>Select a Template</label>
+              <div className={styles.templateGrid}>
+                {PROPOSAL_TEMPLATES.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className={`${styles.templateCard} ${selectedTemplateIdState === template.id ? styles.selected : ""}`}
+                    onClick={() => setSelectedTemplateIdState(template.id)}
+                  >
+                    <div className={styles.templateCardIcon}>{template.icon}</div>
+                    <div className={styles.templateCardInfo}>
+                      <div className={styles.templateCardTitle}>{template.name}</div>
+                      <div className={styles.templateCardDescription}>{template.description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.section}>
+            <label className={styles.label}>Client Name</label>
+            {loading ? (
+              <div className={styles.noClients}>
+                <p>Loading clients...</p>
+              </div>
+            ) : clients.length === 0 ? (
+              <div className={styles.noClients}>
+                <p>No clients found. Create your first client to continue.</p>
+                <Button variant="primary" size="sm" onClick={handleNewClientClick}>
+                  <Plus size={16} />
+                  New Client
+                </Button>
+              </div>
+            ) : (
+              <div className={styles.searchWrapper}>
+                <div className={styles.searchInputWrapper}>
+                  <Input
+                    type="text"
+                    placeholder="Search for a client..."
+                    value={clientSearchQuery}
+                    onChange={(e) => handleClientSearchChange(e.target.value)}
+                    onFocus={handleClientSearchFocus}
+                    onBlur={handleClientSearchBlur}
+                    onKeyDown={handleClientKeyDown}
+                    className={styles.searchInput}
+                  />
+                  <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
+                    <Plus size={16} />
+                    New Client
+                  </Button>
+                </div>
+
+                {showClientDropdown && filteredClients.length > 0 && (
+                  <div className={styles.clientDropdown}>
+                    {filteredClients.map((client, index) => (
                       <button
                         key={template.id}
                         type="button"
-                        className={`${styles.templateCard} ${selectedTemplateIdState === template.id ? styles.selected : ""}`}
-                        onClick={() => setSelectedTemplateIdState(template.id)}
+                        className={`${styles.clientOption} ${selectedClientId === client.id ? styles.selected : ""} ${index === highlightedIndex ? styles.highlighted : ""}`}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          handleClientSelect(client.id, client.name);
+                        }}
                       >
                         <div className={styles.templateCardIcon}>{template.icon}</div>
                         <div className={styles.templateCardInfo}>

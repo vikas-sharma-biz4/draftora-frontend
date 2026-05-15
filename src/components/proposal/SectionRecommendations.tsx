@@ -7,12 +7,7 @@ import { getSectionRecommendations, type SectionRecommendation } from "@/service
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
 import { logger } from "@/utils/logger";
-import {
-  usePrefetchedRecommendations,
-  useRecommendationsFetchStatus,
-  useRecommendationsError,
-  useWizardActions,
-} from "@/store/features/wizard/proposalWizardSlice";
+import { usePrefetchedRecommendations, useRecommendationsFetchStatus } from "@/store/features/wizard/proposalWizardSlice";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
@@ -54,6 +49,10 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
+  // Load prefetched recommendations from store
+  const prefetchedRecommendations = usePrefetchedRecommendations();
+  const recommendationsFetchStatus = useRecommendationsFetchStatus();
+
   const contextRef = useRef(context);
   const documentContextRef = useRef(documentContext);
   const templateIdRef = useRef(templateId);
@@ -67,61 +66,24 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     existingSectionsRef.current = existingSections;
   });
 
-  // Sync prefetched recommendations from store to local state when they become available
+  // Load prefetched recommendations when available
   useEffect(() => {
-    if (prefetchedRecommendations && recommendationsFetchStatus === 'success' && !hasUserRequested) {
-      // Only use prefetched data if user hasn't already requested (avoid overwriting user's manual regenerations)
-      const cacheKey = JSON.stringify({
-        templateId,
-        existingSections: existingSections.sort(),
-        context,
-        documentContext,
-      });
-
-      if (currentCacheKeyRef.current !== cacheKey) {
-        setRecommendations(prefetchedRecommendations);
-        setHasUserRequested(true);
-        currentCacheKeyRef.current = cacheKey;
-        logger.debug('[SectionRecommendations] Using prefetched recommendations from store', { count: prefetchedRecommendations.length });
-      }
+    if (prefetchedRecommendations && prefetchedRecommendations.length > 0 && !hasUserRequested) {
+      logger.info('[SectionRecommendations] Loading prefetched recommendations from store', { count: prefetchedRecommendations.length });
+      setRecommendations(prefetchedRecommendations);
+      setHasUserRequested(true);
     }
-  }, [prefetchedRecommendations, recommendationsFetchStatus, hasUserRequested, templateId, existingSections, context, documentContext]);
+  }, [prefetchedRecommendations, hasUserRequested]);
 
-  // Invalidate cache when template, context, or sections change
-  useEffect(() => {
-    const cacheKey = JSON.stringify({
-      templateId,
-      existingSections: existingSections.sort(),
-      context,
-      documentContext,
-    });
-
-    if (currentCacheKeyRef.current && currentCacheKeyRef.current !== cacheKey) {
-      // Context changed, invalidate cache
-      invalidateRecommendationsCache();
-      currentCacheKeyRef.current = cacheKey;
-      setRecommendations([]);
-      setHasUserRequested(false);
-      logger.debug('[SectionRecommendations] Context changed, cache invalidated', { oldKey: currentCacheKeyRef.current, newKey: cacheKey });
-    } else if (!currentCacheKeyRef.current) {
-      currentCacheKeyRef.current = cacheKey;
-    }
-  }, [templateId, existingSections, context, documentContext, invalidateRecommendationsCache]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Cancel any in-flight fetch when component unmounts
-      // Note: We don't clear the store state here as it might be used by other components
-      logger.debug('[SectionRecommendations] Component unmounting');
-    };
-  }, []);
+  // Removed automatic background fetching - user must click Generate button
 
   const fetchRecommendationsInBackground = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
+    const prompt = customPrompt ?? userPrompt;
 
-    if (!ctx && !docCtx) {
+    // Allow API call if there's either context/document context OR a user prompt
+    if (!ctx && !docCtx && !prompt) {
       return;
     }
 
@@ -130,8 +92,9 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       await prefetchRecommendations({
         templateId: templateIdRef.current ?? null,
         existingSections: existingSectionsRef.current,
-        context: ctx,
-        documentContext: docCtx,
+        existingSectionsWithRules: existingSectionsWithRules,
+        context: fullContext,
+        userPrompt: prompt || null,
       });
     } catch (error) {
       logger.error("Failed to fetch recommendations:", error);
@@ -144,8 +107,10 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
+    const prompt = customPrompt ?? userPrompt;
 
-    if (!ctx && !docCtx) {
+    // Allow API call if there's either context/document context OR a user prompt
+    if (!ctx && !docCtx && !prompt) {
       return;
     }
 
@@ -198,7 +163,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         existingSections: existingSectionsRef.current,
         existingSectionsWithRules,
         context: fullContext,
-        userPrompt: customPrompt ?? userPrompt ?? null,
+        userPrompt: prompt || null,
       });
 
       setRecommendations(recs);
@@ -237,6 +202,8 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       toast.info(`"${rec.sectionTitle}" is already in your Table of Contents`);
       return;
     }
+
+    logger.info('[SectionRecommendations] Adding section to TOC', { sectionKey, sectionTitle: rec.sectionTitle });
 
     onAddSection(sectionKey, rec.sectionTitle);
     toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
@@ -365,17 +332,17 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             )}
           </div>
 
-          {isLoading || recommendationsFetchStatus === 'pending' ? (
+          {isLoading || recommendationsFetchStatus === 'loading' ? (
             <div className={styles.loadingState}>
               <div className={styles.spinner}></div>
               <p>Loading recommendations...</p>
             </div>
-          ) : recommendations.length === 0 ? (
+          ) : hasUserRequested && recommendations.length === 0 ? (
             <div className={styles.emptyState}>
               <p>No recommendations available</p>
               <span className={styles.emptyHint}>
-                {!context && !documentContext
-                  ? "Add context or upload documents to get AI recommendations"
+                {!context && !documentContext && !userPrompt
+                  ? "Add context, upload documents, or enter a custom prompt to get AI recommendations"
                   : "All relevant sections are already selected"}
               </span>
             </div>

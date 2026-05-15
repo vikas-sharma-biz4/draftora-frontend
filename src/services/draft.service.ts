@@ -158,14 +158,7 @@ export async function updateDraft(
   draftId: string,
   payload: Partial<SaveDraftPayload>
 ): Promise<SavedDraft> {
-  if (!draftId) {
-    logger.error('[draft.service] updateDraft called without draftId');
-    throw new Error('Cannot update draft: missing draftId');
-  }
-
-  logger.info('[draft.service] Updating draft:', { draftId, title: payload.title });
-
-  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}/`, {
+  const data = await http.put<RawSavedDraft>(`/drafts/${draftId}`, {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -183,7 +176,7 @@ export async function updateDraft(
 }
 
 export async function getDraft(draftId: string): Promise<SavedDraft> {
-  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}/`, { cache: "no-store" });
+  const data = await http.get<RawSavedDraft>(`/drafts/${draftId}`, { cache: "no-store" });
   return mapSavedDraft(data);
 }
 
@@ -219,7 +212,7 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
  */
 export async function getDraftByProposalId(proposalId: number): Promise<DraftMetadata | null> {
   const data = await http.get<RawDraftListItem[]>(
-    `/drafts/?proposal_id=${proposalId}`,
+    `/drafts?proposal_id=${proposalId}`,
     { cache: "no-store" },
   );
 

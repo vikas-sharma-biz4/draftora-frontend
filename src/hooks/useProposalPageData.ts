@@ -57,6 +57,7 @@ export function useProposalPageData(
 
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeSectionRef = useRef<string>(activeSection);
+  const hasSyncedStepsRef = useRef<boolean>(false);
 
   useEffect(() => {
     activeSectionRef.current = activeSection;
@@ -73,10 +74,16 @@ export function useProposalPageData(
     markStepCompleted(3);
   }, [markStepCompleted]);
 
-  // Sync visited steps from backend on mount
+  // Sync visited steps from backend after proposal is fetched
   useEffect(() => {
-    if (proposalId) {
+    // Reset sync flag when proposalId changes
+    hasSyncedStepsRef.current = false;
+  }, [proposalId]);
+
+  useEffect(() => {
+    if (proposalId && proposal && !hasSyncedStepsRef.current) {
       syncVisitedStepsFromBackend(proposalId);
+      hasSyncedStepsRef.current = true;
     }
   }, [proposalId, syncVisitedStepsFromBackend]);
 
