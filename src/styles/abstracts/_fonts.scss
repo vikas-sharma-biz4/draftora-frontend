@@ -1,9 +1,10 @@
 // ─── Google Fonts import ─────────────────────────────────────────────────────
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap");
+// Fonts are now loaded via next/font/google in layout.tsx for better performance
+// @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
 // ─── Font stacks ─────────────────────────────────────────────────────────────
-$font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-$font-mono: "DM Mono", "SFMono-Regular", Consolas, monospace;
+$font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+$font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
 // ─── Font weights ────────────────────────────────────────────────────────────
 $font-light:    300;

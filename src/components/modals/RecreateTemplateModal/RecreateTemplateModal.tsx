@@ -20,7 +20,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 
-import styles from "../TemplateSelectionModal.module.scss";
+import styles from "../TemplateSelectionModal/TemplateSelectionModal.module.scss";
 import Button from "@/components/common/Button";
 import { Input, Select, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";

@@ -176,8 +176,8 @@ export default function ParametersPage(): JSX.Element {
         // Only sync if sections is empty (initial load) or if templateType just changed
         // AND the user hasn't made manual modifications
         if (sections.length === 0 || (!hasModifiedSections && JSON.stringify(sections.map(s => s.key)) !== JSON.stringify(templateSections.map(s => s.key)))) {
-          logger.info('[ParametersPage] Syncing from template sections', { 
-            templateType, 
+          logger.info('[ParametersPage] Syncing from template sections', {
+            templateType,
             templateCount: templateSections.length,
             currentCount: sections.length,
             hasModifiedSections
@@ -190,6 +190,32 @@ export default function ParametersPage(): JSX.Element {
     // For non-template modes, DO NOT sync - trust local state completely
     // This prevents overwriting manual additions
   }, [templateType, selectedSections, sections, hasModifiedSections]);
+
+  // Sync local sections to store when they change (for auto-save to work correctly)
+  useEffect(() => {
+    const keys = sections.map((s) => s.key);
+    const displayNames: Record<string, string> = {};
+    for (const s of sections) {
+      displayNames[s.key] = s.label;
+    }
+    // Only update if different from store
+    const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
+    const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
+    if (keysChanged || displayNamesChanged) {
+      logger.info('[ParametersPage] Syncing local sections to store', {
+        keysCount: keys.length,
+        displayNamesCount: Object.keys(displayNames).length,
+        keysChanged,
+        displayNamesChanged,
+        hasModifiedSections
+      });
+      updateProposalData({
+        selectedSections: keys,
+        sectionDisplayNames: displayNames,
+        customSections: [],
+      });
+    }
+  }, [sections, hasModifiedSections, selectedSections, sectionDisplayNames, updateProposalData]);
 
   // Invalidate recommendations cache when template or critical context changes
   useEffect(() => {
@@ -273,6 +299,43 @@ export default function ParametersPage(): JSX.Element {
     router.push("/");
   }, [setCurrentStep, router]);
 
+  const handleSaveDraftWithSync = useCallback(async (): Promise<void> => {
+    console.log('[ParametersPage] handleSaveDraftWithSync called', {
+      localSectionsCount: sections.length,
+      localSectionsKeys: sections.map(s => s.key),
+      storeSelectedSections: selectedSections,
+      storeSectionDisplayNames: sectionDisplayNames
+    });
+
+    // Sync local sections state to store before saving
+    const keys = sections.map((s) => s.key);
+    const displayNames: Record<string, string> = {};
+    for (const s of sections) {
+      displayNames[s.key] = s.label;
+    }
+
+    console.log('[ParametersPage] Syncing sections to store', {
+      keys,
+      displayNames
+    });
+
+    updateProposalData({
+      selectedSections: keys,
+      sectionDisplayNames: displayNames,
+      customSections: [],
+    });
+
+    // Wait longer for state update to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    console.log('[ParametersPage] After sync, calling handleSaveDraft');
+
+    // Then call the save draft function
+    await handleSaveDraft();
+
+    console.log('[ParametersPage] handleSaveDraft completed');
+  }, [sections, updateProposalData, handleSaveDraft, selectedSections, sectionDisplayNames]);
+
   const handleNext = useCallback(async (): Promise<void> => {
     if (sections.length === 0) {
       toast.error("Please add at least one section.");
@@ -315,14 +378,22 @@ export default function ParametersPage(): JSX.Element {
   }, [setShouldStartBackgroundFetch]);
 
   const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
-    logger.info('[ParametersPage] handleSectionsChange called', { 
+    logger.info('[ParametersPage] handleSectionsChange called', {
       isFunction: typeof newSections === 'function',
-      currentLength: sections.length 
+      currentLength: sections.length
     });
+    console.log('[ParametersPage] handleSectionsChange called', {
+      isFunction: typeof newSections === 'function',
+      currentLength: sections.length,
+      currentSections: sections.map(s => s.key)
+    });
+
     // Mark that user has made manual modifications
     setHasModifiedSections(true);
     setSections(newSections);
-  }, [sections.length]);
+
+    console.log('[ParametersPage] handleSectionsChange completed');
+  }, [sections.length, sections]);
 
   return (
     <PageLayout noPadding>
@@ -393,7 +464,7 @@ export default function ParametersPage(): JSX.Element {
             </Button>
           </div>
           <div className="page-footer-right">
-            <Button variant="secondary" onClick={handleSaveDraft}>
+            <Button variant="secondary" onClick={handleSaveDraftWithSync}>
               Save Draft
             </Button>
             <Button variant="primary" onClick={handleNext}>

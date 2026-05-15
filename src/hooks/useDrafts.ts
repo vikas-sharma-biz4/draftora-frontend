@@ -34,7 +34,8 @@ export function useDrafts(options: UseDraftsOptions = {}): UseDraftsReturn {
     if (autoFetch) {
       fetchDrafts(force);
     }
-  }, [autoFetch, force, fetchDrafts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refetch = useCallback(async () => {
     await fetchDrafts(true);

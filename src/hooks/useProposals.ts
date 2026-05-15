@@ -17,6 +17,7 @@ interface UseProposalsOptions {
 interface UseProposalsReturn {
   proposals: ProposalListItem[];
   isLoading: boolean;
+  isInitialized: boolean;
   error: string | null;
   refetch: () => Promise<void>;
   getProposalById: (id: number) => ProposalListItem | undefined;
@@ -27,6 +28,7 @@ export function useProposals(options: UseProposalsOptions = {}): UseProposalsRet
   
   const allProposals = useProposalStore(state => state.proposals);
   const isLoading = useProposalStore(state => state.isLoading);
+  const isInitialized = useProposalStore(state => state.isInitialized);
   const error = useProposalStore(state => state.error);
   const fetchProposals = useProposalStore(state => state.fetchProposals);
   const getProposalById = useProposalStore(state => state.getProposalById);
@@ -63,6 +65,7 @@ export function useProposals(options: UseProposalsOptions = {}): UseProposalsRet
   return {
     proposals,
     isLoading,
+    isInitialized,
     error,
     refetch,
     getProposalById,
