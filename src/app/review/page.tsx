@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/review/ReviewPage";
+﻿"use client";
+
+export { default } from "@/views/review/ReviewPage";

@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { History, Download, Eye } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import styles from "./HistoryPage.module.scss";
 import { useProposals } from "@/hooks/useProposals";
 import { useErrorToast } from "@/hooks/useErrorToast";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
 import { formatDate } from "@/utils/dateUtils";
+import { logger } from "@/utils/logger";
 import PageLayout from "@/layouts/AppLayout";
 import PageHeader from "@/components/common/PageHeader";
 import EmptyState from "@/components/common/EmptyState";
@@ -18,18 +19,38 @@ import HistoryCardSkeleton from "@/components/common/skeletons/HistoryCardSkelet
 
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const { proposals: historyItems, isLoading: loading, isInitialized, error } = useProposals({ filter: 'history' });
+  const { proposals: historyItems, isLoading: loading, isInitialized, error, refetch } = useProposals({ 
+    filter: 'history',
+  });
   const { downloadProposal } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
-  const [mounted, setMounted] = useState<boolean>(false);
+
+  // Refresh when tab becomes visible only if Zustand cache is stale
+  useEffect(() => {
+    const handleVisibilityChange = (): void => {
+      if (!document.hidden) {
+        void refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetch]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (isInitialized && !loading) {
+      logger.info(`[HistoryPage] Data loaded - ${historyItems.length} history items found`, {
+        items: historyItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          approvalStatus: item.approvalStatus,
+        })),
+      });
+    }
+  }, [isInitialized, loading, historyItems]);
 
   useErrorToast(error, "Failed to load history");
 
-  const handleDownload = async (id: number): Promise<void> => {
+  const handleDownload = useCallback(async (id: number): Promise<void> => {
     setDownloadingIds((prev) => new Set(prev).add(id));
     try {
       await downloadProposal(id);
@@ -40,7 +61,7 @@ export default function HistoryPage(): JSX.Element {
         return newSet;
       });
     }
-  };
+  }, [downloadProposal]);
 
   return (
     <PageLayout>
@@ -49,7 +70,7 @@ export default function HistoryPage(): JSX.Element {
         subtitle="View all completed, approved, and rejected proposals."
       />
 
-      {!mounted || (loading && !isInitialized) ? (
+      {loading && !isInitialized ? (
         <SkeletonGrid
           className={styles.historyGrid}
           renderItem={() => <HistoryCardSkeleton />}

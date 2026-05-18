@@ -35,7 +35,7 @@ export default function MainSidebar(): JSX.Element {
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
       <div className="sidebar-logo">
-        <Link href="/" className="sidebar-logo-btn" aria-label="Go to home">
+        <Link href="/" className="sidebar-logo-btn" aria-label="Go to home" prefetch={false}>
           <img
             src="/images/draftora-logo.png"
             alt="Draftora"
@@ -55,6 +55,7 @@ export default function MainSidebar(): JSX.Element {
                 href={item.path}
                 className="sidebar-nav-link"
                 aria-current={active ? "page" : undefined}
+                prefetch={false}
               >
                 <span className="sidebar-step-indicator">
                   {item.icon}

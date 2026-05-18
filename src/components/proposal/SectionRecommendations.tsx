@@ -238,9 +238,12 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       <div className={styles.header}>
         <div className={styles.headerTitle}>
           <h3>AI Section Recommendations</h3>
+          {recommendationsFetchStatus === 'loading' && (
+            <span className={styles.loadingBadge}>Generating...</span>
+          )}
         </div>
         <div className={styles.headerActions}>
-          {!hasUserRequested && (
+          {!hasUserRequested && recommendationsFetchStatus !== 'loading' && (
             <button
               className={styles.getRecommendationsBtn}
               onClick={handleGetRecommendations}
@@ -249,12 +252,29 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
               Generate
             </button>
           )}
+          {hasUserRequested && recommendations.length > 0 && (
+            <button
+              className={styles.regenerateBtn}
+              onClick={handleRegenerate}
+              disabled={isLoading}
+            >
+              <RefreshCw size={14} />
+              Regenerate
+            </button>
+          )}
         </div>
       </div>
 
-      {!hasUserRequested ? (
+      {!hasUserRequested && recommendationsFetchStatus !== 'loading' ? (
         <div className={styles.ctaState}>
           <p className={styles.ctaText}>Click Generate to get AI-powered section recommendations</p>
+          <p className={styles.ctaHint}>Or wait - we're already generating in the background...</p>
+        </div>
+      ) : recommendationsFetchStatus === 'loading' && recommendations.length === 0 ? (
+        <div className={styles.loadingState}>
+          <div className={styles.spinner}></div>
+          <p>Analyzing your context and generating recommendations...</p>
+          <span className={styles.loadingHint}>This usually takes 5-10 seconds</span>
         </div>
       ) : (
         <>
