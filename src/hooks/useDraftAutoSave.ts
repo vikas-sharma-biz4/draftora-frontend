@@ -16,6 +16,9 @@ import {
   useTemplateType,
   useCurrentStep,
   useCurrentProposalId,
+  useFilesMeta,
+  useSelectedDocumentIds,
+  useWebReferences,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
@@ -48,6 +51,9 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const templateType = useTemplateType();
   const currentStep = useCurrentStep();
   const currentProposalId = useCurrentProposalId();
+  const filesMeta = useFilesMeta();
+  const selectedDocumentIds = useSelectedDocumentIds();
+  const webReferences = useWebReferences();
   const draftStage = useDraftSessionStore(state => state.draftStage);
   const pathname = usePathname();
 
@@ -83,12 +89,12 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
     templateId,
     templateType,
     files: [],
-    filesMeta: [],
-    selectedDocumentIds: [],
+    filesMeta,
+    selectedDocumentIds,
     customSections: [],
     contextualInstructions: "",
-    webReferences: [],
-  }), [title, clientName, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType]);
+    webReferences,
+  }), [title, clientName, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType, filesMeta, selectedDocumentIds, webReferences]);
 
   useDraftPersistence({
     enabled: hasData,

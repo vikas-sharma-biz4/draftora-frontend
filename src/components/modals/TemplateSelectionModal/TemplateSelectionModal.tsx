@@ -142,6 +142,7 @@ export default function TemplateSelectionModal({
   });
   const [isCreatingClient, setIsCreatingClient] = useState<boolean>(false);
   const [showTemplateSelector, setShowTemplateSelector] = useState<boolean>(false);
+  const [isNavigating, setIsNavigating] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -492,7 +493,7 @@ export default function TemplateSelectionModal({
    * and routes the user to the parameter wizard (step 4).
    * Triggers toast errors for missing client, name, or documents.
    */
-  function handleContinue(): void {
+  async function handleContinue(): Promise<void> {
     if (!selectedClientId) {
       toast.error("Please select a client");
       return;
@@ -560,10 +561,21 @@ export default function TemplateSelectionModal({
     setCurrentStep(4);
     setShouldStartBackgroundFetch(true);
 
-    // Trigger AI-based recommendations prefetch
+    // Start background generation BEFORE navigation
+    logger.info('[TemplateSelectionModal] Starting background recommendations fetch');
     void prefetchRecommendations();
 
+    // Show loading state and coordinate modal close with navigation
+    setIsNavigating(true);
+
+    // Small delay to allow animation to start
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Navigate to parameters page
     router.push("/parameters");
+
+    // Close modal with slide-down animation
+    await new Promise(resolve => setTimeout(resolve, 300));
     onClose();
   }
 
@@ -1128,8 +1140,9 @@ export default function TemplateSelectionModal({
                 variant="primary"
                 onClick={handleContinue}
                 disabled={!selectedClientId || !proposalName.trim() || selectedDocuments.size === 0 || uploadedFiles.some((f) => f.status === "parsing")}
+                loading={isNavigating}
               >
-                Continue to Wizard
+                {isNavigating ? "Starting..." : "Continue to Wizard"}
               </Button>
             </>
           )}

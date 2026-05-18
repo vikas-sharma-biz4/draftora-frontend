@@ -68,17 +68,17 @@ function camelToSnakeCase(obj: unknown): unknown {
  * Raw API response types for saved draft (snake_case from backend)
  */
 interface RawWizardState {
-  current_step: number;
-  max_step_reached: number;
-  completed_steps: number[];
-  proposal_data: Record<string, unknown>;
+  currentStep: number;
+  maxStepReached: number;
+  completedSteps: number[];
+  proposalData: Record<string, unknown>;
 }
 
 interface RawUIState {
-  scroll_position: number;
-  active_section: string | null;
-  expanded_sections: string[];
-  last_visible_section: string | null;
+  scrollPosition: number;
+  activeSection: string | null;
+  expandedSections: string[];
+  lastVisibleSection: string | null;
 }
 
 /**
@@ -116,15 +116,15 @@ interface RawSavedDraft {
  */
 function mapWizardState(raw: RawWizardState): SavedDraft["wizardState"] {
   console.log('[draft.service] mapWizardState called with:', {
-    rawProposalData: raw.proposal_data,
-    rawProposalDataKeys: raw.proposal_data ? Object.keys(raw.proposal_data) : [],
+    rawProposalData: raw.proposalData,
+    rawProposalDataKeys: raw.proposalData ? Object.keys(raw.proposalData) : [],
   });
 
   return {
-    currentStep: raw.current_step as SavedDraft["wizardState"]["currentStep"],
-    maxStepReached: raw.max_step_reached as SavedDraft["wizardState"]["maxStepReached"],
-    completedSteps: raw.completed_steps,
-    proposalData: raw.proposal_data as unknown as SavedDraft["wizardState"]["proposalData"],
+    currentStep: raw.currentStep as SavedDraft["wizardState"]["currentStep"],
+    maxStepReached: raw.maxStepReached as SavedDraft["wizardState"]["maxStepReached"],
+    completedSteps: raw.completedSteps,
+    proposalData: raw.proposalData as unknown as SavedDraft["wizardState"]["proposalData"],
   };
 }
 
@@ -133,10 +133,10 @@ function mapWizardState(raw: RawWizardState): SavedDraft["wizardState"] {
  */
 function mapUIState(raw: RawUIState): SavedDraft["uiState"] {
   return {
-    scrollPosition: raw.scroll_position,
-    activeSection: raw.active_section,
-    expandedSections: raw.expanded_sections,
-    lastVisibleSection: raw.last_visible_section,
+    scrollPosition: raw.scrollPosition,
+    activeSection: raw.activeSection,
+    expandedSections: raw.expandedSections,
+    lastVisibleSection: raw.lastVisibleSection,
   };
 }
 
@@ -207,23 +207,23 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
   console.log('[draft.service] Received from backend:', {
     id: data.id,
     wizardState: data.wizard_state,
-    proposalData: data.wizard_state.proposal_data,
-    selectedSections: data.wizard_state.proposal_data?.selected_sections,
-    filesMeta: data.wizard_state.proposal_data?.filesMeta,
-    selectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
-    webReferences: data.wizard_state.proposal_data?.web_references,
-    sectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+    proposalData: data.wizard_state.proposalData,
+    selectedSections: data.wizard_state.proposalData?.selectedSections,
+    filesMeta: data.wizard_state.proposalData?.filesMeta,
+    selectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
+    webReferences: data.wizard_state.proposalData?.webReferences,
+    sectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
   });
 
   logger.info('[draft.service] Draft saved successfully', {
     draftId: data.id,
     responseWizardStateKeys: Object.keys(data.wizard_state),
-    responseProposalDataKeys: data.wizard_state.proposal_data ? Object.keys(data.wizard_state.proposal_data) : [],
-    responseSelectedSections: data.wizard_state.proposal_data?.selected_sections,
-    responseFilesMeta: data.wizard_state.proposal_data?.filesMeta,
-    responseSelectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
-    responseWebReferences: data.wizard_state.proposal_data?.web_references,
-    responseSectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+    responseProposalDataKeys: data.wizard_state.proposalData ? Object.keys(data.wizard_state.proposalData) : [],
+    responseSelectedSections: data.wizard_state.proposalData?.selectedSections,
+    responseFilesMeta: data.wizard_state.proposalData?.filesMeta,
+    responseSelectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
+    responseWebReferences: data.wizard_state.proposalData?.webReferences,
+    responseSectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
   });
 
   return mapSavedDraft(data);
@@ -258,23 +258,23 @@ export async function getDraft(draftId: string): Promise<SavedDraft> {
     title: data.title,
     clientName: data.client_name,
     wizardState: data.wizard_state,
-    proposalData: data.wizard_state.proposal_data,
-    selectedSections: data.wizard_state.proposal_data?.selected_sections,
-    filesMeta: data.wizard_state.proposal_data?.filesMeta,
-    selectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
-    webReferences: data.wizard_state.proposal_data?.web_references,
-    sectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+    proposalData: data.wizard_state.proposalData,
+    selectedSections: data.wizard_state.proposalData?.selectedSections,
+    filesMeta: data.wizard_state.proposalData?.filesMeta,
+    selectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
+    webReferences: data.wizard_state.proposalData?.webReferences,
+    sectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
   });
 
   logger.info('[draft.service] Draft fetched successfully', {
     draftId: data.id,
     responseWizardStateKeys: Object.keys(data.wizard_state),
-    responseProposalDataKeys: data.wizard_state.proposal_data ? Object.keys(data.wizard_state.proposal_data) : [],
-    responseSelectedSections: data.wizard_state.proposal_data?.selected_sections,
-    responseFilesMeta: data.wizard_state.proposal_data?.filesMeta,
-    responseSelectedDocumentIds: data.wizard_state.proposal_data?.selected_document_ids,
-    responseWebReferences: data.wizard_state.proposal_data?.web_references,
-    responseSectionDisplayNames: data.wizard_state.proposal_data?.section_display_names,
+    responseProposalDataKeys: data.wizard_state.proposalData ? Object.keys(data.wizard_state.proposalData) : [],
+    responseSelectedSections: data.wizard_state.proposalData?.selectedSections,
+    responseFilesMeta: data.wizard_state.proposalData?.filesMeta,
+    responseSelectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
+    responseWebReferences: data.wizard_state.proposalData?.webReferences,
+    responseSectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
   });
 
   return mapSavedDraft(data);
