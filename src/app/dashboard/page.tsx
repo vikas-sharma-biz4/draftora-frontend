@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/dashboard/DashboardPage";
+﻿"use client";
+
+export { default } from "@/views/dashboard/DashboardPage";

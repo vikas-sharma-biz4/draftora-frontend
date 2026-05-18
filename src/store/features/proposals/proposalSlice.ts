@@ -93,14 +93,17 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
 
     // Return cached data if valid and not forced
     if (!force && isCacheValid()) {
+      console.log('[proposalSlice] Using cached data - cache is still valid');
       return;
     }
 
     // Prevent duplicate concurrent requests
     if (isLoading) {
+      console.log('[proposalSlice] Fetch already in progress - skipping');
       return;
     }
 
+    console.log('[proposalSlice] Fetching proposals from API', { force, cacheValid: isCacheValid() });
     set({ isLoading: true, error: null });
 
     try {
@@ -111,6 +114,13 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
+      console.log('[proposalSlice] Proposals fetched successfully', { 
+        count: sorted.length,
+        approved: sorted.filter(p => p.approvalStatus === 'approved').length,
+        rejected: sorted.filter(p => p.approvalStatus === 'rejected').length,
+        pending: sorted.filter(p => p.approvalStatus === 'pending').length,
+      });
+
       set({
         proposals: sorted,
         isLoading: false,
@@ -120,6 +130,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch proposals';
+      console.error('[proposalSlice] Failed to fetch proposals', error);
       set({
         isLoading: false,
         error: errorMessage,
@@ -144,6 +155,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
 
   updateProposal: (id: number, updates: Partial<ProposalListItem>) => {
+    console.log('[proposalSlice] Updating proposal in store', { id, updates });
     set(state => ({
       proposals: state.proposals.map(p =>
         p.id === id ? { ...p, ...updates } : p
@@ -160,6 +172,7 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
 
   invalidateCache: () => {
+    console.log('[proposalSlice] Cache invalidated - next fetch will be fresh');
     set({
       lastFetched: null,
     });
