@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
+import { Users, Plus, Building2, Calendar, Trash2, RefreshCw } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -32,13 +32,38 @@ export default function ClientsPage(): JSX.Element {
   const { clients, isLoading: loading, refetch } = useClients();
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
   const [mounted, setMounted] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Force refresh on mount to ensure fresh data
+    console.log('[ClientsPage] Forcing refresh on mount');
+    refetch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    console.log('[ClientsPage] Clients updated:', {
+      count: clients.length,
+      clients: clients.map(c => ({ id: c.id, name: c.name, documentsCount: c.documents?.length || 0 }))
+    });
+  }, [clients]);
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
+
+  async function handleRefresh(): Promise<void> {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      toast.success("Clients refreshed");
+    } catch (error) {
+      logger.error("Failed to refresh clients:", error);
+      toast.error("Failed to refresh clients");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
@@ -74,12 +99,22 @@ export default function ClientsPage(): JSX.Element {
     <PageLayout>
       <PageHeader
         title="Clients"
-        subtitle="Manage your client relationships and view all proposals associated with each client."
+        subtitle={`Manage your client relationships and view all proposals associated with each client.${clients.length > 0 ? ` (${clients.length} total)` : ''}`}
         action={
-          <Button variant="primary" onClick={handleNewClient}>
-            <Plus size={18} />
-            New Client
-          </Button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Button 
+              variant="secondary" 
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+            >
+              <RefreshCw size={18} className={isRefreshing ? 'spin' : ''} />
+              Refresh
+            </Button>
+            <Button variant="primary" onClick={handleNewClient}>
+              <Plus size={18} />
+              New Client
+            </Button>
+          </div>
         }
       />
 
