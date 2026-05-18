@@ -13,6 +13,7 @@ import {
   updateSection,
   regenerateSection,
   updateApprovalStatus,
+  reorderProposalSections,
 } from "@/services/proposal.service";
 import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
@@ -123,6 +124,10 @@ export default function ProposalOutputPage(): JSX.Element {
   }, [proposalId]);
 
   const handleRegenerate = useCallback(async (key: string, instructions?: string): Promise<string | null> => {
+    // This callback is now used for selection-based regeneration
+    // The RichEditor passes selectedText via the RegenerateSelectionParams
+    // For now, we keep the old signature for backward compatibility
+    // The actual selection regeneration happens in ProposalSectionEditor
     try {
       const newContent = await regenerateSection(proposalId, key, instructions);
       handleContentChange(key, newContent);
@@ -160,23 +165,50 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleSectionAdded(key: string, label: string, content: string): void {
+  function handleSectionAdded(key: string, label: string, content: string, afterKey?: string): void {
+    const currentSections = proposal?.selectedSections ?? [];
+    let newSelected: string[];
+    if (afterKey) {
+      const idx = currentSections.indexOf(afterKey);
+      newSelected = idx >= 0
+        ? [...currentSections.slice(0, idx + 1), key, ...currentSections.slice(idx + 1)]
+        : [...currentSections, key];
+    } else {
+      newSelected = [...currentSections, key];
+    }
+
+    const newDisplayNames = { ...(proposal?.sectionDisplayNames ?? {}), [key]: label };
+
     setProposal((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        selectedSections: [...prev.selectedSections, key],
-        sectionDisplayNames: { ...(prev.sectionDisplayNames ?? {}), [key]: label },
+        selectedSections: newSelected,
+        sectionDisplayNames: newDisplayNames,
         sections: { ...(prev.sections ?? {}), [key]: content },
       };
     });
     setActiveSection(key);
+
+    // Persist insertion order to backend so it survives reload
+    reorderProposalSections(proposalId, {
+      order: newSelected,
+      sectionDisplayNames: newDisplayNames,
+    }).catch((err) => {
+      logger.warn("[ProposalOutputPage] reorder after add failed", err);
+    });
+
     setTimeout(() => {
       const el = document.getElementById(`section-${key}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
+  }
+
+  function handleSectionsReordered(newOrder: string[]): void {
+    setProposal((prev) => {
+      if (!prev) return prev;
+      return { ...prev, selectedSections: newOrder };
+    });
   }
 
   // ── Approve/Reject handlers ──────────────────────────────────────────────────
@@ -342,6 +374,7 @@ export default function ProposalOutputPage(): JSX.Element {
           onSectionRenamed={handleSectionRenamed}
           onSectionRemoved={handleSectionRemoved}
           onSectionAdded={handleSectionAdded}
+          onSectionsReordered={handleSectionsReordered}
         />
 
         <div className="proposal-content">
@@ -356,12 +389,12 @@ export default function ProposalOutputPage(): JSX.Element {
           {sectionMetas.map(({ key, label }) => (
             <ProposalSectionEditor
               key={key}
+              proposalId={proposalId}
               sectionKey={key}
               label={label}
               rawContent={proposal?.sections?.[key] ?? ""}
               onContentChange={handleContentChange}
               onSave={handleSaveSection}
-              onRegenerate={handleRegenerate}
             />
           ))}
 

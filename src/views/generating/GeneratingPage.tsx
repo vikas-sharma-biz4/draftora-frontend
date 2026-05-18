@@ -8,8 +8,37 @@ import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { logger } from "@/utils/logger";
 import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";
 import { useGenerationStore } from "@/store/features/generation/generationSlice";
-import Button from "@/components/common/Button";
 import CircularProgress from "@/components/common/CircularProgress";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Maps generation status to a 0-based active step index:
+ *   0 = Analysing Source Materials
+ *   1 = Building Context
+ *   2 = Generating Sections
+ *   3 = Final Review
+ *   4 = All done (sentinel)
+ */
+function deriveActiveStep(
+  status: string,
+  completedSections: number,
+  totalSections: number,
+): number {
+  if (status === "completed" || status === "cancelled") return 4;
+  if (status === "finalizing" || (totalSections > 0 && completedSections >= totalSections)) return 3;
+  if (status === "generating" || status === "refining") return 2;
+  if (status === "planning") return 1;
+  return 0;
+}
+
+function estimateTimeRemaining(percent: number): string {
+  if (percent >= 97) return "Almost done...";
+  if (percent >= 85) return "10–20 seconds";
+  if (percent >= 60) return "30–45 seconds";
+  if (percent >= 30) return "1–2 minutes";
+  return "2–3 minutes";
+}
 
 export default function GeneratingPage(): JSX.Element {
   const params = useParams();
@@ -21,18 +50,12 @@ export default function GeneratingPage(): JSX.Element {
   // Zustand store for generation state
   const {
     status,
-    currentStage,
     progressPercent,
     totalSections,
     completedSections,
-    currentSection,
-    selectedSections,
-    completedSectionKeys,
-    isConnected,
     isConnecting,
     error,
     setProposalId,
-    setJobId,
     setStatus,
     setCurrentStage,
     setProgressPercent,
@@ -50,10 +73,12 @@ export default function GeneratingPage(): JSX.Element {
   const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
+    // Reset generation state to start fresh
+    resetGenerationState();
     setMounted(true);
     setProposalId(proposalId);
     setStartedAt(new Date().toISOString());
-  }, [proposalId, setProposalId, setStartedAt]);
+  }, [proposalId, setProposalId, setStartedAt, resetGenerationState]);
 
   const handleCompleted = useCallback(() => {
     logger.info("[GeneratingPage] Generation completed, navigating to proposal view", { proposalId });
@@ -215,6 +240,23 @@ export default function GeneratingPage(): JSX.Element {
     );
   }
 
+  // ── Build Sequence derivation ──────────────────────────────────────────────
+  const activeStep = deriveActiveStep(status, completedSections, totalSections);
+  const isAllDone = activeStep === 4;
+
+  const buildSteps = [
+    { label: "Analysing Source Materials" },
+    { label: "Building Context" },
+    {
+      label: totalSections > 0
+        ? `Generating Sections (${completedSections} / ${totalSections})`
+        : "Generating Sections",
+    },
+    { label: "Final Review" },
+  ];
+
+  const displayProgress = isAllDone ? 100 : progressPercent;
+
   return (
     <div className="generating-page">
       <div className="generating-container">
@@ -225,57 +267,59 @@ export default function GeneratingPage(): JSX.Element {
         </p>
 
         <div className="generating-content">
-          {/* Left side - Progress Circle */}
+          {/* Left — Circular Progress */}
           <div className="generating-progress-section">
-            <CircularProgress progress={progressPercent} size={240} strokeWidth={8} label={`${Math.round(progressPercent)}%`} />
+            <CircularProgress
+              progress={displayProgress}
+              size={200}
+              strokeWidth={6}
+              label={`${Math.round(displayProgress)}%`}
+            />
             <div className="generating-time-label">TIME REMAINING</div>
-            <div className="generating-time-value">30-45 seconds</div>
-            {isConnected && (
-              <div className="generating-connection-badge">
-                ✓ Connected via SSE
-              </div>
-            )}
+            <div className="generating-time-value">
+              {isAllDone ? "Done!" : estimateTimeRemaining(displayProgress)}
+            </div>
           </div>
 
-          {/* Right side - Build Sequence */}
+          {/* Right — Build Sequence */}
           <div className="generating-sequence-section">
-            <div className="generating-sequence-header">
-              GENERATING SECTIONS ({completedSections}/{totalSections})
-            </div>
+            <div className="generating-sequence-header">BUILD SEQUENCE</div>
             <ul className="generating-sequence-list">
-              {selectedSections.length > 0 ? (
-                selectedSections.map((section) => {
-                  const isDone = completedSectionKeys.includes(section);
-                  const isActive = currentSection === section;
-                  return (
-                    <li
-                      key={section}
-                      className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}`}
-                    >
-                      <span className="generating-sequence-icon">
-                        {isDone ? "✓" : isActive ? "◐" : "○"}
-                      </span>
-                      <span className="generating-sequence-text">
-                        {section}
-                        {isActive && <span className="generating-sequence-status"> - Generating...</span>}
-                      </span>
-                    </li>
-                  );
-                })
-              ) : (
-                <li className="generating-sequence-item">
-                  <span className="generating-sequence-icon">○</span>
-                  <span className="generating-sequence-text">Loading sections...</span>
-                </li>
-              )}
+              {buildSteps.map((step, idx) => {
+                const isDone = isAllDone || idx < activeStep;
+                const isActive = !isAllDone && idx === activeStep;
+                const isPending = !isAllDone && idx > activeStep;
+
+                return (
+                  <li
+                    key={idx}
+                    className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
+                  >
+                    <span className="generating-sequence-icon">
+                      {isDone ? (
+                        <svg viewBox="0 0 24 24" fill="currentColor" width={20} height={20}>
+                          <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                        </svg>
+                      ) : isActive ? (
+                        <svg className="gen-spinner" viewBox="0 0 24 24" fill="none" width={20} height={20}>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.25 }} />
+                          <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" style={{ opacity: 0.85 }} />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" width={20} height={20}>
+                          <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.5" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="generating-sequence-text">{step.label}</span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
 
-        <button
-          onClick={handleCancel}
-          className="generating-cancel-btn"
-        >
+        <button onClick={handleCancel} className="generating-cancel-btn">
           Cancel Generation
         </button>
       </div>

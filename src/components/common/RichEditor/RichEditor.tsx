@@ -1,28 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { memo, useEffect, useState, useCallback, useRef, useId } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Highlight } from "@tiptap/extension-highlight";
-import { Color } from "@tiptap/extension-color";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import Highlight from "@tiptap/extension-highlight";
 import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
+import Image from "@tiptap/extension-image";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import Underline from "@tiptap/extension-underline";
+import { createPortal } from "react-dom";
+import { toolbarManager } from "./FloatingToolbarManager";
 
 import { EDITOR_HIGHLIGHT_COLORS, EDITOR_TEXT_COLORS } from "@/constants";
+
+interface RegenerateSelectionParams {
+  selectedText: string;
+  selectionRange: { from: number; to: number };
+  instructions?: string;
+}
 
 interface RichEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
-  /** Called when user clicks "Regenerate" in the bubble menu with the selected text. */
-  onRegenerateSelection?: (selectedText: string) => void;
+  /** Called when user submits regeneration with selection context and instructions. */
+  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<string | null>;
 }
 
 function DropdownPortal({
@@ -71,6 +78,9 @@ export default function RichEditor({
   onRegenerateSelection,
 }: RichEditorProps): JSX.Element {
   const [regenLoading, setRegenLoading] = useState<boolean>(false);
+  const [showRegenPrompt, setShowRegenPrompt] = useState<boolean>(false);
+  const [regenPrompt, setRegenPrompt] = useState<string>("");
+  const [savedSelection, setSavedSelection] = useState<{ from: number; to: number } | null>(null);
   const [showHeadingMenu, setShowHeadingMenu] = useState<boolean>(false);
   const [showLinkInput, setShowLinkInput] = useState<boolean>(false);
   const [linkUrl, setLinkUrl] = useState<string>("");
@@ -80,6 +90,9 @@ export default function RichEditor({
   const headingBtnRef = useRef<HTMLButtonElement | null>(null);
   const linkBtnRef = useRef<HTMLButtonElement | null>(null);
   const imageBtnRef = useRef<HTMLButtonElement | null>(null);
+  
+  // Unique ID for this editor instance (for toolbar ownership)
+  const editorId = useId();
 
   const editor = useEditor({
     extensions: [
@@ -197,16 +210,62 @@ export default function RichEditor({
     editor.chain().focus().setHorizontalRule().run();
   }, [editor]);
 
-  const handleRegenerateSelection = useCallback(async (): Promise<void> => {
-    if (!editor || !onRegenerateSelection) return;
+  const openRegenPrompt = useCallback((): void => {
+    if (!editor) return;
     const { from, to } = editor.state.selection;
     if (from === to) return;
+    setSavedSelection({ from, to });
+    setShowRegenPrompt(true);
+    setRegenPrompt("");
+  }, [editor]);
+
+  const closeRegenPrompt = useCallback((): void => {
+    setShowRegenPrompt(false);
+    setRegenPrompt("");
+    setSavedSelection(null);
+  }, []);
+
+  const handleRegenerateSubmit = useCallback(async (): Promise<void> => {
+    if (!editor || !onRegenerateSelection || !savedSelection) return;
+    
+    const { from, to } = savedSelection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (!selectedText.trim()) return;
+
     setRegenLoading(true);
-    onRegenerateSelection(selectedText);
-    setRegenLoading(false);
-  }, [editor, onRegenerateSelection]);
+    try {
+      const regeneratedContent = await onRegenerateSelection({
+        selectedText,
+        selectionRange: { from, to },
+        instructions: regenPrompt.trim() || undefined,
+      });
+
+      if (regeneratedContent !== null && editor) {
+        // Replace content at exact selection position using TipTap transaction
+        editor
+          .chain()
+          .focus()
+          .setTextSelection({ from, to })
+          .insertContent(regeneratedContent)
+          .run();
+      }
+    } catch (error) {
+      console.error("[RichEditor] Regeneration failed:", error);
+    } finally {
+      setRegenLoading(false);
+      closeRegenPrompt();
+    }
+  }, [editor, onRegenerateSelection, savedSelection, regenPrompt, closeRegenPrompt]);
+
+  const handleRegenKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void handleRegenerateSubmit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeRegenPrompt();
+    }
+  }, [handleRegenerateSubmit, closeRegenPrompt]);
 
   const bubbleElRef = useRef<HTMLDivElement | null>(null);
   const [bubbleReady, setBubbleReady] = useState(false);
@@ -215,9 +274,21 @@ export default function RichEditor({
 
   useEffect(() => {
     if (!editor) return;
-    const el = document.createElement("div");
-    el.className = "rte-bubble-mount";
-    document.body.appendChild(el);
+    
+    // Cleanup function to reset all toolbar state
+    const cleanupToolbarState = () => {
+      setShowRegenPrompt(false);
+      setRegenPrompt("");
+      setSavedSelection(null);
+      setShowHeadingMenu(false);
+      setShowLinkInput(false);
+      setShowImageInput(false);
+      setIsToolbarCollapsed(true);
+      setHasSelection(false);
+    };
+    
+    // Request toolbar ownership from centralized manager
+    const el = toolbarManager.requestToolbar(editorId, cleanupToolbarState);
     bubbleElRef.current = el;
 
     const handleSelectionUpdate = () => {
@@ -225,27 +296,70 @@ export default function RichEditor({
       const hasTextSelected = !empty && from !== to;
 
       if (hasTextSelected) {
+        // CRITICAL: Only proceed if this editor owns the toolbar
+        // This prevents multiple editors from fighting over the same toolbar
+        if (!toolbarManager.isOwner(editorId)) {
+          // Request ownership - this will cleanup any other editor's toolbar
+          toolbarManager.requestToolbar(editorId, cleanupToolbarState);
+        }
+        
+        // CRITICAL: Reset ALL toolbar UI state for EVERY new selection
+        // This ensures clean toolbar state and prevents any menus/panels from auto-opening
+        setShowRegenPrompt(false);
+        setRegenPrompt("");
+        setSavedSelection(null);
+        setShowHeadingMenu(false);
+        setShowLinkInput(false);
+        setShowImageInput(false);
+        setIsToolbarCollapsed(true); // Start collapsed by default
+
         // Get selection coordinates from the editor view (already viewport-relative)
         const startCoords = editor.view.coordsAtPos(from);
         const endCoords = editor.view.coordsAtPos(to);
 
         // Calculate center of selection
         const top = endCoords.bottom + 2; // 2px below end of selection
-        const left = (startCoords.left + endCoords.left) / 2; // Center horizontally
+        let left = (startCoords.left + endCoords.left) / 2; // Center horizontally
 
         setSelectionCoords({ top, left });
         setHasSelection(true);
 
-        // Position and show the bubble
-        if (el) {
+        // Position and show the bubble with viewport boundary detection
+        if (el && toolbarManager.isOwner(editorId)) {
           el.style.position = 'fixed';
           el.style.top = `${top}px`;
+          el.style.display = 'block'; // Must be visible to measure width
+          
+          // Get toolbar dimensions after rendering
+          const toolbarWidth = el.offsetWidth || 600; // Default estimate if not yet rendered
+          const viewportWidth = window.innerWidth;
+          const padding = 16; // Minimum padding from viewport edges
+          
+          // Calculate boundaries
+          const minLeft = padding + (toolbarWidth / 2);
+          const maxLeft = viewportWidth - padding - (toolbarWidth / 2);
+          
+          // Constrain left position to keep toolbar on screen
+          if (left < minLeft) {
+            left = minLeft;
+          } else if (left > maxLeft) {
+            left = maxLeft;
+          }
+          
           el.style.left = `${left}px`;
           el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
-          el.style.display = 'block';
+          el.style.maxWidth = `${viewportWidth - (padding * 2)}px`; // Responsive max-width
         }
       } else {
         setHasSelection(false);
+        // Reset ALL toolbar UI state when selection is cleared
+        setShowRegenPrompt(false);
+        setRegenPrompt("");
+        setSavedSelection(null);
+        setShowHeadingMenu(false);
+        setShowLinkInput(false);
+        setShowImageInput(false);
+        setIsToolbarCollapsed(true);
         // Hide the bubble
         if (el) {
           el.style.display = 'none';
@@ -257,10 +371,26 @@ export default function RichEditor({
     let isMouseDown = false;
 
     const handleMouseDown = (e: MouseEvent) => {
+      // Don't reset if clicking on the toolbar or regen panel
+      const target = e.target as Node;
+      if (el && el.contains(target)) {
+        return; // Clicking on toolbar - do nothing
+      }
+
       // Only track mouse down if clicking inside the editor, not on the toolbar
       const editorDom = editor.view.dom;
-      if (editorDom.contains(e.target as Node)) {
+      if (editorDom.contains(target)) {
         isMouseDown = true;
+        // CRITICAL: Reset ALL toolbar state immediately when starting new selection
+        // This prevents multiple toolbars and ensures clean state
+        setShowRegenPrompt(false);
+        setRegenPrompt("");
+        setSavedSelection(null);
+        setShowHeadingMenu(false);
+        setShowLinkInput(false);
+        setShowImageInput(false);
+        setIsToolbarCollapsed(true);
+        setHasSelection(false);
         // Hide toolbar when starting to select
         if (el) {
           el.style.display = 'none';
@@ -277,8 +407,18 @@ export default function RichEditor({
       }
     };
 
+    // Hide toolbar on scroll to prevent it from moving with content
+    const handleScroll = () => {
+      if (toolbarManager.isOwner(editorId) && el) {
+        el.style.display = 'none';
+        setHasSelection(false);
+        cleanupToolbarState();
+      }
+    };
+
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('scroll', handleScroll, true); // Use capture to catch all scroll events
 
     // Also handle keyboard selection (no mouse involved)
     editor.on('selectionUpdate', () => {
@@ -294,13 +434,15 @@ export default function RichEditor({
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
-      if (el.parentNode) {
-        el.parentNode.removeChild(el);
-      }
+      window.removeEventListener('scroll', handleScroll, true);
+      
+      // Release toolbar ownership - manager will handle cleanup
+      toolbarManager.releaseToolbar(editorId);
+      
       bubbleElRef.current = null;
       setBubbleReady(false);
     };
-  }, [editor]);
+  }, [editor, editorId]);
 
   if (!editor) return <div className="rte-content" />;
 
@@ -525,19 +667,19 @@ export default function RichEditor({
         ))}
       </div>
 
-      {/* AI Regenerate - Visually Distinct */}
+      {/* AI Regenerate - Always visible in toolbar row */}
       {onRegenerateSelection && (
         <>
           <div className="rte-toolbar-divider" />
           <button
             type="button"
-            className="rte-btn-ai"
+            className={`rte-btn-ai${showRegenPrompt ? " active" : ""}`}
             title="Regenerate selection with AI"
             disabled={regenLoading}
-            onClick={handleRegenerateSelection}
+            onClick={openRegenPrompt}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            <span>{regenLoading ? "Regenerating..." : "AI Regen"}</span>
+            <span>AI Regen</span>
           </button>
         </>
       )}
@@ -564,10 +706,56 @@ export default function RichEditor({
     </div>
   );
 
+  // Regen prompt panel (renders below toolbar)
+  const regenPanel = showRegenPrompt && onRegenerateSelection && (
+    <div className="rte-regen-panel">
+      <input
+        type="text"
+        className="rte-regen-input"
+        placeholder="How should AI rewrite this?"
+        value={regenPrompt}
+        onChange={(e) => setRegenPrompt(e.target.value)}
+        onKeyDown={handleRegenKeyDown}
+        autoFocus
+        disabled={regenLoading}
+      />
+      <button
+        type="button"
+        className="rte-regen-submit"
+        onClick={() => void handleRegenerateSubmit()}
+        disabled={regenLoading}
+        title="Regenerate (Enter)"
+      >
+        {regenLoading ? (
+          <svg className="rte-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        )}
+      </button>
+      <button
+        type="button"
+        className="rte-regen-cancel"
+        onClick={closeRegenPrompt}
+        disabled={regenLoading}
+        title="Cancel (Esc)"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  );
+
+  // Combined toolbar + panel container
+  const toolbarWithPanel = (
+    <div className="rte-toolbar-container-floating">
+      {toolbar}
+      {regenPanel}
+    </div>
+  );
+
   return (
     <div className="rte-wrapper">
-      {/* Render toolbar into bubble mount via portal when text is selected */}
-      {bubbleReady && hasSelection && bubbleElRef.current && createPortal(toolbar, bubbleElRef.current)}
+      {/* Render toolbar + panel into bubble mount via portal when text is selected */}
+      {bubbleReady && hasSelection && bubbleElRef.current && createPortal(toolbarWithPanel, bubbleElRef.current)}
 
       {/* Editor content */}
       <div className="rte-content">
