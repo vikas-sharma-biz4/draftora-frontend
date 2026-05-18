@@ -155,12 +155,20 @@ export async function deleteClient(clientId: number): Promise<void> {
 //       The functions below are kept for backward compatibility but no longer cache.
 
 /**
- * List all clients with full documents array in a single API call.
+ * List all clients with full documents array, automatically fetching all pages.
+ * @param includeDeleted - If true, includes soft-deleted clients (for debugging)
  */
-export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
-  const response = await http.get<{
-    success: boolean;
-    data: {
+export async function listClientsFullData(includeDeleted: boolean = false): Promise<ClientWithDocuments[]> {
+  const allClients: ClientWithDocuments[] = [];
+  let currentPage = 1;
+  let totalPages = 1;
+  const perPage = 50; // Maximum allowed by backend
+
+  console.log('[client.service] Starting to fetch all clients...', { includeDeleted });
+
+  // Fetch all pages
+  while (currentPage <= totalPages) {
+    const response = await http.get<{
       success: boolean;
       data: (ClientApiResponse & { documents: ClientDocumentApiResponse[] })[];
       meta: {
@@ -170,16 +178,35 @@ export async function listClientsFullData(): Promise<ClientWithDocuments[]> {
         total_pages: number;
       };
       message: string;
-    };
-    message: string;
-  }>("/clients/full-data?page=1&per_page=50");
-  console.log('[client.service] Full data API response:', response);
-  const clients = response.data.data;
-  console.log('[client.service] Clients array:', clients);
-  return clients.map(clientData => ({
-    ...transformClient(clientData),
-    documents: clientData.documents.map(transformClientDocument),
-  }));
+    }>(`/clients/full-data?page=${currentPage}&per_page=${perPage}${includeDeleted ? '&include_deleted=true' : ''}`);
+
+    console.log(`[client.service] Fetched page ${currentPage}/${totalPages}:`, {
+      clientsInPage: response.data?.length || 0,
+      total: response.meta?.total || 0,
+      totalPages: response.meta?.total_pages || 1
+    });
+
+    // Update total pages from first response
+    if (currentPage === 1) {
+      totalPages = response.meta?.total_pages || 1;
+      console.log(`[client.service] Total pages to fetch: ${totalPages}, Total clients: ${response.meta?.total || 0}`);
+    }
+
+    // Transform and add clients from this page
+    if (response.data && Array.isArray(response.data)) {
+      const clientsFromPage = response.data.map(clientData => ({
+        ...transformClient(clientData),
+        documents: clientData.documents.map(transformClientDocument),
+      }));
+
+      allClients.push(...clientsFromPage);
+    }
+    
+    currentPage++;
+  }
+
+  console.log(`[client.service] Finished fetching all clients. Total: ${allClients.length}`);
+  return allClients;
 }
 
 /**
