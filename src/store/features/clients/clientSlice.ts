@@ -137,15 +137,24 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
   // Actions
   fetchClients: async (force = false) => {
-    const { isCacheValid, isLoading } = get();
+    const { isCacheValid, isLoading, clients: currentClients } = get();
+
+    console.log('[clientSlice] fetchClients called:', { 
+      force, 
+      isCacheValid: isCacheValid(), 
+      isLoading,
+      currentClientsCount: currentClients.length 
+    });
 
     // Return cached data if valid and not forced
     if (!force && isCacheValid()) {
+      console.log('[clientSlice] Using cached data');
       return;
     }
 
     // Prevent duplicate concurrent requests
     if (isLoading) {
+      console.log('[clientSlice] Already loading, skipping');
       return;
     }
 
@@ -153,8 +162,11 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
     try {
       const clients = await clientApi.listClientsFullData();
-      console.log('[clientSlice] Fetched clients:', clients);
-      console.log('[clientSlice] Is array?', Array.isArray(clients));
+      console.log('[clientSlice] Fetched clients from API:', {
+        count: clients.length,
+        isArray: Array.isArray(clients),
+        clients: clients.map(c => ({ id: c.id, name: c.name, documentsCount: c.documents?.length || 0 }))
+      });
       set({
         clients,
         isLoading: false,
@@ -164,14 +176,15 @@ export const useClientStore = create<ClientState>((set, get) => ({
       });
       // Save to localStorage for persistence
       saveClientsToLocalStorage(clients);
+      console.log('[clientSlice] Saved to localStorage');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch clients';
+      console.error('[clientSlice] Failed to fetch clients:', errorMessage, error);
       set({
         isLoading: false,
         error: errorMessage,
       });
       // Don't re-throw - silently fail and let components handle the error state
-      console.warn('[clientSlice] Failed to fetch clients:', errorMessage);
     }
   },
 
