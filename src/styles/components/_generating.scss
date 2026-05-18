@@ -152,6 +152,10 @@
   opacity: 0.5;
 }
 
+.generating-sequence-item.pending {
+  opacity: 0.3;
+}
+
 .generating-sequence-icon {
   font-size: 18px;
   color: #d1d5db;
@@ -159,15 +163,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .generating-sequence-item.active .generating-sequence-icon {
-  color: #6366f1;
-  animation: spin 1.2s linear infinite;
+  color: #4f46e5;
 }
 
 .generating-sequence-item.done .generating-sequence-icon {
-  color: #9ca3af;
+  color: #6b7280;
+}
+
+.generating-sequence-item.pending .generating-sequence-icon {
+  color: #d1d5db;
 }
 
 .generating-sequence-text {
@@ -285,6 +293,11 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+.gen-spinner {
+  animation: spin 0.9s linear infinite;
+  transform-origin: center;
 }
 
 .generating-connection-badge {
