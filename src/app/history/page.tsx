@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/history/HistoryPage";
+﻿"use client";
+
+export { default } from "@/views/history/HistoryPage";

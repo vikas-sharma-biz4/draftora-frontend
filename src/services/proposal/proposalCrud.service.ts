@@ -77,7 +77,7 @@ export async function generateProposal(
     length_preference: data.lengthPreference,
     language: data.language,
     template_type: data.templateType || "scratch",
-    ai_model: data.aiModel || null,
+    ai_model: data.aiModel || DEFAULT_AI_MODEL,
     selected_sections: allSections,
     section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
     contextual_instructions: contextual || null,
@@ -270,15 +270,8 @@ export interface ListProposalsParams {
   offset?: number;
 }
 
-export async function listProposals(params?: ListProposalsParams): Promise<ProposalListItem[]> {
-  const queryParams = new URLSearchParams();
-  if (params?.limit) queryParams.set("limit", String(params.limit));
-  if (params?.offset) queryParams.set("offset", String(params.offset));
-  const qs = queryParams.toString();
-  const url = qs ? `/proposals?${qs}` : "/proposals";
-
-  const items = await http.get<ProposalListApiItem[]>(url, { cache: "no-store" });
-  return items.map((item) => ({
+function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
+  return {
     id: item.id,
     title: item.title,
     clientId: item.client_id,
@@ -290,7 +283,38 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
     templateType: parseTemplateType(item.template_type),
     createdAt: item.created_at,
     updatedAt: item.updated_at,
-  }));
+  };
+}
+
+export async function listProposals(params?: ListProposalsParams): Promise<ProposalListItem[]> {
+  // If explicit limit/offset params are passed, use them directly (legacy behaviour)
+  if (params?.limit !== undefined || params?.offset !== undefined) {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.set("per_page", String(params.limit));
+    if (params.offset) queryParams.set("page", String(Math.floor((params.offset ?? 0) / (params.limit ?? 10)) + 1));
+    const url = `/proposals?${queryParams.toString()}`;
+    const raw = await http.get<ProposalListApiItem[]>(url, { cache: "no-store" });
+    return raw.map(mapProposalListItem);
+  }
+
+  // Paginate through all pages using per_page=100 (backend max) to minimise round-trips.
+  // handleResponse unwraps json.data, so we receive the items array directly.
+  // Sentinel: stop when a page returns fewer items than per_page.
+  const PER_PAGE = 100;
+  const all: ProposalListItem[] = [];
+  let page = 1;
+
+  while (true) {
+    const items = await http.get<ProposalListApiItem[]>(
+      `/proposals?page=${page}&per_page=${PER_PAGE}`,
+      { cache: "no-store" },
+    );
+    all.push(...items.map(mapProposalListItem));
+    if (items.length < PER_PAGE) break;
+    page++;
+  }
+
+  return all;
 }
 
 export function getDownloadUrl(id: number): string {

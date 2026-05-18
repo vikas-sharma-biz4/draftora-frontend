@@ -111,10 +111,9 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
 
     let isMounted = true;
 
-    // ── Async save (used on unmount & visibilitychange) ──────────────────────
+    // ── Core save logic — no mount guard (safe: only updates refs, no state setters) ──
 
-    async function saveToDrafts(): Promise<void> {
-      if (!isMounted) return;
+    async function performSave(): Promise<void> {
       const currentProposal = proposalRef.current;
       if (!currentProposal || !currentProposal.status || currentProposal.status !== "completed") return;
 
@@ -148,7 +147,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
           const existing = await getDraftByProposalId(proposalId);
           if (existing) {
             draftId = existing.id;
-            if (isMounted) draftIdRef.current = draftId;
+            draftIdRef.current = draftId;
           }
         }
 
@@ -156,13 +155,20 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
           await updateDraftApi(draftId, draftPayload);
         } else {
           const saved = await saveDraftApi(draftPayload);
-          if (isMounted) draftIdRef.current = saved.id;
+          draftIdRef.current = saved.id;
         }
 
         logger.info("[useDraftPersistence] draft saved:", currentProposal.title);
       } catch (error) {
-        logger.error("[useDraftPersistence] async save failed:", error);
+        logger.error("[useDraftPersistence] save failed:", error);
       }
+    }
+
+    // ── Guarded save — used by event listeners to skip stale in-flight calls ──
+
+    async function saveToDrafts(): Promise<void> {
+      if (!isMounted) return;
+      await performSave();
     }
 
     // ── Sync fallback (used on beforeunload) ─────────────────────────────────
@@ -211,12 +217,15 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     window.addEventListener("pagehide", handlePageHide);
 
     return () => {
+      // Call performSave() directly BEFORE setting isMounted=false.
+      // saveToDrafts() checks isMounted and would return immediately in cleanup,
+      // making the unmount save a dead code path. performSave() has no mount guard
+      // and is safe after unmount because it only mutates refs, not React state.
+      void performSave();
       isMounted = false;
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("pagehide", handlePageHide);
-      // Save on unmount
-      void saveToDrafts();
     };
   }, [enabled, proposalId, lastLocation, stage]);
 }

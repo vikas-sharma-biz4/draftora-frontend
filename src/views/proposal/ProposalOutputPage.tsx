@@ -204,9 +204,13 @@ export default function ProposalOutputPage(): JSX.Element {
       ? "Proposal approved and moved to history!"
       : "Proposal rejected and moved to history";
 
+    logger.info(`[Approval Flow] Starting ${actionType} action for proposal ${proposalId}`);
     setLoading(true);
     try {
+      // Update approval status in backend
+      logger.info(`[Approval Flow] Calling API to update approval status to: ${status}`);
       await updateApprovalStatus(proposalId, status);
+      logger.info(`[Approval Flow] API call successful - approval status updated to: ${status}`);
 
       // Remove from drafts via API
       try {
@@ -218,16 +222,23 @@ export default function ProposalOutputPage(): JSX.Element {
         logger.error("Failed to remove draft:", draftError);
       }
 
+      // CRITICAL: Invalidate cache FIRST to ensure history page fetches fresh data
+      logger.info(`[Approval Flow] Invalidating Zustand cache to force fresh data fetch`);
+      invalidateCache();
+
+      // Then update local state for immediate UI feedback
       setProposal((prev) => {
         if (!prev) return prev;
         return { ...prev, approvalStatus: status };
       });
 
+      // Update Zustand store (optimistic update)
+      logger.info(`[Approval Flow] Updating Zustand store with new approval status: ${status}`);
       updateProposalInStore(proposalId, { approvalStatus: status });
-      invalidateCache();
 
       toast.success(successMessage);
 
+      logger.info(`[Approval Flow] Redirecting to /history in 500ms`);
       await new Promise(resolve => setTimeout(resolve, 500));
       router.push("/history");
     } catch (error) {
