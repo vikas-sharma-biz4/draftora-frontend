@@ -15,6 +15,23 @@
 import { create } from 'zustand';
 import type { DraftStage } from '@/interfaces/draftInterfaces';
 
+const SESSION_DRAFT_ID_KEY = 'draftora_current_draft_id';
+
+const isBrowser = typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
+
+function readDraftIdFromSession(): string | null {
+  if (!isBrowser) return null;
+  try { return sessionStorage.getItem(SESSION_DRAFT_ID_KEY); } catch { return null; }
+}
+
+function writeDraftIdToSession(id: string | null): void {
+  if (!isBrowser) return;
+  try {
+    if (id) sessionStorage.setItem(SESSION_DRAFT_ID_KEY, id);
+    else sessionStorage.removeItem(SESSION_DRAFT_ID_KEY);
+  } catch { /* ignore */ }
+}
+
 export const INITIAL_DRAFT_SESSION_STATE = {
   currentDraftId: null as string | null,
   autoSaveEnabled: true,
@@ -22,6 +39,8 @@ export const INITIAL_DRAFT_SESSION_STATE = {
   completedSteps: [] as number[],
   isSaving: false as boolean,
 };
+
+const restoredDraftId = readDraftIdFromSession();
 
 interface DraftSessionState {
   currentDraftId: string | null;
@@ -41,13 +60,14 @@ interface DraftSessionState {
 }
 
 export const useDraftSessionStore = create<DraftSessionState>((set) => ({
-  currentDraftId: null,
+  currentDraftId: restoredDraftId,
   autoSaveEnabled: true,
   draftStage: "template_selection",
   completedSteps: [],
   isSaving: false,
 
   setCurrentDraftId: (id: string | null) => {
+    writeDraftIdToSession(id);
     set({ currentDraftId: id });
   },
 
@@ -79,8 +99,12 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   },
 
   resetDraftSession: () => {
+    writeDraftIdToSession(null);
     set(INITIAL_DRAFT_SESSION_STATE);
   },
 
-  reset: () => set(INITIAL_DRAFT_SESSION_STATE),
+  reset: () => {
+    writeDraftIdToSession(null);
+    set(INITIAL_DRAFT_SESSION_STATE);
+  },
 }));

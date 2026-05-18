@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/proposal/ProposalOutputPage";
+﻿"use client";
+
+export { default } from "@/views/proposal/ProposalOutputPage";

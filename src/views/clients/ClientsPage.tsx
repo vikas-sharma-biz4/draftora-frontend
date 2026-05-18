@@ -31,23 +31,16 @@ export default function ClientsPage(): JSX.Element {
   const router = useRouter();
   const { clients, isLoading: loading, refetch } = useClients();
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
-  const [mounted, setMounted] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
+  // Refresh when tab becomes visible only if cache is stale
   useEffect(() => {
-    setMounted(true);
-    // Force refresh on mount to ensure fresh data
-    console.log('[ClientsPage] Forcing refresh on mount');
-    refetch();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
-
-  useEffect(() => {
-    console.log('[ClientsPage] Clients updated:', {
-      count: clients.length,
-      clients: clients.map(c => ({ id: c.id, name: c.name, documentsCount: c.documents?.length || 0 }))
-    });
-  }, [clients]);
+    const handleVisibilityChange = (): void => {
+      if (!document.hidden) void refetch();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetch]);
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
@@ -118,12 +111,7 @@ export default function ClientsPage(): JSX.Element {
         }
       />
 
-      {!mounted ? (
-        <SkeletonGrid
-          className={styles.clientsGrid}
-          renderItem={() => <ClientCardSkeleton />}
-        />
-      ) : loading ? (
+      {loading ? (
         <SkeletonGrid
           className={styles.clientsGrid}
           renderItem={() => <ClientCardSkeleton />}

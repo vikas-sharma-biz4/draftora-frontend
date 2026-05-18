@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/generating/GeneratingPage";
+﻿"use client";
+
+export { default } from "@/views/generating/GeneratingPage";

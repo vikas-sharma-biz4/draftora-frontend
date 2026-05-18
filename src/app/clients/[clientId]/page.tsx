@@ -1,1 +1,3 @@
-﻿export { default } from "@/views/clients/ClientDetailPage";
+﻿"use client";
+
+export { default } from "@/views/clients/ClientDetailPage";

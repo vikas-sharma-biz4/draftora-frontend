@@ -20,7 +20,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 // Lazy load heavy components to reduce initial bundle size
 const ErrorBoundary = dynamic(() => import("@/components/common/ErrorBoundary"), {
-  ssr: true,
+  ssr: false,
 });
 
 const ToastProvider = dynamic(() => import("@/components/common/ToastProvider"), {
