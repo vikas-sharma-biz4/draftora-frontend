@@ -43,17 +43,21 @@
 
 import { memo, useEffect, useState, useCallback } from "react";
 import SectionEditMode from "./SectionEditMode";
-import Button from "@/components/common/Button";
-import { Input } from "@/components/common/Input";
-import { RefreshCw, X } from "lucide-react";
+import { regenerateSelection } from "@/services/proposal.service";
+
+interface RegenerateSelectionParams {
+  selectedText: string;
+  selectionRange: { from: number; to: number };
+  instructions?: string;
+}
 
 interface ProposalSectionEditorProps {
+  proposalId: number;
   sectionKey: string;
   label: string;
   rawContent: string;
   onContentChange: (key: string, html: string) => void;
   onSave: (key: string, content: string) => Promise<void>;
-  onRegenerate: (key: string, instructions?: string) => Promise<string | null>;
 }
 
 /**
@@ -93,32 +97,19 @@ interface ProposalSectionEditorProps {
  * Edit mode: SectionEditMode (TipTap editor with auto-save)
  */
 const ProposalSectionEditor = memo(function ProposalSectionEditor({
+  proposalId,
   sectionKey,
   label,
   rawContent,
   onContentChange,
   onSave,
-  onRegenerate,
 }: ProposalSectionEditorProps): JSX.Element {
   const [localContent, setLocalContent] = useState<string>(rawContent);
-  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
-  const [showRegenInput, setShowRegenInput] = useState<boolean>(false);
-  const [regenInstructions, setRegenInstructions] = useState<string>("");
 
   useEffect(() => {
     setLocalContent(rawContent);
   }, [rawContent]);
 
-  async function handleRegenerate(): Promise<void> {
-    setIsRegenerating(true);
-    const result = await onRegenerate(sectionKey, regenInstructions || undefined);
-    if (result !== null) {
-      setLocalContent(result);
-      setShowRegenInput(false);
-      setRegenInstructions("");
-    }
-    setIsRegenerating(false);
-  }
 
   const handleContentChange = useCallback(
     (key: string, html: string): void => {
@@ -129,63 +120,30 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
   );
 
   const handleRegenerateSelection = useCallback(
-    (selectedText: string): void => {
-      setRegenInstructions(`Rewrite this selection: ${selectedText}`);
-      setShowRegenInput(true);
+    async (params: RegenerateSelectionParams): Promise<string | null> => {
+      try {
+        // Call the new selection-based regeneration API
+        const regeneratedText = await regenerateSelection(
+          proposalId,
+          sectionKey,
+          params.selectedText,
+          undefined, // selection_context - could be enhanced later
+          params.instructions
+        );
+        return regeneratedText;
+      } catch (error) {
+        console.error("[ProposalSectionEditor] Selection regeneration failed:", error);
+        return null;
+      }
     },
-    []
+    [proposalId, sectionKey]
   );
 
   return (
     <div className="proposal-page" id={`section-${sectionKey}`}>
       <div className="proposal-page-header">
         <h2 className="proposal-page-title">{label}</h2>
-        <div className="proposal-page-actions">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowRegenInput((v) => !v)}
-            title="Regenerate with AI"
-          >
-            <RefreshCw size={13} />
-            {showRegenInput ? (
-              <X size={13} />
-            ) : (
-              "Regenerate"
-            )}
-          </Button>
-        </div>
       </div>
-
-      {showRegenInput && (
-        <div className="regen-bar">
-          <Input
-            className="form-input flex-1 font-13"
-            placeholder="Optional instructions, e.g. focus more on ROI…"
-            value={regenInstructions}
-            onChange={(e) => setRegenInstructions(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleRegenerate();
-              if (e.key === "Escape") setShowRegenInput(false);
-            }}
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleRegenerate}
-            loading={isRegenerating}
-          >
-            Go
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowRegenInput(false)}
-          >
-            ✕
-          </Button>
-        </div>
-      )}
 
       <SectionEditMode
         sectionKey={sectionKey}
