@@ -16,12 +16,13 @@ export {
   getProposalStatus,
   getProposal,
   listProposals,
+  listProposalHistory,
   getDownloadUrl,
   cancelProposal,
   updateApprovalStatus,
 } from "./proposal/proposalCrud.service";
 
-export type { ProposalStatus, ListProposalsParams } from "./proposal/proposalCrud.service";
+export type { ProposalStatus, ListProposalsParams, PaginatedProposalResponse } from "./proposal/proposalCrud.service";
 
 export {
   updateSection,

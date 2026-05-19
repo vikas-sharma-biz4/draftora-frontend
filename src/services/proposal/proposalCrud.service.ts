@@ -297,24 +297,63 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
     return raw.map(mapProposalListItem);
   }
 
-  // Paginate through all pages using per_page=100 (backend max) to minimise round-trips.
-  // handleResponse unwraps json.data, so we receive the items array directly.
-  // Sentinel: stop when a page returns fewer items than per_page.
+  // Fetch only the first page (100 items max) to avoid multiple sequential API calls.
+  // This is optimized for performance - if you need all proposals, use pagination params.
   const PER_PAGE = 100;
-  const all: ProposalListItem[] = [];
-  let page = 1;
+  const items = await http.get<ProposalListApiItem[]>(
+    `/proposals?page=1&per_page=${PER_PAGE}`,
+    { cache: "no-store" },
+  );
 
-  while (true) {
-    const items = await http.get<ProposalListApiItem[]>(
-      `/proposals?page=${page}&per_page=${PER_PAGE}`,
-      { cache: "no-store" },
-    );
-    all.push(...items.map(mapProposalListItem));
-    if (items.length < PER_PAGE) break;
-    page++;
+  return items.map(mapProposalListItem);
+}
+
+export interface PaginatedProposalResponse {
+  items: ProposalListItem[];
+  page: number;
+  perPage: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+interface ProposalHistoryDataResponse {
+  data: ProposalListApiItem[];
+  meta: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
+}
+
+export async function listProposalHistory(
+  page: number = 1,
+  perPage: number = 20
+): Promise<PaginatedProposalResponse> {
+  const url = `/proposals/history?page=${page}&per_page=${perPage}`;
+  // Note: http.get returns the unwrapped 'data' field from the API response
+  const response = await http.get<ProposalHistoryDataResponse>(url, { cache: "no-store" });
+
+  // Defensive check: ensure response has expected structure
+  if (!response || !response.data || !Array.isArray(response.data)) {
+    logger.error('[listProposalHistory] Invalid API response structure', { response });
+    throw new Error('Invalid response from proposal history API');
   }
 
-  return all;
+  if (!response.meta) {
+    logger.error('[listProposalHistory] Missing meta in API response', { response });
+    throw new Error('Missing pagination metadata in API response');
+  }
+
+  return {
+    items: response.data.map(mapProposalListItem),
+    page: response.meta.page,
+    perPage: response.meta.per_page,
+    total: response.meta.total,
+    totalPages: response.meta.total_pages,
+    hasMore: response.meta.page < response.meta.total_pages,
+  };
 }
 
 export function getDownloadUrl(id: number): string {

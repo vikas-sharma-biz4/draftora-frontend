@@ -9,7 +9,7 @@
 "use client";
 
 import { useCallback, useId, useState } from "react";
-import { X, Sparkles } from "lucide-react";
+import { X } from "lucide-react";
 
 import BaseModal from "@/components/common/BaseModal";
 import Button from "@/components/common/Button";
@@ -183,10 +183,7 @@ export default function AddSectionModal({
           {isGenerating ? (
             "Generating\u2026"
           ) : (
-            <>
-              <Sparkles size={14} style={{ marginRight: 6 }} />
-              Generate Section
-            </>
+            "Generate Section"
           )}
         </Button>
       </div>
