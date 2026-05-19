@@ -13,12 +13,18 @@ const RichEditor = dynamic(() => import("@/components/common/RichEditor"), {
   ),
 });
 
+interface RegenerateSelectionParams {
+  selectedText: string;
+  selectionRange: { from: number; to: number };
+  instructions?: string;
+}
+
 interface SectionEditModeProps {
   sectionKey: string;
   content: string;
   onContentChange: (key: string, html: string) => void;
   onSave: (key: string, content: string) => Promise<void>;
-  onRegenerateSelection?: (selectedText: string) => void;
+  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<string | null>;
   placeholder?: string;
 }
 
