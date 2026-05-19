@@ -26,6 +26,7 @@ export type { ProposalStatus, ListProposalsParams } from "./proposal/proposalCru
 export {
   updateSection,
   regenerateSection,
+  regenerateSelection,
   addProposalSection,
   removeProposalSection,
   reorderProposalSections,
