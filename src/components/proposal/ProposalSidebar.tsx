@@ -411,16 +411,6 @@ export default function ProposalSidebar({
             </ul>
           </SortableContext>
         </DndContext>
-
-        <button
-          className="proposal-sidebar-add-btn"
-          onClick={() => openAddModal()}
-          disabled={isGenerating}
-          aria-label="Add new section to proposal"
-        >
-          <Plus size={12} />
-          Add section
-        </button>
       </nav>
 
       <AddSectionModal

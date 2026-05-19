@@ -17,7 +17,7 @@ export function DashboardWithDraftRecovery(): JSX.Element {
   } = useDraftRecovery({
     autoRecover: false,
     onRecoveryComplete: () => {
-      toast.success("Draft recovered successfully");
+      toast.success("Draft recovered");
       setShowRecoveryModal(false);
     },
     onRecoveryError: (error) => {

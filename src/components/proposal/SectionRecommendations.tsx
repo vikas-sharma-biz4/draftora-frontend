@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
-import { Sparkles, RefreshCw, GripVertical, Plus, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/utils/toast";
 import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
@@ -36,12 +36,10 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
 ) => {
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [hasUserRequested, setHasUserRequested] = useState<boolean>(false);
+  const [isRevealed, setIsRevealed] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
-  const [isBackgroundLoading, setIsBackgroundLoading] = useState<boolean>(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
-  const hasAutoFetchedRef = useRef<boolean>(false);
 
   // Load prefetched recommendations from store
   const prefetchedRecommendations = usePrefetchedRecommendations();
@@ -59,56 +57,13 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     existingSectionsRef.current = existingSections;
   });
 
-  // Load prefetched recommendations when available
+  // Auto-load prefetched recommendations when they arrive from store
   useEffect(() => {
-    if (prefetchedRecommendations && prefetchedRecommendations.length > 0 && !hasUserRequested) {
+    if (prefetchedRecommendations && prefetchedRecommendations.length > 0) {
       logger.info('[SectionRecommendations] Loading prefetched recommendations from store', { count: prefetchedRecommendations.length });
       setRecommendations(prefetchedRecommendations);
-      setHasUserRequested(true);
     }
-  }, [prefetchedRecommendations, hasUserRequested]);
-
-  // Removed automatic background fetching - user must click Generate button
-
-  const fetchRecommendationsInBackground = async (customPrompt?: string): Promise<void> => {
-    const ctx = contextRef.current;
-    const docCtx = documentContextRef.current;
-    const prompt = customPrompt ?? userPrompt;
-
-    // Allow API call if there's either context/document context OR a user prompt
-    if (!ctx && !docCtx && !prompt) {
-      return;
-    }
-
-    setIsBackgroundLoading(true);
-    try {
-      const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
-
-      const existingSectionsWithRules = existingSectionsRef.current.map((key) => ({
-        sectionKey: key,
-        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        include: "",
-        exclude: "",
-        purpose: "",
-      }));
-
-      const recs = await getSectionRecommendations({
-        templateId: templateIdRef.current,
-        existingSections: existingSectionsRef.current,
-        existingSectionsWithRules: existingSectionsWithRules,
-        context: fullContext,
-        userPrompt: prompt || null,
-      });
-
-      setRecommendations(recs);
-      setHasUserRequested(true);
-    } catch (error) {
-      logger.error("Failed to fetch recommendations:", error);
-      setRecommendations([]);
-    } finally {
-      setIsBackgroundLoading(false);
-    }
-  };
+  }, [prefetchedRecommendations]);
 
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
@@ -141,28 +96,15 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       });
 
       setRecommendations(recs);
-      setHasUserRequested(true);
     } catch (error) {
       logger.error("Failed to fetch recommendations:", error);
-      toast.error("Failed to generate recommendations. Please try again.");
+      toast.error("Failed to generate recommendations. Please try again");
       setRecommendations([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-
-  const handleGetRecommendations = (): void => {
-    setHasUserRequested(true);
-    setRecommendations([]);
-    fetchRecommendations();
-  };
-
-  const handleRegenerate = (): void => {
-    setHasUserRequested(true);
-    setRecommendations([]);
-    fetchRecommendations();
-  };
 
   const handleAddSection = (rec: SectionRecommendation, index: number): void => {
     const sectionKey = rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -202,7 +144,6 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const handlePromptChange = (): void => {
     setIsEditingPrompt(false);
     if (userPrompt.trim()) {
-      setHasUserRequested(true);
       setRecommendations([]);
       fetchRecommendations(userPrompt);
     }
@@ -229,7 +170,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       });
     },
     startBackgroundFetch: () => {
-      fetchRecommendationsInBackground();
+      // No-op: auto-fetch is now triggered via prefetchRecommendations() in ParametersPage
     },
   }));
 
@@ -238,43 +179,27 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       <div className={styles.header}>
         <div className={styles.headerTitle}>
           <h3>AI Section Recommendations</h3>
-          {recommendationsFetchStatus === 'loading' && (
+          {isRevealed && recommendationsFetchStatus === 'loading' && recommendations.length === 0 && (
             <span className={styles.loadingBadge}>Generating...</span>
-          )}
-        </div>
-        <div className={styles.headerActions}>
-          {!hasUserRequested && recommendationsFetchStatus !== 'loading' && (
-            <button
-              className={styles.getRecommendationsBtn}
-              onClick={handleGetRecommendations}
-              disabled={isLoading}
-            >
-              Generate
-            </button>
-          )}
-          {hasUserRequested && recommendations.length > 0 && (
-            <button
-              className={styles.regenerateBtn}
-              onClick={handleRegenerate}
-              disabled={isLoading}
-            >
-              <RefreshCw size={14} />
-              Regenerate
-            </button>
           )}
         </div>
       </div>
 
-      {!hasUserRequested && recommendationsFetchStatus !== 'loading' ? (
+      {!isRevealed ? (
         <div className={styles.ctaState}>
-          <p className={styles.ctaText}>Click Generate to get AI-powered section recommendations</p>
-          <p className={styles.ctaHint}>Or wait - we're already generating in the background...</p>
+          <button
+            className={styles.ctaBtn}
+            onClick={() => setIsRevealed(true)}
+          >
+            Generate
+          </button>
+          <p className={styles.ctaHint}>AI is analyzing your context in the background</p>
         </div>
       ) : recommendationsFetchStatus === 'loading' && recommendations.length === 0 ? (
         <div className={styles.loadingState}>
           <div className={styles.spinner}></div>
           <p>Analyzing your context and generating recommendations...</p>
-          <span className={styles.loadingHint}>This usually takes 5-10 seconds</span>
+          <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
         </div>
       ) : (
         <>
@@ -317,12 +242,18 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             )}
           </div>
 
-          {isLoading || recommendationsFetchStatus === 'loading' ? (
+          {isLoading ? (
             <div className={styles.loadingState}>
               <div className={styles.spinner}></div>
               <p>Loading recommendations...</p>
             </div>
-          ) : hasUserRequested && recommendations.length === 0 ? (
+          ) : recommendationsFetchStatus === 'loading' ? (
+            <div className={styles.loadingState}>
+              <div className={styles.spinner}></div>
+              <p>Analyzing your context and generating recommendations...</p>
+              <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
+            </div>
+          ) : recommendations.length === 0 ? (
             <div className={styles.emptyState}>
               <p>No recommendations available</p>
               <span className={styles.emptyHint}>

@@ -102,3 +102,35 @@
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
+
+.loadMoreTrigger {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.loadingMore {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: var(--color-background);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.endOfList {
+  text-align: center;
+  padding: 40px 24px;
+  margin-top: 32px;
+  
+  p {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
