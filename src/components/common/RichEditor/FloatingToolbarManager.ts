@@ -1,6 +1,6 @@
 /**
  * Centralized Floating Toolbar Manager
- * 
+ *
  * Ensures ONLY ONE floating toolbar exists globally across all editor instances.
  * Manages lifecycle, cleanup, and state synchronization.
  */

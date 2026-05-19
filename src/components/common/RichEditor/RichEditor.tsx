@@ -90,7 +90,7 @@ export default function RichEditor({
   const headingBtnRef = useRef<HTMLButtonElement | null>(null);
   const linkBtnRef = useRef<HTMLButtonElement | null>(null);
   const imageBtnRef = useRef<HTMLButtonElement | null>(null);
-  
+
   // Unique ID for this editor instance (for toolbar ownership)
   const editorId = useId();
 
@@ -227,7 +227,7 @@ export default function RichEditor({
 
   const handleRegenerateSubmit = useCallback(async (): Promise<void> => {
     if (!editor || !onRegenerateSelection || !savedSelection) return;
-    
+
     const { from, to } = savedSelection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (!selectedText.trim()) return;
@@ -271,10 +271,12 @@ export default function RichEditor({
   const [bubbleReady, setBubbleReady] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
   const [selectionCoords, setSelectionCoords] = useState({ top: 0, left: 0 });
+  const keepToolbarVisibleRef = useRef<boolean>(false);
+  const toolbarPositionSetRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!editor) return;
-    
+
     // Cleanup function to reset all toolbar state
     const cleanupToolbarState = () => {
       setShowRegenPrompt(false);
@@ -286,7 +288,7 @@ export default function RichEditor({
       setIsToolbarCollapsed(true);
       setHasSelection(false);
     };
-    
+
     // Request toolbar ownership from centralized manager
     const el = toolbarManager.requestToolbar(editorId, cleanupToolbarState);
     bubbleElRef.current = el;
@@ -302,7 +304,7 @@ export default function RichEditor({
           // Request ownership - this will cleanup any other editor's toolbar
           toolbarManager.requestToolbar(editorId, cleanupToolbarState);
         }
-        
+
         // CRITICAL: Reset ALL toolbar UI state for EVERY new selection
         // This ensures clean toolbar state and prevents any menus/panels from auto-opening
         setShowRegenPrompt(false);
@@ -313,44 +315,51 @@ export default function RichEditor({
         setShowImageInput(false);
         setIsToolbarCollapsed(true); // Start collapsed by default
 
-        // Get selection coordinates from the editor view (already viewport-relative)
-        const startCoords = editor.view.coordsAtPos(from);
-        const endCoords = editor.view.coordsAtPos(to);
-
-        // Calculate center of selection
-        const top = endCoords.bottom + 2; // 2px below end of selection
-        let left = (startCoords.left + endCoords.left) / 2; // Center horizontally
-
-        setSelectionCoords({ top, left });
         setHasSelection(true);
+        keepToolbarVisibleRef.current = true; // Mark toolbar as active
 
-        // Position and show the bubble with viewport boundary detection
-        if (el && toolbarManager.isOwner(editorId)) {
+        // Only calculate and set position for NEW selections (not during scroll)
+        if (!toolbarPositionSetRef.current && el && toolbarManager.isOwner(editorId)) {
+          // Get selection coordinates from the editor view (already viewport-relative)
+          const startCoords = editor.view.coordsAtPos(from);
+          const endCoords = editor.view.coordsAtPos(to);
+
+          // Calculate center of selection
+          const top = endCoords.bottom + 2; // 2px below end of selection
+          let left = (startCoords.left + endCoords.left) / 2; // Center horizontally
+
+          setSelectionCoords({ top, left });
+
+          // Position and show the bubble with viewport boundary detection
           el.style.position = 'fixed';
           el.style.top = `${top}px`;
           el.style.display = 'block'; // Must be visible to measure width
-          
+
           // Get toolbar dimensions after rendering
-          const toolbarWidth = el.offsetWidth || 600; // Default estimate if not yet rendered
+          const toolbarWidth = el.offsetWidth || 320; // Vertical toolbar is ~320px wide
           const viewportWidth = window.innerWidth;
-          const padding = 16; // Minimum padding from viewport edges
-          
+          const padding = 12; // Minimum padding from viewport edges
+
           // Calculate boundaries
           const minLeft = padding + (toolbarWidth / 2);
           const maxLeft = viewportWidth - padding - (toolbarWidth / 2);
-          
+
           // Constrain left position to keep toolbar on screen
           if (left < minLeft) {
             left = minLeft;
           } else if (left > maxLeft) {
             left = maxLeft;
           }
-          
+
           el.style.left = `${left}px`;
           el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
-          el.style.maxWidth = `${viewportWidth - (padding * 2)}px`; // Responsive max-width
+          // maxWidth is controlled by CSS — do not override with inline style
+
+          // Mark position as set - don't recalculate until new selection
+          toolbarPositionSetRef.current = true;
         }
-      } else {
+      } else if (!keepToolbarVisibleRef.current) {
+        // Only hide if we're not keeping it visible (e.g., during scroll)
         setHasSelection(false);
         // Reset ALL toolbar UI state when selection is cleared
         setShowRegenPrompt(false);
@@ -365,6 +374,7 @@ export default function RichEditor({
           el.style.display = 'none';
         }
       }
+      // If keepToolbarVisibleRef.current is true and no selection, toolbar stays visible
     };
 
     // Track mouse state to only show toolbar after mouse is released
@@ -381,6 +391,8 @@ export default function RichEditor({
       const editorDom = editor.view.dom;
       if (editorDom.contains(target)) {
         isMouseDown = true;
+        keepToolbarVisibleRef.current = false; // Reset flag - user is making new selection
+        toolbarPositionSetRef.current = false; // Reset position flag - allow repositioning
         // CRITICAL: Reset ALL toolbar state immediately when starting new selection
         // This prevents multiple toolbars and ensures clean state
         setShowRegenPrompt(false);
@@ -395,6 +407,10 @@ export default function RichEditor({
         if (el) {
           el.style.display = 'none';
         }
+      } else {
+        // Clicking outside editor - reset flags to allow toolbar to hide
+        keepToolbarVisibleRef.current = false;
+        toolbarPositionSetRef.current = false;
       }
     };
 
@@ -407,18 +423,11 @@ export default function RichEditor({
       }
     };
 
-    // Hide toolbar on scroll to prevent it from moving with content
-    const handleScroll = () => {
-      if (toolbarManager.isOwner(editorId) && el) {
-        el.style.display = 'none';
-        setHasSelection(false);
-        cleanupToolbarState();
-      }
-    };
+    // Toolbar uses position:fixed so it won't scroll with content
+    // No scroll handler needed - toolbar stays at fixed viewport coordinates
 
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('scroll', handleScroll, true); // Use capture to catch all scroll events
 
     // Also handle keyboard selection (no mouse involved)
     editor.on('selectionUpdate', () => {
@@ -434,11 +443,10 @@ export default function RichEditor({
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('scroll', handleScroll, true);
-      
+
       // Release toolbar ownership - manager will handle cleanup
       toolbarManager.releaseToolbar(editorId);
-      
+
       bubbleElRef.current = null;
       setBubbleReady(false);
     };
@@ -678,12 +686,11 @@ export default function RichEditor({
             disabled={regenLoading}
             onClick={openRegenPrompt}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span>AI Regen</span>
           </button>
         </>
       )}
-      
+
       {/* Expand/Collapse Button */}
       <button
         type="button"
