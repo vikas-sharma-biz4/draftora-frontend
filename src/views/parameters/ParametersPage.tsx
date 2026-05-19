@@ -1,12 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "@/utils/toast";
-import Button from "@/components/common/Button";
 import { logger } from "@/utils/logger";
+import dynamic from "next/dynamic";
+import Button from "@/components/common/Button";
+import BackButton from "@/components/common/BackButton";
 
 import {
   useTemplateType,
@@ -28,6 +28,7 @@ import {
   useShouldStartBackgroundFetch,
   useWizardActions,
   useGeneratedProposalId,
+  useRecommendationsFetchStatus,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/hooks";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
@@ -112,7 +113,8 @@ export default function ParametersPage(): JSX.Element {
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
   const shouldStartBackgroundFetch = useShouldStartBackgroundFetch();
-  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setShouldStartBackgroundFetch, invalidateRecommendationsCache } = useWizardActions();
+  const recommendationsFetchStatus = useRecommendationsFetchStatus();
+  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
   const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
@@ -149,9 +151,9 @@ export default function ParametersPage(): JSX.Element {
       sectionDisplayNames,
       originalSections
     );
-    logger.info('[ParametersPage] computedSections: built from store', { 
+    logger.info('[ParametersPage] computedSections: built from store', {
       selectedSectionsCount: selectedSections.length,
-      builtCount: built.length 
+      builtCount: built.length
     });
     return built;
   }, [templateType, selectedSections, sectionDisplayNames, originalSections]);
@@ -217,14 +219,13 @@ export default function ParametersPage(): JSX.Element {
     }
   }, [sections, hasModifiedSections, selectedSections, sectionDisplayNames, updateProposalData]);
 
-  // Invalidate recommendations cache when template or critical context changes
+  // Auto-fetch AI recommendations immediately when landing on Parameters page
   useEffect(() => {
-    // Only invalidate if we have prefetched data and the context changed
-    // This ensures cache is invalidated when user changes template, sections, or description
-    if (templateId !== undefined || description !== undefined) {
-      invalidateRecommendationsCache();
+    if (recommendationsFetchStatus === 'idle') {
+      prefetchRecommendations();
     }
-  }, [templateId, description, invalidateRecommendationsCache]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync computed sections to store when they change (only for non-template modes)
   // DISABLED: This causes race conditions with manual section additions
@@ -295,9 +296,13 @@ export default function ParametersPage(): JSX.Element {
   }, []);
 
   const handleBack = useCallback((): void => {
-    setCurrentStep(1);
-    router.push("/");
-  }, [setCurrentStep, router]);
+    if (generatedProposalId) {
+      router.push(`/proposal/${generatedProposalId}`);
+    } else {
+      setCurrentStep(1);
+      router.push("/");
+    }
+  }, [setCurrentStep, router, generatedProposalId]);
 
   const handleSaveDraftWithSync = useCallback(async (): Promise<void> => {
     console.log('[ParametersPage] handleSaveDraftWithSync called', {
@@ -369,7 +374,7 @@ export default function ParametersPage(): JSX.Element {
     router.push("/review");
 
     if (isRegenerating) {
-      toast.info("Parameters updated. Review and regenerate to apply changes.");
+      toast.info("Parameters updated. Review and regenerate to apply changes");
     }
   }, [sections, updateProposalData, currentProposalId, markStepVisitedOnBackend, markStepCompleted, setDraftStage, setCurrentStep, maxStepReached, setMaxStepReached, router, isRegenerating]);
 
@@ -459,9 +464,7 @@ export default function ParametersPage(): JSX.Element {
 
         <div className="page-footer">
           <div className="page-footer-left">
-            <Button variant="ghost" onClick={handleBack}>
-              Back
-            </Button>
+            <BackButton onClick={handleBack} />
           </div>
           <div className="page-footer-right">
             <Button variant="secondary" onClick={handleSaveDraftWithSync}>

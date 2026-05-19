@@ -16,7 +16,7 @@ export function ParametersPageWithAutoSave(): JSX.Element {
     location: "WIZARD_PARAMETERS",
     onSaveSuccess: (draftId) => {
       setCurrentDraftId(draftId);
-      toast.success("Draft saved successfully");
+      toast.success("Draft saved");
     },
     onSaveError: (error) => {
       toast.error(`Failed to save draft: ${error.message}`);

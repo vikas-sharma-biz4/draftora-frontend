@@ -474,10 +474,10 @@ export default function RecreateTemplateModal({
           setContextUploads((prev) => prev.filter((f) => f.id !== fileId));
           toast.success(`"${file.name}" added to context documents`);
         } catch {
-          toast.success(`"${file.name}" parsed â€” ${result.word_count} words`);
+          toast.success(`"${file.name}" parsed — ${result.word_count} words`);
         }
       } else {
-        toast.success(`"${file.name}" parsed â€” ${result.word_count} words`);
+        toast.success(`"${file.name}" parsed — ${result.word_count} words`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Parse failed";

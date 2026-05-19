@@ -95,7 +95,7 @@ export default function ClientWorkspacePage(): JSX.Element {
       try {
         setUploadingFiles(prev => new Set(prev).add(file.name));
         await uploadDocument(client.id, file);
-        toast.success(`${file.name} uploaded successfully`);
+        toast.success(`${file.name} uploaded`);
         await loadClient();
       } catch (error) {
         logger.error(`Failed to upload ${file.name}:`, error);
