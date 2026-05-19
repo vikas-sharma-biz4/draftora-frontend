@@ -645,7 +645,7 @@ export default function TemplateSelectionModal({
         }
       }
 
-      toast.success(`Client "${newClientFormData.clientName}" created successfully`);
+      toast.success(`Client "${newClientFormData.clientName}" created`);
 
       // Client is automatically added to store by createClient
       setSelectedClientId(newClient.id);

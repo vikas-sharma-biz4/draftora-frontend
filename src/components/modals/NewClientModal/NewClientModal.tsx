@@ -187,7 +187,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
-      toast.success(`"${file.name}" parsed â€” ${result.word_count} words`);
+      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Backend connection failed";
       setUploadedFiles((prev) =>
@@ -250,7 +250,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
         }
       }
 
-      toast.success(`Client "${formData.clientName}" created successfully`);
+      toast.success(`Client "${formData.clientName}" created`);
       onClientCreated(newClient, formData.notes || "", uploadedFiles.map((f) => f.file));
     } catch (error) {
       logger.error("Failed to create client:", error);

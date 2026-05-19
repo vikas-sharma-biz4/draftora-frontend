@@ -37,7 +37,7 @@ export default function StyleVoiceEditorModal({
       lengthPreference: selectedLength,
       language: selectedLanguage,
     });
-    toast.success("Style & voice updated successfully");
+    toast.success("Style & voice updated");
   }
 
   return (

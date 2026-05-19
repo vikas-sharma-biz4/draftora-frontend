@@ -124,7 +124,7 @@ export default function DocumentUploadCard({ onFilesUploaded }: DocumentUploadCa
                 )
               );
 
-              toast.success(`${file.name} parsed successfully`);
+              toast.success(`${file.name} parsed`);
             } else {
               setUploadingFiles((prev) =>
                 prev.map((f) =>

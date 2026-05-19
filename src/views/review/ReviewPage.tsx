@@ -3,10 +3,11 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { FileText, Sparkles } from "lucide-react";
+
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import Button from "@/components/common/Button";
+import BackButton from "@/components/common/BackButton";
 
 import styles from "./ReviewPage.module.scss";
 
@@ -210,18 +211,19 @@ export default function ReviewPage(): JSX.Element {
     }
   }, [proposalData.clientId, proposalData.selectedDocumentIds, proposalData.filesMeta.length, clients]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handleSaveScope(data: { title: string; clientName: string; description: string }): void {
+  function handleSaveScope(data: { title: string; clientName: string; clientId: number | null; description: string }): void {
     logger.info('[ReviewPage] handleSaveScope called', data);
     updateProposalData({
       title: data.title,
       clientName: data.clientName,
+      clientId: data.clientId ?? undefined,
       description: data.description,
     });
 
     // Close modal after a brief delay to ensure state update completes
     setTimeout(() => {
       setShowScopeModal(false);
-      toast.success("Client details updated successfully");
+      toast.success("Client details updated");
     }, 0);
   }
 
@@ -278,7 +280,7 @@ export default function ReviewPage(): JSX.Element {
         templateId,
         templateType: "predefined" as const,
       });
-      toast.success("Template updated successfully");
+      toast.success("Template updated");
     }
 
     setShowTemplateModal(false);
@@ -567,14 +569,7 @@ export default function ReviewPage(): JSX.Element {
                 loading={isGenerating}
                 className="launch-btn"
               >
-                {isGenerating ? (
-                  <>
-                    <Sparkles size={18} className="sparkle-icon" />
-                    Generating Proposal...
-                  </>
-                ) : (
-                  "Generate Proposal"
-                )}
+                {isGenerating ? "Generating Proposal..." : "Generate Proposal"}
               </Button>
 
               <Button
@@ -585,39 +580,21 @@ export default function ReviewPage(): JSX.Element {
               >
                 Save Draft
               </Button>
-
-              <div className="launch-stats">
-                <div className="launch-stats-title">Summary Stats</div>
-                <div className="launch-stat-item">
-                  <span className="launch-stat-label">Estimated Length</span>
-                  <span className="launch-stat-value">{estimatedPages}</span>
-                </div>
-                <div className="launch-stat-item">
-                  <span className="launch-stat-label">Data Sources</span>
-                  <span className="launch-stat-value">
-                    {proposalData.filesMeta.length} File
-                    {proposalData.filesMeta.length !== 1 ? "s" : ""}
-                  </span>
-                </div>
-                <div className="launch-stat-item">
-                  <span className="launch-stat-label">Sections</span>
-                  <span className="launch-stat-value">
-                    {proposalData.selectedSections.length} Selected
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
         <div className="page-footer">
           <div className="page-footer-left">
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/parameters")}
-            >
-              Back
-            </Button>
+            <BackButton
+              onClick={() => {
+                if (generatedProposalId) {
+                  router.push(`/proposal/${generatedProposalId}`);
+                } else {
+                  router.push("/parameters");
+                }
+              }}
+            />
           </div>
           <div className="page-footer-right">
             <Button variant="secondary" onClick={handleSaveDraft}>
@@ -631,6 +608,7 @@ export default function ReviewPage(): JSX.Element {
           <ScopeEditorModal
             proposalTitle={proposalData.title}
             clientName={proposalData.clientName}
+            clientId={proposalData.clientId}
             description={proposalData.description}
             onClose={() => setShowScopeModal(false)}
             onSave={handleSaveScope}

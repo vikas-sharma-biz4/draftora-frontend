@@ -42,6 +42,7 @@ interface ProposalState {
 
   // Actions
   fetchProposals: (force?: boolean) => Promise<void>;
+  fetchProposalHistory: (force?: boolean) => Promise<void>;
   setProposals: (proposals: ProposalListItem[]) => void;
   addProposal: (proposal: ProposalListItem) => void;
   updateProposal: (id: number, updates: Partial<ProposalListItem>) => void;
@@ -131,6 +132,57 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch proposals';
       console.error('[proposalSlice] Failed to fetch proposals', error);
+      set({
+        isLoading: false,
+        error: errorMessage,
+      });
+      throw error;
+    }
+  },
+
+  fetchProposalHistory: async (force = false) => {
+    const { isCacheValid, isLoading } = get();
+
+    // Return cached data if valid and not forced
+    if (!force && isCacheValid()) {
+      console.log('[proposalSlice] Using cached history data - cache is still valid');
+      return;
+    }
+
+    // Prevent duplicate concurrent requests
+    if (isLoading) {
+      console.log('[proposalSlice] Fetch already in progress - skipping');
+      return;
+    }
+
+    console.log('[proposalSlice] Fetching proposal history from API', { force, cacheValid: isCacheValid() });
+    set({ isLoading: true, error: null });
+
+    try {
+      const response = await proposalApi.listProposalHistory(1, 100);
+
+      // Sort by creation date (newest first)
+      const sorted = [...response.items].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      console.log('[proposalSlice] Proposal history fetched successfully', { 
+        count: sorted.length,
+        total: response.total,
+        approved: sorted.filter(p => p.approvalStatus === 'approved').length,
+        rejected: sorted.filter(p => p.approvalStatus === 'rejected').length,
+      });
+
+      set({
+        proposals: sorted,
+        isLoading: false,
+        isInitialized: true,
+        lastFetched: Date.now(),
+        error: null,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch proposal history';
+      console.error('[proposalSlice] Failed to fetch proposal history', error);
       set({
         isLoading: false,
         error: errorMessage,

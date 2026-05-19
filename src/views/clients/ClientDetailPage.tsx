@@ -179,7 +179,7 @@ export default function ClientWorkspacePage(): JSX.Element {
         if (uploadedDoc.status === 'processing') {
           toast.info(`${file.name} is being parsed...`);
         } else if (uploadedDoc.status === 'parsed') {
-          toast.success(`${file.name} uploaded and parsed successfully`);
+          toast.success(`${file.name} uploaded and parsed`);
         }
       } catch (error) {
         logger.error(`Failed to upload ${file.name}:`, error);

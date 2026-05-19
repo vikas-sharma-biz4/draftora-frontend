@@ -9,28 +9,9 @@ import { logger } from "@/utils/logger";
 import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";
 import { useGenerationStore } from "@/store/features/generation/generationSlice";
 import CircularProgress from "@/components/common/CircularProgress";
+import Button from "@/components/common/Button";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Maps generation status to a 0-based active step index:
- *   0 = Analysing Source Materials
- *   1 = Building Context
- *   2 = Generating Sections
- *   3 = Final Review
- *   4 = All done (sentinel)
- */
-function deriveActiveStep(
-  status: string,
-  completedSections: number,
-  totalSections: number,
-): number {
-  if (status === "completed" || status === "cancelled") return 4;
-  if (status === "finalizing" || (totalSections > 0 && completedSections >= totalSections)) return 3;
-  if (status === "generating" || status === "refining") return 2;
-  if (status === "planning") return 1;
-  return 0;
-}
 
 function estimateTimeRemaining(percent: number): string {
   if (percent >= 97) return "Almost done...";
@@ -45,7 +26,7 @@ export default function GeneratingPage(): JSX.Element {
   const router = useRouter();
   const proposalId = Number(params.id);
 
-  const { setIsGenerating, resetProposal } = useWizardActions();
+  const { setIsGenerating, setGeneratedProposalId, resetProposal } = useWizardActions();
 
   // Zustand store for generation state
   const {
@@ -63,6 +44,7 @@ export default function GeneratingPage(): JSX.Element {
     setSelectedSections,
     addCompletedSection,
     setTotalSections,
+    setCompletedSections,
     setConnectionState,
     setError,
     setStartedAt,
@@ -85,9 +67,12 @@ export default function GeneratingPage(): JSX.Element {
     setIsGenerating(false);
     setCompletedAt(new Date().toISOString());
     
+    // Store the generated proposal ID so we can navigate back to it
+    setGeneratedProposalId(proposalId);
+    
     // Navigate to proposal view
     router.push(`/proposal/${proposalId}`);
-  }, [proposalId, router, setIsGenerating, setCompletedAt]);
+  }, [proposalId, router, setIsGenerating, setCompletedAt, setGeneratedProposalId]);
 
   const handleFailed = useCallback((message: string) => {
     logger.error("[GeneratingPage] Generation failed", { message, proposalId });
@@ -114,10 +99,13 @@ export default function GeneratingPage(): JSX.Element {
   const handleSectionCompleted = useCallback((section: string, completed: number, total: number) => {
     logger.info("[GeneratingPage] Section completed", { section, completed, total, proposalId });
     addCompletedSection(section);
-    // Calculate and set progress percentage
+    if (total > 0) {
+      setTotalSections(total);
+      setCompletedSections(completed);
+    }
     const progress = total > 0 ? (completed / total) * 100 : 0;
     setProgressPercent(progress);
-  }, [proposalId, addCompletedSection, setProgressPercent]);
+  }, [proposalId, addCompletedSection, setTotalSections, setCompletedSections, setProgressPercent]);
 
   const handleProgress = useCallback((percent: number) => {
     setProgressPercent(percent);
@@ -175,19 +163,29 @@ export default function GeneratingPage(): JSX.Element {
     },
   });
 
-  const handleCancel = useCallback(async () => {
-    logger.info("[GeneratingPage] Cancelling generation", { proposalId });
+  const handleCancel = useCallback(() => {
+    logger.info("[GeneratingPage] User cancelled generation", { proposalId });
+    
+    // Step 1: Immediately disconnect SSE stream
     disconnect();
     
-    try {
-      await cancelProposal(proposalId);
-      setIsGenerating(false);
-      router.push("/review");
-    } catch (err) {
-      logger.error("[GeneratingPage] Failed to cancel generation", err);
-      setError("Failed to cancel generation");
-    }
-  }, [proposalId, disconnect, setIsGenerating, router, setError]);
+    // Step 2: Reset wizard state
+    setIsGenerating(false);
+    resetGenerationState();
+    
+    // Step 3: Navigate to review page instantly (don't wait for backend)
+    router.push("/review");
+    
+    // Step 4: Kill backend generation process asynchronously
+    cancelProposal(proposalId)
+      .then(() => {
+        logger.info("[GeneratingPage] Backend generation killed successfully", { proposalId });
+      })
+      .catch((err) => {
+        logger.error("[GeneratingPage] Failed to kill backend generation (non-critical)", err);
+        // Non-critical error — user already navigated away
+      });
+  }, [proposalId, disconnect, setIsGenerating, resetGenerationState, router]);
 
   // Error state
   if (error && status === "failed") {
@@ -240,22 +238,11 @@ export default function GeneratingPage(): JSX.Element {
     );
   }
 
-  // ── Build Sequence derivation ──────────────────────────────────────────────
-  const activeStep = deriveActiveStep(status, completedSections, totalSections);
-  const isAllDone = activeStep === 4;
-
-  const buildSteps = [
-    { label: "Analysing Source Materials" },
-    { label: "Building Context" },
-    {
-      label: totalSections > 0
-        ? `Generating Sections (${completedSections} / ${totalSections})`
-        : "Generating Sections",
-    },
-    { label: "Final Review" },
-  ];
-
+  const isAllDone = status === "completed" || status === "cancelled";
   const displayProgress = isAllDone ? 100 : progressPercent;
+  const sectionLabel = totalSections > 0
+    ? `Generating Sections (${completedSections} / ${totalSections})`
+    : "Generating Sections...";
 
   return (
     <div className="generating-page">
@@ -281,47 +268,32 @@ export default function GeneratingPage(): JSX.Element {
             </div>
           </div>
 
-          {/* Right — Build Sequence */}
+          {/* Right — Single section progress step */}
           <div className="generating-sequence-section">
             <div className="generating-sequence-header">BUILD SEQUENCE</div>
             <ul className="generating-sequence-list">
-              {buildSteps.map((step, idx) => {
-                const isDone = isAllDone || idx < activeStep;
-                const isActive = !isAllDone && idx === activeStep;
-                const isPending = !isAllDone && idx > activeStep;
-
-                return (
-                  <li
-                    key={idx}
-                    className={`generating-sequence-item${isDone ? " done" : ""}${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
-                  >
-                    <span className="generating-sequence-icon">
-                      {isDone ? (
-                        <svg viewBox="0 0 24 24" fill="currentColor" width={20} height={20}>
-                          <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                        </svg>
-                      ) : isActive ? (
-                        <svg className="gen-spinner" viewBox="0 0 24 24" fill="none" width={20} height={20}>
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.25 }} />
-                          <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" style={{ opacity: 0.85 }} />
-                        </svg>
-                      ) : (
-                        <svg viewBox="0 0 24 24" fill="none" width={20} height={20}>
-                          <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.5" />
-                        </svg>
-                      )}
-                    </span>
-                    <span className="generating-sequence-text">{step.label}</span>
-                  </li>
-                );
-              })}
+              <li className={`generating-sequence-item${isAllDone ? " done" : " active"}`}>
+                <span className="generating-sequence-icon">
+                  {isAllDone ? (
+                    <svg viewBox="0 0 24 24" fill="currentColor" width={20} height={20}>
+                      <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="gen-spinner" viewBox="0 0 24 24" fill="none" width={20} height={20}>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.25 }} />
+                      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" style={{ opacity: 0.85 }} />
+                    </svg>
+                  )}
+                </span>
+                <span className="generating-sequence-text">{sectionLabel}</span>
+              </li>
             </ul>
           </div>
         </div>
 
-        <button onClick={handleCancel} className="generating-cancel-btn">
+        <Button variant="ghost" onClick={handleCancel} className="generating-cancel-btn">
           Cancel Generation
-        </button>
+        </Button>
       </div>
     </div>
   );
