@@ -164,7 +164,7 @@
   color: #64748b;
   cursor: wait;
   overflow: hidden;
-  
+
   &::before {
     content: '';
     position: absolute;
@@ -203,22 +203,22 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  
+
   .dot {
     width: 4px;
     height: 4px;
     border-radius: 50%;
     background: #64748b;
     animation: dot-pulse 1.4s infinite ease-in-out;
-    
+
     &:nth-child(1) {
       animation-delay: 0s;
     }
-    
+
     &:nth-child(2) {
       animation-delay: 0.2s;
     }
-    
+
     &:nth-child(3) {
       animation-delay: 0.4s;
     }

@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { History, Download, Eye } from "lucide-react";
+import { History, Download, Eye, Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
 import styles from "./HistoryPage.module.scss";
-import { useProposals } from "@/hooks/useProposals";
+import { useInfiniteProposalHistory } from "@/hooks/useInfiniteProposalHistory";
 import { useErrorToast } from "@/hooks/useErrorToast";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
 import { formatDate } from "@/utils/dateUtils";
@@ -19,13 +19,19 @@ import HistoryCardSkeleton from "@/components/common/skeletons/HistoryCardSkelet
 
 export default function HistoryPage(): JSX.Element {
   const router = useRouter();
-  const { proposals: historyItems, isLoading: loading, isInitialized, error, refetch } = useProposals({ 
-    filter: 'history',
-  });
+  const { 
+    proposals: historyItems, 
+    isLoading, 
+    isLoadingMore,
+    error, 
+    hasMore,
+    refetch,
+    observerRef 
+  } = useInfiniteProposalHistory();
   const { downloadProposal } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
 
-  // Refresh when tab becomes visible only if Zustand cache is stale
+  // Refresh when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = (): void => {
       if (!document.hidden) {
@@ -37,16 +43,16 @@ export default function HistoryPage(): JSX.Element {
   }, [refetch]);
 
   useEffect(() => {
-    if (isInitialized && !loading) {
+    if (!isLoading && historyItems.length > 0) {
       logger.info(`[HistoryPage] Data loaded - ${historyItems.length} history items found`, {
-        items: historyItems.map(item => ({
+        items: historyItems.slice(0, 5).map(item => ({
           id: item.id,
           title: item.title,
           approvalStatus: item.approvalStatus,
         })),
       });
     }
-  }, [isInitialized, loading, historyItems]);
+  }, [isLoading, historyItems]);
 
   useErrorToast(error, "Failed to load history");
 
@@ -70,7 +76,7 @@ export default function HistoryPage(): JSX.Element {
         subtitle="View all completed, approved, and rejected proposals."
       />
 
-      {loading && !isInitialized ? (
+      {isLoading ? (
         <SkeletonGrid
           className={styles.historyGrid}
           renderItem={() => <HistoryCardSkeleton />}
@@ -82,47 +88,68 @@ export default function HistoryPage(): JSX.Element {
           subtitle="Approved and rejected proposals will appear here."
         />
       ) : (
-        <div className={styles.historyGrid}>
-          {historyItems.map((item) => (
-            <div key={item.id} className={styles.historyCard}>
-              <div className={styles.cardHeader}>
-                <div className={styles.cardTitle}>{item.title}</div>
-                <StatusBadge status={item.approvalStatus} />
+        <>
+          <div className={styles.historyGrid}>
+            {historyItems.map((item, index) => (
+              <div key={item.id} className={styles.historyCard}>
+                <div className={styles.cardHeader}>
+                  <div className={styles.cardTitle}>{item.title}</div>
+                  <StatusBadge status={item.approvalStatus} />
+                </div>
+                <div className={styles.cardClient}>
+                  <span className={styles.clientLabel}>Client:</span>
+                  <span className={styles.clientName}>{item.clientName}</span>
+                </div>
+                <div className={styles.cardDate}>
+                  {formatDate(item.createdAt)}
+                </div>
+                <div className={styles.cardActions}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => router.push(`/proposal/${item.id}?from=history`)}
+                  >
+                    <Eye size={14} /> View
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => handleDownload(item.id)}
+                    disabled={downloadingIds.has(item.id)}
+                  >
+                    {downloadingIds.has(item.id) ? (
+                      <div className="flex items-center gap-2">
+                        <span className="spinner spinner-white" style={{ width: 14, height: 14 }} />
+                        Downloading...
+                      </div>
+                    ) : (
+                      <>
+                        <Download size={14} /> Download
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className={styles.cardClient}>
-                <span className={styles.clientLabel}>Client:</span>
-                <span className={styles.clientName}>{item.clientName}</span>
-              </div>
-              <div className={styles.cardDate}>
-                {formatDate(item.createdAt)}
-              </div>
-              <div className={styles.cardActions}>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => router.push(`/proposal/${item.id}?from=history`)}
-                >
-                  <Eye size={14} /> View
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => handleDownload(item.id)}
-                  disabled={downloadingIds.has(item.id)}
-                >
-                  {downloadingIds.has(item.id) ? (
-                    <div className="flex items-center gap-2">
-                      <span className="spinner spinner-white" style={{ width: 14, height: 14 }} />
-                      Downloading...
-                    </div>
-                  ) : (
-                    <>
-                      <Download size={14} /> Download
-                    </>
-                  )}
-                </button>
-              </div>
+            ))}
+          </div>
+
+          {/* Infinite scroll trigger element */}
+          {hasMore && (
+            <div ref={observerRef} className={styles.loadMoreTrigger}>
+              {isLoadingMore && (
+                <div className={styles.loadingMore}>
+                  <Loader2 size={24} className="animate-spin" />
+                  <span>Loading more proposals...</span>
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          )}
+
+          {/* End of list indicator */}
+          {!hasMore && historyItems.length > 0 && (
+            <div className={styles.endOfList}>
+              <p>You've reached the end of your proposal history</p>
+            </div>
+          )}
+        </>
       )}
     </PageLayout>
   );

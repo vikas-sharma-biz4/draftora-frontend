@@ -238,7 +238,7 @@ export default function KnowledgeBaseSelectorModal({
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
-      toast.success(`"${file.name}" parsed â€” ${result.word_count} words`);
+      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
 
       // Save to the selected client so it appears in Knowledge Base list
       await saveParsedDocumentToClient(file, fileId, result);
@@ -292,7 +292,7 @@ export default function KnowledgeBaseSelectorModal({
       // Don't call onRefreshDocuments - the document is already in the local store via addDocument
       // The parent's clientDocuments will automatically pick it up from the store
 
-      toast.success(`${file.name} uploaded successfully`);
+      toast.success(`${file.name} uploaded`);
     } catch (error) {
       logger.error("Failed to upload document:", error);
       toast.error(`Failed to upload ${file.name}`);

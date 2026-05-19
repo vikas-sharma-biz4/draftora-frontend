@@ -117,9 +117,9 @@ export default function ProposalOutputPage(): JSX.Element {
   const handleSaveSection = useCallback(async (key: string, content: string): Promise<void> => {
     try {
       await updateSection(proposalId, key, content);
-      toast.success("Section saved.");
+      toast.success("Section saved");
     } catch {
-      toast.error("Failed to save section.");
+      toast.error("Failed to save section");
     }
   }, [proposalId]);
 
@@ -134,7 +134,7 @@ export default function ProposalOutputPage(): JSX.Element {
       toast.success("Section regenerated.");
       return newContent;
     } catch {
-      toast.error("Regeneration failed.");
+      toast.error("Regeneration failed");
       return null;
     }
   }, [proposalId, handleContentChange]);

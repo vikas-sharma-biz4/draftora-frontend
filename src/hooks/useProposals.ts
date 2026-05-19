@@ -1,6 +1,6 @@
 /**
  * Custom hook for accessing proposal state
- * 
+ *
  * Provides automatic data fetching and memoized selectors
  */
 
@@ -25,24 +25,31 @@ interface UseProposalsReturn {
 
 export function useProposals(options: UseProposalsOptions = {}): UseProposalsReturn {
   const { autoFetch = true, force = false, filter = 'all' } = options;
-  
+
   const allProposals = useProposalStore(state => state.proposals);
   const isLoading = useProposalStore(state => state.isLoading);
   const isInitialized = useProposalStore(state => state.isInitialized);
   const error = useProposalStore(state => state.error);
   const fetchProposals = useProposalStore(state => state.fetchProposals);
+  const fetchProposalHistory = useProposalStore(state => state.fetchProposalHistory);
   const getProposalById = useProposalStore(state => state.getProposalById);
   const getHistoryProposals = useProposalStore(state => state.getHistoryProposals);
   const getApprovedProposals = useProposalStore(state => state.getApprovedProposals);
   const getRejectedProposals = useProposalStore(state => state.getRejectedProposals);
   const getPendingProposals = useProposalStore(state => state.getPendingProposals);
-  
+
   useEffect(() => {
     if (autoFetch) {
-      fetchProposals(force);
+      // Use dedicated history endpoint for history filter
+      if (filter === 'history') {
+        fetchProposalHistory(force);
+      } else {
+        fetchProposals(force);
+      }
     }
-  }, [autoFetch, force, fetchProposals]);
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch, force, filter]);
+
   const proposals = useMemo(() => {
     switch (filter) {
       case 'history':
@@ -57,11 +64,16 @@ export function useProposals(options: UseProposalsOptions = {}): UseProposalsRet
         return allProposals;
     }
   }, [filter, allProposals, getHistoryProposals, getApprovedProposals, getRejectedProposals, getPendingProposals]);
-  
+
   const refetch = async () => {
-    await fetchProposals(true);
+    // Use appropriate fetch method based on filter
+    if (filter === 'history') {
+      await fetchProposalHistory(true);
+    } else {
+      await fetchProposals(true);
+    }
   };
-  
+
   return {
     proposals,
     isLoading,

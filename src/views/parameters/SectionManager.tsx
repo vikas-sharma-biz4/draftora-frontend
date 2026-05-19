@@ -76,7 +76,7 @@ export default function SectionManager({
     setEditingKey((prev) => {
       const label = editLabel.trim();
       if (!label) {
-        toast.error("Section name cannot be empty.");
+        toast.error("Section name cannot be empty");
         return prev;
       }
       onSectionsChange((sections) =>
@@ -93,7 +93,7 @@ export default function SectionManager({
   const handleRemove = useCallback((key: string): void => {
     onSectionsChange((prev) => {
       if (prev.length <= 1) {
-        toast.error("At least one section is required.");
+        toast.error("At least one section is required");
         return prev;
       }
       return prev.filter((s) => s.key !== key);
@@ -122,7 +122,7 @@ export default function SectionManager({
     onSectionsChange((prev) => {
       // Check for duplicates using the actual previous state from the callback
       if (prev.some((s) => s.label.toLowerCase() === label.toLowerCase())) {
-        toast.error("A section with this name already exists.");
+        toast.error("A section with this name already exists");
         isAddingSectionRef.current = false;
         return prev;
       }
@@ -136,25 +136,25 @@ export default function SectionManager({
 
   const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
-    
+
     // Check if section already exists before attempting to add
     if (sections.some(s => s.key === sectionKey)) {
       toast.error(`"${sectionTitle}" is already in the structure`);
       logger.warn('[SectionManager] Section already exists, skipping add', { sectionKey });
       return;
     }
-    
+
     const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
     const updatedSections = [...sections, newSection];
-    
-    logger.info('[SectionManager] Updating local sections state', { 
+
+    logger.info('[SectionManager] Updating local sections state', {
       before: sections.map(s => s.key),
       after: updatedSections.map(s => s.key)
     });
-    
+
     // Update local state first
     onSectionsChange(updatedSections);
-    
+
     // Then update store
     onUpdateProposalData({
       selectedSections: updatedSections.map(s => s.key),
@@ -163,7 +163,7 @@ export default function SectionManager({
         [sectionKey]: sectionTitle,
       },
     });
-    
+
     logger.info('[SectionManager] Section added successfully', { sectionKey, totalSections: updatedSections.length });
   }, [sections, onUpdateProposalData, proposalData.sectionDisplayNames, onSectionsChange]);
 

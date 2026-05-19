@@ -73,7 +73,7 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
         notes: formData.notes || undefined,
       });
 
-      toast.success(`Client "${updatedClient.name}" updated successfully`);
+      toast.success(`Client "${updatedClient.name}" updated`);
       onClientUpdated(updatedClient);
     } catch (error) {
       logger.error("Failed to update client:", error);
