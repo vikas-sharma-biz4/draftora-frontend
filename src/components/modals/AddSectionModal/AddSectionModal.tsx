@@ -181,9 +181,9 @@ export default function AddSectionModal({
           className={styles.saveButton}
         >
           {isGenerating ? (
-            "Generating\u2026"
+            "Adding\u2026"
           ) : (
-            "Generate Section"
+            "Add Section"
           )}
         </Button>
       </div>

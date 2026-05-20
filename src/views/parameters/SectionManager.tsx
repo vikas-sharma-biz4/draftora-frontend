@@ -20,6 +20,7 @@ import type { SectionItem } from "@/components/common/SortableSectionList";
 import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
+import AddSectionModal from "@/components/modals/AddSectionModal";
 
 const SortableSectionList = dynamic(
   () => import("@/components/common/SortableSectionList"),
@@ -54,10 +55,12 @@ export default function SectionManager({
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
-  const [addLabel, setAddLabel] = useState<string>("");
-  const [showAddInput, setShowAddInput] = useState<boolean>(false);
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
-  const isAddingSectionRef = useRef<boolean>(false);
+
+  // Add section modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
+  const [insertAfterKey, setInsertAfterKey] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   // Trigger AI recommendations background fetch when flag is set
   useEffect(() => {
@@ -99,40 +102,6 @@ export default function SectionManager({
       return prev.filter((s) => s.key !== key);
     });
   }, [onSectionsChange]);
-
-  const handleAddSection = useCallback((): void => {
-    // Prevent duplicate calls
-    if (isAddingSectionRef.current) return;
-    isAddingSectionRef.current = true;
-
-    const label = addLabel.trim();
-    if (!label) {
-      isAddingSectionRef.current = false;
-      return;
-    }
-
-    const key =
-      "custom_" +
-      label
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_|_$/g, "")
-        .slice(0, 40);
-
-    onSectionsChange((prev) => {
-      // Check for duplicates using the actual previous state from the callback
-      if (prev.some((s) => s.label.toLowerCase() === label.toLowerCase())) {
-        toast.error("A section with this name already exists");
-        isAddingSectionRef.current = false;
-        return prev;
-      }
-      // Clear input and hide input field only on success
-      setShowAddInput(false);
-      setAddLabel("");
-      isAddingSectionRef.current = false;
-      return [...prev, { key, label }];
-    });
-  }, [addLabel, onSectionsChange]);
 
   const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
@@ -187,6 +156,59 @@ export default function SectionManager({
     e.dataTransfer.dropEffect = "copy";
   }, []);
 
+  // Add section modal handlers
+  const openAddModal = useCallback((afterKey?: string): void => {
+    setInsertAfterKey(afterKey ?? null);
+    setIsAddModalOpen(true);
+  }, []);
+
+  const closeAddModal = useCallback((): void => {
+    setIsAddModalOpen(false);
+    setInsertAfterKey(null);
+  }, []);
+
+  const handleAddSectionFromModal = useCallback(async (name: string, instructions: string): Promise<void> => {
+    const key =
+      "custom_" +
+      name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 40);
+
+    // Check for duplicates
+    if (sections.some((s) => s.key === key || s.label.toLowerCase() === name.toLowerCase())) {
+      toast.error("A section with this name already exists");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      onSectionsChange((prev) => {
+        const newSection: SectionItem = { key, label: name };
+        if (insertAfterKey) {
+          const idx = prev.findIndex((s) => s.key === insertAfterKey);
+          if (idx >= 0) {
+            const updated = [...prev];
+            updated.splice(idx + 1, 0, newSection);
+            return updated;
+          }
+        }
+        return [...prev, newSection];
+      });
+      closeAddModal();
+      toast.success(`Section "${name}" added`);
+    } catch (error) {
+      toast.error("Failed to add section");
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [sections, insertAfterKey, onSectionsChange, closeAddModal]);
+
+  const handleAddAfter = useCallback((key: string): void => {
+    openAddModal(key);
+  }, [openAddModal]);
+
   return (
     <div className="parameters-layout mb-14">
       {/* Left Column: Section Structure */}
@@ -221,6 +243,7 @@ export default function SectionManager({
               onCancelEdit={handleCancelEdit}
               onRemove={handleRemove}
               onEditLabelChange={setEditLabel}
+              onAddAfter={handleAddAfter}
             />
           )}
         </div>
@@ -243,51 +266,6 @@ export default function SectionManager({
           </ul>
         </div>
 
-        {/* Add section row */}
-        {showAddInput ? (
-          <div className="section-add-row">
-            <input
-              className="section-add-input"
-              placeholder="Section name, e.g. Pricing & Payment Terms"
-              value={addLabel}
-              onChange={(e) => setAddLabel(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAddSection();
-                }
-                if (e.key === "Escape") {
-                  setShowAddInput(false);
-                  setAddLabel("");
-                }
-              }}
-            />
-            <Button variant="primary" size="sm" type="button" onClick={handleAddSection}>
-              <Check size={13} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setShowAddInput(false);
-                setAddLabel("");
-              }}
-            >
-              <X size={13} />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowAddInput(true)}
-            className="mt-10 flex-center gap-6"
-          >
-            <Plus size={13} />
-            Add Section
-          </Button>
-        )}
       </div>
 
       {/* Right Column: AI Recommendations */}
@@ -301,6 +279,16 @@ export default function SectionManager({
           (proposalData.filesMeta?.map((f) => f.name).join(", ") ?? "")
         }
         onAddSection={addSectionToProposal}
+      />
+
+      {/* Add Section Modal */}
+      <AddSectionModal
+        isOpen={isAddModalOpen}
+        isGenerating={isGenerating}
+        existingKeys={sections.map(s => s.key)}
+        insertAfterLabel={insertAfterKey ? (sections.find(s => s.key === insertAfterKey)?.label) : undefined}
+        onClose={closeAddModal}
+        onSubmit={handleAddSectionFromModal}
       />
     </div>
   );
