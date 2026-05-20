@@ -153,6 +153,23 @@ export default function KnowledgeBaseSelectorModal({
   // Filter all documents by search query
   const filteredAllDocuments = allDocuments;
 
+  // Filter selected IDs to only include documents that exist in allDocuments
+  // This fixes the issue where counter shows selected count but checkboxes don't reflect it
+  useEffect(() => {
+    if (mounted) {
+      const validDocumentIds = new Set(allDocuments.map(d => d.id));
+      setSelected(prev => {
+        const filtered = new Set<string>();
+        prev.forEach(id => {
+          if (validDocumentIds.has(id)) {
+            filtered.add(id);
+          }
+        });
+        return filtered;
+      });
+    }
+  }, [allDocuments, mounted]);
+
   function isValidFile(file: File): boolean {
     const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
     const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext);

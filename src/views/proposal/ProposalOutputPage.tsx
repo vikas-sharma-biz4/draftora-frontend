@@ -7,7 +7,6 @@ import { logger } from "@/utils/logger";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { useVisitedPipelineSteps } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
-import { toast } from "@/utils/toast";
 
 import {
   updateSection,
@@ -16,13 +15,19 @@ import {
   reorderProposalSections,
 } from "@/services/proposal.service";
 import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
-import { SECTION_DISPLAY_NAMES } from "@/constants";
+import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import { toast } from "@/utils/toast";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useProposalPageData } from "@/hooks/useProposalPageData";
 
 const ProposalSectionEditor = dynamic(
   () => import("@/components/proposal/ProposalSectionEditor"),
+  { ssr: false }
+);
+
+const SectionViewMode = dynamic(
+  () => import("@/components/proposal/SectionViewMode"),
   { ssr: false }
 );
 
@@ -49,6 +54,7 @@ interface SectionMeta {
   key: string;
   label: string;
   hasContent: boolean;
+  isStatic?: boolean;
 }
 
 function resolveSectionLabel(
@@ -117,7 +123,7 @@ export default function ProposalOutputPage(): JSX.Element {
   const handleSaveSection = useCallback(async (key: string, content: string): Promise<void> => {
     try {
       await updateSection(proposalId, key, content);
-      toast.success("Section saved");
+      // toast.success("Section saved");
     } catch {
       toast.error("Failed to save section");
     }
@@ -152,6 +158,12 @@ export default function ProposalOutputPage(): JSX.Element {
   }
 
   function handleSectionRemoved(key: string): void {
+    // Prevent removal of static sections
+    if (STATIC_SECTION_KEYS.includes(key as any)) {
+      toast.error("Not allowed on static sections");
+      return;
+    }
+
     setProposal((prev) => {
       if (!prev) return prev;
       const remaining = prev.selectedSections.filter((k) => k !== key);
@@ -286,7 +298,12 @@ export default function ProposalOutputPage(): JSX.Element {
 
   const displayNames = proposal?.sectionDisplayNames ?? {};
   const sectionMetas: SectionMeta[] = (proposal?.selectedSections ?? []).map(
-    (key) => ({ key, label: resolveSectionLabel(key, displayNames), hasContent: Boolean(proposal?.sections?.[key]) })
+    (key) => ({
+      key,
+      label: resolveSectionLabel(key, displayNames),
+      hasContent: Boolean(proposal?.sections?.[key]),
+      isStatic: STATIC_SECTION_KEYS.includes(key as any)
+    })
   );
 
   // Show loading state while fetching
@@ -386,16 +403,28 @@ export default function ProposalOutputPage(): JSX.Element {
 
           {isLoading && sectionMetas.length === 0 && <ProposalSkeleton />}
 
-          {sectionMetas.map(({ key, label }) => (
-            <ProposalSectionEditor
-              key={key}
-              proposalId={proposalId}
-              sectionKey={key}
-              label={label}
-              rawContent={proposal?.sections?.[key] ?? ""}
-              onContentChange={handleContentChange}
-              onSave={handleSaveSection}
-            />
+          {sectionMetas.map(({ key, label, isStatic }) => (
+            isStatic ? (
+              <div key={key} className="proposal-page" id={`section-${key}`}>
+                <div className="proposal-page-header">
+                  <h2 className="proposal-page-title">{label}</h2>
+                </div>
+                <SectionViewMode
+                  sectionKey={key}
+                  content={proposal?.sections?.[key] ?? ""}
+                />
+              </div>
+            ) : (
+              <ProposalSectionEditor
+                key={key}
+                proposalId={proposalId}
+                sectionKey={key}
+                label={label}
+                rawContent={proposal?.sections?.[key] ?? ""}
+                onContentChange={handleContentChange}
+                onSave={handleSaveSection}
+              />
+            )
           ))}
 
           {proposal?.status === "completed" &&

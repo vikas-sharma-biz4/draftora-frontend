@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useDraftRecovery } from "@/hooks/useDraftRecovery";
-import { DraftRecoveryModal } from "@/components/draft";
+import { useDraftRecovery } from "../src/hooks/useDraftRecovery";
+import { DraftRecoveryModal } from "../src/components/draft";
 import { toast } from "sonner";
 
 export function DashboardWithDraftRecovery(): JSX.Element {

@@ -19,6 +19,8 @@ interface FormFieldProps {
   }) => React.ReactNode;
   /** Extra class on the outer .form-group wrapper */
   className?: string;
+  /** Optional inline style for the label */
+  labelStyle?: React.CSSProperties;
 }
 
 /**
@@ -41,6 +43,7 @@ export default function FormField({
   hint,
   children,
   className,
+  labelStyle,
 }: FormFieldProps): JSX.Element {
   const uid = useId();
   const inputId  = `${uid}-input`;
@@ -52,7 +55,7 @@ export default function FormField({
 
   return (
     <div className={["form-group", className].filter(Boolean).join(" ")}>
-      <label className="form-label" htmlFor={inputId}>
+      <label className="form-label" htmlFor={inputId} style={labelStyle}>
         {label}
         {tip && <span className="form-label-tip">&nbsp;— {tip}</span>}
       </label>

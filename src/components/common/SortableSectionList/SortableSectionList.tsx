@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Check, X } from "lucide-react";
+import { GripVertical, Pencil, Check, X, Plus } from "lucide-react";
 
 export interface SectionItem {
   key: string;
@@ -37,6 +37,7 @@ interface SortableSectionListProps {
   onCancelEdit: () => void;
   onRemove: (key: string) => void;
   onEditLabelChange: (val: string) => void;
+  onAddAfter: (key: string) => void;
 }
 
 interface SortableSectionProps {
@@ -50,6 +51,7 @@ interface SortableSectionProps {
   onCancelEdit: () => void;
   onRemove: (key: string) => void;
   onEditLabelChange: (val: string) => void;
+  onAddAfter: (key: string) => void;
 }
 
 function SortableSection({
@@ -63,6 +65,7 @@ function SortableSection({
   onCancelEdit,
   onRemove,
   onEditLabelChange,
+  onAddAfter,
 }: SortableSectionProps): JSX.Element {
   const {
     attributes,
@@ -158,6 +161,13 @@ function SortableSection({
               onClick={() => onStartEdit(item)}
             >
               <Pencil size={13} />
+            </button>
+            <button
+              className="icon-btn-plain"
+              title="Add section after this"
+              onClick={() => onAddAfter(item.key)}
+            >
+              <Plus size={13} />
             </button>
             <button
               className="icon-btn-plain danger"
@@ -276,6 +286,7 @@ export default function SortableSectionList({
   onCancelEdit,
   onRemove,
   onEditLabelChange,
+  onAddAfter,
 }: SortableSectionListProps): JSX.Element {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -366,6 +377,7 @@ export default function SortableSectionList({
               onCancelEdit={onCancelEdit}
               onRemove={onRemove}
               onEditLabelChange={onEditLabelChange}
+              onAddAfter={onAddAfter}
             />
           ))}
         </div>
