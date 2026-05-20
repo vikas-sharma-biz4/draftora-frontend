@@ -1,1 +1,1 @@
-﻿export { default } from './DeleteClientModal';
+export { default } from './DeleteClientModal';

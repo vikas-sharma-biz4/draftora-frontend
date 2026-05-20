@@ -1,1 +1,1 @@
-﻿export { default } from './DeleteAllDraftsModal';
+export { default } from './DeleteAllDraftsModal';

@@ -11,8 +11,6 @@ import { useGenerationStore } from "@/store/features/generation/generationSlice"
 import CircularProgress from "@/components/common/CircularProgress";
 import Button from "@/components/common/Button";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function estimateTimeRemaining(percent: number): string {
   if (percent >= 97) return "Almost done...";
   if (percent >= 85) return "10–20 seconds";

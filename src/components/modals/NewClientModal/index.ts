@@ -1,1 +1,1 @@
-﻿export { default } from './NewClientModal';
+export { default } from './NewClientModal';

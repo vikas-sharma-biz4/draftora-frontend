@@ -1,4 +1,3 @@
-// ─── Generating page wrapper ──────────────────────────────────────────────────
 .generating-page {
   min-height: 100vh;
   background: #f5f5f7;
@@ -8,7 +7,6 @@
   padding: 40px 24px 48px;
 }
 
-// ─── Container ────────────────────────────────────────────────────────────────
 .generating-container {
   flex: 1;
   display: flex;
@@ -21,7 +19,6 @@
   padding-top: 20px;
 }
 
-// ─── Main title ───────────────────────────────────────────────────────────────
 .generating-main-title {
   font-size: 2.5rem;
   font-weight: 700;
@@ -42,7 +39,6 @@
   font-weight: 400;
 }
 
-// ─── Content layout ───────────────────────────────────────────────────────────
 .generating-content {
   display: flex;
   gap: 48px;
@@ -56,7 +52,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-// ─── Progress section (left) ──────────────────────────────────────────────────
 .generating-progress-section {
   display: flex;
   flex-direction: column;
@@ -109,7 +104,6 @@
   margin-top: 8px;
 }
 
-// ─── Sequence section (right) ─────────────────────────────────────────────────
 .generating-sequence-section {
   flex: 1;
   max-width: 420px;
@@ -195,7 +189,6 @@
   color: #9ca3af;
 }
 
-// ─── Cancel button ────────────────────────────────────────────────────────────
 .generating-cancel-btn {
   margin-top: 24px;
   font-size: 14px;
@@ -218,7 +211,6 @@
   color: #1f2937;
 }
 
-// ─── Error state ──────────────────────────────────────────────────────────────
 .generating-error-state {
   max-width: 480px;
   text-align: center;
@@ -256,7 +248,6 @@
   justify-content: center;
 }
 
-// ─── Circular Progress Component ──────────────────────────────────────────────
 .circular-progress {
   position: relative;
   display: inline-block;
@@ -277,7 +268,6 @@
   pointer-events: none;
 }
 
-// ─── Animations ───────────────────────────────────────────────────────────────
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
@@ -311,7 +301,6 @@
   font-weight: 500;
 }
 
-// ─── Responsive ───────────────────────────────────────────────────────────────
 @media (max-width: 768px) {
   .generating-content {
     flex-direction: column;

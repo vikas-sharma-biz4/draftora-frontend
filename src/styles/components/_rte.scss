@@ -1,9 +1,7 @@
-// ─── RTE wrapper ──────────────────────────────────────────────────────────────
 .rte-wrapper {
   position: relative;
 }
 
-// ─── Bubble menu mount point ──────────────────────────────────────────────────
 .rte-bubble-mount {
   position: fixed;
   z-index: 10000;
@@ -21,14 +19,12 @@
   box-sizing: border-box;
 }
 
-// ─── Floating toolbar container (toolbar + panel wrapper) ────────────────────
 .rte-toolbar-container-floating {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-// ─── Regen prompt panel (appears below toolbar) ───────────────────────────────
 .rte-regen-panel {
   display: flex;
   align-items: center;
@@ -119,14 +115,12 @@
   to { transform: rotate(360deg); }
 }
 
-// ─── Inline toolbar container ─────────────────────────────────────────────────
 .rte-toolbar-container {
   position: relative;
   z-index: 100;
   margin-bottom: 12px;
 }
 
-// ─── Classic floating toolbar ─────────────────────────────────────────────────
 .rte-toolbar {
   display: flex;
   align-items: center;
@@ -161,7 +155,6 @@
   flex-shrink: 0;
 }
 
-// ─── RTE base button ──────────────────────────────────────────────────────────
 .rte-btn {
   display: inline-flex;
   align-items: center;
@@ -206,7 +199,6 @@
   font-weight: 700;
 }
 
-// ─── Color swatch buttons ─────────────────────────────────────────────────────
 .rte-color-btn {
   position: relative;
   width: 28px;
@@ -234,7 +226,6 @@
   border: 1.5px solid var(--color-border-dark);
 }
 
-// ─── TipTap editor body ───────────────────────────────────────────────────────
 .rte-content {
   padding: 28px 32px;
   min-height: 200px;
@@ -341,7 +332,6 @@
   height: 0;
 }
 
-// ─── Bubble menu (dark floating bar) ─────────────────────────────────────────
 .bubble-menu {
   display: flex;
   align-items: center;
@@ -405,7 +395,6 @@
   flex-shrink: 0;
 }
 
-// ─── Modern floating toolbar (glassmorphism) ──────────────────────────────────
 .rte-toolbar-modern {
   display: flex;
   flex-direction: column;
@@ -494,7 +483,6 @@
   color: var(--color-primary);
 }
 
-// ─── Toolbar groups & dividers ────────────────────────────────────────────────
 .rte-toolbar-group {
   display: flex;
   align-items: center;
@@ -516,7 +504,6 @@
   flex-shrink: 0;
 }
 
-// ─── Icon button (modern) ─────────────────────────────────────────────────────
 .rte-btn-icon {
   display: flex;
   align-items: center;
@@ -557,7 +544,6 @@
 
 .rte-btn-icon svg { flex-shrink: 0; }
 
-// ─── Dropdown button ──────────────────────────────────────────────────────────
 .rte-btn-dropdown {
   display: flex;
   align-items: center;
@@ -589,7 +575,6 @@
   opacity: 1;
 }
 
-// ─── Dropdown menu ────────────────────────────────────────────────────────────
 .rte-dropdown {
   position: relative;
   display: flex;
@@ -633,7 +618,6 @@
 
 .rte-dropdown-menu button:active { transform: scale(0.98); }
 
-// ─── Link / image input panel ─────────────────────────────────────────────────
 .rte-link-input-panel {
   display: flex;
   align-items: center;
@@ -714,7 +698,6 @@
 
 .rte-link-btn-remove:active { transform: scale(0.95); }
 
-// ─── Color group ──────────────────────────────────────────────────────────────
 .rte-color-group { gap: 4px; }
 
 .rte-color-label {
@@ -819,7 +802,6 @@
   background: transparent;
 }
 
-// ─── AI regenerate button ─────────────────────────────────────────────────────
 .rte-btn-ai {
   display: flex;
   align-items: center;
@@ -844,7 +826,6 @@
   flex-shrink: 0;
 }
 
-// ─── Inline regenerate input (replaces button when clicked) ─────────────────
 .rte-regen-input-inline {
   height: 36px;
   padding: 0 14px;
@@ -913,7 +894,6 @@
 
 .rte-btn-ai span { position: relative; z-index: 1; }
 
-// ─── ProseMirror global styles ────────────────────────────────────────────────
 .ProseMirror {
   outline: none;
   min-height: 120px;
@@ -1004,7 +984,6 @@
 
 .ProseMirror td { background: white; }
 
-// ─── Responsive — 480px: compact adjustments ──────────────────────────────────
 @media (max-width: 480px) {
   .rte-toolbar-modern {
     max-width: calc(100vw - 16px);

@@ -1,4 +1,3 @@
-// ─── Two-column grid ──────────────────────────────────────────────────────────
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -9,21 +8,18 @@
   }
 }
 
-// ─── Three-column grid ────────────────────────────────────────────────────────
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
-// ─── Four-column grid ─────────────────────────────────────────────────────────
 .grid-4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
-// ─── Responsive — 1024px ──────────────────────────────────────────────────────
 @media (max-width: 1024px) {
   .grid-2,
   .grid-3 {
@@ -31,7 +27,6 @@
   }
 }
 
-// ─── Responsive — 640px ───────────────────────────────────────────────────────
 @media (max-width: 640px) {
   .grid-2 {
     grid-template-columns: 1fr;

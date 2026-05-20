@@ -203,7 +203,6 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
   },
 }));
 
-// ─── Granular Selector Hooks ─────────────────────────────────────────────────────
 
 /**
  * Selector hooks for fine-grained Zustand subscriptions.

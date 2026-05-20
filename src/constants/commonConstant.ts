@@ -296,7 +296,6 @@ export const PROPOSAL_TEMPLATES = [
   },
 ] as unknown as Array<ProposalTemplate>;
 
-// ── Static sections ──────────────────────────────────────────────────────────
 // These are automatically appended at the end of every proposal. Their content
 // is fixed and not AI-generated. They are editable post-generation.
 
@@ -316,7 +315,6 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
   brain_behind_development: "Brain Behind Innovative Development",
 };
 
-// ── RichEditor toolbar colors ─────────────────────────────────────────────────
 // Empty string represents "remove highlight / default color" action.
 // "custom" string represents custom color picker option.
 export const EDITOR_HIGHLIGHT_COLORS: string[] = [
@@ -390,7 +388,6 @@ export const CLIENT_TIERS = [
   "Small Business",
 ] as const;
 
-// ── Template TOCs (Table of Contents) ───────────────────────────────────────────
 // Maps template types to their predefined section structures
 export const TEMPLATE_TOCS = {
   mvp: [
@@ -433,7 +430,6 @@ export const TEMPLATE_TOCS = {
   ],
 } as const;
 
-// ── Breakpoints (must match SCSS $bp-* in _variables.scss) ────────────────────
 export const BREAKPOINTS = {
   mobile:  640,
   tablet:  1024,

@@ -1,1 +1,1 @@
-﻿export { default } from './TemplateSelectorModal';
+export { default } from './TemplateSelectorModal';

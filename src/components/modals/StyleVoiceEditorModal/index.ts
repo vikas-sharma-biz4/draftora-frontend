@@ -1,1 +1,1 @@
-﻿export { default } from './StyleVoiceEditorModal';
+export { default } from './StyleVoiceEditorModal';

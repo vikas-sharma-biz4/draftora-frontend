@@ -1,1 +1,1 @@
-﻿export { default } from './RecreateTemplateModal';
+export { default } from './RecreateTemplateModal';

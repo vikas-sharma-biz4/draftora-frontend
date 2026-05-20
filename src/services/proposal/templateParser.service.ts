@@ -7,7 +7,6 @@
 
 import { http } from "@/config/httpClient";
 
-// ── Template Parsing ───────────────────────────────────────────────────────────
 
 export interface ExtractedTemplateSection {
   key: string;
@@ -39,7 +38,6 @@ export async function parseCustomTemplate(
   };
 }
 
-// ── Recreate template document parsing ──────────────────────────────────────
 
 export interface RecreateExtractedSection {
   id: string;
@@ -89,7 +87,6 @@ export async function parseRecreateDocument(
   };
 }
 
-// ── File Parsing ─────────────────────────────────────────────────────────────
 
 export interface ParsedFileResult {
   filename: string;
@@ -169,7 +166,6 @@ export async function getSupportedParseFormats(): Promise<string[]> {
   return data.extensions ?? [];
 }
 
-// ── Section Suggestion ─────────────────────────────────────────────────────────
 
 export interface SuggestSectionsPayload {
   title: string;
@@ -196,7 +192,6 @@ export async function suggestSections(
   return data.sections;
 }
 
-// ── AI Section Recommendations ──────────────────────────────────────────────
 
 export interface SectionRecommendation {
   sectionTitle: string;

@@ -1,12 +1,9 @@
-// ─── Google Fonts import ─────────────────────────────────────────────────────
 // Fonts are now loaded via next/font/google in layout.tsx for better performance
 // @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
-// ─── Font stacks ─────────────────────────────────────────────────────────────
 $font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 $font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
-// ─── Font weights ────────────────────────────────────────────────────────────
 $font-light:    300;
 $font-regular:  400;
 $font-medium:   500;
@@ -14,7 +11,6 @@ $font-semibold: 600;
 $font-bold:     700;
 $font-extrabold: 800;
 
-// ─── Font sizes ──────────────────────────────────────────────────────────────
 $text-xs:   0.75rem;   // 12px
 $text-sm:   0.875rem;  // 14px
 $text-base: 1rem;      // 16px
@@ -23,7 +19,6 @@ $text-xl:   1.25rem;   // 20px
 $text-2xl:  1.5rem;    // 24px
 $text-3xl:  1.875rem;  // 30px
 
-// ─── Line heights ────────────────────────────────────────────────────────────
 $leading-tight:  1.3;
 $leading-normal: 1.6;
 $leading-loose:  1.8;

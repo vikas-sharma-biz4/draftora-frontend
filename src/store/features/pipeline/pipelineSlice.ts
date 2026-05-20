@@ -39,7 +39,6 @@ export const usePipelineStore = create<PipelineState>((set) => ({
   },
 }));
 
-// ─── Selector Hooks ─────────────────────────────────────────────────────
 
 /**
  * Selects the visited pipeline steps array.

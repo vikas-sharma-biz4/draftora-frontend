@@ -1,1 +1,1 @@
-﻿export { default } from './ScopeEditorModal';
+export { default } from './ScopeEditorModal';

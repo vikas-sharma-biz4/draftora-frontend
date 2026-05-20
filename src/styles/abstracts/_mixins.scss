@@ -1,7 +1,6 @@
 @use "variables" as *;
 @use "colors" as *;
 
-// ─── Responsive breakpoints ──────────────────────────────────────────────────
 @mixin mobile {
   @media (max-width: #{$bp-mobile}) { @content; }
 }
@@ -18,7 +17,6 @@
   @media (min-width: #{$bp-wide}) { @content; }
 }
 
-// ─── Flex helpers ────────────────────────────────────────────────────────────
 @mixin flex-center {
   display: flex;
   align-items: center;
@@ -36,7 +34,6 @@
   flex-direction: column;
 }
 
-// ─── Typography ──────────────────────────────────────────────────────────────
 @mixin text-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -50,7 +47,6 @@
   overflow: hidden;
 }
 
-// ─── Visually hidden (a11y) ──────────────────────────────────────────────────
 @mixin visually-hidden {
   position: absolute;
   width: 1px;
@@ -63,13 +59,11 @@
   border: 0;
 }
 
-// ─── Focus ring ──────────────────────────────────────────────────────────────
 @mixin focus-ring($color: $color-primary, $alpha: 0.15) {
   outline: none;
   box-shadow: 0 0 0 3px rgba($color, $alpha);
 }
 
-// ─── Scrollbar ───────────────────────────────────────────────────────────────
 @mixin custom-scrollbar($width: 6px, $track: transparent, $thumb: rgba(0, 0, 0, 0.1)) {
   &::-webkit-scrollbar       { width: $width; }
   &::-webkit-scrollbar-track { background: $track; }

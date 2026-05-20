@@ -131,6 +131,7 @@ export default function TemplateSelectionModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const processedFilesRef = useRef<Set<string>>(new Set());
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const initialDocIdsRef = useRef<Set<number>>(new Set());
   const [modalView, setModalView] = useState<ModalView>(initialView);
   const [newClientFormData, setNewClientFormData] = useState<NewClientFormData>({
     clientName: "",
@@ -157,9 +158,29 @@ export default function TemplateSelectionModal({
     if (selectedClientId) {
       const client = clients.find((c) => c.id === selectedClientId);
       if (client && client.documents) {
-        const allDocIds = new Set(client.documents.filter((d) => d.status === "parsed").map((d) => d.id));
-        setSelectedDocuments(allDocIds);
+        const currentDocIds = new Set(client.documents.filter((d) => d.status === "parsed").map((d) => d.id));
+
+        // Only auto-select all documents if this is the first time selecting this client
+        // (i.e., when selectedClientId changes, not when clients array updates)
+        if (initialDocIdsRef.current.size === 0 || !currentDocIds.isSupersetOf(initialDocIdsRef.current)) {
+          setSelectedDocuments(currentDocIds);
+          initialDocIdsRef.current = currentDocIds;
+        } else {
+          // If clients array updated but client hasn't changed, only add new documents
+          const newDocIds = new Set(Array.from(currentDocIds).filter(id => !initialDocIdsRef.current.has(id)));
+          if (newDocIds.size > 0) {
+            setSelectedDocuments((prev) => {
+              const next = new Set(prev);
+              newDocIds.forEach(id => next.add(id));
+              return next;
+            });
+            initialDocIdsRef.current = currentDocIds;
+          }
+        }
       }
+    } else {
+      // Reset when no client is selected
+      initialDocIdsRef.current = new Set();
     }
   }, [selectedClientId, clients]);
 
@@ -424,7 +445,7 @@ export default function TemplateSelectionModal({
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
-      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+      // toast.success(`"${file.name}" parsed — ${result.word_count} words`);
 
       // Save to the selected client so it appears in Knowledge Base list
       await saveParsedDocumentToClient(file, fileId, result);
@@ -462,7 +483,7 @@ export default function TemplateSelectionModal({
       // Remove from uploaded files list (auto-move to selected documents)
       setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
 
-      toast.success(`${file.name} uploaded and added to selected documents`);
+      // toast.success(`${file.name} uploaded and added to selected documents`);
     } catch (error) {
       logger.error("Failed to upload document:", error);
       const errorMessage = error instanceof Error ? error.message : "Backend connection failed";
@@ -568,14 +589,10 @@ export default function TemplateSelectionModal({
     // Show loading state and coordinate modal close with navigation
     setIsNavigating(true);
 
-    // Small delay to allow animation to start
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Navigate to parameters page
+    // Navigate to parameters page immediately
     router.push("/parameters");
 
-    // Close modal with slide-down animation
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Close modal immediately
     onClose();
   }
 

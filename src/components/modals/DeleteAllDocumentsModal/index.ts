@@ -1,1 +1,1 @@
-﻿export { default } from './DeleteAllDocumentsModal';
+export { default } from './DeleteAllDocumentsModal';

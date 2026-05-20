@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Users, Plus, Building2, Calendar, Trash2, RefreshCw } from "lucide-react";
+import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -31,7 +31,6 @@ export default function ClientsPage(): JSX.Element {
   const router = useRouter();
   const { clients, isLoading: loading, refetch } = useClients();
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Refresh when tab becomes visible only if cache is stale
   useEffect(() => {
@@ -44,19 +43,6 @@ export default function ClientsPage(): JSX.Element {
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
-
-  async function handleRefresh(): Promise<void> {
-    setIsRefreshing(true);
-    try {
-      await refetch();
-      toast.success("Clients refreshed");
-    } catch (error) {
-      logger.error("Failed to refresh clients:", error);
-      toast.error("Failed to refresh clients");
-    } finally {
-      setIsRefreshing(false);
-    }
-  }
 
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
@@ -94,20 +80,10 @@ export default function ClientsPage(): JSX.Element {
         title="Clients"
         subtitle={`Manage your client relationships and view all proposals associated with each client.${clients.length > 0 ? ` (${clients.length} total)` : ''}`}
         action={
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button 
-              variant="secondary" 
-              onClick={handleRefresh}
-              disabled={isRefreshing || loading}
-            >
-              <RefreshCw size={18} className={isRefreshing ? 'spin' : ''} />
-              Refresh
-            </Button>
-            <Button variant="primary" onClick={handleNewClient}>
-              <Plus size={18} />
-              New Client
-            </Button>
-          </div>
+          <Button variant="primary" onClick={handleNewClient}>
+            <Plus size={18} />
+            New Client
+          </Button>
         }
       />
 

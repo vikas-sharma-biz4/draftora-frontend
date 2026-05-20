@@ -17,7 +17,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const LOCAL_STORAGE_KEY = 'draftora_clients_cache';
 const LOCAL_STORAGE_TIMESTAMP_KEY = 'draftora_clients_timestamp';
 
-// ─── LocalStorage Helpers ─────────────────────────────────────────────────────
 
 /**
  * Check if we're in a browser environment

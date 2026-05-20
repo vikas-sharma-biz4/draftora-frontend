@@ -31,7 +31,6 @@ import type {
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
-// ─── Options ────────────────────────────────────────────────────────────────
 
 export interface UseDraftPersistenceOptions {
   /** Whether the hook is active */
@@ -52,7 +51,6 @@ export interface UseDraftPersistenceOptions {
   skipIfApproved?: boolean;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function captureUIState(activeSection: string): DraftUIState {
   return {
@@ -81,7 +79,6 @@ function saveToFallbackStore(draftItem: Record<string, unknown>): void {
   }
 }
 
-// ─── Hook ───────────────────────────────────────────────────────────────────
 
 export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
   const {

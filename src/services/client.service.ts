@@ -4,7 +4,6 @@
 
 import { http } from "@/config/httpClient";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface Client {
   id: number;
@@ -50,7 +49,6 @@ interface ClientDocumentApiResponse {
   updated_at: string;
 }
 
-// ─── Data Transformation Helpers ─────────────────────────────────────────────────
 
 /**
  * Transform API response (snake_case) to frontend model (camelCase)
@@ -100,7 +98,6 @@ export interface UpdateClientRequest {
   notes?: string;
 }
 
-// ─── Client CRUD ──────────────────────────────────────────────────────────────
 
 /**
  * Create a new client
@@ -150,7 +147,6 @@ export async function deleteClient(clientId: number): Promise<void> {
   await http.delete<null>(`/clients/${clientId}`);
 }
 
-// ─── Caching ──────────────────────────────────────────────────────────────────
 // NOTE: All caching is now handled by Zustand clientSlice for SSR safety.
 //       The functions below are kept for backward compatibility but no longer cache.
 
@@ -224,7 +220,6 @@ export function invalidateClientsCache(): void {
   // No-op: caching is now handled by Zustand clientSlice
 }
 
-// ─── Document Management ──────────────────────────────────────────────────────
 
 /**
  * Upload and parse a document for a client

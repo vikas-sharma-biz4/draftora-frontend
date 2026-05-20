@@ -2,7 +2,6 @@ import { http } from "@/config/httpClient";
 import type { SavedDraft, SaveDraftPayload, DraftMetadata, DraftStage, DraftLocation } from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
 
-// ─── Runtime Validation ─────────────────────────────────────────────────────
 
 const VALID_STAGES: DraftStage[] = [
   "template_selection", "wizard_in_progress", "parameters_complete", "review_complete", "generated",
@@ -36,7 +35,6 @@ function parseDraftStatus(raw: string): DraftStatus {
   return "draft";
 }
 
-// ─── Shared Types & Mappers ──────────────────────────────────────────────────
 
 /**
  * Converts camelCase object keys to snake_case (recursive)
@@ -161,7 +159,6 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
   };
 }
 
-// ─── API Functions ───────────────────────────────────────────────────────────
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
   logger.info('[draft.service] Saving draft to backend', {

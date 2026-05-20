@@ -1,4 +1,3 @@
-// ─── Base button ─────────────────────────────────────────────────────────────
 .btn {
   display: inline-flex;
   align-items: center;
@@ -28,7 +27,6 @@
   }
 }
 
-// ─── Variants ────────────────────────────────────────────────────────────────
 .btn-primary {
   background: var(--color-primary);
   color: var(--color-white);
@@ -74,7 +72,6 @@
   }
 }
 
-// ─── Sizes ───────────────────────────────────────────────────────────────────
 .btn-sm {
   padding: 0.3125rem 0.75rem;
   font-size: 0.8125rem;
@@ -91,7 +88,6 @@
   height: 2rem;
 }
 
-// ─── Additional color variants ────────────────────────────────────────────────
 .btn-success {
   background: var(--color-success-light);
   color: var(--color-success-dark);
@@ -120,14 +116,11 @@
   }
 }
 
-// ─── Width utility ────────────────────────────────────────────────────────────
 .btn-full { width: 100%; }
 
-// ─── Micro sizes ──────────────────────────────────────────────────────────────
 .btn-xs       { font-size: 11px; padding: 4px 10px; }
 .btn-xs-ghost { font-size: 11px; padding: 4px 8px; }
 
-// ─── Text-link styled as small pill button ────────────────────────────────────
 .link-plain {
   background: var(--color-text);
   color: var(--color-white) !important;
@@ -149,14 +142,12 @@
   }
 }
 
-// ─── Loading state content (horizontal layout) ────────────────────────────────
 .btn-loading-content {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-// ─── Modern Downloading Button State ──────────────────────────────────────────
 .downloading-btn {
   position: relative;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);

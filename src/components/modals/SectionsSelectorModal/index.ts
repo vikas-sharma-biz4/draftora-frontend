@@ -1,1 +1,1 @@
-﻿export { default } from './SectionsSelectorModal';
+export { default } from './SectionsSelectorModal';

@@ -41,7 +41,6 @@ import {
 } from "@/services/proposal.service";
 import AddSectionModal from "@/components/modals/AddSectionModal";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface SectionMeta {
   key: string;
@@ -63,14 +62,12 @@ export interface ProposalSidebarProps {
   onSectionsReordered: (newOrder: string[]) => void;
 }
 
-// ─── DnD modifier — restrict to vertical axis ─────────────────────────────────
 
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({
   ...transform,
   x: 0,
 });
 
-// ─── Key builder (shared with AddSectionModal validation) ─────────────────────
 
 function buildSectionKey(name: string): string {
   return (
@@ -83,7 +80,6 @@ function buildSectionKey(name: string): string {
   );
 }
 
-// ─── SortableProposalSection ───────────────────────────────────────────────────
 
 interface SortableSectionProps {
   section: SectionMeta;
@@ -250,7 +246,6 @@ function SortableProposalSection({
   );
 }
 
-// ─── ProposalSidebar ───────────────────────────────────────────────────────────
 
 export default function ProposalSidebar({
   proposalId,
