@@ -1,22 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { BREAKPOINTS, MAIN_NAV_ITEMS } from "@/constants";
-import ThemeToggle from "@/components/common/ThemeToggle/ThemeToggle";
+import { useUIStore } from "@/store/features/ui/uiSlice";
 
 const MOBILE_BREAKPOINT = BREAKPOINTS.mobile;
 
 export default function MainSidebar(): JSX.Element {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(true);
+  const sidebarOpen = useUIStore((state) => state.sidebarOpen);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
+  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
+
+  const collapsed = !sidebarOpen;
 
   function handleToggle(): void {
     if (window.innerWidth <= MOBILE_BREAKPOINT) return;
-    setCollapsed((prev) => !prev);
+    toggleSidebar();
   }
 
   function isActive(path: string): boolean {
@@ -67,12 +71,6 @@ export default function MainSidebar(): JSX.Element {
         })}
       </ul>
 
-      <div className="sidebar-footer">
-        <div className="flex-row">
-          <ThemeToggle />
-          {!collapsed && <span className="text-small text-muted">Theme</span>}
-        </div>
-      </div>
     </aside>
   );
 }

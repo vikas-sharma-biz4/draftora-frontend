@@ -66,10 +66,10 @@ export default function GeneratingPage(): JSX.Element {
     logger.info("[GeneratingPage] Generation completed, navigating to proposal view", { proposalId });
     setIsGenerating(false);
     setCompletedAt(new Date().toISOString());
-    
+
     // Store the generated proposal ID so we can navigate back to it
     setGeneratedProposalId(proposalId);
-    
+
     // Navigate to proposal view
     router.push(`/proposal/${proposalId}`);
   }, [proposalId, router, setIsGenerating, setCompletedAt, setGeneratedProposalId]);
@@ -165,17 +165,17 @@ export default function GeneratingPage(): JSX.Element {
 
   const handleCancel = useCallback(() => {
     logger.info("[GeneratingPage] User cancelled generation", { proposalId });
-    
+
     // Step 1: Immediately disconnect SSE stream
     disconnect();
-    
+
     // Step 2: Reset wizard state
     setIsGenerating(false);
     resetGenerationState();
-    
+
     // Step 3: Navigate to review page instantly (don't wait for backend)
     router.push("/review");
-    
+
     // Step 4: Kill backend generation process asynchronously
     cancelProposal(proposalId)
       .then(() => {
@@ -291,7 +291,7 @@ export default function GeneratingPage(): JSX.Element {
           </div>
         </div>
 
-        <Button variant="ghost" onClick={handleCancel} className="generating-cancel-btn">
+        <Button variant="danger" onClick={handleCancel}>
           Cancel Generation
         </Button>
       </div>
