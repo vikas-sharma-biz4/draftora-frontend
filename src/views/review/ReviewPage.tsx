@@ -313,11 +313,11 @@ export default function ReviewPage(): JSX.Element {
     setErrorMessage("");
 
     // Show immediate feedback to user
-    if (isRegenerating) {
-      toast.info("Regenerating proposal with updated parameters...");
-    } else {
-      toast.info("Starting proposal generation...");
-    }
+    // if (isRegenerating) {
+    //   toast.info("Regenerating proposal with updated parameters...");
+    // } else {
+    //   toast.info("Starting proposal generation...");
+    // }
 
     logger.debug("[ReviewPage] Starting proposal generation with data:", {
       title: proposalData.title,
