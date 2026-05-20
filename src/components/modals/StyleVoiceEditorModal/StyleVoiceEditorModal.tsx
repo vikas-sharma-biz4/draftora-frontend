@@ -107,8 +107,8 @@ export default function StyleVoiceEditorModal({
           <div className={styles.previewBox}>
             <div className={styles.previewLabel}>Preview</div>
             <div className={styles.previewText}>
-              <strong>Tone:</strong> {TONE_OPTIONS.find(o => o.value === selectedTone)?.label} â€¢{" "}
-              <strong>Length:</strong> {LENGTH_OPTIONS.find(o => o.value === selectedLength)?.label} â€¢{" "}
+              <strong>Tone:</strong> {TONE_OPTIONS.find(o => o.value === selectedTone)?.label} •{" "}
+              <strong>Length:</strong> {LENGTH_OPTIONS.find(o => o.value === selectedLength)?.label} •{" "}
               <strong>Language:</strong> {selectedLanguage}
             </div>
           </div>
