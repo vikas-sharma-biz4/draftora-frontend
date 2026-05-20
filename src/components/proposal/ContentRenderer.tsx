@@ -23,6 +23,25 @@ const AI_CONTENT_OVERRIDE_KEYS: string[] = [
 ];
 
 /**
+ * Section keys that should always use AIMarkdownRenderer even if they
+ * contain HTML tags. This is needed for sections like similar_projects
+ * that generate markdown with embedded HTML for image alignment.
+ */
+const FORCE_MARKDOWN_RENDERER_KEYS: string[] = [
+  "similar_projects",
+  "prototypes_developed",
+];
+
+/**
+ * Section keys that should ALWAYS use AIMarkdownRenderer regardless of content type.
+ * This is a higher-priority list that bypasses all content detection logic.
+ */
+const ALWAYS_MARKDOWN_RENDERER_KEYS: string[] = [
+  "similar_projects",
+  "prototypes_developed",
+];
+
+/**
  * Detects the content type for a proposal section and dispatches to the
  * correct renderer component:
  *
@@ -39,6 +58,28 @@ export default function ContentRenderer({
   content,
 }: ContentRendererProps): JSX.Element {
   const type = detectContentType(sectionKey, content);
+
+  // Debug logging to verify section key routing
+  console.log('=== ContentRenderer Debug ===');
+  console.log('[ContentRenderer] sectionKey:', sectionKey);
+  console.log('[ContentRenderer] type:', type);
+  console.log('[ContentRenderer] isHtmlContent:', isHtmlContent(content));
+  console.log('[ContentRenderer] isGeneratedImageContent:', isGeneratedImageContent(content));
+  console.log('[ContentRenderer] ALWAYS_MARKDOWN_RENDERER_KEYS:', ALWAYS_MARKDOWN_RENDERER_KEYS);
+  console.log('[ContentRenderer] ALWAYS_MARKDOWN_RENDERER_KEYS includes sectionKey:', ALWAYS_MARKDOWN_RENDERER_KEYS.includes(sectionKey));
+  console.log('[ContentRenderer] FORCE_MARKDOWN_RENDERER_KEYS:', FORCE_MARKDOWN_RENDERER_KEYS);
+  console.log('[ContentRenderer] FORCE_MARKDOWN_RENDERER_KEYS includes sectionKey:', FORCE_MARKDOWN_RENDERER_KEYS.includes(sectionKey));
+  console.log('[ContentRenderer] AI_CONTENT_OVERRIDE_KEYS:', AI_CONTENT_OVERRIDE_KEYS);
+  console.log('[ContentRenderer] AI_CONTENT_OVERRIDE_KEYS includes sectionKey:', AI_CONTENT_OVERRIDE_KEYS.includes(sectionKey));
+  console.log('[ContentRenderer] content (first 200 chars):', content.substring(0, 200));
+  console.log('=== End ContentRenderer Debug ===');
+
+  // HIGH PRIORITY: Always use AIMarkdownRenderer for keys in ALWAYS_MARKDOWN_RENDERER_KEYS
+  // This bypasses all content detection logic to ensure markdown is properly rendered
+  if (ALWAYS_MARKDOWN_RENDERER_KEYS.includes(sectionKey)) {
+    console.log('[ContentRenderer] Using AIMarkdownRenderer for section:', sectionKey);
+    return <AIMarkdownRenderer content={content} />;
+  }
 
   // Sections with GENERATED_IMAGE:: content always use DiagramRenderer
   // regardless of section key — covers Eraser architecture + user-flow chunks.
@@ -63,7 +104,9 @@ export default function ContentRenderer({
   }
 
   // Static HTML content: use existing renderers unchanged.
-  if (isHtmlContent(content)) {
+  // EXCEPT: Force AIMarkdownRenderer for keys in FORCE_MARKDOWN_RENDERER_KEYS
+  // (e.g., similar_projects generates markdown with embedded HTML for image alignment)
+  if (isHtmlContent(content) && !FORCE_MARKDOWN_RENDERER_KEYS.includes(sectionKey)) {
     switch (type) {
       case "table":
         return <TableRenderer content={content} />;

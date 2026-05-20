@@ -87,9 +87,13 @@ export default function RichEditor({
   const [showImageInput, setShowImageInput] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>("");
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(true);
+  const [showCustomTextColorPicker, setShowCustomTextColorPicker] = useState<boolean>(false);
+  const [showCustomHighlightPicker, setShowCustomHighlightPicker] = useState<boolean>(false);
   const headingBtnRef = useRef<HTMLButtonElement | null>(null);
   const linkBtnRef = useRef<HTMLButtonElement | null>(null);
   const imageBtnRef = useRef<HTMLButtonElement | null>(null);
+  const customTextBtnRef = useRef<HTMLButtonElement | null>(null);
+  const customHighlightBtnRef = useRef<HTMLButtonElement | null>(null);
 
   // Unique ID for this editor instance (for toolbar ownership)
   const editorId = useId();
@@ -287,6 +291,8 @@ export default function RichEditor({
       setShowImageInput(false);
       setIsToolbarCollapsed(true);
       setHasSelection(false);
+      setShowCustomTextColorPicker(false);
+      setShowCustomHighlightPicker(false);
     };
 
     // Request toolbar ownership from centralized manager
@@ -314,6 +320,8 @@ export default function RichEditor({
         setShowLinkInput(false);
         setShowImageInput(false);
         setIsToolbarCollapsed(true); // Start collapsed by default
+        setShowCustomTextColorPicker(false);
+        setShowCustomHighlightPicker(false);
 
         setHasSelection(true);
         keepToolbarVisibleRef.current = true; // Mark toolbar as active
@@ -333,16 +341,20 @@ export default function RichEditor({
           // Position and show the bubble with viewport boundary detection
           el.style.position = 'fixed';
           el.style.top = `${top}px`;
+          el.style.left = `${left}px`;
           el.style.display = 'block'; // Must be visible to measure width
 
           // Get toolbar dimensions after rendering
-          const toolbarWidth = el.offsetWidth || 320; // Vertical toolbar is ~320px wide
+          const toolbarWidth = el.offsetWidth || 320;
           const viewportWidth = window.innerWidth;
           const padding = 12; // Minimum padding from viewport edges
 
-          // Calculate boundaries
-          const minLeft = padding + (toolbarWidth / 2);
-          const maxLeft = viewportWidth - padding - (toolbarWidth / 2);
+          // Calculate boundaries - toolbar should not go off screen
+          // With translateX(-50%), the actual left edge is at: left - (toolbarWidth / 2)
+          // The actual right edge is at: left + (toolbarWidth / 2)
+          const toolbarHalfWidth = toolbarWidth / 2;
+          const minLeft = padding + toolbarHalfWidth;
+          const maxLeft = viewportWidth - padding - toolbarHalfWidth;
 
           // Constrain left position to keep toolbar on screen
           if (left < minLeft) {
@@ -353,7 +365,6 @@ export default function RichEditor({
 
           el.style.left = `${left}px`;
           el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
-          // maxWidth is controlled by CSS — do not override with inline style
 
           // Mark position as set - don't recalculate until new selection
           toolbarPositionSetRef.current = true;
@@ -369,6 +380,8 @@ export default function RichEditor({
         setShowLinkInput(false);
         setShowImageInput(false);
         setIsToolbarCollapsed(true);
+        setShowCustomTextColorPicker(false);
+        setShowCustomHighlightPicker(false);
         // Hide the bubble
         if (el) {
           el.style.display = 'none';
@@ -403,6 +416,8 @@ export default function RichEditor({
         setShowImageInput(false);
         setIsToolbarCollapsed(true);
         setHasSelection(false);
+        setShowCustomTextColorPicker(false);
+        setShowCustomHighlightPicker(false);
         // Hide toolbar when starting to select
         if (el) {
           el.style.display = 'none';
@@ -423,11 +438,55 @@ export default function RichEditor({
       }
     };
 
-    // Toolbar uses position:fixed so it won't scroll with content
-    // No scroll handler needed - toolbar stays at fixed viewport coordinates
+    // Handle scroll to update toolbar position
+    const handleScroll = () => {
+      requestAnimationFrame(() => {
+        if (!el || !toolbarManager.isOwner(editorId) || !keepToolbarVisibleRef.current) {
+          return;
+        }
+
+        // Check if there's an active selection in the editor state
+        const { from, to, empty } = editor.state.selection;
+        if (empty || from === to) return;
+
+        // Get updated selection coordinates
+        const startCoords = editor.view.coordsAtPos(from);
+        const endCoords = editor.view.coordsAtPos(to);
+
+        // Recalculate position
+        const top = endCoords.bottom + 2;
+        let left = (startCoords.left + endCoords.left) / 2;
+
+        // Apply boundary detection
+        const toolbarWidth = el.offsetWidth || 320;
+        const viewportWidth = window.innerWidth;
+        const padding = 12;
+        const toolbarHalfWidth = toolbarWidth / 2;
+        const minLeft = padding + toolbarHalfWidth;
+        const maxLeft = viewportWidth - padding - toolbarHalfWidth;
+
+        if (left < minLeft) {
+          left = minLeft;
+        } else if (left > maxLeft) {
+          left = maxLeft;
+        }
+
+        el.style.top = `${top}px`;
+        el.style.left = `${left}px`;
+        el.style.display = 'block'; // Ensure toolbar is visible
+      });
+    };
+
+    // Attach scroll listener to the editor's scrollable parent and window
+    const editorDom = editor.view.dom;
+    const scrollableParent = editorDom.closest('[data-scrollable="true"]') || editorDom.parentElement;
 
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('scroll', handleScroll, true); // Capture phase for all scroll events
+    if (scrollableParent && scrollableParent !== document.body && scrollableParent !== document.documentElement) {
+      scrollableParent.addEventListener('scroll', handleScroll);
+    }
 
     // Also handle keyboard selection (no mouse involved)
     editor.on('selectionUpdate', () => {
@@ -443,6 +502,10 @@ export default function RichEditor({
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('scroll', handleScroll, true);
+      if (scrollableParent && scrollableParent !== document.body && scrollableParent !== document.documentElement) {
+        scrollableParent.removeEventListener('scroll', handleScroll);
+      }
 
       // Release toolbar ownership - manager will handle cleanup
       toolbarManager.releaseToolbar(editorId);
@@ -640,18 +703,57 @@ export default function RichEditor({
       <div className="rte-toolbar-group rte-color-group">
         <span className="rte-color-label">Highlight</span>
         {EDITOR_HIGHLIGHT_COLORS.map((color) => (
-          <button
-            key={color || "none"}
-            type="button"
-            className="rte-color-swatch-btn"
-            title={color ? `Highlight: ${color}` : "Remove highlight"}
-            onClick={() => setHighlight(color)}
-          >
-            <div
-              className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-              style={color ? { background: color } : undefined}
-            />
-          </button>
+          color === "custom" ? (
+            <div key="custom" className="rte-dropdown">
+              <button
+                ref={customHighlightBtnRef}
+                type="button"
+                className="rte-color-swatch-btn"
+                title="Custom highlight color"
+                onClick={() => {
+                  setShowCustomHighlightPicker(!showCustomHighlightPicker);
+                  setShowCustomTextColorPicker(false);
+                }}
+              >
+                <div className="rte-color-swatch rte-color-swatch-custom">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v20M2 12h20"/>
+                  </svg>
+                </div>
+              </button>
+              {showCustomHighlightPicker && (
+                <DropdownPortal
+                  triggerRef={customHighlightBtnRef}
+                  isOpen={showCustomHighlightPicker}
+                  className="rte-custom-color-picker-portal"
+                >
+                  <input
+                    type="color"
+                    className="rte-custom-color-picker-input"
+                    onChange={(e) => {
+                      setHighlight(e.target.value);
+                      setShowCustomHighlightPicker(false);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                </DropdownPortal>
+              )}
+            </div>
+          ) : (
+            <button
+              key={color || "none"}
+              type="button"
+              className="rte-color-swatch-btn"
+              title={color ? `Highlight: ${color}` : "Remove highlight"}
+              onClick={() => setHighlight(color)}
+            >
+              <div
+                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
+                style={color ? { background: color } : undefined}
+              />
+            </button>
+          )
         ))}
       </div>
 
@@ -660,18 +762,57 @@ export default function RichEditor({
       <div className="rte-toolbar-group rte-color-group">
         <span className="rte-color-label">Text</span>
         {EDITOR_TEXT_COLORS.map((color) => (
-          <button
-            key={color || "none"}
-            type="button"
-            className="rte-color-swatch-btn"
-            title={color ? `Color: ${color}` : "Default color"}
-            onClick={() => setColor(color)}
-          >
-            <div
-              className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-              style={color ? { background: color } : undefined}
-            />
-          </button>
+          color === "custom" ? (
+            <div key="custom" className="rte-dropdown">
+              <button
+                ref={customTextBtnRef}
+                type="button"
+                className="rte-color-swatch-btn"
+                title="Custom text color"
+                onClick={() => {
+                  setShowCustomTextColorPicker(!showCustomTextColorPicker);
+                  setShowCustomHighlightPicker(false);
+                }}
+              >
+                <div className="rte-color-swatch rte-color-swatch-custom">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v20M2 12h20"/>
+                  </svg>
+                </div>
+              </button>
+              {showCustomTextColorPicker && (
+                <DropdownPortal
+                  triggerRef={customTextBtnRef}
+                  isOpen={showCustomTextColorPicker}
+                  className="rte-custom-color-picker-portal"
+                >
+                  <input
+                    type="color"
+                    className="rte-custom-color-picker-input"
+                    onChange={(e) => {
+                      setColor(e.target.value);
+                      setShowCustomTextColorPicker(false);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                </DropdownPortal>
+              )}
+            </div>
+          ) : (
+            <button
+              key={color || "none"}
+              type="button"
+              className="rte-color-swatch-btn"
+              title={color ? `Color: ${color}` : "Default color"}
+              onClick={() => setColor(color)}
+            >
+              <div
+                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
+                style={color ? { background: color } : undefined}
+              />
+            </button>
+          )
         ))}
       </div>
 
@@ -679,15 +820,28 @@ export default function RichEditor({
       {onRegenerateSelection && (
         <>
           <div className="rte-toolbar-divider" />
-          <button
-            type="button"
-            className={`rte-btn-ai${showRegenPrompt ? " active" : ""}`}
-            title="Regenerate selection with AI"
-            disabled={regenLoading}
-            onClick={openRegenPrompt}
-          >
-            <span>AI Regen</span>
-          </button>
+          {showRegenPrompt ? (
+            <input
+              type="text"
+              className="rte-regen-input-inline"
+              placeholder="How should AI rewrite this?"
+              value={regenPrompt}
+              onChange={(e) => setRegenPrompt(e.target.value)}
+              onKeyDown={handleRegenKeyDown}
+              autoFocus
+              disabled={regenLoading}
+            />
+          ) : (
+            <button
+              type="button"
+              className="rte-btn-ai"
+              title="Regenerate selection with AI"
+              disabled={regenLoading}
+              onClick={openRegenPrompt}
+            >
+              <span>AI</span>
+            </button>
+          )}
         </>
       )}
 
@@ -713,49 +867,10 @@ export default function RichEditor({
     </div>
   );
 
-  // Regen prompt panel (renders below toolbar)
-  const regenPanel = showRegenPrompt && onRegenerateSelection && (
-    <div className="rte-regen-panel">
-      <input
-        type="text"
-        className="rte-regen-input"
-        placeholder="How should AI rewrite this?"
-        value={regenPrompt}
-        onChange={(e) => setRegenPrompt(e.target.value)}
-        onKeyDown={handleRegenKeyDown}
-        autoFocus
-        disabled={regenLoading}
-      />
-      <button
-        type="button"
-        className="rte-regen-submit"
-        onClick={() => void handleRegenerateSubmit()}
-        disabled={regenLoading}
-        title="Regenerate (Enter)"
-      >
-        {regenLoading ? (
-          <svg className="rte-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-        ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        )}
-      </button>
-      <button
-        type="button"
-        className="rte-regen-cancel"
-        onClick={closeRegenPrompt}
-        disabled={regenLoading}
-        title="Cancel (Esc)"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-  );
-
-  // Combined toolbar + panel container
+  // Combined toolbar container
   const toolbarWithPanel = (
     <div className="rte-toolbar-container-floating">
       {toolbar}
-      {regenPanel}
     </div>
   );
 

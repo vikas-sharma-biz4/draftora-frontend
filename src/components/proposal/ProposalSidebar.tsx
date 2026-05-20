@@ -29,10 +29,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, GripVertical, Pencil, Plus, X } from "lucide-react";
+import { Check, GripVertical, Pencil, Plus, X, Lock } from "lucide-react";
 
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
+import { STATIC_SECTION_KEYS } from "@/constants";
 import {
   addProposalSection,
   removeProposalSection,
@@ -46,6 +47,7 @@ interface SectionMeta {
   key: string;
   label: string;
   hasContent: boolean;
+  isStatic?: boolean;
 }
 
 export interface ProposalSidebarProps {
@@ -112,6 +114,7 @@ function SortableProposalSection({
   onRemove,
   onAddAfter,
 }: SortableSectionProps): JSX.Element {
+  const isStatic = section.isStatic || false;
   const {
     attributes,
     listeners,
@@ -138,15 +141,17 @@ function SortableProposalSection({
         onClick={() => !isRenaming && !isPending && onSectionClick()}
       >
         {/* Drag handle — visible on row hover */}
-        <span
-          className="proposal-sidebar-drag-handle"
-          {...attributes}
-          {...listeners}
-          aria-label="Drag to reorder section"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <GripVertical size={11} />
-        </span>
+        {!isStatic && (
+          <span
+            className="proposal-sidebar-drag-handle"
+            {...attributes}
+            {...listeners}
+            aria-label="Drag to reorder section"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical size={11} />
+          </span>
+        )}
 
         <span
           className={`proposal-sidebar-dot ${section.hasContent ? "has-content" : "empty"}`}
@@ -193,24 +198,48 @@ function SortableProposalSection({
             <button
               className="proposal-sidebar-icon-btn"
               title="Rename section"
-              onClick={(e) => { e.stopPropagation(); onStartRename(); }}
-              disabled={isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
+                if (isStaticSection) {
+                  toast.error("Not allowed on static sections");
+                  return;
+                }
+                onStartRename();
+              }}
+              disabled={isPending || isStatic}
             >
               <Pencil size={11} />
             </button>
             <button
               className="proposal-sidebar-icon-btn"
               title="Add section after this"
-              onClick={(e) => { e.stopPropagation(); onAddAfter(); }}
-              disabled={isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
+                if (isStaticSection) {
+                  toast.error("Not allowed on static sections");
+                  return;
+                }
+                onAddAfter();
+              }}
+              disabled={isPending || isStatic}
             >
               <Plus size={11} />
             </button>
             <button
               className="proposal-sidebar-icon-btn danger"
               title="Remove section"
-              onClick={(e) => { e.stopPropagation(); onRemove(); }}
-              disabled={isPending}
+              onClick={(e) => {
+                e.stopPropagation();
+                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
+                if (isStaticSection) {
+                  toast.error("Not allowed on static sections");
+                  return;
+                }
+                onRemove();
+              }}
+              disabled={isPending || isStatic}
             >
               <X size={11} />
             </button>
@@ -288,6 +317,12 @@ export default function ProposalSidebar({
   // ── Remove handler ────────────────────────────────────────────────────────
 
   async function handleRemoveSection(key: string): Promise<void> {
+    // Prevent removal of static sections
+    if (STATIC_SECTION_KEYS.includes(key as any)) {
+      toast.error("Not allowed on static sections");
+      return;
+    }
+
     if (sections.length <= 1) {
       toast.error(MESSAGES.PROPOSAL_MIN_SECTIONS);
       return;

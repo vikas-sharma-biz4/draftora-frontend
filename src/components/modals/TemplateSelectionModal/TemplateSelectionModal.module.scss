@@ -425,8 +425,14 @@
   flex-direction: column;
   gap: 8px;
   max-height: 280px;
-  overflow-y: auto;
   padding: 2px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .documentItem {
@@ -1009,7 +1015,6 @@
   flex-direction: column;
   gap: 6px;
   max-height: 200px;
-  overflow-y: auto;
 }
 
 .documentItem {

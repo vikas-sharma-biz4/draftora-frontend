@@ -183,19 +183,19 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             <span className={styles.loadingBadge}>Generating...</span>
           )}
         </div>
+        <button
+          className={styles.ctaBtn}
+          onClick={() => {
+            setIsRevealed(true);
+            fetchRecommendations();
+          }}
+          disabled={isLoading || recommendationsFetchStatus === 'loading'}
+        >
+          {isRevealed ? 'Regenerate' : 'Generate'}
+        </button>
       </div>
 
-      {!isRevealed ? (
-        <div className={styles.ctaState}>
-          <button
-            className={styles.ctaBtn}
-            onClick={() => setIsRevealed(true)}
-          >
-            Generate
-          </button>
-          <p className={styles.ctaHint}>AI is analyzing your context in the background</p>
-        </div>
-      ) : recommendationsFetchStatus === 'loading' && recommendations.length === 0 ? (
+      {recommendationsFetchStatus === 'loading' && recommendations.length === 0 ? (
         <div className={styles.loadingState}>
           <div className={styles.spinner}></div>
           <p>Analyzing your context and generating recommendations...</p>

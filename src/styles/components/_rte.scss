@@ -590,7 +590,11 @@
 }
 
 // ─── Dropdown menu ────────────────────────────────────────────────────────────
-.rte-dropdown { position: relative; }
+.rte-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
 
 .rte-dropdown-menu {
   min-width: 160px;
@@ -771,6 +775,50 @@
   background: var(--color-danger);
 }
 
+.rte-color-swatch-custom {
+  background: linear-gradient(135deg, #ff0000 0%, #00ff00 25%, #0000ff 50%, #ffff00 75%, #ff00ff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.rte-custom-color-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  z-index: 10;
+}
+
+.rte-custom-color-picker-portal {
+  padding: 8px;
+  background: white;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  z-index: 1001;
+}
+
+.rte-custom-color-picker-input {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+}
+
 // ─── AI regenerate button ─────────────────────────────────────────────────────
 .rte-btn-ai {
   display: flex;
@@ -794,6 +842,45 @@
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
+}
+
+// ─── Inline regenerate input (replaces button when clicked) ─────────────────
+.rte-regen-input-inline {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  background: white;
+  color: var(--color-text);
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  flex: 1;
+  min-width: 200px;
+  max-width: 260px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+
+  &::placeholder {
+    color: var(--color-text-light);
+    font-weight: 400;
+  }
+
+  &:focus {
+    background: white;
+    border-color: var(--color-primary);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(102, 126, 234, 0.15);
+    transform: translateY(-1px);
+    min-width: 280px;
+    max-width: 320px;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
 }
 
 .rte-btn-ai::before {

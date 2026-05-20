@@ -761,11 +761,6 @@ export default function RecreateTemplateModal({
               <h2 className={styles.modalTitle}>
                 {modalView === "new_client" ? "Add New Client" : "Recreate Template"}
               </h2>
-              <p className={styles.modalSubtitle}>
-                {modalView === "new_client"
-                  ? "Enter details to provision a new client workspace."
-                  : <>Upload an <strong>exact document</strong> to extract its structure, then provide context to rewrite it</>}
-              </p>
             </div>
           </div>
           <Button
@@ -847,9 +842,6 @@ export default function RecreateTemplateModal({
                   <div className={styles.uploadText}>
                     Click to upload or drag and drop
                   </div>
-                  <div className={styles.uploadHint}>
-                    PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
-                  </div>
                   <input
                     id="new-client-file-upload-recreate"
                     ref={contextInputRef}
@@ -902,7 +894,7 @@ export default function RecreateTemplateModal({
             <>
               {/* â”€â”€ Client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               <div className={styles.section}>
-                <label className={styles.label}>Client Name</label>
+                <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>Client Name</label>
             {loading ? (
               <div className={styles.noClients}>
                 <p>Loading clients...</p>
@@ -953,7 +945,7 @@ export default function RecreateTemplateModal({
           </div>
 
           {/* â”€â”€ Proposal name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <FormField label="Proposal Name">
+          <FormField label="Proposal Name" labelStyle={{ marginBottom: 0, fontWeight: 400 }}>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
@@ -966,7 +958,7 @@ export default function RecreateTemplateModal({
           </FormField>
 
           {/* â”€â”€ Project brief â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <FormField label="Project Brief (Optional)">
+          <FormField label="Project Brief (Optional)" labelStyle={{ marginBottom: 0, fontWeight: 400 }}>
             {(fieldProps) => (
               <Textarea
                 {...fieldProps}
@@ -981,15 +973,10 @@ export default function RecreateTemplateModal({
           {/* â”€â”€ SECTION 1: Exact Document â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <FileSearch size={16} />
-              <label className={styles.label} style={{ marginBottom: 0 }}>
+              <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
                 Exact Document <span style={{ color: "var(--color-error)" }}>*</span>
               </label>
-              <span className={styles.sectionBadge}>Structure Source Â· 1 file only</span>
             </div>
-            <p className={styles.sectionHint}>
-              Upload the original document whose structure you want to preserve. Its sections will be extracted and rewritten.
-            </p>
 
             {!exactDocument ? (
               <label
@@ -1006,10 +993,9 @@ export default function RecreateTemplateModal({
                   onChange={handleExactInputChange}
                 />
                 <Upload size={24} className={styles.uploadIcon} />
-                <span className={styles.uploadText}>
+                <span className={styles.uploadText} style={{ fontWeight: 400 }}>
                   Drop document here or <strong>browse</strong>
                 </span>
-                <span className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX Â· max 10 MB</span>
               </label>
             ) : (
               <div className={styles.uploadedFilesList}>
@@ -1088,15 +1074,10 @@ export default function RecreateTemplateModal({
           {/* â”€â”€ SECTION 2: Context Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <FileText size={16} />
-              <label className={styles.label} style={{ marginBottom: 0 }}>
+              <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
                 Context Documents
               </label>
-              <span className={styles.sectionBadge}>Content Source Â· Multiple allowed</span>
             </div>
-            <p className={styles.sectionHint}>
-              Select existing client documents or upload new ones. These provide the context for rewriting each section.
-            </p>
 
             {/* Existing KB docs */}
             {selectedClient && (selectedClient.documents || []).length > 0 && (
@@ -1158,7 +1139,6 @@ export default function RecreateTemplateModal({
               <span className={styles.uploadText}>
                 Add more context files
               </span>
-              <span className={styles.uploadHint}>PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX Â· max 10 MB each</span>
             </label>
 
             {/* Context uploads in progress */}
