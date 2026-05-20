@@ -121,7 +121,7 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   introduction: "Introduction",
   purpose: "Purpose",
   high_level_scope: "High-Level Scope of the Project",
-  high_level_feature_list: "High-Level Feature List — MVP",
+  high_level_feature_list: "High-Level Feature List",
   non_functional_requirements: "Non-Functional Requirements (NFRs)",
   proposed_technology_stack: "Proposed Technology Stack",
   milestone_timeline: "Milestone and Timeline Estimations (MVP)",
@@ -318,21 +318,19 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
 
 // ── RichEditor toolbar colors ─────────────────────────────────────────────────
 // Empty string represents "remove highlight / default color" action.
+// "custom" string represents custom color picker option.
 export const EDITOR_HIGHLIGHT_COLORS: string[] = [
-  "#fef08a",
-  "#bbf7d0",
-  "#bfdbfe",
-  "#fecaca",
-  "",
+  "#fef08a", // yellow
+  "#bfdbfe", // blue
+  "custom", // custom color picker
+  "", // remove
 ];
 
 export const EDITOR_TEXT_COLORS: string[] = [
-  "#1e1b4b",
-  "#047857",
-  "#1d4ed8",
-  "#b91c1c",
-  "#92400e",
-  "",
+  "#000000", // Black
+  "#1d4ed8", // Blue
+  "custom", // custom color picker
+  "", // default
 ];
 
 export const GENERATION_STEPS = [
@@ -399,7 +397,7 @@ export const TEMPLATE_TOCS = {
     { key: "introduction", label: "Introduction" },
     { key: "purpose", label: "Purpose" },
     { key: "high_level_scope", label: "High-Level Scope of the Project" },
-    { key: "high_level_feature_list", label: "High-Level Feature List — MVP" },
+    { key: "high_level_feature_list", label: "High-Level Feature List" },
     { key: "non_functional_requirements", label: "Non-Functional Requirements (NFRs)" },
     { key: "proposed_technology_stack", label: "Proposed Technology Stack" },
     { key: "system_architecture", label: "System Architecture" },

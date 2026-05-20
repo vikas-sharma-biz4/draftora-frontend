@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  padding: 80px 24px 48px;
+  padding: 40px 24px 48px;
 }
 
 // ─── Container ────────────────────────────────────────────────────────────────
@@ -14,10 +14,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   max-width: 900px;
   margin: 0 auto;
   width: 100%;
+  padding-top: 20px;
 }
 
 // ─── Main title ───────────────────────────────────────────────────────────────
@@ -36,7 +37,7 @@
   color: #6b7280;
   text-align: center;
   max-width: 640px;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
   line-height: 1.6;
   font-weight: 400;
 }
@@ -44,13 +45,13 @@
 // ─── Content layout ───────────────────────────────────────────────────────────
 .generating-content {
   display: flex;
-  gap: 64px;
+  gap: 48px;
   align-items: flex-start;
   justify-content: center;
   width: 100%;
   max-width: 800px;
   background: white;
-  padding: 48px 56px;
+  padding: 32px 40px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -196,7 +197,7 @@
 
 // ─── Cancel button ────────────────────────────────────────────────────────────
 .generating-cancel-btn {
-  margin-top: 40px;
+  margin-top: 24px;
   font-size: 14px;
   font-weight: 400;
   color: #6b7280;
