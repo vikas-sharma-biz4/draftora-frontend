@@ -249,7 +249,7 @@ export default function ReviewPage(): JSX.Element {
     });
 
     setShowKnowledgeBaseModal(false);
-    toast.success(`${selectedIds.length} document(s) selected for Knowledge Base`);
+    // toast.success(`${selectedIds.length} document(s) selected for Knowledge Base`);
   }
 
   function handleSaveStyleVoice(data: { tone: ToneOption; lengthPreference: LengthOption; language: string }): void {
