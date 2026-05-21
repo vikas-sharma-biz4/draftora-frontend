@@ -1,88 +1,32 @@
-/**
- * useDraftPersistence — unified hook for draft save-on-unmount + beforeunload
- *
- * Replaces the triplicated draft-save logic previously found in:
- *   - useDraftAutoSave.ts
- *   - useProposalDraftSync.ts
- *   - useProposalPageData.ts (inline effect)
- *
- * Handles:
- *   - Async save via saveDraft / updateDraft on unmount & visibilitychange
- *   - Synchronous localStorage fallback on beforeunload
- *   - Draft lookup via getDraftByProposalId (no N+1 listDrafts call)
- *   - UI state capture (scroll position, active section)
- */
-
 "use client";
 
-import { useEffect, useRef } from "react";
-
-import {
-  saveDraft as saveDraftApi,
-  updateDraft as updateDraftApi,
-  getDraftByProposalId,
-} from "@/services/draft.service";
-import type {
-  DraftLocation,
-  DraftStage,
-  DraftUIState,
-  SaveDraftPayload,
-} from "@/interfaces/draftInterfaces";
-import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
+import { useEffect, useCallback } from "react";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import { getDraftByProposalId, getDraft, updateDraft as updateDraftApi } from "@/services/draft.service";
+import type { DraftLocation, DraftUIState, SaveDraftPayload } from "@/interfaces/draftInterfaces";
+import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
-// ─── Options ────────────────────────────────────────────────────────────────
-
-export interface UseDraftPersistenceOptions {
-  /** Whether the hook is active */
+interface UseDraftPersistenceOptions {
   enabled: boolean;
-  /** Proposal ID — used to look up existing draft */
   proposalId: number | null;
-  /** Full proposal data to persist */
   proposal: ProposalData | null;
-  /** Current active section key for UI state restoration */
   activeSection: string;
-  /** Where the user currently is in the app */
   lastLocation: DraftLocation;
-  /** Current draft stage */
-  stage: DraftStage;
-  /** Wizard step to record */
-  wizardStep?: WizardStep;
-  /** If true, skip save for approved/rejected proposals (default: true) */
-  skipIfApproved?: boolean;
+  stage: string;
+  wizardStep: number;
+  skipIfApproved: boolean;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function captureUIState(activeSection: string): DraftUIState {
-  return {
-    scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
-    activeSection: activeSection || null,
-    expandedSections: [],
-    lastVisibleSection: null,
-  };
-}
-
-const AUTOSAVE_FALLBACK_KEY = "drafts_autosave_fallback";
-
-function saveToFallbackStore(draftItem: Record<string, unknown>): void {
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_FALLBACK_KEY);
-    const existing: Array<{ id: string }> = raw ? JSON.parse(raw) : [];
-    const idx = existing.findIndex((d) => d.id === draftItem.id);
-    if (idx >= 0) {
-      existing[idx] = draftItem as typeof existing[0];
-    } else {
-      existing.unshift(draftItem as typeof existing[0]);
-    }
-    localStorage.setItem(AUTOSAVE_FALLBACK_KEY, JSON.stringify(existing));
-  } catch (error) {
-    logger.error("[useDraftPersistence] fallback save failed:", error);
-  }
-}
-
-// ─── Hook ───────────────────────────────────────────────────────────────────
-
+/**
+ * Auto-saves the current proposal state to backend database when:
+ * - The browser is closing (beforeunload event)
+ * - The tab is hidden (visibilitychange event)
+ *
+ * This is a lower-level persistence hook that handles the actual save logic.
+ * It's used by higher-level hooks like useDraftAutoSave and useWizardAutoSave.
+ */
 export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
   const {
     enabled,
@@ -91,141 +35,135 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     activeSection,
     lastLocation,
     stage,
-    wizardStep = 5 as WizardStep,
-    skipIfApproved = true,
+    wizardStep,
+    skipIfApproved,
   } = options;
 
-  const draftIdRef = useRef<string | null>(null);
-  const proposalRef = useRef<ProposalData | null>(proposal);
-  const activeSectionRef = useRef<string>(activeSection);
-  const wizardStepRef = useRef<WizardStep>(wizardStep);
-  const skipIfApprovedRef = useRef<boolean>(skipIfApproved);
+  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
+  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
+  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
+  const saveDraftToStore = useDraftStore(state => state.saveDraft);
 
-  useEffect(() => { proposalRef.current = proposal; }, [proposal]);
-  useEffect(() => { activeSectionRef.current = activeSection; }, [activeSection]);
-  useEffect(() => { wizardStepRef.current = wizardStep; }, [wizardStep]);
-  useEffect(() => { skipIfApprovedRef.current = skipIfApproved; }, [skipIfApproved]);
+  const saveDraft = useCallback(async (): Promise<void> => {
+    if (!enabled || !proposal) {
+      logger.debug('[useDraftPersistence] Save disabled or no proposal data');
+      return;
+    }
 
-  useEffect(() => {
-    if (!enabled || !proposalId || !proposalRef.current) return;
+    if (!proposalId) {
+      logger.debug('[useDraftPersistence] No proposalId, skipping save');
+      return;
+    }
 
-    let isMounted = true;
+    try {
+      // Capture UI state for restoration
+      const uiState: DraftUIState = {
+        scrollPosition: typeof window !== "undefined" ? window.scrollY : 0,
+        activeSection: activeSection || null,
+        expandedSections: [],
+        lastVisibleSection: null,
+      };
 
-    // ── Core save logic — no mount guard (safe: only updates refs, no state setters) ──
-
-    async function performSave(): Promise<void> {
-      const currentProposal = proposalRef.current;
-      if (!currentProposal || !currentProposal.status || currentProposal.status !== "completed") return;
-
-      if (skipIfApprovedRef.current && (currentProposal.approvalStatus === "approved" || currentProposal.approvalStatus === "rejected")) {
-        return;
-      }
-
-      try {
-        const uiState = captureUIState(activeSectionRef.current);
-
-        const draftPayload: SaveDraftPayload = {
-          proposalId,
-          title: currentProposal.title || "Untitled Proposal",
-          clientName: currentProposal.clientName || "",
-          status: "draft",
-          lastLocation,
-          stage,
-          wizardState: {
-            proposalData: { ...currentProposal },
-            currentStep: wizardStepRef.current,
-            maxStepReached: wizardStepRef.current,
-            completedSteps: [1, 2, 3, 4, 5],
-          },
-          generatedContent: currentProposal.sections || {},
-          uiState,
-        };
-
-        // Look up existing draft by proposalId (targeted query, no N+1)
-        let draftId = draftIdRef.current;
-        if (!draftId && proposalId != null) {
-          const existing = await getDraftByProposalId(proposalId);
-          if (existing) {
-            draftId = existing.id;
-            draftIdRef.current = draftId;
+      // Fetch existing draft to preserve generated content if proposal exists
+      let existingGeneratedContent: Record<string, string> = {};
+      if (proposalId) {
+        try {
+          const existingDraft = await getDraftByProposalId(proposalId);
+          if (existingDraft) {
+            const fullDraft = await getDraft(existingDraft.id);
+            existingGeneratedContent = fullDraft.generatedContent || {};
+            logger.debug('[useDraftPersistence] Preserved existing generated content', {
+              sectionCount: Object.keys(existingGeneratedContent).length
+            });
           }
+        } catch (error) {
+          logger.warn('[useDraftPersistence] Failed to fetch existing draft for content preservation', error);
         }
-
-        if (draftId) {
-          await updateDraftApi(draftId, draftPayload);
-        } else {
-          const saved = await saveDraftApi(draftPayload);
-          draftIdRef.current = saved.id;
-        }
-
-        logger.info("[useDraftPersistence] draft saved:", currentProposal.title);
-      } catch (error) {
-        logger.error("[useDraftPersistence] save failed:", error);
-      }
-    }
-
-    // ── Guarded save — used by event listeners to skip stale in-flight calls ──
-
-    async function saveToDrafts(): Promise<void> {
-      if (!isMounted) return;
-      await performSave();
-    }
-
-    // ── Sync fallback (used on beforeunload) ─────────────────────────────────
-
-    function handleBeforeUnload(): void {
-      const currentProposal = proposalRef.current;
-      if (!currentProposal || !currentProposal.status || currentProposal.status !== "completed") return;
-      if (skipIfApprovedRef.current && (currentProposal.approvalStatus === "approved" || currentProposal.approvalStatus === "rejected")) {
-        return;
       }
 
-      const uiState = captureUIState(activeSectionRef.current);
+      // Construct wizard state
+      const wizardState = {
+        proposalData: proposal,
+        currentStep: wizardStep as any,
+        maxStepReached: wizardStep as any,
+        completedSteps: [],
+      };
 
-      saveToFallbackStore({
-        id: draftIdRef.current || String(proposalId),
-        savedAt: new Date().toISOString(),
-        title: currentProposal.title || "Untitled Proposal",
-        clientName: currentProposal.clientName || "",
-        stage,
-        status: "pending_approval",
-        currentStep: wizardStepRef.current,
+      const draftPayload: SaveDraftPayload = {
+        proposalId,
+        title: proposal.title || "Untitled Proposal",
+        clientName: proposal.clientName || "",
+        status: (proposal.status as any) || "draft",
         lastLocation,
-        proposalData: { ...currentProposal },
+        stage: stage as any,
+        wizardState,
+        generatedContent: existingGeneratedContent,
         uiState,
+      };
+
+      logger.info('[useDraftPersistence] Saving draft', {
+        proposalId,
+        hasGeneratedContent: Object.keys(draftPayload.generatedContent).length > 0,
+        sectionCount: Object.keys(draftPayload.generatedContent).length,
+        stage,
+        lastLocation,
       });
-    }
 
-    // ── Visibility change handler ────────────────────────────────────────────
-
-    function handleVisibilityChange(): void {
-      if (document.hidden) {
-        void saveToDrafts();
+      if (currentDraftId) {
+        // Update existing draft
+        await updateDraftInStore(currentDraftId, draftPayload);
+        logger.info('[useDraftPersistence] Draft updated', { draftId: currentDraftId });
+      } else {
+        // Create new draft and store ID
+        const saved = await saveDraftToStore(draftPayload);
+        setCurrentDraftId(saved.id);
+        logger.info('[useDraftPersistence] Draft created', { draftId: saved.id });
       }
+    } catch (error) {
+      logger.error('[useDraftPersistence] Save failed', error);
     }
+  }, [
+    enabled,
+    proposal,
+    proposalId,
+    activeSection,
+    lastLocation,
+    stage,
+    wizardStep,
+    skipIfApproved,
+    currentDraftId,
+    setCurrentDraftId,
+    updateDraftInStore,
+    saveDraftToStore,
+  ]);
 
-    // ── Page hide handler ────────────────────────────────────────────────────
+  // Save on beforeunload (browser close/refresh)
+  useEffect(() => {
+    if (!enabled) return;
 
-    function handlePageHide(): void {
-      void saveToDrafts();
-    }
-
-    // ── Register listeners ───────────────────────────────────────────────────
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("pagehide", handlePageHide);
-
-    return () => {
-      // Call performSave() directly BEFORE setting isMounted=false.
-      // saveToDrafts() checks isMounted and would return immediately in cleanup,
-      // making the unmount save a dead code path. performSave() has no mount guard
-      // and is safe after unmount because it only mutates refs, not React state.
-      void performSave();
-      isMounted = false;
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("pagehide", handlePageHide);
+    const handleBeforeUnload = (e: BeforeUnloadEvent): void => {
+      if (proposal) {
+        // Try async save (may not complete before unload)
+        void saveDraft();
+      }
     };
-  }, [enabled, proposalId, lastLocation, stage]);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [enabled, proposal, saveDraft]);
+
+  // Save on visibility change (tab switch)
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden && proposal) {
+        logger.info('[useDraftPersistence] Tab hidden, saving draft');
+        void saveDraft();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [enabled, proposal, saveDraft]);
 }

@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { isHtmlContent, plainTextToHtml } from "@/utils/contentParser";
+import { type RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
 
 const RichEditor = dynamic(() => import("@/components/common/RichEditor"), {
   ssr: false,
@@ -24,7 +25,7 @@ interface SectionEditModeProps {
   content: string;
   onContentChange: (key: string, html: string) => void;
   onSave: (key: string, content: string) => Promise<void>;
-  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<string | null>;
+  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<RegenerateSelectionResult | null>;
   placeholder?: string;
 }
 
