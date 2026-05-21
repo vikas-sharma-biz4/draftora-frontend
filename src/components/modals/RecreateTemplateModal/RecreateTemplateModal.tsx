@@ -295,8 +295,8 @@ export default function RecreateTemplateModal({
       return 1;
     }
 
-    // Rule 5: Bullets (â€¢, -, *, â†’)
-    if (/^[â€¢\-\*â†’]\s+/.test(title)) {
+    // Rule 5: Bullets (-, *, â†’)
+    if (/^[\-\*â†’]\s+/.test(title)) {
       return 2;
     }
 
@@ -490,10 +490,10 @@ export default function RecreateTemplateModal({
           setContextUploads((prev) => prev.filter((f) => f.id !== fileId));
           toast.success(`"${file.name}" added to context documents`);
         } catch {
-          toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+          toast.success(`"${file.name}" parsed`);
         }
       } else {
-        toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+        toast.success(`"${file.name}" parsed`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Parse failed";
@@ -888,7 +888,7 @@ export default function RecreateTemplateModal({
                           <div className={styles.fileName} title={entry.file.name}>{entry.file.name}</div>
                           <div className={styles.fileMeta}>
                             {entry.status === "parsing" && <span className={styles.parsingStatus}>Parsing on server...</span>}
-                            {entry.status === "parsed" && entry.parsedData && <span className={styles.parsedStatus}>{entry.parsedData.word_count} words</span>}
+                            {entry.status === "parsed" && entry.parsedData && <span className={styles.parsedStatus}>Parsing Complete</span>}
                             {entry.status === "error" && entry.error && <span className={styles.errorStatus}>{entry.error}</span>}
                           </div>
                         </div>
@@ -1175,7 +1175,7 @@ export default function RecreateTemplateModal({
                       <span className={styles.fileName}>{entry.file.name}</span>
                       <span className={styles.fileSize}>
                         {entry.status === "parsing" && "Parsing..."}
-                        {entry.status === "parsed" && `${entry.parsedData?.word_count ?? 0} words`}
+                        {entry.status === "parsed" && "Parsing Complete"}
                         {entry.status === "error" && (entry.error ?? "Error")}
                       </span>
                     </div>

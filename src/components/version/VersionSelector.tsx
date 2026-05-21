@@ -133,7 +133,7 @@ export function VersionSelector({
                         <span className={styles.versionMeta}>
                           {getSourceLabel(version.source)}
                           {version.parentVersion && (
-                            <> • Based on v{version.parentVersion}</>
+                            <> Based on v{version.parentVersion}</>
                           )}
                         </span>
                         {version.changeDescription && (

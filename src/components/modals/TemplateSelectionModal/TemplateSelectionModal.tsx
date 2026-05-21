@@ -840,13 +840,13 @@ export default function TemplateSelectionModal({
                           <div className={styles.fileMeta}>
                             {formatFileSize(file.size)}
                             {status === "parsing" && (
-                              <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
+                              <span className={styles.parsingStatus}>Parsing on server...</span>
                             )}
                             {status === "parsed" && parsedData && (
-                              <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words</span>
+                              <span className={styles.parsedStatus}>Parsing Complete</span>
                             )}
                             {status === "error" && error && (
-                              <span className={styles.errorStatus}> â€¢ {error}</span>
+                              <span className={styles.errorStatus}>{error}</span>
                             )}
                           </div>
                         </div>
@@ -1036,7 +1036,7 @@ export default function TemplateSelectionModal({
                         <div className={styles.documentInfo}>
                           <div className={styles.documentName} title={doc.name}>{doc.name}</div>
                           <div className={styles.documentMeta}>
-                            {formatFileSize(doc.sizeBytes)} • {formatDate(doc.createdAt)}
+                            {formatFileSize(doc.sizeBytes)} {formatDate(doc.createdAt)}
                           </div>
                         </div>
                       </div>
@@ -1104,13 +1104,13 @@ export default function TemplateSelectionModal({
                           <div className={styles.fileMeta}>
                             {formatFileSize(file.size)}
                             {status === "parsing" && (
-                              <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
+                              <span className={styles.parsingStatus}>Parsing on server...</span>
                             )}
                             {status === "parsed" && parsedData && (
-                              <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words</span>
+                              <span className={styles.parsedStatus}>Parsing Complete</span>
                             )}
                             {status === "error" && error && (
-                              <span className={styles.errorStatus}> â€¢ {error}</span>
+                              <span className={styles.errorStatus}>{error}</span>
                             )}
                           </div>
                         </div>

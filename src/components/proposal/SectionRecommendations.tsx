@@ -12,6 +12,7 @@ import { usePrefetchedRecommendations, useRecommendationsFetchStatus } from "@/s
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
   startBackgroundFetch: () => void;
+  restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation) => void;
 }
 
 interface SectionRecommendationsProps {
@@ -19,7 +20,7 @@ interface SectionRecommendationsProps {
   existingSections: string[];
   context: string;
   documentContext: string;
-  onAddSection: (sectionKey: string, title: string) => void;
+  onAddSection: (sectionKey: string, title: string, recommendation?: SectionRecommendation) => void;
   onSectionAdded?: (sectionKey: string) => void;
 }
 
@@ -118,7 +119,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
 
     logger.info('[SectionRecommendations] Adding section to TOC', { sectionKey, sectionTitle: rec.sectionTitle });
 
-    onAddSection(sectionKey, rec.sectionTitle);
+    onAddSection(sectionKey, rec.sectionTitle, rec);
     toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
 
     // Remove from recommendations list
@@ -174,7 +175,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     fetchRecommendations();
   };
 
-  // Expose removeRecommendation and startBackgroundFetch methods to parent via ref
+  // Expose removeRecommendation, startBackgroundFetch, and restoreRecommendation methods to parent via ref
   useImperativeHandle(ref, () => ({
     removeRecommendation: (sectionKey: string) => {
       setRecommendations((prev) => {
@@ -190,6 +191,21 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     startBackgroundFetch: () => {
       // No-op: auto-fetch is now triggered via prefetchRecommendations() in ParametersPage
     },
+    restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation) => {
+      setRecommendations((prev) => {
+        // Check if recommendation already exists to avoid duplicates
+        const normalizedKey = sectionKey.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        const existingIndex = prev.findIndex(
+          (rec) => rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') === normalizedKey
+        );
+        if (existingIndex !== -1) {
+          // Already exists, don't add duplicate
+          return prev;
+        }
+        // Add to the end of the list
+        return [...prev, recommendation];
+      });
+    },
   }));
 
   return (
@@ -197,9 +213,6 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       <div className={styles.header}>
         <div className={styles.headerTitle}>
           <h3>AI Section Recommendations</h3>
-          {isRevealed && recommendationsFetchStatus === 'loading' && recommendations.length === 0 && (
-            <span className={styles.loadingBadge}>Generating...</span>
-          )}
         </div>
         <button
           className={styles.ctaBtn}
@@ -213,8 +226,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       {recommendationsFetchStatus === 'loading' && recommendations.length === 0 && isRevealed ? (
         <div className={styles.loadingState}>
           <div className={styles.spinner}></div>
-          <p>Analyzing your context and generating recommendations...</p>
-          <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
+          <p>Recommended sections are Generating....</p>
         </div>
       ) : (
         <>
@@ -265,18 +277,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             </div>
           )}
 
-          {isLoading ? (
-            <div className={styles.loadingState}>
-              <div className={styles.spinner}></div>
-              <p>Loading recommendations...</p>
-            </div>
-          ) : recommendationsFetchStatus === 'loading' ? (
-            <div className={styles.loadingState}>
-              <div className={styles.spinner}></div>
-              <p>Analyzing your context and generating recommendations...</p>
-              <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
-            </div>
-          ) : recommendationsFetchStatus === 'error' ? (
+          {recommendationsFetchStatus === 'error' ? (
             <div className={styles.emptyState}>
               <p>Failed to load recommendations</p>
               <span className={styles.emptyHint}>
@@ -288,12 +289,6 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
               >
                 Retry
               </button>
-            </div>
-          ) : isRevealed && recommendationsFetchStatus === 'idle' ? (
-            <div className={styles.loadingState}>
-              <div className={styles.spinner}></div>
-              <p>Analyzing your context and generating recommendations...</p>
-              <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
             </div>
           ) : recommendations.length === 0 && isRevealed ? (
             <div className={styles.emptyState}>

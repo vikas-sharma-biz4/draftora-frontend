@@ -19,6 +19,7 @@ import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import SectionRecommendations, { type SectionRecommendationsRef } from "@/components/proposal/SectionRecommendations";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import type { SectionRecommendation } from "@/services/proposal.service";
 import { logger } from "@/utils/logger";
 import AddSectionModal from "@/components/modals/AddSectionModal";
 
@@ -56,6 +57,9 @@ export default function SectionManager({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
+
+  // Track sections that were added from AI recommendations
+  const [aiRecommendedSectionsMap, setAiRecommendedSectionsMap] = useState<Map<string, SectionRecommendation>>(new Map());
 
   // Add section modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -99,11 +103,27 @@ export default function SectionManager({
         toast.error("At least one section is required");
         return prev;
       }
+
+      // Check if this section was from AI recommendations
+      const recommendation = aiRecommendedSectionsMap.get(key);
+      if (recommendation && sectionRecommendationsRef.current) {
+        // Restore the recommendation to the AI recommendations list
+        sectionRecommendationsRef.current.restoreRecommendation(key, recommendation);
+        logger.info('[SectionManager] Restored section to AI recommendations', { sectionKey: key });
+
+        // Remove from the tracking map
+        setAiRecommendedSectionsMap(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(key);
+          return newMap;
+        });
+      }
+
       return prev.filter((s) => s.key !== key);
     });
-  }, [onSectionsChange]);
+  }, [onSectionsChange, aiRecommendedSectionsMap]);
 
-  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string): void => {
+  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string, recommendation?: SectionRecommendation): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
 
     // Check if section already exists before attempting to add
@@ -120,6 +140,12 @@ export default function SectionManager({
       before: sections.map(s => s.key),
       after: updatedSections.map(s => s.key)
     });
+
+    // Store recommendation data if provided (section came from AI recommendations)
+    if (recommendation) {
+      setAiRecommendedSectionsMap(prev => new Map(prev).set(sectionKey, recommendation));
+      logger.info('[SectionManager] Stored AI recommendation data for section', { sectionKey });
+    }
 
     // Update local state first
     onSectionsChange(updatedSections);
