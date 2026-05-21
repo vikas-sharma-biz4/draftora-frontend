@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import { FileText, Clock, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { FileText, Clock, Trash2, Loader2, Search, X, ArrowRight } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -58,6 +58,37 @@ export default function DraftsPage(): JSX.Element {
   const [deleteModalData, setDeleteModalData] = useState<{ id: string; name: string } | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState<"all" | "parameters" | "review" | "generated">("all");
+
+  // Filter drafts
+  const filteredDrafts = useMemo(() => {
+    let filtered = [...drafts];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (draft) =>
+          (draft.title || "Untitled Proposal").toLowerCase().includes(query) ||
+          (draft.clientName || "").toLowerCase().includes(query)
+      );
+    }
+
+    // Apply location filter
+    if (locationFilter !== "all") {
+      const locationMap: Record<string, string> = {
+        parameters: "wizard_parameters",
+        review: "wizard_review",
+        generated: "web_view",
+      };
+      filtered = filtered.filter((draft) => draft.lastLocation === locationMap[locationFilter]);
+    }
+
+    return filtered;
+  }, [drafts, searchQuery, locationFilter]);
 
   useEffect(() => {
     setMounted(true);
@@ -245,17 +276,6 @@ export default function DraftsPage(): JSX.Element {
       <PageHeader
         title="Drafts"
         subtitle="Resume work on proposals that are in progress or pending completion."
-        action={
-          !isLoading && drafts.length > 0 ? (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setShowDeleteAllModal(true)}
-            >
-              Delete All
-            </Button>
-          ) : undefined
-        }
       />
 
         {!mounted ? (
@@ -277,17 +297,87 @@ export default function DraftsPage(): JSX.Element {
             onCtaClick={handleNewProposalClick}
           />
         ) : (
-          <div className={styles.draftsGrid}>
-            {drafts.map((draft) => (
+          <>
+            {/* Search and Filter Controls */}
+            <div className={styles.controlsContainer}>
+              {/* Filter Pills and Delete All Button Group */}
+              <div className={styles.filterSortGroup}>
+                {/* Filter Pills */}
+                <div className={styles.filterGroup}>
+                  <button
+                    onClick={() => setLocationFilter("all")}
+                    className={`${styles.filterPill} ${locationFilter === "all" ? styles.active : ""}`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setLocationFilter("parameters")}
+                    className={`${styles.filterPill} ${locationFilter === "parameters" ? styles.active : ""}`}
+                  >
+                    Parameters
+                  </button>
+                  <button
+                    onClick={() => setLocationFilter("review")}
+                    className={`${styles.filterPill} ${locationFilter === "review" ? styles.active : ""}`}
+                  >
+                    Review
+                  </button>
+                  <button
+                    onClick={() => setLocationFilter("generated")}
+                    className={`${styles.filterPill} ${locationFilter === "generated" ? styles.active : ""}`}
+                  >
+                    Generated
+                  </button>
+                </div>
+
+                {/* Delete All Button */}
+                {!isLoading && drafts.length > 0 && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowDeleteAllModal(true)}
+                    className={styles.deleteAllButton}
+                  >
+                    Delete All
+                  </Button>
+                )}
+              </div>
+
+              {/* Search Input */}
+              <div className={styles.searchWrapper}>
+                <Search size={18} className={styles.searchIcon} />
+                <input
+                  type="text"
+                  placeholder="Search drafts by title or client..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={styles.searchInput}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className={styles.clearButton}
+                    aria-label="Clear search"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Results */}
+            {filteredDrafts.length === 0 ? (
+              <EmptyState
+                icon={<Search size={48} />}
+                title="No Results Found"
+                subtitle="Try adjusting your search or filters."
+              />
+            ) : (
+              <div className={styles.draftsGrid}>
+                {filteredDrafts.map((draft) => (
               <article
                 key={draft.id}
                 className={styles.draftCard}
-                onClick={() => void handleLoadDraft(draft.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleLoadDraft(draft.id);
-                }}
               >
                 <div className={styles.draftHeader}>
                   <div className={styles.draftIcon}>
@@ -311,10 +401,6 @@ export default function DraftsPage(): JSX.Element {
                     <div className={styles.draftClient}>{draft.clientName}</div>
                   )}
                   <div className={styles.draftMeta}>
-                    <span className={styles.draftStatus}>
-                      <span className={styles.statusDot} />
-                      {getStatusLabel(draft.status)}
-                    </span>
                     <span className={styles.draftDate}>
                       <Clock size={12} />
                       {formatDateWithTime(draft.updatedAt)}
@@ -327,17 +413,24 @@ export default function DraftsPage(): JSX.Element {
 
                 <div className={styles.draftFooter}>
                   <Button
-                    variant="ghost"
+                    variant="primary"
                     size="sm"
                     fullWidth
                     loading={loadingDraftId === draft.id}
+                    className={styles.primaryCtaButton}
+                    onClick={() => void handleLoadDraft(draft.id)}
                   >
-                    Resume Editing
+                    <span className={styles.buttonContent}>
+                      Resume Editing
+                      <ArrowRight size={14} className={styles.buttonArrow} />
+                    </span>
                   </Button>
                 </div>
               </article>
             ))}
           </div>
+            )}
+          </>
         )}
 
       {showTemplateModal && (
