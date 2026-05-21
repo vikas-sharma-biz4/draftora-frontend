@@ -24,11 +24,8 @@ const nextConfig = {
       };
     }
 
-    // Disable webpack cache compression to prevent memory allocation errors
-    config.cache = {
-      type: 'filesystem',
-      compression: false,
-    };
+    // Disable webpack cache to prevent module resolution errors
+    config.cache = false;
 
     return config;
   },

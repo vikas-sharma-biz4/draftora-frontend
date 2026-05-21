@@ -644,8 +644,8 @@ export default function RecreateTemplateModal({
     });
 
     setDraftStage("wizard_in_progress");
-    setCurrentStep(4);
-    markStepCompleted(3);
+    setCurrentStep(1);
+    markStepCompleted(1);
     router.push("/parameters");
     onClose();
   }

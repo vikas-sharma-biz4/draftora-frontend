@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, Search, FileText, Upload, Loader2, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "@/utils/toast";
@@ -27,7 +27,7 @@ interface KnowledgeBaseSelectorModalProps {
   availableDocuments: KnowledgeBaseDocument[];
   selectedDocumentIds: string[];
   onClose: () => void;
-  onSave: (selectedIds: string[]) => void;
+  onSave: (selectedIds: string[], hasNewUploads: boolean) => void;
   clientId?: number;
   onRefreshDocuments?: () => void;
 }
@@ -47,6 +47,7 @@ export default function KnowledgeBaseSelectorModal({
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [hasNewUploads, setHasNewUploads] = useState<boolean>(false);
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
   const clients = useClientStore(state => state.clients);
   const initializedRef = useRef<boolean>(false);
@@ -57,7 +58,8 @@ export default function KnowledgeBaseSelectorModal({
       setSelected(new Set(selectedDocumentIds));
       initializedRef.current = true;
     }
-  }, [mounted, selectedDocumentIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-select newly uploaded documents when they appear in availableDocuments
   useEffect(() => {
@@ -68,14 +70,23 @@ export default function KnowledgeBaseSelectorModal({
       if (newlyAvailableDocs.length > 0) {
         setSelected(prev => {
           const next = new Set(prev);
+          let hasNew = false;
           newlyAvailableDocs.forEach(doc => {
-            next.add(doc.id);
+            if (!prev.has(doc.id)) {
+              next.add(doc.id);
+              hasNew = true;
+            }
           });
+          // Only update if something actually changed
+          if (!hasNew) {
+            return prev;
+          }
           return next;
         });
       }
     }
-  }, [availableDocuments, uploadedFiles, mounted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
@@ -106,14 +117,14 @@ export default function KnowledgeBaseSelectorModal({
 
   // Get client documents from store to ensure we have the latest data
   const currentClient = clients.find(c => c.id === clientId);
-  const storeDocuments = (currentClient?.documents || []).map((doc) => ({
+  const storeDocuments = useMemo(() => (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),
     name: doc.name,
     size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
     date: doc.createdAt ? formatDate(doc.createdAt) : "",
     status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
     fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
-  }));
+  })), [currentClient?.documents]);
 
   // Debug logging
   logger.debug('[KnowledgeBaseSelectorModal] Document state:', {
@@ -127,7 +138,7 @@ export default function KnowledgeBaseSelectorModal({
   // Combine store documents with uploaded parsed documents
   // Show all parsed uploaded files even if they're not yet in storeDocuments
   // This ensures newly uploaded documents remain visible during refresh
-  const allDocuments = [
+  const allDocuments = useMemo(() => [
     ...storeDocuments,
     ...uploadedFiles
       .filter((f) => f.status === "parsed" && f.uploadedDocId && !storeDocuments.some(d => d.id === f.uploadedDocId))
@@ -140,7 +151,7 @@ export default function KnowledgeBaseSelectorModal({
         fileType: "pdf" as const,
         isNew: true,
       })),
-  ];
+  ], [storeDocuments, uploadedFiles]);
 
   // Debug logging
   logger.debug('[KnowledgeBaseSelectorModal] Render state:', {
@@ -155,20 +166,24 @@ export default function KnowledgeBaseSelectorModal({
 
   // Filter selected IDs to only include documents that exist in allDocuments
   // This fixes the issue where counter shows selected count but checkboxes don't reflect it
+  const allDocumentIds = useMemo(() => new Set(allDocuments.map(d => d.id)), [allDocuments]);
+  
   useEffect(() => {
     if (mounted) {
-      const validDocumentIds = new Set(allDocuments.map(d => d.id));
       setSelected(prev => {
-        const filtered = new Set<string>();
-        prev.forEach(id => {
-          if (validDocumentIds.has(id)) {
-            filtered.add(id);
-          }
-        });
+        // Check if any selected IDs are not in allDocumentIds
+        const invalidIds = Array.from(prev).filter(id => !allDocumentIds.has(id));
+        if (invalidIds.length === 0) {
+          return prev; // No changes needed
+        }
+        // Remove invalid IDs
+        const filtered = new Set(prev);
+        invalidIds.forEach(id => filtered.delete(id));
         return filtered;
       });
     }
-  }, [allDocuments, mounted]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function isValidFile(file: File): boolean {
     const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -198,6 +213,7 @@ export default function KnowledgeBaseSelectorModal({
 
     logger.debug('[KnowledgeBaseSelectorModal] Adding files to uploadedFiles:', newFiles.map(f => ({ name: f.file.name, id: f.id })));
     setUploadedFiles((prev) => [...prev, ...newFiles]);
+    setHasNewUploads(true); // Mark that new documents were uploaded
     newFiles.forEach((f) => startRealParsing(f.file, f.id));
   }
 
@@ -355,7 +371,7 @@ export default function KnowledgeBaseSelectorModal({
 
     // Only use the selected set - uploaded files are already auto-selected and included
     const allSelected = Array.from(selected);
-    onSave(allSelected);
+    onSave(allSelected, hasNewUploads);
     toast.success(`${allSelected.length} document(s) selected`);
     onClose();
   }
