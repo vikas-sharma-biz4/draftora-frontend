@@ -277,7 +277,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               <span className={styles.clientBadgeStatus}>Active</span>
             </div>
             <h1 className={styles.clientName}>{client.name}</h1>
-            <p className={styles.clientMeta}>{client.industry} • Active • Created {formatDate(client.createdAt)}</p>
+            <p className={styles.clientMeta}>{client.industry} Active Created {formatDate(client.createdAt)}</p>
           </div>
           <div className={styles.clientHeaderActions}>
             <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
@@ -363,7 +363,6 @@ export default function ClientWorkspacePage(): JSX.Element {
                         <div className={styles.documentName}>{doc.name}</div>
                         <div className={styles.documentMeta}>
                           <span>{Math.round(doc.sizeBytes / 1024)} KB</span>
-                          <span>•</span>
                           <span>{formatDate(doc.createdAt)}</span>
                         </div>
                       </div>

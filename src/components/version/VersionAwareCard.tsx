@@ -136,7 +136,7 @@ export function VersionAwareCard({
           {version.source === "generated" && "AI Generated"}
           {version.source === "edited" && "Manually Edited"}
           {version.source === "regenerated" && "Regenerated"}
-          {version.parentVersion && ` • Based on v${version.parentVersion}`}
+          {version.parentVersion && `Based on v${version.parentVersion}`}
         </span>
       </div>
     </div>
