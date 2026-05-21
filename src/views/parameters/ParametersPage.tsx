@@ -364,7 +364,7 @@ export default function ParametersPage(): JSX.Element {
 
     markStepCompleted(1);
     setDraftStage("parameters_complete");
-    setCurrentStep(5);
+    setCurrentStep(2);
 
     // Update maxStepReached to allow returning to Step 2 from Step 1
     if (maxStepReached < 2) {
@@ -410,8 +410,8 @@ export default function ParametersPage(): JSX.Element {
           proposalId={currentProposalId}
           maxStepReached={maxStepReached}
         />
-        <div className="page-badge">Phase 04</div>
-        <h1 className="page-title">Step 4: Table of Contents &amp; Parameters</h1>
+        <div className="page-badge">Phase 01</div>
+        <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
         <p className="page-subtitle">
           {isRecreateMode
             ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."

@@ -198,6 +198,8 @@ export function useProposalPageData(
     activeSection,
     lastLocation: "web_view",
     stage: "generated",
+    wizardStep: 5,
+    skipIfApproved: false,
   });
 
   return {

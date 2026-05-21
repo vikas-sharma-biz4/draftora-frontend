@@ -579,7 +579,7 @@ export default function TemplateSelectionModal({
     });
 
     setDraftStage("wizard_in_progress");
-    setCurrentStep(4);
+    setCurrentStep(1);
     setShouldStartBackgroundFetch(true);
 
     // Start background generation BEFORE navigation
