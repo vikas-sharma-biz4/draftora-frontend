@@ -26,8 +26,6 @@ import { Input, Select, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";
 
 import {
-  listClientsWithDocuments,
-  invalidateClientsCache,
   uploadDocument,
   type ClientWithDocuments,
 } from "@/services/client.service";
@@ -67,11 +65,13 @@ export default function RecreateTemplateModal({
   const { updateProposalData, setCurrentStep } = useWizardActions();
   const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
   const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
+  const fetchClients = useClientStore(state => state.fetchClients);
+  const clients = useClientStore(state => state.clients);
+  const invalidateClientsCache = useClientStore(state => state.invalidateCache);
+  const isLoadingClients = useClientStore(state => state.isLoading);
 
   const [mounted, setMounted] = useState<boolean>(false);
-  const [clients, setClients] = useState<ClientWithDocuments[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [proposalName, setProposalName] = useState<string>("");
   const [proposalDescription, setProposalDescription] = useState<string>("");
 
@@ -93,6 +93,7 @@ export default function RecreateTemplateModal({
   const contextInputRef = useRef<HTMLInputElement>(null);
   const [contextDragOver, setContextDragOver] = useState<boolean>(false);
   const processedContextRef = useRef<Set<string>>(new Set());
+  const initialDocIdsRef = useRef<Set<number>>(new Set());
 
   // Client search
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
@@ -139,11 +140,31 @@ export default function RecreateTemplateModal({
     if (selectedClientId) {
       const client = clients.find((c) => c.id === selectedClientId);
       if (client?.documents) {
-        const allDocIds = new Set(
+        const currentDocIds = new Set(
           client.documents.filter((d) => d.status === "parsed").map((d) => d.id)
         );
-        setSelectedDocuments(allDocIds);
+
+        // Only auto-select all documents if this is the first time selecting this client
+        // (i.e., when selectedClientId changes, not when clients array updates)
+        if (initialDocIdsRef.current.size === 0 || !currentDocIds.isSupersetOf(initialDocIdsRef.current)) {
+          setSelectedDocuments(currentDocIds);
+          initialDocIdsRef.current = currentDocIds;
+        } else {
+          // If clients array updated but client hasn't changed, only add new documents
+          const newDocIds = new Set(Array.from(currentDocIds).filter(id => !initialDocIdsRef.current.has(id)));
+          if (newDocIds.size > 0) {
+            setSelectedDocuments((prev) => {
+              const next = new Set(prev);
+              newDocIds.forEach(id => next.add(id));
+              return next;
+            });
+            initialDocIdsRef.current = currentDocIds;
+          }
+        }
       }
+    } else {
+      // Reset when no client is selected
+      initialDocIdsRef.current = new Set();
     }
   }, [selectedClientId, clients]);
 
@@ -320,14 +341,9 @@ export default function RecreateTemplateModal({
 
   async function loadClients(): Promise<void> {
     try {
-      setLoading(true);
-      const clientsWithDocs = await listClientsWithDocuments();
-      setClients(clientsWithDocs);
+      await fetchClients();
     } catch {
       toast.error("Failed to load clients");
-      setClients([]);
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -469,7 +485,7 @@ export default function RecreateTemplateModal({
         try {
           const uploaded = await uploadDocument(selectedClientId, file);
           invalidateClientsCache();
-          await loadClients();
+          await fetchClients();
           setSelectedDocuments((prev) => new Set(Array.from(prev).concat(uploaded.id)));
           setContextUploads((prev) => prev.filter((f) => f.id !== fileId));
           toast.success(`"${file.name}" added to context documents`);
@@ -892,10 +908,10 @@ export default function RecreateTemplateModal({
             </>
           ) : (
             <>
-              {/* â”€â”€ Client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              {}
               <div className={styles.section}>
                 <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>Client Name</label>
-            {loading ? (
+            {isLoadingClients ? (
               <div className={styles.noClients}>
                 <p>Loading clients...</p>
               </div>

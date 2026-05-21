@@ -132,7 +132,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
           lastLocation,
           stage,
           wizardState: {
-            proposalData: { ...currentProposal, files: [] },
+            proposalData: { ...currentProposal },
             currentStep: wizardStepRef.current,
             maxStepReached: wizardStepRef.current,
             completedSteps: [1, 2, 3, 4, 5],
@@ -191,7 +191,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         status: "pending_approval",
         currentStep: wizardStepRef.current,
         lastLocation,
-        proposalData: { ...currentProposal, files: [] },
+        proposalData: { ...currentProposal },
         uiState,
       });
     }

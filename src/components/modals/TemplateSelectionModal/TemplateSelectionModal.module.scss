@@ -1015,6 +1015,13 @@
   flex-direction: column;
   gap: 6px;
   max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .documentItem {
@@ -1080,7 +1087,7 @@
 
 .clientName {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--color-text);
 }
 

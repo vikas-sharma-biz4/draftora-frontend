@@ -129,6 +129,7 @@ export function useProposalPageData(
           sectionDisplayNames: data.sectionDisplayNames || {},
           contextualInstructions: data.contextualInstructions || "",
           webReferences: data.webReferences || [],
+          selectedDocumentIds: data.selectedDocumentIds || [],
         });
         setDraftStage("generated");
         setCompletedSteps([1, 2, 3]);

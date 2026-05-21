@@ -255,7 +255,7 @@ export default function KnowledgeBaseSelectorModal({
       setUploadedFiles((prev) =>
         prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
-      toast.success(`"${file.name}" parsed — ${result.word_count} words`);
+      // toast.success(`"${file.name}" parsed — ${result.word_count} words`);
 
       // Save to the selected client so it appears in Knowledge Base list
       await saveParsedDocumentToClient(file, fileId, result);
@@ -309,7 +309,7 @@ export default function KnowledgeBaseSelectorModal({
       // Don't call onRefreshDocuments - the document is already in the local store via addDocument
       // The parent's clientDocuments will automatically pick it up from the store
 
-      toast.success(`${file.name} uploaded`);
+      // toast.success(`${file.name} uploaded`);
     } catch (error) {
       logger.error("Failed to upload document:", error);
       toast.error(`Failed to upload ${file.name}`);
@@ -456,51 +456,53 @@ export default function KnowledgeBaseSelectorModal({
             </div>
           )}
 
-          <div className={styles.actionBar}>
-            <button className={styles.toggleAllButton} onClick={toggleAll}>
-              {selected.size === allDocuments.length ? "Deselect All" : "Select All"}
-            </button>
-            <span className={styles.counter}>{selected.size} document(s) selected</span>
-          </div>
+          <div className={styles.knowledgeBaseScrollContainer}>
+            <div className={styles.actionBar}>
+              <button className={styles.toggleAllButton} onClick={toggleAll}>
+                {selected.size === allDocuments.length ? "Deselect All" : "Select All"}
+              </button>
+              <span className={styles.counter}>{selected.size} document(s) selected</span>
+            </div>
 
-          {filteredAllDocuments.length === 0 ? (
-            <div className={styles.emptyState}>
-              <FileText size={48} className={styles.emptyIcon} />
-              <p className={styles.emptyText}>
-                No documents available
-              </p>
-            </div>
-          ) : (
-            <div className={styles.documentList}>
-              {filteredAllDocuments.map((doc) => {
-                const isSelected = selected.has(doc.id);
-                return (
-                  <div
-                    key={doc.id}
-                    className={`${styles.documentItem} ${isSelected ? styles.selected : ""}`}
-                    onClick={() => toggleDocument(doc.id)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleDocument(doc.id)}
-                      className={styles.checkbox}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className={styles.documentInfo}>
-                      <span className={styles.documentName}>{doc.name}</span>
-                      <span className={styles.documentMeta}>
-                        {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""} • {doc.date}
-                        {"isNew" in doc && doc.isNew ? <span className="badge badge-success">New</span> : null}
-                      </span>
+            {filteredAllDocuments.length === 0 ? (
+              <div className={styles.emptyState}>
+                <FileText size={48} className={styles.emptyIcon} />
+                <p className={styles.emptyText}>
+                  No documents available
+                </p>
+              </div>
+            ) : (
+              <div className={styles.documentList}>
+                {filteredAllDocuments.map((doc) => {
+                  const isSelected = selected.has(doc.id);
+                  return (
+                    <div
+                      key={doc.id}
+                      className={`${styles.documentItem} ${isSelected ? styles.selected : ""}`}
+                      onClick={() => toggleDocument(doc.id)}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleDocument(doc.id)}
+                        className={styles.checkbox}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className={styles.documentInfo}>
+                        <span className={styles.documentName}>{doc.name}</span>
+                        <span className={styles.documentMeta}>
+                          {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""} • {doc.date}
+                          {"isNew" in doc && doc.isNew ? <span className="badge badge-success">New</span> : null}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className={styles.modalFooter}>
