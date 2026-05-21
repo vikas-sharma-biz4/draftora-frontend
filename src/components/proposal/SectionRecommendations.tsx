@@ -37,6 +37,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
+  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
@@ -143,6 +144,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
 
   const handlePromptChange = (): void => {
     setIsEditingPrompt(false);
+    setIsRegenerating(false);
     if (userPrompt.trim()) {
       setRecommendations([]);
       fetchRecommendations(userPrompt);
@@ -154,6 +156,22 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       e.preventDefault();
       handlePromptChange();
     }
+  };
+
+  const handleGenerateClick = (): void => {
+    if (!isRevealed) {
+      // First click: reveal prefetched recommendations
+      setIsRevealed(true);
+    } else {
+      // Second click: open custom prompt input for regeneration
+      setIsRegenerating(true);
+      setIsEditingPrompt(true);
+    }
+  };
+
+  const handleRetryFetch = (): void => {
+    setRecommendations([]);
+    fetchRecommendations();
   };
 
   // Expose removeRecommendation and startBackgroundFetch methods to parent via ref
@@ -185,17 +203,14 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         </div>
         <button
           className={styles.ctaBtn}
-          onClick={() => {
-            setIsRevealed(true);
-            fetchRecommendations();
-          }}
+          onClick={handleGenerateClick}
           disabled={isLoading || recommendationsFetchStatus === 'loading'}
         >
           {isRevealed ? 'Regenerate' : 'Generate'}
         </button>
       </div>
 
-      {recommendationsFetchStatus === 'loading' && recommendations.length === 0 ? (
+      {recommendationsFetchStatus === 'loading' && recommendations.length === 0 && isRevealed ? (
         <div className={styles.loadingState}>
           <div className={styles.spinner}></div>
           <p>Analyzing your context and generating recommendations...</p>
@@ -203,44 +218,52 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         </div>
       ) : (
         <>
-          <div className={styles.promptSection}>
-            <label className={styles.promptLabel}>
-              Custom Prompt (Optional)
-            </label>
-            {isEditingPrompt ? (
-              <div className={styles.promptEditContainer}>
-                <textarea
-                  className={styles.promptTextarea}
-                  value={userPrompt}
-                  onChange={(e) => setUserPrompt(e.target.value)}
-                  onKeyDown={handlePromptKeyDown}
-                  placeholder="e.g., Focus on technical sections, emphasize security aspects... (Press Enter to apply)"
-                  rows={3}
-                />
-                <div className={styles.promptActions}>
-                  <button
-                    className={styles.promptCancelBtn}
-                    onClick={() => setIsEditingPrompt(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    className={styles.promptApplyBtn}
-                    onClick={handlePromptChange}
-                  >
-                    Apply & Regenerate
-                  </button>
+          {isRevealed && (
+            <div className={styles.promptSection}>
+              <label className={styles.promptLabel}>
+                Custom Prompt (Optional)
+              </label>
+              {isEditingPrompt || isRegenerating ? (
+                <div className={styles.promptEditContainer}>
+                  <textarea
+                    className={styles.promptTextarea}
+                    value={userPrompt}
+                    onChange={(e) => setUserPrompt(e.target.value)}
+                    onKeyDown={handlePromptKeyDown}
+                    placeholder="e.g., Focus on technical sections, emphasize security aspects... (Press Enter to apply)"
+                    rows={3}
+                  />
+                  <div className={styles.promptActions}>
+                    <button
+                      className={styles.promptCancelBtn}
+                      onClick={() => {
+                        setIsEditingPrompt(false);
+                        setIsRegenerating(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className={styles.promptApplyBtn}
+                      onClick={handlePromptChange}
+                    >
+                      Apply & Regenerate
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div
-                className={styles.promptDisplay}
-                onClick={() => setIsEditingPrompt(true)}
-              >
-                {userPrompt || "Click to add custom guidance for AI..."}
-              </div>
-            )}
-          </div>
+              ) : (
+                <div
+                  className={styles.promptDisplay}
+                  onClick={() => {
+                    setIsEditingPrompt(true);
+                    setIsRegenerating(true);
+                  }}
+                >
+                  {userPrompt || "Click to add custom guidance for AI..."}
+                </div>
+              )}
+            </div>
+          )}
 
           {isLoading ? (
             <div className={styles.loadingState}>
@@ -253,7 +276,26 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
               <p>Analyzing your context and generating recommendations...</p>
               <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
             </div>
-          ) : recommendations.length === 0 ? (
+          ) : recommendationsFetchStatus === 'error' ? (
+            <div className={styles.emptyState}>
+              <p>Failed to load recommendations</p>
+              <span className={styles.emptyHint}>
+                There was an error generating recommendations. Please try again.
+              </span>
+              <button
+                className={styles.retryBtn}
+                onClick={handleRetryFetch}
+              >
+                Retry
+              </button>
+            </div>
+          ) : isRevealed && recommendationsFetchStatus === 'idle' ? (
+            <div className={styles.loadingState}>
+              <div className={styles.spinner}></div>
+              <p>Analyzing your context and generating recommendations...</p>
+              <span className={styles.loadingHint}>This usually takes 5–10 seconds</span>
+            </div>
+          ) : recommendations.length === 0 && isRevealed ? (
             <div className={styles.emptyState}>
               <p>No recommendations available</p>
               <span className={styles.emptyHint}>
@@ -262,7 +304,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
                   : "All relevant sections are already selected"}
               </span>
             </div>
-          ) : (
+          ) : isRevealed && recommendations.length > 0 ? (
             <div className={styles.recommendationsList}>
               {recommendations.map((rec, index) => {
                 const sectionKey = rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -329,7 +371,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
                 );
               })}
             </div>
-          )}
+          ) : null}
 
         </>
       )}
