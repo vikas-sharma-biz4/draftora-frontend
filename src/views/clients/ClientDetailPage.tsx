@@ -49,7 +49,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const clientIdParam = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
   const clientId = typeof clientIdParam === 'string' ? parseInt(clientIdParam, 10) : clientIdParam as number;
 
-  const { client, isLoading: loading } = useClient(clientId);
+  const { client, isLoading: loading, refetch: refetchClient } = useClient(clientId);
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
   const deleteDocumentFromStore = useClientStore(state => state.deleteDocument);
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
@@ -115,6 +115,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
     try {
       await deleteDocumentFromStore(client.id, deleteDocModalData.id);
+      await refetchClient();
       toast.success("Document deleted");
       setDeleteDocModalData(null);
     } catch (error) {
@@ -132,12 +133,23 @@ export default function ClientWorkspacePage(): JSX.Element {
     if (!client || client.documents.length === 0) return;
 
     try {
-      await Promise.all(client.documents.map((doc) => deleteDocumentFromStore(client.id, doc.id)));
-      toast.success("All documents deleted");
+      const results = await Promise.allSettled(client.documents.map((doc) => deleteDocumentFromStore(client.id, doc.id)));
+      await refetchClient();
+
+      const failedDeletions = results.filter(result => result.status === 'rejected');
+
+      if (failedDeletions.length === 0) {
+        toast.success("All documents deleted");
+      } else if (failedDeletions.length === client.documents.length) {
+        toast.error("Failed to delete all documents");
+      } else {
+        toast.warning(`${failedDeletions.length} of ${client.documents.length} documents failed to delete`);
+      }
       setDeleteAllDocsModalOpen(false);
     } catch (error) {
-      logger.error("Failed to delete all documents:", error);
-      toast.error("Failed to delete some documents");
+      logger.error("An unexpected error occurred during bulk document deletion:", error);
+      await refetchClient();
+      toast.error("An unexpected error occurred");
     }
   }
 

@@ -23,6 +23,13 @@ const nextConfig = {
         ignored: ['**/node_modules', '**/.git', '**/.next'],
       };
     }
+
+    // Disable webpack cache compression to prevent memory allocation errors
+    config.cache = {
+      type: 'filesystem',
+      compression: false,
+    };
+
     return config;
   },
 };
