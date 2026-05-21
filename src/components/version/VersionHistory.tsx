@@ -130,7 +130,7 @@ export function VersionHistory({
                 <p className={styles.sourceLabel}>
                   {getSourceLabel(version.source)}
                   {version.parentVersion && (
-                    <> • Based on v{version.parentVersion}</>
+                    <> Based on v{version.parentVersion}</>
                   )}
                 </p>
 

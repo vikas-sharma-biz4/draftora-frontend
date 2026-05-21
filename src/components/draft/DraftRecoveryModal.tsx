@@ -106,7 +106,7 @@ export function DraftRecoveryModal({
                     <span className={styles.location}>
                       {getLocationLabel(draft.lastLocation)}
                     </span>
-                    <span className={styles.separator}>•</span>
+                    <span className={styles.separator}></span>
                     {getStatusBadge(draft.status)}
                   </div>
                   <div className={styles.draftTime}>
