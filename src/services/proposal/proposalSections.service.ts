@@ -31,9 +31,15 @@ export async function regenerateSection(
   return data.content;
 }
 
-interface RegenerateSelectionResponse {
+export interface RegenerateSelectionResponse {
   section_key: string;
   regenerated_text: string;
+  format?: string | null;
+}
+
+export interface RegenerateSelectionResult {
+  regeneratedText: string;
+  format: string | null;
 }
 
 export async function regenerateSelection(
@@ -42,20 +48,25 @@ export async function regenerateSelection(
   selectedText: string,
   selectionContext?: string,
   instructions?: string
-): Promise<string> {
+): Promise<RegenerateSelectionResult> {
   const data = await http.post<RegenerateSelectionResponse>(`/proposals/${id}/regenerate-selection/`, {
     section_key: sectionKey,
     selected_text: selectedText,
     selection_context: selectionContext ?? null,
     instructions: instructions ?? null,
   });
-  return data.regenerated_text;
+  return {
+    regeneratedText: data.regenerated_text,
+    format: data.format ?? null,
+  };
 }
 
 export interface AddSectionPayload {
   key: string;
   label: string;
   instructions?: string;
+  templateType?: string;
+  formatRules?: string;
 }
 
 export interface ReorderSectionsPayload {
@@ -66,8 +77,16 @@ export interface ReorderSectionsPayload {
 export async function addProposalSection(
   id: number,
   payload: AddSectionPayload
-): Promise<{ key: string; label: string; content: string }> {
-  return http.post<{ key: string; label: string; content: string }>(`/proposals/${id}/sections/`, payload);
+): Promise<{ key: string; label: string; content: string; formatType?: string }> {
+  return http.post<{ key: string; label: string; content: string; format_type?: string }>(
+    `/proposals/${id}/sections/`,
+    payload
+  ).then(data => ({
+    key: data.key,
+    label: data.label,
+    content: data.content,
+    formatType: data.format_type,
+  }));
 }
 
 export async function removeProposalSection(

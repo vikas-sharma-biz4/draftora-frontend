@@ -17,6 +17,8 @@ import { createPortal } from "react-dom";
 import { toolbarManager } from "./FloatingToolbarManager";
 
 import { EDITOR_HIGHLIGHT_COLORS, EDITOR_TEXT_COLORS } from "@/constants";
+import { type RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
+import { plainTextToHtml } from "@/utils/contentParser";
 
 interface RegenerateSelectionParams {
   selectedText: string;
@@ -29,7 +31,7 @@ interface RichEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   /** Called when user submits regeneration with selection context and instructions. */
-  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<string | null>;
+  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<RegenerateSelectionResult | null>;
 }
 
 function DropdownPortal({
@@ -238,20 +240,28 @@ export default function RichEditor({
 
     setRegenLoading(true);
     try {
-      const regeneratedContent = await onRegenerateSelection({
+      const result = await onRegenerateSelection({
         selectedText,
         selectionRange: { from, to },
         instructions: regenPrompt.trim() || undefined,
       });
 
-      if (regeneratedContent !== null && editor) {
+      if (result !== null && editor) {
+        const { regeneratedText, format } = result;
+
+        // Parse the regenerated content based on format
+        // The backend returns markdown, so convert to HTML for TipTap
+        const contentToInsert = plainTextToHtml(regeneratedText);
+
         // Replace content at exact selection position using TipTap transaction
         editor
           .chain()
           .focus()
           .setTextSelection({ from, to })
-          .insertContent(regeneratedContent)
+          .insertContent(contentToInsert)
           .run();
+
+        console.log("[RichEditor] Content regenerated with format:", format);
       }
     } catch (error) {
       console.error("[RichEditor] Regeneration failed:", error);

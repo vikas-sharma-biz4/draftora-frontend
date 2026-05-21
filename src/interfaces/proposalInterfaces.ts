@@ -68,7 +68,7 @@ export interface ProposalData {
 
 export type ToneOption = "professional" | "persuasive" | "technical" | "creative";
 export type LengthOption = "concise" | "balanced" | "comprehensive";
-export type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type WizardStep = 1 | 2 | 3;
 
 export interface ProposalListItem {
   id: number;

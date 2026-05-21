@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
@@ -99,7 +99,7 @@ export default function ReviewPage(): JSX.Element {
 
   // Reconstruct proposalData object for backward compatibility with existing code
   // This is a temporary measure - the component should eventually use granular selectors directly
-  const proposalData = {
+  const proposalData = useMemo(() => ({
     title,
     clientName,
     clientId,
@@ -118,7 +118,7 @@ export default function ReviewPage(): JSX.Element {
     customSections: [],
     contextualInstructions: "",
     webReferences,
-  } as any;
+  } as any), [title, clientName, clientId, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType, filesMeta, selectedDocumentIds, webReferences]);
 
   const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
@@ -227,11 +227,13 @@ export default function ReviewPage(): JSX.Element {
     }, 0);
   }
 
-  async function handleSaveKnowledgeBase(selectedIds: string[]): Promise<void> {
-    // First refresh clients to get the latest documents (including newly uploaded)
-    await refetchClients();
+  async function handleSaveKnowledgeBase(selectedIds: string[], hasNewUploads: boolean): Promise<void> {
+    // Only refresh clients if new documents were uploaded (to get newly uploaded docs)
+    if (hasNewUploads) {
+      await refetchClients();
+    }
 
-    // Then rebuild filesMeta from selected documents using refreshed client data
+    // Rebuild filesMeta from selected documents using client data
     const currentClient = clients.find((c) => c.id === proposalData.clientId);
     const newFilesMeta = currentClient
       ? currentClient.documents
@@ -288,14 +290,16 @@ export default function ReviewPage(): JSX.Element {
 
   const currentClient = clients.find((c) => c.id === proposalData.clientId);
   // Map API ClientDocument to the shape expected by KnowledgeBaseSelectorModal
-  const clientDocuments = (currentClient?.documents || []).map((doc) => ({
+  const clientDocuments = useMemo(() => (currentClient?.documents || []).map((doc) => ({
     id: String(doc.id),
     name: doc.name,
     size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
     date: doc.createdAt ? formatDate(doc.createdAt) : "",
     status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
     fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
-  }));
+  })), [currentClient]);
+
+  const selectedDocumentIdsMemoized = useMemo(() => (proposalData.selectedDocumentIds || []).map(String), [proposalData.selectedDocumentIds]);
 
   async function handleGenerate(): Promise<void> {
     // Check if sections are selected
@@ -622,7 +626,7 @@ export default function ReviewPage(): JSX.Element {
         {showKnowledgeBaseModal && (
           <KnowledgeBaseSelectorModal
             availableDocuments={clientDocuments}
-            selectedDocumentIds={(proposalData.selectedDocumentIds || []).map(String)}
+            selectedDocumentIds={selectedDocumentIdsMemoized}
             onClose={() => setShowKnowledgeBaseModal(false)}
             onSave={handleSaveKnowledgeBase}
             clientId={proposalData.clientId}

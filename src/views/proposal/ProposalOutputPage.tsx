@@ -177,7 +177,7 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleSectionAdded(key: string, label: string, content: string, afterKey?: string): void {
+  function handleSectionAdded(key: string, label: string, content: string, afterKey?: string, formatType?: string): void {
     const currentSections = proposal?.selectedSections ?? [];
     let newSelected: string[];
     if (afterKey) {
@@ -190,6 +190,11 @@ export default function ProposalOutputPage(): JSX.Element {
     }
 
     const newDisplayNames = { ...(proposal?.sectionDisplayNames ?? {}), [key]: label };
+    
+    // Update sectionTypes if formatType is provided
+    const newSectionTypes = formatType 
+      ? { ...(proposal?.sectionTypes ?? {}), [key]: formatType }
+      : proposal?.sectionTypes;
 
     setProposal((prev) => {
       if (!prev) return prev;
@@ -198,6 +203,7 @@ export default function ProposalOutputPage(): JSX.Element {
         selectedSections: newSelected,
         sectionDisplayNames: newDisplayNames,
         sections: { ...(prev.sections ?? {}), [key]: content },
+        sectionTypes: newSectionTypes,
       };
     });
     setActiveSection(key);
@@ -392,6 +398,7 @@ export default function ProposalOutputPage(): JSX.Element {
           onSectionRemoved={handleSectionRemoved}
           onSectionAdded={handleSectionAdded}
           onSectionsReordered={handleSectionsReordered}
+          templateType={proposal?.templateType}
         />
 
         <div className="proposal-content">

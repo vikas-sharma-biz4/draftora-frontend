@@ -168,8 +168,16 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
       clientId,
       description,
       selectedSections,
+      sectionDisplayNames,
       tone,
       lengthPreference,
+      language,
+      aiModel,
+      templateId,
+      templateType,
+      filesMeta,
+      selectedDocumentIds,
+      webReferences,
     });
 
     // Skip if data hasn't changed (unless forced)

@@ -40,6 +40,7 @@ import {
   reorderProposalSections,
 } from "@/services/proposal.service";
 import AddSectionModal from "@/components/modals/AddSectionModal";
+import { generateFormatRules } from "@/utils/formatRules";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -58,9 +59,11 @@ export interface ProposalSidebarProps {
   onSectionRenamed: (key: string, newLabel: string) => void;
   onSectionRemoved: (key: string) => void;
   /** afterKey is the key of the section after which the new one is inserted */
-  onSectionAdded: (key: string, label: string, content: string, afterKey?: string) => void;
+  onSectionAdded: (key: string, label: string, content: string, afterKey?: string, formatType?: string) => void;
   /** Called after drag-end with the new ordered list of section keys */
   onSectionsReordered: (newOrder: string[]) => void;
+  /** Template type for format rules */
+  templateType?: string;
 }
 
 // ─── DnD modifier — restrict to vertical axis ─────────────────────────────────
@@ -261,6 +264,7 @@ export default function ProposalSidebar({
   onSectionRemoved,
   onSectionAdded,
   onSectionsReordered,
+  templateType,
 }: ProposalSidebarProps): JSX.Element {
   // ── Local ordered state — reconciled with props ───────────────────────────
   const [orderedSections, setOrderedSections] = useState<SectionMeta[]>(sections);
@@ -360,12 +364,18 @@ export default function ProposalSidebar({
       setIsGenerating(true);
       try {
         toast.info(MESSAGES.PROPOSAL_SECTION_GENERATING);
+        
+        // Generate format rules based on template type and section name
+        const formatRules = generateFormatRules(templateType, name, instructions);
+        
         const result = await addProposalSection(proposalId, {
           key,
           label: name,
           instructions: instructions || undefined,
+          templateType,
+          formatRules,
         });
-        onSectionAdded(key, name, result.content, insertAfterKey ?? undefined);
+        onSectionAdded(key, name, result.content, insertAfterKey ?? undefined, result.formatType);
         closeAddModal();
         toast.success(MESSAGES.PROPOSAL_SECTION_ADDED(name));
       } catch (error) {
@@ -378,7 +388,7 @@ export default function ProposalSidebar({
         setIsGenerating(false);
       }
     },
-    [proposalId, orderedSections, insertAfterKey, onSectionAdded]
+    [proposalId, orderedSections, insertAfterKey, onSectionAdded, templateType]
   );
 
   // ── Drag-end handler ──────────────────────────────────────────────────────
@@ -453,6 +463,7 @@ export default function ProposalSidebar({
         isGenerating={isGenerating}
         existingKeys={existingKeys}
         insertAfterLabel={insertAfterLabel}
+        templateType={templateType}
         onClose={closeAddModal}
         onSubmit={handleAddSection}
       />
