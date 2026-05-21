@@ -203,6 +203,7 @@ interface RawProposalApiResponse {
   section_display_names: Record<string, string> | null;
   contextual_instructions: string | null;
   web_references: string[] | null;
+  selected_document_ids: number[] | null;
   template_type: string | null;
   status: string;
   approval_status: "pending" | "approved" | "rejected" | null;
@@ -230,6 +231,7 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
     customSections: [],
     contextualInstructions: d.contextual_instructions ?? "",
     webReferences: d.web_references ?? [],
+    selectedDocumentIds: d.selected_document_ids ?? [],
     files: [],
     filesMeta: [],
     templateId: null,

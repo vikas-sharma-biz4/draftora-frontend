@@ -291,7 +291,7 @@ export default function GeneratingPage(): JSX.Element {
           </div>
         </div>
 
-        <Button variant="danger" onClick={handleCancel}>
+        <Button variant="danger" onClick={handleCancel} className="generating-cancel-button">
           Cancel Generation
         </Button>
       </div>
