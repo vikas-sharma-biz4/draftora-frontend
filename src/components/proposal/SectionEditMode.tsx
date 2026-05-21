@@ -18,6 +18,7 @@ interface RegenerateSelectionParams {
   selectedText: string;
   selectionRange: { from: number; to: number };
   instructions?: string;
+  selectionContext?: string;
 }
 
 interface SectionEditModeProps {
