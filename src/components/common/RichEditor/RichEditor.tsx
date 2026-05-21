@@ -24,6 +24,7 @@ interface RegenerateSelectionParams {
   selectedText: string;
   selectionRange: { from: number; to: number };
   instructions?: string;
+  selectionContext?: string;
 }
 
 interface RichEditorProps {
@@ -238,12 +239,20 @@ export default function RichEditor({
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (!selectedText.trim()) return;
 
+    // Extract surrounding context to help AI understand boundaries
+    const contextRadius = 300;
+    const doc = editor.state.doc;
+    const contextBefore = from > 1 ? doc.textBetween(Math.max(0, from - contextRadius), from, " ") : "";
+    const contextAfter = to < doc.content.size ? doc.textBetween(to, Math.min(doc.content.size, to + contextRadius), " ") : "";
+    const selectionContext = [contextBefore && `...${contextBefore}`, contextAfter && `${contextAfter}...`].filter(Boolean).join("\n\n");
+
     setRegenLoading(true);
     try {
       const result = await onRegenerateSelection({
         selectedText,
         selectionRange: { from, to },
         instructions: regenPrompt.trim() || undefined,
+        selectionContext: selectionContext || undefined,
       });
 
       if (result !== null && editor) {
