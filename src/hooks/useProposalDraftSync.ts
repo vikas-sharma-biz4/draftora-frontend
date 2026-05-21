@@ -27,5 +27,7 @@ export function useProposalDraftSync(options: UseProposalDraftSyncOptions): void
     activeSection,
     lastLocation: "web_view",
     stage: "generated",
+    wizardStep: 5,
+    skipIfApproved: false,
   });
 }

@@ -39,6 +39,8 @@ interface AddSectionModalProps {
   existingKeys: string[];
   /** Label of the section after which this new one will be inserted */
   insertAfterLabel?: string;
+  /** Template type for format rules */
+  templateType?: string;
   onClose: () => void;
   /** Called with (sectionName, instructions) when the user submits */
   onSubmit: (name: string, instructions: string) => Promise<void>;
@@ -49,6 +51,7 @@ export default function AddSectionModal({
   isGenerating,
   existingKeys,
   insertAfterLabel,
+  templateType,
   onClose,
   onSubmit,
 }: AddSectionModalProps): JSX.Element | null {

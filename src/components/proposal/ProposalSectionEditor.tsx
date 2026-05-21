@@ -43,7 +43,7 @@
 
 import { memo, useEffect, useState, useCallback } from "react";
 import SectionEditMode from "./SectionEditMode";
-import { regenerateSelection } from "@/services/proposal.service";
+import { regenerateSelection, type RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
 
 interface RegenerateSelectionParams {
   selectedText: string;
@@ -120,17 +120,17 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
   );
 
   const handleRegenerateSelection = useCallback(
-    async (params: RegenerateSelectionParams): Promise<string | null> => {
+    async (params: RegenerateSelectionParams): Promise<RegenerateSelectionResult | null> => {
       try {
         // Call the new selection-based regeneration API
-        const regeneratedText = await regenerateSelection(
+        const result = await regenerateSelection(
           proposalId,
           sectionKey,
           params.selectedText,
           undefined, // selection_context - could be enhanced later
           params.instructions
         );
-        return regeneratedText;
+        return result;
       } catch (error) {
         console.error("[ProposalSectionEditor] Selection regeneration failed:", error);
         return null;
