@@ -209,7 +209,7 @@ export default function ClientWorkspacePage(): JSX.Element {
                   </div>
                   <div className={styles.documentInfo}>
                     <h3>{doc.name}</h3>
-                    <p>{doc.fileType?.toUpperCase() || 'FILE'} • {Math.round((doc.sizeBytes || 0) / 1024)} KB</p>
+                    <p>{doc.fileType?.toUpperCase() || 'FILE'} {Math.round((doc.sizeBytes || 0) / 1024)} KB</p>
                     <span className={`${styles.status} ${styles[doc.status]}`}>
                       {doc.status === 'parsed' ? <CheckCircle size={14} /> : <Clock size={14} />}
                       {doc.status}

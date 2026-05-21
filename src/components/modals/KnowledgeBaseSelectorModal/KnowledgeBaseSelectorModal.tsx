@@ -167,7 +167,7 @@ export default function KnowledgeBaseSelectorModal({
   // Filter selected IDs to only include documents that exist in allDocuments
   // This fixes the issue where counter shows selected count but checkboxes don't reflect it
   const allDocumentIds = useMemo(() => new Set(allDocuments.map(d => d.id)), [allDocuments]);
-  
+
   useEffect(() => {
     if (mounted) {
       setSelected(prev => {
@@ -443,19 +443,19 @@ export default function KnowledgeBaseSelectorModal({
                     <div className={styles.fileMeta}>
                       {formatFileSize(file.size)}
                       {status === "pending" && (
-                        <span className={styles.parsingStatus}> â€¢ Waiting to upload...</span>
+                        <span className={styles.parsingStatus}>Waiting to upload...</span>
                       )}
                       {status === "parsing" && (
-                        <span className={styles.parsingStatus}> â€¢ Parsing on server...</span>
+                        <span className={styles.parsingStatus}>Parsing on server...</span>
                       )}
                       {status === "parsed" && parsedData && uploadedDocId && (
-                        <span className={styles.parsedStatus}> â€¢ {parsedData.word_count} words â€¢ Added to list</span>
+                        <span className={styles.parsedStatus}>Parsing Complete</span>
                       )}
                       {status === "parsed" && !parsedData && (
-                        <span className={styles.parsedStatus}> â€¢ Parsed successfully</span>
+                        <span className={styles.parsedStatus}>Parsed successfully</span>
                       )}
                       {status === "error" && error && (
-                        <span className={styles.errorStatus}> â€¢ {error}</span>
+                        <span className={styles.errorStatus}>{error}</span>
                       )}
                     </div>
                   </div>
@@ -509,7 +509,7 @@ export default function KnowledgeBaseSelectorModal({
                       <div className={styles.documentInfo}>
                         <span className={styles.documentName}>{doc.name}</span>
                         <span className={styles.documentMeta}>
-                          {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""} • {doc.date}
+                          {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""} {doc.date}
                           {"isNew" in doc && doc.isNew ? <span className="badge badge-success">New</span> : null}
                         </span>
                       </div>

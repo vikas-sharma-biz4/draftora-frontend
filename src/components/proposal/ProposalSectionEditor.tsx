@@ -49,6 +49,7 @@ interface RegenerateSelectionParams {
   selectedText: string;
   selectionRange: { from: number; to: number };
   instructions?: string;
+  selectionContext?: string;
 }
 
 interface ProposalSectionEditorProps {
@@ -127,7 +128,7 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
           proposalId,
           sectionKey,
           params.selectedText,
-          undefined, // selection_context - could be enhanced later
+          params.selectionContext,
           params.instructions
         );
         return result;
