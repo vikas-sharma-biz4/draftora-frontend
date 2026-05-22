@@ -103,15 +103,6 @@ export default function StyleVoiceEditorModal({
               </Select>
             )}
           </FormField>
-
-          <div className={styles.previewBox}>
-            <div className={styles.previewLabel}>Preview</div>
-            <div className={styles.previewText}>
-              <strong>Tone:</strong> {TONE_OPTIONS.find(o => o.value === selectedTone)?.label}{" "}
-              <strong>Length:</strong> {LENGTH_OPTIONS.find(o => o.value === selectedLength)?.label}{" "}
-              <strong>Language:</strong> {selectedLanguage}
-            </div>
-          </div>
         </div>
 
         <div className={styles.modalFooter}>

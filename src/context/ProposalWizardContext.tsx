@@ -56,7 +56,7 @@ export function ProposalWizardProvider({
     if (hasHydratedGlobally) return;
     hasHydratedGlobally = true;
 
-    const { updateProposalData, setCurrentStep, setHydrated } =
+    const { updateProposalData, setCurrentStep, setHydrated, setCurrentProposalId, setMaxStepReached } =
       useProposalWizardStore.getState();
     try {
       const raw = localStorage.getItem(PROPOSAL_WIZARD_STORAGE_KEY);
@@ -64,6 +64,8 @@ export function ProposalWizardProvider({
         const saved = JSON.parse(raw) as {
           proposalData?: Partial<ProposalData>;
           currentStep?: WizardStep;
+          currentProposalId?: number | null;
+          maxStepReached?: WizardStep;
         };
         if (saved.proposalData) {
           // Only update if there's meaningful data to avoid unnecessary updates
@@ -84,6 +86,12 @@ export function ProposalWizardProvider({
         if (saved.currentStep) {
           setCurrentStep(saved.currentStep);
         }
+        if (saved.currentProposalId !== undefined) {
+          setCurrentProposalId(saved.currentProposalId);
+        }
+        if (saved.maxStepReached) {
+          setMaxStepReached(saved.maxStepReached);
+        }
       }
     } catch (err) {
       logger.warn("[ProposalWizardProvider] Failed to restore draft from localStorage:", err);
@@ -101,6 +109,8 @@ export function ProposalWizardProvider({
         const state = useProposalWizardStore.getState();
         const proposalData = state.proposalData;
         const currentStep = state.currentStep;
+        const currentProposalId = state.currentProposalId;
+        const maxStepReached = state.maxStepReached;
 
         // Only save if there's meaningful data
         if (!proposalData.title && !proposalData.clientName && !proposalData.description) {
@@ -115,6 +125,8 @@ export function ProposalWizardProvider({
             sectionDisplayNames: proposalData.sectionDisplayNames,
           },
           currentStep,
+          currentProposalId,
+          maxStepReached,
         };
         localStorage.setItem(PROPOSAL_WIZARD_STORAGE_KEY, JSON.stringify(toSave));
       } catch (err) {

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
 import { logger } from "@/utils/logger";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { useVisitedPipelineSteps } from "@/store/features/pipeline/pipelineSlice";
@@ -79,6 +79,7 @@ export default function ProposalOutputPage(): JSX.Element {
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
   const proposalId = Number(params.id);
   const [mounted, setMounted] = useState<boolean>(false);
+  const currentActiveSectionRef = useRef<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -93,6 +94,79 @@ export default function ProposalOutputPage(): JSX.Element {
     activeSection,
     setActiveSection,
   } = useProposalPageData(proposalId, searchParams);
+
+  // Sync ref when activeSection changes from user clicks (not from scroll)
+  useEffect(() => {
+    currentActiveSectionRef.current = activeSection;
+  }, [activeSection]);
+
+  // Intercept browser back button to always navigate to review page
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // Intercept browser back navigation and redirect to review
+      event.preventDefault();
+      router.push('/review');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [router]);
+
+  /**
+   * Scroll spy: Automatically highlight the active section in sidebar based on scroll position.
+   * Uses scroll event listener to detect which section is closest to the top of viewport.
+   */
+  useEffect(() => {
+    if (!proposal || !mounted) return;
+
+    const sectionKeys = proposal.selectedSections ?? [];
+    if (sectionKeys.length === 0) return;
+
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 100; // Offset for header
+      let closestSection = currentActiveSectionRef.current;
+      let closestDistance = Infinity;
+
+      sectionKeys.forEach((key) => {
+        const element = document.getElementById(`section-${key}`);
+        if (element) {
+          const elementTop = element.offsetTop;
+          const distance = Math.abs(scrollPosition - elementTop);
+
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestSection = key;
+          }
+        }
+      });
+
+      if (closestSection && closestSection !== currentActiveSectionRef.current) {
+        currentActiveSectionRef.current = closestSection;
+        setActiveSection(closestSection);
+      }
+    };
+
+    // Initial check
+    handleScroll();
+
+    // Add scroll listener with throttle
+    let scrollTimeout: NodeJS.Timeout;
+    const throttledScroll = () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(handleScroll, 50);
+    };
+
+    window.addEventListener("scroll", throttledScroll);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("scroll", throttledScroll);
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+    };
+  }, [proposal, mounted, setActiveSection]);
 
   // Approval workflow state
   const [isApproving, setIsApproving] = useState<boolean>(false);

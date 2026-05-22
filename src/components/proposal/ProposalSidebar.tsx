@@ -140,7 +140,7 @@ function SortableProposalSection({
       className={`proposal-sidebar-sortable-item${isDragging ? " dragging" : ""}`}
     >
       <div
-        className={`proposal-sidebar-section-row${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
+        className={`proposal-sidebar-section-row${isActive ? " active" : ""}${isPending ? " pending" : ""}${isStatic ? " is-static" : ""}`}
         onClick={() => !isRenaming && !isPending && onSectionClick()}
       >
         {/* Drag handle — visible on row hover */}
@@ -197,56 +197,43 @@ function SortableProposalSection({
             </button>
           </div>
         ) : (
-          <div className="proposal-sidebar-section-actions">
-            <button
-              className="proposal-sidebar-icon-btn"
-              title="Rename section"
-              onClick={(e) => {
-                e.stopPropagation();
-                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
-                if (isStaticSection) {
-                  toast.error("Not allowed on static sections");
-                  return;
-                }
-                onStartRename();
-              }}
-              disabled={isPending || isStatic}
-            >
-              <Pencil size={11} />
-            </button>
-            <button
-              className="proposal-sidebar-icon-btn"
-              title="Add section after this"
-              onClick={(e) => {
-                e.stopPropagation();
-                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
-                if (isStaticSection) {
-                  toast.error("Not allowed on static sections");
-                  return;
-                }
-                onAddAfter();
-              }}
-              disabled={isPending || isStatic}
-            >
-              <Plus size={11} />
-            </button>
-            <button
-              className="proposal-sidebar-icon-btn danger"
-              title="Remove section"
-              onClick={(e) => {
-                e.stopPropagation();
-                const isStaticSection = isStatic || STATIC_SECTION_KEYS.includes(section.key as any);
-                if (isStaticSection) {
-                  toast.error("Not allowed on static sections");
-                  return;
-                }
-                onRemove();
-              }}
-              disabled={isPending || isStatic}
-            >
-              <X size={11} />
-            </button>
-          </div>
+          !isStatic && (
+            <div className="proposal-sidebar-section-actions">
+              <button
+                className="proposal-sidebar-icon-btn"
+                title="Rename section"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartRename();
+                }}
+                disabled={isPending}
+              >
+                <Pencil size={11} />
+              </button>
+              <button
+                className="proposal-sidebar-icon-btn"
+                title="Add section after this"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddAfter();
+                }}
+                disabled={isPending}
+              >
+                <Plus size={11} />
+              </button>
+              <button
+                className="proposal-sidebar-icon-btn danger"
+                title="Remove section"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                disabled={isPending}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          )
         )}
       </div>
     </li>
@@ -436,10 +423,10 @@ export default function ProposalSidebar({
             strategy={verticalListSortingStrategy}
           >
             <ul className="proposal-sidebar-links">
-              {orderedSections.map(({ key, label, hasContent }) => (
+              {orderedSections.map(({ key, label, hasContent, isStatic }) => (
                 <SortableProposalSection
                   key={key}
-                  section={{ key, label, hasContent }}
+                  section={{ key, label, hasContent, isStatic }}
                   isActive={activeSection === key}
                   isRenaming={renamingKey === key}
                   renameValue={renameValue}
