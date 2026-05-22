@@ -121,7 +121,7 @@ export default function ClientsPage(): JSX.Element {
                 </button>
               )}
             </div>
-            <Button variant="primary" onClick={handleNewClient}>
+            <Button variant="primary" onClick={handleNewClient} className={styles.newClientButton}>
               <Plus size={18} />
               New Client
             </Button>

@@ -242,7 +242,8 @@ export default function HistoryPage(): JSX.Element {
                           <input
                             type="date"
                             value={customDateRange?.start || ""}
-                            onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value, end: prev?.end || e.target.value }))}
+                            max={new Date().toISOString().split('T')[0]}
+                            onChange={(e) => setCustomDateRange(prev => ({ start: e.target.value, end: prev?.end || "" }))}
                             className={styles.dateInput}
                           />
                         </div>
@@ -251,7 +252,15 @@ export default function HistoryPage(): JSX.Element {
                           <input
                             type="date"
                             value={customDateRange?.end || ""}
-                            onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value, start: prev?.start || e.target.value }))}
+                            max={new Date().toISOString().split('T')[0]}
+                            onChange={(e) => {
+                              const newEnd = e.target.value;
+                              setCustomDateRange(prev => ({ start: prev?.start || "", end: newEnd }));
+                              // Auto-close dropdown when both dates are selected
+                              if (customDateRange?.start && newEnd) {
+                                setShowDateDropdown(false);
+                              }
+                            }}
                             className={styles.dateInput}
                           />
                         </div>
