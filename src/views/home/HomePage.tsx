@@ -303,10 +303,10 @@ export default function HomePage(): JSX.Element {
 
 
         {/* Workflow Steps Indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className={styles.workflowSteps}>
 
-        <div className={styles.workflowSteps}>
-
-          {workflowSteps.map((step, index) => (
+            {workflowSteps.map((step, index) => (
 
             <div
 
@@ -330,6 +330,7 @@ export default function HomePage(): JSX.Element {
 
           ))}
 
+          </div>
         </div>
 
 
