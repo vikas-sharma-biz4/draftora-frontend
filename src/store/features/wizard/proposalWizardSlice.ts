@@ -299,6 +299,12 @@ export const useExactDocumentName = () =>
   useProposalWizardStore((state) => state.proposalData.exactDocumentName);
 
 /**
+ * Selects the approval status.
+ */
+export const useApprovalStatus = () =>
+  useProposalWizardStore((state) => state.proposalData.approvalStatus);
+
+/**
  * Selects the original sections (for recreate mode).
  */
 export const useOriginalSections = () =>

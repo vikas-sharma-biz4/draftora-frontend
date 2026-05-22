@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 
 import { toast } from "@/utils/toast";
@@ -11,7 +11,7 @@ import BackButton from "@/components/common/BackButton";
 
 import styles from "./ReviewPage.module.scss";
 
-import { generateProposal } from "@/services/proposal.service";
+import { generateProposal, getProposal } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
 import {
   useProposalTitle,
@@ -36,9 +36,11 @@ import {
   useFilesMeta,
   useWebReferences,
   useSelectedDocumentIds,
+  useApprovalStatus,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
+import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
 import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
@@ -127,12 +129,39 @@ export default function ReviewPage(): JSX.Element {
   const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
   const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
+  const approvalStatus = useApprovalStatus();
   const { clients, refetch: refetchClients } = useClients({ autoFetch: true });
 
   // Enable auto-save when user is in pipeline stage (but NOT during generation)
-  useWizardAutoSave({ enabled: !isGenerating, debounceMs: 2000 });
+  useWizardAutoSave({ enabled: !isGenerating, debounceMs: 2000, approvalStatus });
+
+  // Restore currentProposalId from URL params if not set in store
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId && !currentProposalId) {
+      setCurrentProposalId(Number(urlProposalId));
+    }
+  }, [searchParams, currentProposalId, setCurrentProposalId]);
+
+  // Fetch proposal data when viewing from History to get approvalStatus
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId || currentProposalId) {
+      const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
+      if (proposalIdToFetch) {
+        getProposal(proposalIdToFetch).then((data: any) => {
+          if (data?.approvalStatus) {
+            updateProposalData({ approvalStatus: data.approvalStatus });
+          }
+        }).catch((error: unknown) => {
+          logger.warn('[ReviewPage] Failed to fetch proposal for approvalStatus', error);
+        });
+      }
+    }
+  }, [searchParams, currentProposalId, updateProposalData]);
 
   // Sync visited steps from backend on mount
   useEffect(() => {
@@ -140,6 +169,43 @@ export default function ReviewPage(): JSX.Element {
       syncVisitedStepsFromBackend(currentProposalId);
     }
   }, [currentProposalId, syncVisitedStepsFromBackend]);
+
+  // For already-generated proposals (coming from History with proposalId in URL), immediately mark all steps as visited
+  // This ensures the pipeline shows correct state even before backend sync completes
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId || currentProposalId) {
+      // This is viewing an existing proposal - mark all steps as visited
+      const { markStepAsVisited } = usePipelineStore.getState();
+      let needsUpdate = false;
+
+      if (!visitedPipelineSteps.includes(1)) {
+        markStepAsVisited(1);
+        needsUpdate = true;
+      }
+      if (!visitedPipelineSteps.includes(2)) {
+        markStepAsVisited(2);
+        needsUpdate = true;
+      }
+      if (!visitedPipelineSteps.includes(3)) {
+        markStepAsVisited(3);
+        needsUpdate = true;
+      }
+
+      // Set draft stage to generated to enable full pipeline navigation
+      setDraftStage("generated");
+      setCompletedSteps([1, 2, 3]);
+
+      // Sync to backend if we have a proposalId and made local updates
+      const proposalIdToSync = Number(urlProposalId) || currentProposalId;
+      if (needsUpdate && proposalIdToSync) {
+        markStepVisitedOnBackend(proposalIdToSync, 1);
+        markStepVisitedOnBackend(proposalIdToSync, 2);
+        markStepVisitedOnBackend(proposalIdToSync, 3);
+      }
+    }
+  }, [searchParams, currentProposalId, visitedPipelineSteps, markStepVisitedOnBackend, usePipelineStore, setDraftStage, setCompletedSteps]);
+
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);

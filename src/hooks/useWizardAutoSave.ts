@@ -36,6 +36,7 @@ const DRAFT_DEDUP_KEY = "draft_dedup";
 interface UseWizardAutoSaveOptions {
   enabled: boolean;
   debounceMs?: number;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 /**
@@ -50,7 +51,7 @@ interface UseWizardAutoSaveOptions {
  * - Prevents data loss in all scenarios
  */
 export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled: true }): void {
-  const { enabled, debounceMs = 2000 } = options;
+  const { enabled, debounceMs = 2000, approvalStatus } = options;
 
   // Use granular selectors instead of entire proposalData object
   const title = useProposalTitle();
@@ -131,6 +132,12 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     // Never save drafts while on the generating page — generation mutates proposal state
     if (pathname.startsWith("/generating")) {
       logger.debug('[useWizardAutoSave] On generating page, skipping save');
+      return;
+    }
+
+    // Skip auto-save for approved or rejected proposals (in History)
+    if (approvalStatus === "approved" || approvalStatus === "rejected") {
+      logger.debug('[useWizardAutoSave] Skipping save for history proposal', { approvalStatus });
       return;
     }
 
@@ -317,6 +324,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     saveDraftToStore,
     updateDraftInStore,
     setCurrentDraftId,
+    approvalStatus,
   ]);
 
   // Debounced auto-save on data changes

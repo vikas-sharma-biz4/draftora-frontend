@@ -63,6 +63,26 @@
   padding: 24px;
   overflow-y: auto;
   flex: 1;
+
+  // Hide scrollbar for Chrome, Safari and Opera
+  &::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    background: transparent;
+    display: none;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  // Hide scrollbar for IE, Edge and Firefox
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .description {

@@ -68,7 +68,7 @@ export default function TemplateSelectionModal({
   initialView = "template_selection",
 }: TemplateSelectionModalProps): JSX.Element | null {
   const router = useRouter();
-  const { updateProposalData, setCurrentStep, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
+  const { updateProposalData, setCurrentStep } = useWizardActions();
 
   // Use granular selectors for minimal re-renders
   const title = useProposalTitle();
@@ -580,20 +580,17 @@ export default function TemplateSelectionModal({
 
     setDraftStage("wizard_in_progress");
     setCurrentStep(1);
-    setShouldStartBackgroundFetch(true);
-
-    // Start background generation BEFORE navigation
-    logger.info('[TemplateSelectionModal] Starting background recommendations fetch');
-    void prefetchRecommendations();
 
     // Show loading state and coordinate modal close with navigation
     setIsNavigating(true);
 
-    // Navigate to parameters page immediately
+    // Navigate to parameters page
     router.push("/parameters");
 
-    // Close modal immediately
-    onClose();
+    // Close modal after a short delay to allow navigation to start
+    setTimeout(() => {
+      onClose();
+    }, 100);
   }
 
   function handleNewClientClick(): void {
