@@ -1,20 +1,21 @@
 /**
  * Hook for managing pipeline step navigation and access control
- * 
+ *
  * Handles:
- * - Tracking visited pipeline steps
+ * - Tracking visited pipeline steps (persisted via Zustand store)
  * - Determining highest visited step
  * - Syncing step state with backend
  * - Validating step access permissions
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import {
   getProposalStatus,
   markProposalStepVisited,
   validateProposalStepAccess,
 } from '@/services/proposal.service';
 import { logger } from '@/utils/logger';
+import { usePipelineStore } from '@/store/features/pipeline/pipelineSlice';
 
 interface UsePipelineStepsReturn {
   visitedPipelineSteps: number[];
@@ -28,34 +29,37 @@ interface UsePipelineStepsReturn {
 }
 
 export function usePipelineSteps(): UsePipelineStepsReturn {
-  const [visitedPipelineSteps, setVisitedPipelineSteps] = useState<number[]>([]);
-  const [highestVisitedStep, setHighestVisitedStep] = useState<number | null>(null);
+  const visitedPipelineSteps = usePipelineStore((state) => state.visitedSteps);
+  const setVisitedSteps = usePipelineStore((state) => state.setVisitedSteps);
+  const markStepAsVisited = usePipelineStore((state) => state.markStepAsVisited);
+  const resetVisitedSteps = usePipelineStore((state) => state.resetVisitedSteps);
+
+  // Calculate highest visited step from the array
+  const highestVisitedStep = visitedPipelineSteps.length > 0
+    ? Math.max(...visitedPipelineSteps)
+    : null;
 
   const syncVisitedStepsFromBackend = useCallback(async (proposalId: number): Promise<void> => {
     try {
       const status = await getProposalStatus(proposalId);
-      setVisitedPipelineSteps(status.visitedPipelineSteps);
-      setHighestVisitedStep(status.highestVisitedStep);
+      // Merge backend steps with local steps to preserve locally-visited steps
+      const localSteps = visitedPipelineSteps;
+      const backendSteps = status.visitedPipelineSteps || [];
+      const mergedSteps = Array.from(new Set([...localSteps, ...backendSteps])).sort((a, b) => a - b);
+      setVisitedSteps(mergedSteps);
     } catch (error) {
       logger.error('[usePipelineSteps] Failed to sync visited steps:', error);
     }
-  }, []);
+  }, [setVisitedSteps]);
 
   const markStepVisitedOnBackend = useCallback(async (proposalId: number, stepId: number): Promise<void> => {
     try {
       await markProposalStepVisited(proposalId, stepId);
-      setVisitedPipelineSteps((prev) => {
-        if (prev.includes(stepId)) return prev;
-        return [...prev, stepId].sort((a, b) => a - b);
-      });
-      setHighestVisitedStep((prev) => {
-        if (prev === null || stepId > prev) return stepId;
-        return prev;
-      });
+      markStepAsVisited(stepId);
     } catch (error) {
       logger.error('[usePipelineSteps] Failed to mark step visited:', error);
     }
-  }, []);
+  }, [markStepAsVisited]);
 
   const canAccessStep = useCallback(async (proposalId: number, stepId: number): Promise<boolean> => {
     try {
@@ -67,15 +71,17 @@ export function usePipelineSteps(): UsePipelineStepsReturn {
   }, []);
 
   const resetPipelineSteps = useCallback((): void => {
-    setVisitedPipelineSteps([]);
-    setHighestVisitedStep(null);
-  }, []);
+    resetVisitedSteps();
+  }, [resetVisitedSteps]);
 
   return {
     visitedPipelineSteps,
     highestVisitedStep,
-    setVisitedPipelineSteps,
-    setHighestVisitedStep,
+    setVisitedPipelineSteps: setVisitedSteps,
+    setHighestVisitedStep: () => {
+      // No-op - highestVisitedStep is derived from visitedPipelineSteps
+      logger.warn('[usePipelineSteps] setHighestVisitedStep is deprecated - highest is derived from visitedSteps');
+    },
     syncVisitedStepsFromBackend,
     markStepVisitedOnBackend,
     canAccessStep,

@@ -86,6 +86,7 @@
 .proposal-sidebar {
   width: 280px;
   min-width: 280px;
+  max-width: 400px;
   background: var(--color-white);
   border: 1px solid var(--color-border);
   padding: 24px 0;
@@ -180,6 +181,11 @@
   box-shadow: inset 2px 0 0 transparent;
   transition: all 0.15s;
   cursor: pointer;
+}
+
+// Static sections alignment - match with non-static sections
+.proposal-sidebar-section-row.is-static {
+  padding-left: 38px;
 }
 
 .proposal-sidebar-section-row:hover {
