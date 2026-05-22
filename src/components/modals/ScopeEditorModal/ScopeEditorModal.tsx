@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useMemo } from "react";
-import { X, Plus } from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "@/utils/toast";
 
 import styles from "../EditModal.module.scss";
@@ -18,7 +18,6 @@ interface ScopeEditorModalProps {
   description: string;
   onClose: () => void;
   onSave: (data: { title: string; clientName: string; clientId: number | null; description: string }) => void;
-  onNewClient: () => void;
 }
 
 export default function ScopeEditorModal({
@@ -28,7 +27,6 @@ export default function ScopeEditorModal({
   description,
   onClose,
   onSave,
-  onNewClient,
 }: ScopeEditorModalProps): JSX.Element | null {
   const [title, setTitle] = useState<string>(proposalTitle);
   const [desc, setDesc] = useState<string>(description);
@@ -151,47 +149,25 @@ export default function ScopeEditorModal({
               isLoading ? (
                 <p className={styles.emptyText}>Loading clients...</p>
               ) : clients.length === 0 ? (
-                <div className={styles.inputWithButton}>
+                <Input
+                  {...fieldProps}
+                  type="text"
+                  value={clientSearchQuery}
+                  onChange={(e) => setClientSearchQuery(e.target.value)}
+                  placeholder="Enter client name"
+                />
+              ) : (
+                <div className={styles.searchWrapper}>
                   <Input
                     {...fieldProps}
                     type="text"
+                    placeholder="Search for a client..."
                     value={clientSearchQuery}
-                    onChange={(e) => setClientSearchQuery(e.target.value)}
-                    placeholder="Enter client name"
+                    onChange={(e) => handleClientSearchChange(e.target.value)}
+                    onFocus={handleClientSearchFocus}
+                    onBlur={handleClientSearchBlur}
+                    onKeyDown={handleClientKeyDown}
                   />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={onNewClient}
-                    className={styles.newClientButton}
-                  >
-                    <Plus size={14} />
-                    New Client
-                  </Button>
-                </div>
-              ) : (
-                <div className={styles.searchWrapper}>
-                  <div className={styles.inputWithButton}>
-                    <Input
-                      {...fieldProps}
-                      type="text"
-                      placeholder="Search for a client..."
-                      value={clientSearchQuery}
-                      onChange={(e) => handleClientSearchChange(e.target.value)}
-                      onFocus={handleClientSearchFocus}
-                      onBlur={handleClientSearchBlur}
-                      onKeyDown={handleClientKeyDown}
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={onNewClient}
-                      className={styles.newClientButton}
-                    >
-                      <Plus size={14} />
-                      New Client
-                    </Button>
-                  </div>
 
                   {showClientDropdown && filteredClients.length > 0 && (
                     <div className={styles.clientDropdown}>
