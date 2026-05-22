@@ -682,10 +682,6 @@ export default function ReviewPage(): JSX.Element {
             description={proposalData.description}
             onClose={() => setShowScopeModal(false)}
             onSave={handleSaveScope}
-            onNewClient={() => {
-              setShowScopeModal(false);
-              toast.info("New client creation not implemented yet");
-            }}
           />
         )}
 
