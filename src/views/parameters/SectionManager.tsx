@@ -41,8 +41,6 @@ interface SectionManagerProps {
   proposalData: ProposalData;
   onUpdateProposalData: (updates: Partial<ProposalData>) => void;
   isRecreateMode: boolean;
-  shouldStartBackgroundFetch: boolean;
-  onBackgroundFetchStarted: () => void;
 }
 
 export default function SectionManager({
@@ -51,28 +49,19 @@ export default function SectionManager({
   proposalData,
   onUpdateProposalData,
   isRecreateMode,
-  shouldStartBackgroundFetch,
-  onBackgroundFetchStarted,
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
   const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
 
-  // Track sections that were added from AI recommendations
-  const [aiRecommendedSectionsMap, setAiRecommendedSectionsMap] = useState<Map<string, SectionRecommendation>>(new Map());
+  // Track sections that were added from AI recommendations with their original indices
+  const [aiRecommendedSectionsMap, setAiRecommendedSectionsMap] = useState<Map<string, { recommendation: SectionRecommendation; originalIndex: number }>>(new Map());
 
   // Add section modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [insertAfterKey, setInsertAfterKey] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Trigger AI recommendations background fetch when flag is set
-  useEffect(() => {
-    if (shouldStartBackgroundFetch && sectionRecommendationsRef.current) {
-      sectionRecommendationsRef.current.startBackgroundFetch();
-      onBackgroundFetchStarted();
-    }
-  }, [shouldStartBackgroundFetch, onBackgroundFetchStarted]);
 
   const handleStartEdit = useCallback((item: SectionItem): void => {
     setEditingKey(item.key);
@@ -105,11 +94,11 @@ export default function SectionManager({
       }
 
       // Check if this section was from AI recommendations
-      const recommendation = aiRecommendedSectionsMap.get(key);
-      if (recommendation && sectionRecommendationsRef.current) {
-        // Restore the recommendation to the AI recommendations list
-        sectionRecommendationsRef.current.restoreRecommendation(key, recommendation);
-        logger.info('[SectionManager] Restored section to AI recommendations', { sectionKey: key });
+      const recommendationData = aiRecommendedSectionsMap.get(key);
+      if (recommendationData && sectionRecommendationsRef.current) {
+        // Restore the recommendation to the AI recommendations list at its original position
+        sectionRecommendationsRef.current.restoreRecommendation(key, recommendationData.recommendation, recommendationData.originalIndex);
+        logger.info('[SectionManager] Restored section to AI recommendations', { sectionKey: key, originalIndex: recommendationData.originalIndex });
 
         // Remove from the tracking map
         setAiRecommendedSectionsMap(prev => {
@@ -123,7 +112,7 @@ export default function SectionManager({
     });
   }, [onSectionsChange, aiRecommendedSectionsMap]);
 
-  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string, recommendation?: SectionRecommendation): void => {
+  const addSectionToProposal = useCallback((sectionKey: string, sectionTitle: string, recommendation?: SectionRecommendation, originalIndex?: number): void => {
     logger.info('[SectionManager] Adding section to proposal', { sectionKey, sectionTitle, currentSections: sections.map(s => s.key) });
 
     // Check if section already exists before attempting to add
@@ -141,10 +130,10 @@ export default function SectionManager({
       after: updatedSections.map(s => s.key)
     });
 
-    // Store recommendation data if provided (section came from AI recommendations)
-    if (recommendation) {
-      setAiRecommendedSectionsMap(prev => new Map(prev).set(sectionKey, recommendation));
-      logger.info('[SectionManager] Stored AI recommendation data for section', { sectionKey });
+    // Store recommendation data with original index if provided (section came from AI recommendations)
+    if (recommendation && originalIndex !== undefined) {
+      setAiRecommendedSectionsMap(prev => new Map(prev).set(sectionKey, { recommendation, originalIndex }));
+      logger.info('[SectionManager] Stored AI recommendation data for section', { sectionKey, originalIndex });
     }
 
     // Update local state first

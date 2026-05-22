@@ -7,7 +7,7 @@
  * - Memoized selectors for performance
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useClientStore } from '@/store/features/clients/clientSlice';
 import type { ClientWithDocuments } from '@/services/client.service';
 
@@ -63,9 +63,16 @@ export function useClient(clientId: number): {
   const isLoading = useClientStore(state => state.isLoading);
   const error = useClientStore(state => state.error);
   const fetchClients = useClientStore(state => state.fetchClients);
+  const isInitialized = useClientStore(state => state.isInitialized);
+  const clients = useClientStore(state => state.clients);
+  const hasFetchedRef = useRef(false);
 
   useEffect(() => {
-    fetchClients();
+    // Only fetch once on mount if not initialized
+    if (!isInitialized && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchClients();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

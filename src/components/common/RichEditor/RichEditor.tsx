@@ -92,6 +92,8 @@ export default function RichEditor({
   const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(true);
   const [showCustomTextColorPicker, setShowCustomTextColorPicker] = useState<boolean>(false);
   const [showCustomHighlightPicker, setShowCustomHighlightPicker] = useState<boolean>(false);
+  const [userExpandedToolbar, setUserExpandedToolbar] = useState<boolean>(false);
+  const isToolbarButtonClickRef = useRef<boolean>(false);
   const headingBtnRef = useRef<HTMLButtonElement | null>(null);
   const linkBtnRef = useRef<HTMLButtonElement | null>(null);
   const imageBtnRef = useRef<HTMLButtonElement | null>(null);
@@ -217,6 +219,24 @@ export default function RichEditor({
     editor.chain().focus().setHorizontalRule().run();
   }, [editor]);
 
+  // Helper function to check if cursor is inside a list
+  const isInList = useCallback((listType: 'bulletList' | 'orderedList'): boolean => {
+    if (!editor) return false;
+    const { from } = editor.state.selection;
+    const $from = editor.state.doc.resolve(from);
+
+    // Check if the current node or any parent node is a list
+    for (let depth = $from.depth; depth >= 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === listType) {
+        return true;
+      }
+    }
+
+    // Fallback to editor.isActive() for edge cases
+    return editor.isActive(listType);
+  }, [editor]);
+
   const openRegenPrompt = useCallback((): void => {
     if (!editor) return;
     const { from, to } = editor.state.selection;
@@ -338,7 +358,10 @@ export default function RichEditor({
         setShowHeadingMenu(false);
         setShowLinkInput(false);
         setShowImageInput(false);
-        setIsToolbarCollapsed(true); // Start collapsed by default
+        // Only collapse toolbar if user didn't intentionally expand it
+        if (!userExpandedToolbar) {
+          setIsToolbarCollapsed(true);
+        }
         setShowCustomTextColorPicker(false);
         setShowCustomHighlightPicker(false);
 
@@ -390,20 +413,23 @@ export default function RichEditor({
         }
       } else if (!keepToolbarVisibleRef.current) {
         // Only hide if we're not keeping it visible (e.g., during scroll)
-        setHasSelection(false);
-        // Reset ALL toolbar UI state when selection is cleared
-        setShowRegenPrompt(false);
-        setRegenPrompt("");
-        setSavedSelection(null);
-        setShowHeadingMenu(false);
-        setShowLinkInput(false);
-        setShowImageInput(false);
-        setIsToolbarCollapsed(true);
-        setShowCustomTextColorPicker(false);
-        setShowCustomHighlightPicker(false);
-        // Hide the bubble
-        if (el) {
-          el.style.display = 'none';
+        // AND not if a toolbar button was just clicked
+        if (!isToolbarButtonClickRef.current) {
+          setHasSelection(false);
+          // Reset ALL toolbar UI state when selection is cleared
+          setShowRegenPrompt(false);
+          setRegenPrompt("");
+          setSavedSelection(null);
+          setShowHeadingMenu(false);
+          setShowLinkInput(false);
+          setShowImageInput(false);
+          setIsToolbarCollapsed(true);
+          setShowCustomTextColorPicker(false);
+          setShowCustomHighlightPicker(false);
+          // Hide the bubble
+          if (el) {
+            el.style.display = 'none';
+          }
         }
       }
       // If keepToolbarVisibleRef.current is true and no selection, toolbar stays visible
@@ -425,6 +451,7 @@ export default function RichEditor({
         isMouseDown = true;
         keepToolbarVisibleRef.current = false; // Reset flag - user is making new selection
         toolbarPositionSetRef.current = false; // Reset position flag - allow repositioning
+        setUserExpandedToolbar(false); // Reset user expansion flag on new selection
         // CRITICAL: Reset ALL toolbar state immediately when starting new selection
         // This prevents multiple toolbars and ensures clean state
         setShowRegenPrompt(false);
@@ -623,17 +650,25 @@ export default function RichEditor({
       <div className="rte-toolbar-group">
         <button
           type="button"
-          className={`rte-btn-icon${editor.isActive("bulletList") ? " active" : ""}`}
+          className={`rte-btn-icon${isInList("bulletList") ? " active" : ""}`}
           title="Bullet list"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          onClick={() => {
+            isToolbarButtonClickRef.current = true;
+            editor.chain().focus().toggleBulletList().run();
+            setTimeout(() => { isToolbarButtonClickRef.current = false; }, 100);
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         </button>
         <button
           type="button"
-          className={`rte-btn-icon${editor.isActive("orderedList") ? " active" : ""}`}
+          className={`rte-btn-icon${isInList("orderedList") ? " active" : ""}`}
           title="Numbered list"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          onClick={() => {
+            isToolbarButtonClickRef.current = true;
+            editor.chain().focus().toggleOrderedList().run();
+            setTimeout(() => { isToolbarButtonClickRef.current = false; }, 100);
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
         </button>
@@ -869,7 +904,10 @@ export default function RichEditor({
         type="button"
         className="rte-toolbar-expand-btn"
         title={isToolbarCollapsed ? "Show more options" : "Show less options"}
-        onClick={() => setIsToolbarCollapsed(!isToolbarCollapsed)}
+        onClick={() => {
+          setIsToolbarCollapsed(!isToolbarCollapsed);
+          setUserExpandedToolbar(!isToolbarCollapsed);
+        }}
       >
         {isToolbarCollapsed ? (
           <>

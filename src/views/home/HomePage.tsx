@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useRef } from "react";
 
+import { logger } from "@/utils/logger";
 import styles from "./HomePage.module.scss";
 
 import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, SECTION_DISPLAY_NAMES } from "@/constants";
@@ -13,6 +14,7 @@ import {
   useClientId,
   useCurrentStep,
   useWizardActions,
+  useCurrentProposalId,
 } from "@/store/features/wizard/proposalWizardSlice";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
@@ -35,11 +37,21 @@ export default function HomePage(): JSX.Element {
   const title = useProposalTitle();
   const clientId = useClientId();
   const currentStep = useCurrentStep();
-  const { updateProposalData, setCurrentStep } = useWizardActions();
+  const currentProposalId = useCurrentProposalId();
+  const { updateProposalData, setCurrentStep, resetProposal } = useWizardActions();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
   const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
+
+  // Reset wizard state when on home page to clear stale proposal data
+  useEffect(() => {
+    if (currentProposalId !== null) {
+      logger.info("[HomePage] Resetting wizard state to clear stale proposal data");
+      resetProposal();
+      setCurrentDraftId(null);
+    }
+  }, [currentProposalId, resetProposal, setCurrentDraftId]);
 
   const hasMeaningfulData = Boolean(title && clientId);
   useDraftAutoSave({ enabled: hasMeaningfulData });
