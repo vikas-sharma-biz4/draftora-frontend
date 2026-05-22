@@ -17,6 +17,7 @@ interface UseDraftPersistenceOptions {
   stage: string;
   wizardStep: number;
   skipIfApproved: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 /**
@@ -37,6 +38,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     stage,
     wizardStep,
     skipIfApproved,
+    approvalStatus,
   } = options;
 
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
@@ -52,6 +54,12 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
 
     if (!proposalId) {
       logger.debug('[useDraftPersistence] No proposalId, skipping save');
+      return;
+    }
+
+    // Skip auto-save for approved or rejected proposals (in History)
+    if (approvalStatus === "approved" || approvalStatus === "rejected") {
+      logger.debug('[useDraftPersistence] Skipping save for history proposal', { approvalStatus });
       return;
     }
 
@@ -131,6 +139,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     stage,
     wizardStep,
     skipIfApproved,
+    approvalStatus,
     currentDraftId,
     setCurrentDraftId,
     updateDraftInStore,

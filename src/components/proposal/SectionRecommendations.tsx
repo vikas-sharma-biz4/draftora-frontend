@@ -7,12 +7,11 @@ import { getSectionRecommendations, type SectionRecommendation } from "@/service
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import styles from "./SectionRecommendations.module.scss";
 import { logger } from "@/utils/logger";
-import { usePrefetchedRecommendations, useRecommendationsFetchStatus } from "@/store/features/wizard/proposalWizardSlice";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
   startBackgroundFetch: () => void;
-  restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation) => void;
+  restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation, originalIndex?: number) => void;
 }
 
 interface SectionRecommendationsProps {
@@ -20,7 +19,7 @@ interface SectionRecommendationsProps {
   existingSections: string[];
   context: string;
   documentContext: string;
-  onAddSection: (sectionKey: string, title: string, recommendation?: SectionRecommendation) => void;
+  onAddSection: (sectionKey: string, title: string, recommendation?: SectionRecommendation, originalIndex?: number) => void;
   onSectionAdded?: (sectionKey: string) => void;
 }
 
@@ -38,14 +37,9 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRevealed, setIsRevealed] = useState<boolean>(false);
-  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
+  const [showPromptInput, setShowPromptInput] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
-  const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
-
-  // Load prefetched recommendations from store
-  const prefetchedRecommendations = usePrefetchedRecommendations();
-  const recommendationsFetchStatus = useRecommendationsFetchStatus();
 
   const contextRef = useRef(context);
   const documentContextRef = useRef(documentContext);
@@ -59,25 +53,14 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     existingSectionsRef.current = existingSections;
   });
 
-  // Auto-load prefetched recommendations when they arrive from store
-  useEffect(() => {
-    if (prefetchedRecommendations && prefetchedRecommendations.length > 0) {
-      logger.info('[SectionRecommendations] Loading prefetched recommendations from store', { count: prefetchedRecommendations.length });
-      setRecommendations(prefetchedRecommendations);
-    }
-  }, [prefetchedRecommendations]);
 
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
     const ctx = contextRef.current;
     const docCtx = documentContextRef.current;
     const prompt = customPrompt ?? userPrompt;
 
-    // Allow API call if there's either context/document context OR a user prompt
-    if (!ctx && !docCtx && !prompt) {
-      return;
-    }
-
     setIsLoading(true);
+    setRecommendations([]); // Clear existing recommendations to show loading state
     try {
       const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
 
@@ -117,9 +100,9 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       return;
     }
 
-    logger.info('[SectionRecommendations] Adding section to TOC', { sectionKey, sectionTitle: rec.sectionTitle });
+    logger.info('[SectionRecommendations] Adding section to TOC', { sectionKey, sectionTitle: rec.sectionTitle, originalIndex: index });
 
-    onAddSection(sectionKey, rec.sectionTitle, rec);
+    onAddSection(sectionKey, rec.sectionTitle, rec, index);
     toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
 
     // Remove from recommendations list
@@ -144,10 +127,9 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
   };
 
   const handlePromptChange = (): void => {
-    setIsEditingPrompt(false);
-    setIsRegenerating(false);
     if (userPrompt.trim()) {
       setRecommendations([]);
+      setShowPromptInput(false);
       fetchRecommendations(userPrompt);
     }
   };
@@ -159,14 +141,40 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     }
   };
 
-  const handleGenerateClick = (): void => {
+  const handleGenerateClick = async (): Promise<void> => {
     if (!isRevealed) {
-      // First click: reveal prefetched recommendations
-      setIsRevealed(true);
+      // First click: fetch recommendations via API
+      setIsLoading(true);
+      try {
+        await fetchRecommendations();
+        setIsRevealed(true);
+      } catch (error) {
+        logger.error("Failed to fetch recommendations on generate click", error);
+      } finally {
+        setIsLoading(false);
+      }
     } else {
-      // Second click: open custom prompt input for regeneration
-      setIsRegenerating(true);
-      setIsEditingPrompt(true);
+      // Regenerate: if input is not shown, show it
+      if (!showPromptInput) {
+        setShowPromptInput(true);
+      } else {
+        // If input is shown, check if it has content
+        if (userPrompt.trim()) {
+          // Has content: trigger API with prompt
+          setIsLoading(true);
+          try {
+            await fetchRecommendations(userPrompt);
+            setShowPromptInput(false);
+          } catch (error) {
+            logger.error("Failed to regenerate recommendations", error);
+          } finally {
+            setIsLoading(false);
+          }
+        } else {
+          // Empty: close the input without triggering API
+          setShowPromptInput(false);
+        }
+      }
     }
   };
 
@@ -191,7 +199,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     startBackgroundFetch: () => {
       // No-op: auto-fetch is now triggered via prefetchRecommendations() in ParametersPage
     },
-    restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation) => {
+    restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation, originalIndex?: number) => {
       setRecommendations((prev) => {
         // Check if recommendation already exists to avoid duplicates
         const normalizedKey = sectionKey.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -202,7 +210,12 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
           // Already exists, don't add duplicate
           return prev;
         }
-        // Add to the end of the list
+        // Insert at original index if provided, otherwise add to end
+        if (originalIndex !== undefined && originalIndex >= 0 && originalIndex <= prev.length) {
+          const newRecs = [...prev];
+          newRecs.splice(originalIndex, 0, recommendation);
+          return newRecs;
+        }
         return [...prev, recommendation];
       });
     },
@@ -217,89 +230,33 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         <button
           className={styles.ctaBtn}
           onClick={handleGenerateClick}
-          disabled={isLoading || recommendationsFetchStatus === 'loading'}
+          disabled={isLoading}
         >
           {isRevealed ? 'Regenerate' : 'Generate'}
         </button>
+        {isLoading && (
+          <div className={styles.loadingState}>
+            <p>generating...</p>
+          </div>
+        )}
       </div>
 
-      {recommendationsFetchStatus === 'loading' && recommendations.length === 0 && isRevealed ? (
-        <div className={styles.loadingState}>
-          <div className={styles.spinner}></div>
-          <p>Recommended sections are Generating....</p>
-        </div>
-      ) : (
-        <>
-          {isRevealed && (
+      {showPromptInput && (
             <div className={styles.promptSection}>
-              <label className={styles.promptLabel}>
-                Custom Prompt (Optional)
-              </label>
-              {isEditingPrompt || isRegenerating ? (
-                <div className={styles.promptEditContainer}>
-                  <textarea
-                    className={styles.promptTextarea}
-                    value={userPrompt}
-                    onChange={(e) => setUserPrompt(e.target.value)}
-                    onKeyDown={handlePromptKeyDown}
-                    placeholder="e.g., Focus on technical sections, emphasize security aspects... (Press Enter to apply)"
-                    rows={3}
-                  />
-                  <div className={styles.promptActions}>
-                    <button
-                      className={styles.promptCancelBtn}
-                      onClick={() => {
-                        setIsEditingPrompt(false);
-                        setIsRegenerating(false);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className={styles.promptApplyBtn}
-                      onClick={handlePromptChange}
-                    >
-                      Apply & Regenerate
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={styles.promptDisplay}
-                  onClick={() => {
-                    setIsEditingPrompt(true);
-                    setIsRegenerating(true);
-                  }}
-                >
-                  {userPrompt || "Click to add custom guidance for AI..."}
-                </div>
-              )}
+              <div className={styles.promptEditContainer}>
+                <textarea
+                  className={styles.promptTextarea}
+                  value={userPrompt}
+                  onChange={(e) => setUserPrompt(e.target.value)}
+                  onKeyDown={handlePromptKeyDown}
+                  placeholder="e.g., Focus on technical sections, emphasize security aspects... (Press Enter to apply)"
+                  rows={3}
+                />
+              </div>
             </div>
           )}
 
-          {recommendationsFetchStatus === 'error' ? (
-            <div className={styles.emptyState}>
-              <p>Failed to load recommendations</p>
-              <span className={styles.emptyHint}>
-                There was an error generating recommendations. Please try again.
-              </span>
-              <button
-                className={styles.retryBtn}
-                onClick={handleRetryFetch}
-              >
-                Retry
-              </button>
-            </div>
-          ) : recommendations.length === 0 && isRevealed ? (
-            <div className={styles.emptyState}>
-              <p>No recommendations available</p>
-              <span className={styles.emptyHint}>
-                {!context && !documentContext && !userPrompt
-                  ? "Add context, upload documents, or enter a custom prompt to get AI recommendations"
-                  : "All relevant sections are already selected"}
-              </span>
-            </div>
-          ) : isRevealed && recommendations.length > 0 ? (
+          {isRevealed && !isLoading && recommendations.length > 0 && (
             <div className={styles.recommendationsList}>
               {recommendations.map((rec, index) => {
                 const sectionKey = rec.sectionTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
@@ -366,10 +323,8 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
                 );
               })}
             </div>
-          ) : null}
+          )}
 
-        </>
-      )}
     </div>
   );
 });

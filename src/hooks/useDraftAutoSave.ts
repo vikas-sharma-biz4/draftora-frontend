@@ -26,6 +26,7 @@ import type { DraftLocation } from "@/interfaces/draftInterfaces";
 
 interface UseDraftAutoSaveOptions {
   enabled: boolean;
+  approvalStatus?: "pending" | "approved" | "rejected";
 }
 
 /**
@@ -37,7 +38,7 @@ interface UseDraftAutoSaveOptions {
  * This hook resolves the lastLocation from the current pathname.
  */
 export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
-  const { enabled } = options;
+  const { enabled, approvalStatus } = options;
   const title = useProposalTitle();
   const clientName = useClientName();
   const description = useProposalDescription();
@@ -70,6 +71,8 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
     enabled &&
     currentProposalId != null &&
     clientName.trim() !== "" &&
+    approvalStatus !== "approved" &&
+    approvalStatus !== "rejected" &&
     (title.trim() !== "" ||
       description.trim() !== "" ||
       (selectedSections && selectedSections.length > 0) ||
@@ -99,11 +102,12 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   useDraftPersistence({
     enabled: hasData,
     proposalId: currentProposalId,
-    proposal: hasData ? { ...proposalData, status: "completed", approvalStatus: "pending" } : null,
+    proposal: hasData ? { ...proposalData, status: "completed", approvalStatus } : null,
     activeSection: "",
     lastLocation: getLastLocation(),
     stage: draftStage,
     wizardStep: currentStep,
     skipIfApproved: false,
+    approvalStatus,
   });
 }

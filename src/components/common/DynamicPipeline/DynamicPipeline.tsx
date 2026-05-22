@@ -37,6 +37,9 @@ export default function DynamicPipeline({
       // If clicking Web View step and we have a proposalId, navigate to that proposal
       if (stepId === 3 && proposalId) {
         router.push(`/proposal/${proposalId}`);
+      } else if (proposalId) {
+        // If we have a proposalId, append it to preserve context when navigating to earlier steps
+        router.push(`${path}?proposalId=${proposalId}`);
       } else {
         router.push(path);
       }
@@ -59,7 +62,11 @@ export default function DynamicPipeline({
   const currentStepId = getCurrentStepId();
   const isAllCompleted = currentStage === "generated";
   const allowNonLinearNav = currentStage === "generated";
-  
+
+  // Use visitedSteps for completion state if available (persisted to localStorage)
+  // Otherwise fall back to completedSteps (from draftSessionStore)
+  const stepsForCompletion = visitedSteps && visitedSteps.length > 0 ? visitedSteps : completedSteps;
+
   // Determine the highest step the user has reached
   // This allows going back to Step 1 and then returning to Step 2 if they've already been there
   const highestReached = maxStepReached ?? currentStepId;
@@ -72,10 +79,10 @@ export default function DynamicPipeline({
       <div className={styles.pipelineSteps}>
         {PIPELINE_STEPS.map((step, index) => {
           const isActive = step.id === currentStepId;
-          // A step is only "completed" (green) if it's before the current step (or fully generated).
-          // This prevents stale localStorage completedSteps from showing future steps as green.
-          const isCompleted = (completedSteps.includes(step.id) && step.id < currentStepId) || isAllCompleted;
-          
+          // A step is "completed" (green) if it's in visitedSteps and before current step (or fully generated).
+          // This uses persisted visitedSteps from localStorage to survive refreshes.
+          const isCompleted = (stepsForCompletion.includes(step.id) && step.id < currentStepId) || isAllCompleted;
+
           // Progressive navigation: Allow clicking any step up to the highest reached
           // Example: If user reached Step 2, they can go back to Step 1 and return to Step 2
           // But they cannot skip ahead to Step 3 until they've visited it
