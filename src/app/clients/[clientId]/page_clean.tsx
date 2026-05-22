@@ -210,9 +210,14 @@ export default function ClientWorkspacePage(): JSX.Element {
                   <div className={styles.documentInfo}>
                     <h3>{doc.name}</h3>
                     <p>{doc.fileType?.toUpperCase() || 'FILE'} {Math.round((doc.sizeBytes || 0) / 1024)} KB</p>
-                  >
-                    <X size={18} />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteDocument(doc.id)}
+                    >
+                      <X size={18} />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
