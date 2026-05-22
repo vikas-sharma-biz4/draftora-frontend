@@ -4,12 +4,15 @@
 
 import dynamic from "next/dynamic";
 
+import { useRouter } from "next/navigation";
+
 import { useState, useEffect, useRef, useMemo } from "react";
 
 import { Search, X, CheckCircle, Settings, Sparkles, FileText, Check } from "lucide-react";
 
 
 
+import { logger } from "@/utils/logger";
 import styles from "./HomePage.module.scss";
 
 
@@ -23,7 +26,9 @@ import {
   useProposalTitle,
 
   useClientId,
-
+  useCurrentStep,
+  useWizardActions,
+  useCurrentProposalId,
 } from "@/store/features/wizard/proposalWizardSlice";
 
 import DynamicPipeline from "@/components/common/DynamicPipeline";
@@ -65,14 +70,14 @@ export default function HomePage(): JSX.Element {
   const title = useProposalTitle();
 
   const clientId = useClientId();
-
+  const currentStep = useCurrentStep();
+  const { updateProposalData, setCurrentStep } = useWizardActions();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
 
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
 
   const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
-
-
+  const router = useRouter();
 
   const hasMeaningfulData = Boolean(title && clientId);
 
@@ -570,16 +575,6 @@ export default function HomePage(): JSX.Element {
             aria-pressed={isScratchSelected}
 
           >
-
-            {isScratchSelected && (
-
-              <div className="tmpl-selected-badge" aria-hidden="true">
-
-                ✓
-
-              </div>
-
-            )}
 
             <div className="tmpl-scratch-inner">
 

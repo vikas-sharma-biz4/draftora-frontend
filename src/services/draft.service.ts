@@ -292,7 +292,18 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
   const qs = queryParams.toString();
   const url = `/drafts/${qs ? `?${qs}` : ""}`;
 
-  const data = await http.get<RawDraftListItem[]>(url, { cache: "no-store" });
+  const response = await http.get<{ drafts: RawDraftListItem[] } | unknown>(url, { cache: "no-store" });
+
+  // Extract drafts array from response envelope
+  const data = typeof response === 'object' && response !== null && 'drafts' in response
+    ? (response as { drafts: RawDraftListItem[] }).drafts
+    : [];
+
+  // Defensive check: ensure data is an array before mapping
+  if (!Array.isArray(data)) {
+    logger.error("[draft.service] listDrafts received non-array response:", { data });
+    return [];
+  }
 
   return data.map((d) => ({
     id: d.id,
@@ -313,10 +324,21 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
  */
 export async function getDraftByProposalId(proposalId: number): Promise<DraftMetadata | null> {
   try {
-    const data = await http.get<RawDraftListItem[]>(
+    const response = await http.get<{ drafts: RawDraftListItem[] } | unknown>(
       `/drafts?proposal_id=${proposalId}`,
       { cache: "no-store" },
     );
+
+    // Extract drafts array from response envelope
+    const data = typeof response === 'object' && response !== null && 'drafts' in response
+      ? (response as { drafts: RawDraftListItem[] }).drafts
+      : [];
+
+    // Defensive check: ensure data is an array before accessing
+    if (!Array.isArray(data)) {
+      logger.error("[draft.service] getDraftByProposalId received non-array response:", { data });
+      return null;
+    }
 
     const first = data[0];
     if (!first) return null;

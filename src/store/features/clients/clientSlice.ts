@@ -288,16 +288,22 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   removeDocument: (clientId: number, documentId: number) => {
+    console.log('[clientSlice] removeDocument called:', { clientId, documentId });
     set(state => {
       const updatedClients = state.clients.map(c =>
         c.id === clientId
           ? { ...c, documents: c.documents.filter(d => d.id !== documentId) }
           : c
       );
+      console.log('[clientSlice] Document removed from store:', {
+        clientId,
+        documentId,
+        newDocCount: updatedClients.find(c => c.id === clientId)?.documents.length
+      });
       saveClientsToLocalStorage(updatedClients);
       return {
         clients: updatedClients,
-        lastFetched: Date.now(),
+        // Don't update lastFetched to avoid triggering unnecessary refetches
       };
     });
   },
@@ -397,13 +403,14 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   deleteDocument: async (clientId: number, documentId: number) => {
-    try {
-      await clientApi.deleteDocument(clientId, documentId);
+    // Optimistic update: remove from store immediately
+    get().removeDocument(clientId, documentId);
 
-      // Remove from store
-      get().removeDocument(clientId, documentId);
-    } catch (error) {
-      throw error;
-    }
+    // Call API in background without waiting
+    clientApi.deleteDocument(clientId, documentId).catch((error) => {
+      logger.error('[clientSlice] Failed to delete document in background:', error);
+      // Note: We don't revert the optimistic update here as the UI already shows it as deleted
+      // The user can refresh to see the correct state if needed
+    });
   },
 }))

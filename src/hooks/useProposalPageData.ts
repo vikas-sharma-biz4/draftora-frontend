@@ -130,6 +130,7 @@ export function useProposalPageData(
           contextualInstructions: data.contextualInstructions || "",
           webReferences: data.webReferences || [],
           selectedDocumentIds: data.selectedDocumentIds || [],
+          approvalStatus: data.approvalStatus,
         });
         setDraftStage("generated");
         setCompletedSteps([1, 2, 3]);
@@ -192,7 +193,10 @@ export function useProposalPageData(
 
   // Auto-save to drafts when navigating away without approval/rejection
   useDraftPersistence({
-    enabled: proposal?.status === "completed",
+    enabled: proposal?.status === "completed" &&
+             proposal?.approvalStatus !== "approved" &&
+             proposal?.approvalStatus !== "rejected" &&
+             !fromHistory,
     proposalId,
     proposal,
     activeSection,
@@ -200,6 +204,7 @@ export function useProposalPageData(
     stage: "generated",
     wizardStep: 5,
     skipIfApproved: false,
+    approvalStatus: proposal?.approvalStatus,
   });
 
   return {

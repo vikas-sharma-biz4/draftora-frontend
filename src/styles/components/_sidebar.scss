@@ -543,30 +543,20 @@
 // ─── Responsive — 768px ───────────────────────────────────────────────────────
 @media (max-width: 768px) {
   .sidebar {
-    width: 100%;
-    height: auto;
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    padding: 16px;
-    overflow-x: visible;
-  }
-
-  .sidebar-toggle {
-    display: none;
-  }
-
-  .sidebar-steps {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-  }
-
-  .sidebar-step-item {
-    flex-shrink: 0;
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+    flex-basis: var(--sidebar-collapsed-width);
   }
 
   .sidebar-step-label {
+    display: none;
+  }
+
+  .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar-footer .text-small {
     display: none;
   }
 }

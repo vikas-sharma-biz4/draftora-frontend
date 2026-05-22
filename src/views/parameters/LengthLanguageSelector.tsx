@@ -7,21 +7,25 @@
 "use client";
 
 import { Select } from "@/components/common/Input";
-import { LANGUAGE_OPTIONS, LENGTH_OPTIONS } from "@/constants";
+import { LANGUAGE_OPTIONS, LENGTH_OPTIONS, AI_MODEL_OPTIONS } from "@/constants";
 import type { LengthOption } from "@/interfaces/proposalInterfaces";
 
 interface LengthLanguageSelectorProps {
   lengthPreference: LengthOption;
   language: string;
+  aiModel: string;
   onLengthChange: (value: LengthOption) => void;
   onLanguageChange: (value: string) => void;
+  onAiModelChange: (value: string) => void;
 }
 
 export default function LengthLanguageSelector({
   lengthPreference,
   language,
+  aiModel,
   onLengthChange,
   onLanguageChange,
+  onAiModelChange,
 }: LengthLanguageSelectorProps): JSX.Element {
   return (
     <div className="grid-2 mb-14">
@@ -58,7 +62,7 @@ export default function LengthLanguageSelector({
           Language &amp; Locale
         </div>
         <Select
-          className="form-select"
+          className="form-select mb-14"
           value={language}
           onChange={(e) => onLanguageChange(e.target.value)}
         >
@@ -68,6 +72,28 @@ export default function LengthLanguageSelector({
             </option>
           ))}
         </Select>
+        <div className="form-label mt-8 mb-8">
+          AI Model
+        </div>
+        <div className="flex-col gap-8">
+          {AI_MODEL_OPTIONS.map(({ value: optionValue, label, provider, description }) => {
+            const isSelected = (aiModel ?? "gpt-4o") === optionValue;
+            return (
+              <button
+                key={optionValue}
+                type="button"
+                className={`tone-card${isSelected ? " selected" : ""}`}
+                onClick={() => onAiModelChange(optionValue)}
+              >
+                <div className="tone-card-label">
+                  {label}
+                  <span className="font-11 text-muted ml-6">({provider})</span>
+                </div>
+                <div className="tone-card-desc">{description}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

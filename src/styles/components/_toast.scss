@@ -5,14 +5,33 @@
   font-family: var(--font-sans) !important;
 }
 
-[data-sonner-toast] button[data-close-button] {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  color: black !important;
-  z-index: 1;
-  opacity: 1;
-  cursor: pointer;
+// ─── Toast item styling ───────────────────────────────────────────────────────
+.toast-item {
+  position: relative !important;
+  padding-right: 40px !important;
+}
+
+// ─── Close button styling ─────────────────────────────────────────────────────
+/* Force all buttons in Sonner toasts to the right using maximum specificity */
+[data-sonner-toast] button[style],
+[data-sonner-toast] button[data-close-button][style],
+[data-sonner-toast] button.toast-close-button[style],
+.toast-item button[style],
+.toast-item button[data-close-button][style],
+.toast-item button.toast-close-button[style] {
+  position: absolute !important;
+  right: 4px !important;
+  left: auto !important;
+  top: 4px !important;
+  transform: none !important;
+  margin: 0 !important;
+  float: none !important;
+}
+
+/* Ensure the toast has relative positioning for absolute button */
+[data-sonner-toast],
+.toast-item {
+  position: relative !important;
 }
 
 // ─── Toast container ──────────────────────────────────────────────────────────

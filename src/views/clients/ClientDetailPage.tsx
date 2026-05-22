@@ -9,12 +9,12 @@ import { logger } from "@/utils/logger";
 
 import styles from "./ClientDetailPage.module.scss";
 
-import { useClient } from "@/hooks/useClients";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
 import type { ClientDocument } from "@/services/client.service";
 import { listProposals } from "@/services/proposal.service";
+import * as clientApi from "@/services/client.service";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 import { formatDate } from "@/utils/dateUtils";
 import PageLayout from "@/layouts/AppLayout";
@@ -49,11 +49,15 @@ export default function ClientWorkspacePage(): JSX.Element {
   const clientIdParam = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
   const clientId = typeof clientIdParam === 'string' ? parseInt(clientIdParam, 10) : clientIdParam as number;
 
-  const { client, isLoading: loading, refetch: refetchClient } = useClient(clientId);
+  // Read directly from store to avoid useClient auto-fetch
+  const client = useClientStore(state => state.getClientById(clientId));
+  const loading = useClientStore(state => state.isLoading);
+  const fetchClients = useClientStore(state => state.fetchClients);
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
-  const deleteDocumentFromStore = useClientStore(state => state.deleteDocument);
+  const removeDocumentFromStore = useClientStore(state => state.removeDocument);
   const deleteClientFromStore = useClientStore(state => state.deleteClient);
   const { downloadProposal } = useProposalDownload();
+  const hasFetchedRef = useRef(false);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [proposalSearchQuery, setProposalSearchQuery] = useState<string>("");
@@ -71,6 +75,27 @@ export default function ClientWorkspacePage(): JSX.Element {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // One-time fetch if client doesn't exist in store
+  useEffect(() => {
+    if (!client && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      console.log('[ClientDetailPage] Fetching clients - client not found in store');
+      fetchClients();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Log when client documents change
+  useEffect(() => {
+    if (client) {
+      console.log('[ClientDetailPage] Client documents updated:', {
+        clientId: client.id,
+        documentCount: client.documents.length,
+        documentIds: client.documents.map(d => ({ id: d.id, name: d.name }))
+      });
+    }
+  }, [client]);
 
   function handleNewProposal(): void {
     setCurrentDraftId(null); // Clear draft ID for new proposal
@@ -107,6 +132,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
 
   function handleDeleteDocument(docId: number, docName: string): void {
+    console.log('[ClientDetailPage] handleDeleteDocument called:', { docId, docName });
     setDeleteDocModalData({ id: docId, name: docName });
   }
 
@@ -114,11 +140,18 @@ export default function ClientWorkspacePage(): JSX.Element {
     if (!client || !deleteDocModalData) return;
 
     try {
-      await deleteDocumentFromStore(client.id, deleteDocModalData.id);
-      await refetchClient();
+      console.log('[ClientDetailPage] Deleting document:', deleteDocModalData.id, deleteDocModalData.name);
+
+      // Optimistic update: update store
+      removeDocumentFromStore(client.id, deleteDocModalData.id);
       toast.success("Document deleted");
       setDeleteDocModalData(null);
+
+      // Call API in background
+      await clientApi.deleteDocument(client.id, deleteDocModalData.id);
+      console.log('[ClientDetailPage] Document deleted successfully from API');
     } catch (error) {
+      console.error('[ClientDetailPage] Failed to delete document:', error);
       logger.error("Failed to delete document:", error);
       toast.error("Failed to delete document");
     }
@@ -133,22 +166,19 @@ export default function ClientWorkspacePage(): JSX.Element {
     if (!client || client.documents.length === 0) return;
 
     try {
-      const results = await Promise.allSettled(client.documents.map((doc) => deleteDocumentFromStore(client.id, doc.id)));
-      await refetchClient();
-
-      const failedDeletions = results.filter(result => result.status === 'rejected');
-
-      if (failedDeletions.length === 0) {
-        toast.success("All documents deleted");
-      } else if (failedDeletions.length === client.documents.length) {
-        toast.error("Failed to delete all documents");
-      } else {
-        toast.warning(`${failedDeletions.length} of ${client.documents.length} documents failed to delete`);
-      }
+      // Optimistic update: remove all documents from store
+      client.documents.forEach((doc) => {
+        removeDocumentFromStore(client.id, doc.id);
+      });
+      toast.success("All documents deleted");
       setDeleteAllDocsModalOpen(false);
+
+      // Call API in background
+      await Promise.allSettled(
+        client.documents.map((doc) => clientApi.deleteDocument(client.id, doc.id))
+      );
     } catch (error) {
       logger.error("An unexpected error occurred during bulk document deletion:", error);
-      await refetchClient();
       toast.error("An unexpected error occurred");
     }
   }
@@ -179,7 +209,6 @@ export default function ClientWorkspacePage(): JSX.Element {
       const fileId = `${file.name}-${Date.now()}`;
       try {
         setUploadingFiles(prev => new Set(prev).add(fileId));
-        toast.info(`Uploading ${file.name}...`);
 
         const uploadedDoc = await uploadDocumentToStore(client.id, file);
 
@@ -187,11 +216,11 @@ export default function ClientWorkspacePage(): JSX.Element {
           throw new Error('Failed to upload document: uploadedDoc is undefined');
         }
 
-        // Show parsing status
-        if (uploadedDoc.status === 'processing') {
-          toast.info(`${file.name} is being parsed...`);
-        } else if (uploadedDoc.status === 'parsed') {
+        // Show parsing status based on uploaded document
+        if (uploadedDoc.status === 'parsed') {
           toast.success(`${file.name} uploaded and parsed`);
+        } else {
+          toast.success(`${file.name} uploaded successfully`);
         }
       } catch (error) {
         logger.error(`Failed to upload ${file.name}:`, error);
@@ -549,6 +578,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
         {deleteDocModalData && (
           <DeleteDocumentModal
+            key={`delete-doc-${deleteDocModalData.id}`}
             documentName={deleteDocModalData.name}
             onClose={() => setDeleteDocModalData(null)}
             onConfirm={confirmDeleteDocument}
