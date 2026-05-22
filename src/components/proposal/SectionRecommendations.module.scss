@@ -232,18 +232,17 @@
 }
 
 .loadingState {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
-  gap: 1rem;
+  padding: 0.5rem 1rem;
+  gap: 0.25rem;
 
   p {
     margin: 0;
     font-size: 0.875rem;
-    color: var(--color-text-secondary);
+    color: rgba(255, 255, 255, 0.9);
     text-align: center;
   }
 }

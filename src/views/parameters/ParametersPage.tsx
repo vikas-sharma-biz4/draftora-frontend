@@ -1,12 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import dynamic from "next/dynamic";
 import Button from "@/components/common/Button";
 import BackButton from "@/components/common/BackButton";
+import { getProposal } from "@/services/proposal.service";
 
 import {
   useTemplateType,
@@ -25,13 +26,13 @@ import {
   useCurrentProposalId,
   useEditMode,
   useMaxStepReached,
-  useShouldStartBackgroundFetch,
   useWizardActions,
   useGeneratedProposalId,
-  useRecommendationsFetchStatus,
+  useApprovalStatus,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/hooks";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
+import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { useShallow } from "zustand/react/shallow";
 import type { SectionItem } from "@/components/common/SortableSectionList";
@@ -42,7 +43,6 @@ import { SECTION_DISPLAY_NAMES, TEMPLATE_TOCS } from "@/constants";
 import SectionManager from "./SectionManager";
 import ToneSelector from "./ToneSelector";
 import LengthLanguageSelector from "./LengthLanguageSelector";
-import AIModelSelector from "./AIModelSelector";
 
 const PageLayout = dynamic(() => import("@/layouts/AppLayout"), { ssr: false });
 
@@ -112,21 +112,47 @@ export default function ParametersPage(): JSX.Element {
   const currentProposalId = useCurrentProposalId();
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
-  const shouldStartBackgroundFetch = useShouldStartBackgroundFetch();
-  const recommendationsFetchStatus = useRecommendationsFetchStatus();
-  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setShouldStartBackgroundFetch, prefetchRecommendations } = useWizardActions();
+  const approvalStatus = useApprovalStatus();
+  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setCurrentProposalId } = useWizardActions();
   const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
   const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
   const isRecreateMode = templateType === "recreate";
 
   // Enable auto-save when user is in pipeline stage
-  useWizardAutoSave({ enabled: true, debounceMs: 2000 });
+  useWizardAutoSave({ enabled: true, debounceMs: 2000, approvalStatus });
+
+  // Restore currentProposalId from URL params if not set in store
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId && !currentProposalId) {
+      setCurrentProposalId(Number(urlProposalId));
+    }
+  }, [searchParams, currentProposalId, setCurrentProposalId]);
+
+  // Fetch proposal data when viewing from History to get approvalStatus
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId || currentProposalId) {
+      const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
+      if (proposalIdToFetch) {
+        getProposal(proposalIdToFetch).then((data: any) => {
+          if (data?.approvalStatus) {
+            updateProposalData({ approvalStatus: data.approvalStatus });
+          }
+        }).catch((error: unknown) => {
+          logger.warn('[ParametersPage] Failed to fetch proposal for approvalStatus', error);
+        });
+      }
+    }
+  }, [searchParams, currentProposalId, updateProposalData]);
 
   // Sync visited steps from backend on mount
   useEffect(() => {
@@ -134,6 +160,43 @@ export default function ParametersPage(): JSX.Element {
       syncVisitedStepsFromBackend(currentProposalId);
     }
   }, [currentProposalId, syncVisitedStepsFromBackend]);
+
+  // For already-generated proposals (coming from History with proposalId in URL), immediately mark all steps as visited
+  // This ensures the pipeline shows correct state even before backend sync completes
+  useEffect(() => {
+    const urlProposalId = searchParams.get("proposalId");
+    if (urlProposalId || currentProposalId) {
+      // This is viewing an existing proposal - mark all steps as visited
+      const { markStepAsVisited } = usePipelineStore.getState();
+      let needsUpdate = false;
+
+      if (!visitedPipelineSteps.includes(1)) {
+        markStepAsVisited(1);
+        needsUpdate = true;
+      }
+      if (!visitedPipelineSteps.includes(2)) {
+        markStepAsVisited(2);
+        needsUpdate = true;
+      }
+      if (!visitedPipelineSteps.includes(3)) {
+        markStepAsVisited(3);
+        needsUpdate = true;
+      }
+
+      // Set draft stage to generated to enable full pipeline navigation
+      setDraftStage("generated");
+      setCompletedSteps([1, 2, 3]);
+      setMaxStepReached(3);
+
+      // Sync to backend if we have a proposalId and made local updates
+      const proposalIdToSync = Number(urlProposalId) || currentProposalId;
+      if (needsUpdate && proposalIdToSync) {
+        markStepVisitedOnBackend(proposalIdToSync, 1);
+        markStepVisitedOnBackend(proposalIdToSync, 2);
+        markStepVisitedOnBackend(proposalIdToSync, 3);
+      }
+    }
+  }, [searchParams, currentProposalId, visitedPipelineSteps, markStepVisitedOnBackend, usePipelineStore, setDraftStage, setCompletedSteps, setMaxStepReached]);
 
   // Compute sections from templateType - DERIVED STATE (not stored)
   const computedSections = useMemo(() => {
@@ -219,13 +282,6 @@ export default function ParametersPage(): JSX.Element {
     }
   }, [sections, hasModifiedSections, selectedSections, sectionDisplayNames, updateProposalData]);
 
-  // Auto-fetch AI recommendations immediately when landing on Parameters page
-  useEffect(() => {
-    if (recommendationsFetchStatus === 'idle') {
-      prefetchRecommendations();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Sync computed sections to store when they change (only for non-template modes)
   // DISABLED: This causes race conditions with manual section additions
@@ -378,9 +434,6 @@ export default function ParametersPage(): JSX.Element {
     }
   }, [sections, updateProposalData, currentProposalId, markStepVisitedOnBackend, markStepCompleted, setDraftStage, setCurrentStep, maxStepReached, setMaxStepReached, router, isRegenerating]);
 
-  const onBackgroundFetchStarted = useCallback((): void => {
-    setShouldStartBackgroundFetch(false);
-  }, [setShouldStartBackgroundFetch]);
 
   const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
     logger.info('[ParametersPage] handleSectionsChange called', {
@@ -441,8 +494,6 @@ export default function ParametersPage(): JSX.Element {
           } as any}
           onUpdateProposalData={updateProposalData}
           isRecreateMode={isRecreateMode}
-          shouldStartBackgroundFetch={shouldStartBackgroundFetch}
-          onBackgroundFetchStarted={onBackgroundFetchStarted}
         />
 
         <ToneSelector
@@ -453,13 +504,10 @@ export default function ParametersPage(): JSX.Element {
         <LengthLanguageSelector
           lengthPreference={lengthPreference}
           language={language}
+          aiModel={aiModel ?? "gpt-4o"}
           onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
           onLanguageChange={(value) => updateProposalData({ language: value })}
-        />
-
-        <AIModelSelector
-          value={aiModel ?? "gpt-4o"}
-          onChange={(value) => updateProposalData({ aiModel: value })}
+          onAiModelChange={(value) => updateProposalData({ aiModel: value })}
         />
 
         <div className="page-footer">

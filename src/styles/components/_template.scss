@@ -1484,13 +1484,43 @@
 
 .tmpl-scratch {
 
-  background: var(--color-bg);
+  background: var(--color-white);
 
   justify-content: center;
 
   align-items: center;
 
   min-height: 200px;
+
+  border: 2px solid var(--color-border);
+
+  transition: all 0.2s ease;
+
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+
+}
+
+
+
+.tmpl-scratch:hover {
+
+  border-color: var(--color-primary);
+
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  transform: translateY(-2px);
+
+}
+
+
+
+.tmpl-scratch.tmpl-selected {
+
+  border-color: var(--color-primary);
+
+  background: var(--color-primary-light);
+
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
 
 }
 

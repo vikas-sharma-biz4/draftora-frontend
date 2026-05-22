@@ -9,6 +9,11 @@
   }
 }
 
+// ─── AI Model grid with larger spacing ───────────────────────────────────────────
+.ai-model-grid {
+  gap: 24px !important;
+}
+
 // ─── Three-column grid ────────────────────────────────────────────────────────
 .grid-3 {
   display: grid;
