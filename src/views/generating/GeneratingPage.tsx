@@ -70,8 +70,8 @@ export default function GeneratingPage(): JSX.Element {
     // Store the generated proposal ID so we can navigate back to it
     setGeneratedProposalId(proposalId);
 
-    // Navigate to proposal view
-    router.push(`/proposal/${proposalId}`);
+    // Navigate to proposal view using replace to remove generating screen from history
+    router.replace(`/proposal/${proposalId}`);
   }, [proposalId, router, setIsGenerating, setCompletedAt, setGeneratedProposalId]);
 
   const handleFailed = useCallback((message: string) => {
