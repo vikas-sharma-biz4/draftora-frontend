@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Users, Plus, Building2, Calendar, Trash2, FileText, ArrowRight, Search, X, CheckCircle, XCircle } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -44,6 +44,26 @@ export default function ClientsPage(): JSX.Element {
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
 
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter clients
+  const filteredClients = useMemo(() => {
+    let filtered = [...clients];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (client) =>
+          client.name.toLowerCase().includes(query) ||
+          client.industry.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [clients, searchQuery]);
+
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
   }
@@ -80,10 +100,32 @@ export default function ClientsPage(): JSX.Element {
         title="Clients"
         subtitle={`Manage your client relationships and view all proposals associated with each client.${clients.length > 0 ? ` (${clients.length} total)` : ''}`}
         action={
-          <Button variant="primary" onClick={handleNewClient}>
-            <Plus size={18} />
-            New Client
-          </Button>
+          <div className={styles.headerActions}>
+            {/* Search Input */}
+            <div className={styles.searchWrapper}>
+              <Search size={18} className={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="Search clients or industry..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={styles.searchInput}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className={styles.clearButton}
+                  aria-label="Clear search"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            <Button variant="primary" onClick={handleNewClient} className={styles.newClientButton}>
+              <Plus size={18} />
+              New Client
+            </Button>
+          </div>
         }
       />
 
@@ -101,8 +143,17 @@ export default function ClientsPage(): JSX.Element {
           onCtaClick={handleNewClient}
         />
       ) : (
-        <div className={styles.clientsGrid}>
-          {clients.map((client) => (
+        <>
+          {/* Results */}
+          {filteredClients.length === 0 ? (
+            <EmptyState
+              icon={<Search size={48} />}
+              title="No Results Found"
+              subtitle="Try adjusting your search."
+            />
+          ) : (
+            <div className={styles.clientsGrid}>
+              {filteredClients.map((client) => (
             <article
               key={client.id}
               className={styles.clientCard}
@@ -119,6 +170,7 @@ export default function ClientsPage(): JSX.Element {
                 </div>
                 <div className={styles.clientCardActions}>
                   <span className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}>
+                    {client.status === "active" ? <CheckCircle size={10} /> : <XCircle size={10} />}
                     {client.status}
                   </span>
                   <Button
@@ -140,18 +192,25 @@ export default function ClientsPage(): JSX.Element {
 
                 <div className={styles.clientCardMeta}>
                   <div className={styles.clientCardMetaItem}>
-                    <Calendar size={14} />
-                    <span>Created {formatDate(client.createdAt)}</span>
+                    <FileText size={12} />
+                    <span>{client.documents?.length || 0} documents</span>
+                  </div>
+                  <div className={styles.clientCardMetaItem}>
+                    <Calendar size={12} />
+                    <span>Updated {formatDate(client.updatedAt)}</span>
                   </div>
                 </div>
               </div>
 
               <div className={styles.clientCardFooter}>
-                <span className={styles.clientCardTier}>Active Client</span>
+                <span className={styles.clientCardView}>View Details</span>
+                <ArrowRight size={14} className={styles.clientCardArrow} />
               </div>
             </article>
           ))}
         </div>
+          )}
+        </>
       )}
 
         {showTemplateModal && (

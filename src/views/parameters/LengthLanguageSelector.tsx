@@ -72,10 +72,10 @@ export default function LengthLanguageSelector({
             </option>
           ))}
         </Select>
-        <div className="form-label mb-24">
+        <div className="form-label mt-8 mb-8">
           AI Model
         </div>
-        <div className="grid-2">
+        <div className="flex-col gap-8">
           {AI_MODEL_OPTIONS.map(({ value: optionValue, label, provider, description }) => {
             const isSelected = (aiModel ?? "gpt-4o") === optionValue;
             return (
