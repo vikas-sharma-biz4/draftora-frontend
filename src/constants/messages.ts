@@ -54,10 +54,14 @@ export const MESSAGES = {
   PROPOSAL_SECTIONS_REORDERED:         "Section order updated.",
   PROPOSAL_SECTIONS_REORDER_FAILED:    "Failed to update section order.",
 
-  DRAFT_SAVED:       "Draft saved",
-  DRAFT_RESTORED:    "Draft restored",
-  DRAFT_DELETED:     "Draft deleted",
-  DRAFT_ALL_DELETED: "All drafts deleted",
+  KNOWLEDGE_BASE_UPDATED: "Knowledge base updated",
+
+  DRAFT_SAVED:         "Draft saved",
+  DRAFT_RESTORED:      "Draft restored",
+  DRAFT_DELETED:       "Draft deleted",
+  DRAFT_ALL_DELETED:   "All drafts deleted",
+  DRAFT_SAVE_REJECTED:  "Cannot save changes — this proposal has already been reviewed.",
+  DRAFT_SAVE_LOADING:   "Proposal data is still loading — please try again in a moment.",
 
   UPLOAD_IN_PROGRESS:  "Uploading file\u2026",
   UPLOAD_SUCCESS:      "File uploaded",

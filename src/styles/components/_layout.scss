@@ -18,11 +18,18 @@
   width: calc(100% - var(--sidebar-width));
   height: 100vh;
   position: relative;
-  transition: margin-left 0.3s ease, width 0.3s ease;
+  transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .main-content.no-top-padding {
   padding-top: 0;
+}
+
+// When sidebar is collapsed, shrink the offset
+.sidebar.collapsed + .main-content {
+  margin-left: var(--sidebar-collapsed-width);
+  width: calc(100% - var(--sidebar-collapsed-width));
 }
 
 // ─── Page footer (wizard navigation) ─────────────────────────────────────────
@@ -47,33 +54,23 @@
   gap: 12px;
 }
 
-// ─── Responsive — 1024px ──────────────────────────────────────────────────────
+// ─── Responsive — tablet (≤ 1024px): sidebar auto-collapses ──────────────────
 @media (max-width: 1024px) {
-  .main-content {
+  .main-content,
+  .sidebar.collapsed + .main-content {
     margin-left: var(--sidebar-collapsed-width);
     width: calc(100% - var(--sidebar-collapsed-width));
     padding: 24px 32px;
-    max-width: 100%;
   }
 }
 
-// ─── Responsive — 768px ───────────────────────────────────────────────────────
+// ─── Responsive — mobile (≤ 768px): sidebar is overlay, content is full-width ─
 @media (max-width: 768px) {
-  .app-container {
-    flex-direction: column;
-  }
-
-  .main-content {
-    padding: 20px;
-  }
-}
-
-// ─── Responsive — 640px ───────────────────────────────────────────────────────
-@media (max-width: 640px) {
   .main-content,
   .sidebar.collapsed + .main-content {
-    margin-left: var(--sidebar-collapsed-width) !important;
-    width: calc(100% - var(--sidebar-collapsed-width)) !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 20px;
   }
 }
 

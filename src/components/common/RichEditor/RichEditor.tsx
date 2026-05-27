@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState, useCallback, useRef, useId } from "react";
+import { useEffect, useState, useCallback, useRef, useId } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -16,9 +16,12 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { createPortal } from "react-dom";
 import { toolbarManager } from "./FloatingToolbarManager";
 
-import { EDITOR_HIGHLIGHT_COLORS, EDITOR_TEXT_COLORS } from "@/constants";
+import { Input } from "@/components/common/Input";
 import { type RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
 import { plainTextToHtml } from "@/utils/contentParser";
+
+const TEXT_COLOR_PRESETS = ["#000000", "#1d4ed8", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2", "#d97706"];
+const HIGHLIGHT_COLOR_PRESETS = ["#fef08a", "#bfdbfe", "#bbf7d0", "#fecaca", "#ddd6fe", "#fed7aa"];
 
 interface RegenerateSelectionParams {
   selectedText: string;
@@ -67,7 +70,7 @@ function DropdownPortal({
   if (!isOpen) return null;
 
   return createPortal(
-    <div ref={elRef} className={className}>
+    <div ref={elRef} className={`rte-portal-content${className ? ` ${className}` : ""}`}>
       {children}
     </div>,
     document.body
@@ -89,18 +92,19 @@ export default function RichEditor({
   const [linkUrl, setLinkUrl] = useState<string>("");
   const [showImageInput, setShowImageInput] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string>("");
-  const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(true);
-  const [showCustomTextColorPicker, setShowCustomTextColorPicker] = useState<boolean>(false);
-  const [showCustomHighlightPicker, setShowCustomHighlightPicker] = useState<boolean>(false);
-  const [userExpandedToolbar, setUserExpandedToolbar] = useState<boolean>(false);
-  const isToolbarButtonClickRef = useRef<boolean>(false);
+  const [showTextColorPicker, setShowTextColorPicker] = useState<boolean>(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState<boolean>(false);
+
+  // Ref mirrors showRegenPrompt so closures inside useEffect always read fresh value
+  const showRegenPromptRef = useRef<boolean>(false);
+  useEffect(() => { showRegenPromptRef.current = showRegenPrompt; }, [showRegenPrompt]);
+
   const headingBtnRef = useRef<HTMLButtonElement | null>(null);
   const linkBtnRef = useRef<HTMLButtonElement | null>(null);
   const imageBtnRef = useRef<HTMLButtonElement | null>(null);
-  const customTextBtnRef = useRef<HTMLButtonElement | null>(null);
-  const customHighlightBtnRef = useRef<HTMLButtonElement | null>(null);
+  const textColorBtnRef = useRef<HTMLButtonElement | null>(null);
+  const highlightBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Unique ID for this editor instance (for toolbar ownership)
   const editorId = useId();
 
   const editor = useEditor({
@@ -109,9 +113,7 @@ export default function RichEditor({
       Underline,
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: {
-          class: 'editor-link',
-        },
+        HTMLAttributes: { class: "editor-link" },
       }),
       Highlight.configure({ multicolor: true }),
       TextStyle,
@@ -123,9 +125,7 @@ export default function RichEditor({
       Image.configure({
         inline: false,
         allowBase64: true,
-        HTMLAttributes: {
-          class: 'proposal-image',
-        },
+        HTMLAttributes: { class: "proposal-image" },
       }),
     ],
     content,
@@ -139,67 +139,43 @@ export default function RichEditor({
     onUpdate: ({ editor: e }) => {
       onChange(e.getHTML());
     },
-    // Don't auto-focus - cursor appears only when user clicks
   });
 
-  // Update content when it changes externally without re-creating the editor
-  // Only update if content is significantly different (not just formatting changes)
   useEffect(() => {
     if (!editor) return;
-
     const currentHtml = editor.getHTML();
-    const newContent = content;
-
-    // Don't update if content is the same or if editor is focused (user is typing)
-    if (currentHtml === newContent || editor.isFocused) {
-      return;
-    }
-
-    // Only update if content changed externally (e.g., from regeneration)
-    // emitUpdate: false prevents triggering onChange during external updates
-    editor.commands.setContent(newContent, { emitUpdate: false });
+    if (currentHtml === content || editor.isFocused) return;
+    editor.commands.setContent(content, { emitUpdate: false });
   }, [content, editor]);
 
-  const setColor = useCallback(
-    (color: string): void => {
-      if (!editor) return;
-      if (!color) {
-        editor.chain().focus().unsetColor().run();
-      } else {
-        editor.chain().focus().setColor(color).run();
-      }
-    },
-    [editor]
-  );
+  const setColor = useCallback((color: string): void => {
+    if (!editor) return;
+    if (!color) {
+      editor.chain().focus().unsetColor().run();
+    } else {
+      editor.chain().focus().setColor(color).run();
+    }
+  }, [editor]);
 
-  const setHighlight = useCallback(
-    (color: string): void => {
-      if (!editor) return;
-      if (!color) {
-        editor.chain().focus().unsetHighlight().run();
-      } else {
-        editor.chain().focus().toggleHighlight({ color }).run();
-      }
-    },
-    [editor]
-  );
+  const setHighlight = useCallback((color: string): void => {
+    if (!editor) return;
+    if (!color) {
+      editor.chain().focus().unsetHighlight().run();
+    } else {
+      editor.chain().focus().toggleHighlight({ color }).run();
+    }
+  }, [editor]);
 
   const insertTable = useCallback((): void => {
     if (!editor) return;
-    editor
-      .chain()
-      .focus()
-      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-      .run();
+    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   }, [editor]);
 
   const setLink = useCallback((): void => {
-    if (!editor) return;
-    if (linkUrl) {
-      editor.chain().focus().setLink({ href: linkUrl }).run();
-      setLinkUrl("");
-      setShowLinkInput(false);
-    }
+    if (!editor || !linkUrl) return;
+    editor.chain().focus().setLink({ href: linkUrl }).run();
+    setLinkUrl("");
+    setShowLinkInput(false);
   }, [editor, linkUrl]);
 
   const removeLink = useCallback((): void => {
@@ -219,26 +195,25 @@ export default function RichEditor({
     editor.chain().focus().setHorizontalRule().run();
   }, [editor]);
 
-  // Helper function to check if cursor is inside a list
-  const isInList = useCallback((listType: 'bulletList' | 'orderedList'): boolean => {
+  const isInList = useCallback((listType: "bulletList" | "orderedList"): boolean => {
     if (!editor) return false;
     const { from } = editor.state.selection;
     const $from = editor.state.doc.resolve(from);
-
-    // Check if the current node or any parent node is a list
     for (let depth = $from.depth; depth >= 0; depth--) {
       const node = $from.node(depth);
-      if (node.type.name === listType) {
-        return true;
-      }
+      if (node.type.name === listType) return true;
     }
-
-    // Fallback to editor.isActive() for edge cases
     return editor.isActive(listType);
   }, [editor]);
 
-  const openRegenPrompt = useCallback((): void => {
+  const handleAiButtonClick = useCallback((): void => {
     if (!editor) return;
+    if (showRegenPromptRef.current) {
+      setShowRegenPrompt(false);
+      setRegenPrompt("");
+      setSavedSelection(null);
+      return;
+    }
     const { from, to } = editor.state.selection;
     if (from === to) return;
     setSavedSelection({ from, to });
@@ -254,12 +229,10 @@ export default function RichEditor({
 
   const handleRegenerateSubmit = useCallback(async (): Promise<void> => {
     if (!editor || !onRegenerateSelection || !savedSelection) return;
-
     const { from, to } = savedSelection;
     const selectedText = editor.state.doc.textBetween(from, to, " ");
     if (!selectedText.trim()) return;
 
-    // Extract surrounding context to help AI understand boundaries
     const contextRadius = 300;
     const doc = editor.state.doc;
     const contextBefore = from > 1 ? doc.textBetween(Math.max(0, from - contextRadius), from, " ") : "";
@@ -277,19 +250,8 @@ export default function RichEditor({
 
       if (result !== null && editor) {
         const { regeneratedText, format } = result;
-
-        // Parse the regenerated content based on format
-        // The backend returns markdown, so convert to HTML for TipTap
         const contentToInsert = plainTextToHtml(regeneratedText);
-
-        // Replace content at exact selection position using TipTap transaction
-        editor
-          .chain()
-          .focus()
-          .setTextSelection({ from, to })
-          .insertContent(contentToInsert)
-          .run();
-
+        editor.chain().focus().setTextSelection({ from, to }).insertContent(contentToInsert).run();
         console.log("[RichEditor] Content regenerated with format:", format);
       }
     } catch (error) {
@@ -313,14 +275,12 @@ export default function RichEditor({
   const bubbleElRef = useRef<HTMLDivElement | null>(null);
   const [bubbleReady, setBubbleReady] = useState(false);
   const [hasSelection, setHasSelection] = useState(false);
-  const [selectionCoords, setSelectionCoords] = useState({ top: 0, left: 0 });
   const keepToolbarVisibleRef = useRef<boolean>(false);
   const toolbarPositionSetRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!editor) return;
 
-    // Cleanup function to reset all toolbar state
     const cleanupToolbarState = () => {
       setShowRegenPrompt(false);
       setRegenPrompt("");
@@ -328,234 +288,149 @@ export default function RichEditor({
       setShowHeadingMenu(false);
       setShowLinkInput(false);
       setShowImageInput(false);
-      setIsToolbarCollapsed(true);
       setHasSelection(false);
-      setShowCustomTextColorPicker(false);
-      setShowCustomHighlightPicker(false);
+      setShowTextColorPicker(false);
+      setShowHighlightPicker(false);
     };
 
-    // Request toolbar ownership from centralized manager
     const el = toolbarManager.requestToolbar(editorId, cleanupToolbarState);
     bubbleElRef.current = el;
+
+    const positionToolbar = (from: number, to: number) => {
+      if (!el || !toolbarManager.isOwner(editorId)) return;
+      const startCoords = editor.view.coordsAtPos(from);
+      const endCoords = editor.view.coordsAtPos(to);
+      const top = endCoords.bottom + 2;
+      let left = (startCoords.left + endCoords.left) / 2;
+
+      el.style.position = "fixed";
+      el.style.top = `${top}px`;
+      el.style.left = `${left}px`;
+      el.style.display = "block";
+
+      const toolbarWidth = el.offsetWidth || 320;
+      const viewportWidth = window.innerWidth;
+      const padding = 12;
+      const toolbarHalfWidth = toolbarWidth / 2;
+      const minLeft = padding + toolbarHalfWidth;
+      const maxLeft = viewportWidth - padding - toolbarHalfWidth;
+
+      if (left < minLeft) left = minLeft;
+      else if (left > maxLeft) left = maxLeft;
+
+      el.style.left = `${left}px`;
+      el.style.transform = "translateX(-50%)";
+    };
 
     const handleSelectionUpdate = () => {
       const { from, to, empty } = editor.state.selection;
       const hasTextSelected = !empty && from !== to;
 
       if (hasTextSelected) {
-        // CRITICAL: Only proceed if this editor owns the toolbar
-        // This prevents multiple editors from fighting over the same toolbar
         if (!toolbarManager.isOwner(editorId)) {
-          // Request ownership - this will cleanup any other editor's toolbar
           toolbarManager.requestToolbar(editorId, cleanupToolbarState);
         }
 
-        // CRITICAL: Reset ALL toolbar UI state for EVERY new selection
-        // This ensures clean toolbar state and prevents any menus/panels from auto-opening
-        setShowRegenPrompt(false);
-        setRegenPrompt("");
-        setSavedSelection(null);
-        setShowHeadingMenu(false);
-        setShowLinkInput(false);
-        setShowImageInput(false);
-        // Only collapse toolbar if user didn't intentionally expand it
-        if (!userExpandedToolbar) {
-          setIsToolbarCollapsed(true);
-        }
-        setShowCustomTextColorPicker(false);
-        setShowCustomHighlightPicker(false);
-
         setHasSelection(true);
-        keepToolbarVisibleRef.current = true; // Mark toolbar as active
+        keepToolbarVisibleRef.current = true;
 
-        // Only calculate and set position for NEW selections (not during scroll)
-        if (!toolbarPositionSetRef.current && el && toolbarManager.isOwner(editorId)) {
-          // Get selection coordinates from the editor view (already viewport-relative)
-          const startCoords = editor.view.coordsAtPos(from);
-          const endCoords = editor.view.coordsAtPos(to);
+        // Update saved selection if AI panel is open so regen always targets current selection
+        if (showRegenPromptRef.current) {
+          setSavedSelection({ from, to });
+        }
 
-          // Calculate center of selection
-          const top = endCoords.bottom + 2; // 2px below end of selection
-          let left = (startCoords.left + endCoords.left) / 2; // Center horizontally
-
-          setSelectionCoords({ top, left });
-
-          // Position and show the bubble with viewport boundary detection
-          el.style.position = 'fixed';
-          el.style.top = `${top}px`;
-          el.style.left = `${left}px`;
-          el.style.display = 'block'; // Must be visible to measure width
-
-          // Get toolbar dimensions after rendering
-          const toolbarWidth = el.offsetWidth || 320;
-          const viewportWidth = window.innerWidth;
-          const padding = 12; // Minimum padding from viewport edges
-
-          // Calculate boundaries - toolbar should not go off screen
-          // With translateX(-50%), the actual left edge is at: left - (toolbarWidth / 2)
-          // The actual right edge is at: left + (toolbarWidth / 2)
-          const toolbarHalfWidth = toolbarWidth / 2;
-          const minLeft = padding + toolbarHalfWidth;
-          const maxLeft = viewportWidth - padding - toolbarHalfWidth;
-
-          // Constrain left position to keep toolbar on screen
-          if (left < minLeft) {
-            left = minLeft;
-          } else if (left > maxLeft) {
-            left = maxLeft;
-          }
-
-          el.style.left = `${left}px`;
-          el.style.transform = 'translateX(-50%)'; // Center the toolbar on the calculated position
-
-          // Mark position as set - don't recalculate until new selection
+        if (!toolbarPositionSetRef.current) {
+          positionToolbar(from, to);
           toolbarPositionSetRef.current = true;
         }
       } else if (!keepToolbarVisibleRef.current) {
-        // Only hide if we're not keeping it visible (e.g., during scroll)
-        // AND not if a toolbar button was just clicked
-        if (!isToolbarButtonClickRef.current) {
-          setHasSelection(false);
-          // Reset ALL toolbar UI state when selection is cleared
-          setShowRegenPrompt(false);
-          setRegenPrompt("");
-          setSavedSelection(null);
-          setShowHeadingMenu(false);
-          setShowLinkInput(false);
-          setShowImageInput(false);
-          setIsToolbarCollapsed(true);
-          setShowCustomTextColorPicker(false);
-          setShowCustomHighlightPicker(false);
-          // Hide the bubble
-          if (el) {
-            el.style.display = 'none';
-          }
-        }
-      }
-      // If keepToolbarVisibleRef.current is true and no selection, toolbar stays visible
-    };
-
-    // Track mouse state to only show toolbar after mouse is released
-    let isMouseDown = false;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      // Don't reset if clicking on the toolbar or regen panel
-      const target = e.target as Node;
-      if (el && el.contains(target)) {
-        return; // Clicking on toolbar - do nothing
-      }
-
-      // Only track mouse down if clicking inside the editor, not on the toolbar
-      const editorDom = editor.view.dom;
-      if (editorDom.contains(target)) {
-        isMouseDown = true;
-        keepToolbarVisibleRef.current = false; // Reset flag - user is making new selection
-        toolbarPositionSetRef.current = false; // Reset position flag - allow repositioning
-        setUserExpandedToolbar(false); // Reset user expansion flag on new selection
-        // CRITICAL: Reset ALL toolbar state immediately when starting new selection
-        // This prevents multiple toolbars and ensures clean state
+        setHasSelection(false);
         setShowRegenPrompt(false);
         setRegenPrompt("");
         setSavedSelection(null);
         setShowHeadingMenu(false);
         setShowLinkInput(false);
         setShowImageInput(false);
-        setIsToolbarCollapsed(true);
-        setHasSelection(false);
-        setShowCustomTextColorPicker(false);
-        setShowCustomHighlightPicker(false);
-        // Hide toolbar when starting to select
-        if (el) {
-          el.style.display = 'none';
-        }
-      } else {
-        // Clicking outside editor - reset flags to allow toolbar to hide
+        setShowTextColorPicker(false);
+        setShowHighlightPicker(false);
+        if (el) el.style.display = "none";
+      }
+    };
+
+    let isMouseDown = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Don't interfere if clicking inside the toolbar bubble or any portal dropdown
+      const isInPortal = !!(target as Element).closest?.(".rte-portal-content");
+      if ((el && el.contains(target)) || isInPortal) return;
+
+      const editorDom = editor.view.dom;
+      if (editorDom.contains(target)) {
+        // Starting a new text selection — just track mouse state, don't reset toolbar yet
+        isMouseDown = true;
         keepToolbarVisibleRef.current = false;
         toolbarPositionSetRef.current = false;
+        setHasSelection(false);
+        if (el) el.style.display = "none";
+      } else {
+        // Clicking completely outside editor and toolbar — reset everything
+        keepToolbarVisibleRef.current = false;
+        toolbarPositionSetRef.current = false;
+        setHasSelection(false);
+        setShowRegenPrompt(false);
+        setRegenPrompt("");
+        setSavedSelection(null);
+        setShowHeadingMenu(false);
+        setShowLinkInput(false);
+        setShowImageInput(false);
+        setShowTextColorPicker(false);
+        setShowHighlightPicker(false);
+        if (el) el.style.display = "none";
       }
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      // Only handle mouse up if we were tracking a selection in the editor
+    const handleMouseUp = () => {
       if (isMouseDown) {
         isMouseDown = false;
-        // Show toolbar after mouse is released and selection is complete
-        setTimeout(() => handleSelectionUpdate(), 50); // Longer delay to ensure selection is complete
+        setTimeout(() => handleSelectionUpdate(), 50);
       }
     };
 
-    // Handle scroll to update toolbar position
     const handleScroll = () => {
       requestAnimationFrame(() => {
-        if (!el || !toolbarManager.isOwner(editorId) || !keepToolbarVisibleRef.current) {
-          return;
-        }
-
-        // Check if there's an active selection in the editor state
+        if (!el || !toolbarManager.isOwner(editorId) || !keepToolbarVisibleRef.current) return;
         const { from, to, empty } = editor.state.selection;
         if (empty || from === to) return;
-
-        // Get updated selection coordinates
-        const startCoords = editor.view.coordsAtPos(from);
-        const endCoords = editor.view.coordsAtPos(to);
-
-        // Recalculate position
-        const top = endCoords.bottom + 2;
-        let left = (startCoords.left + endCoords.left) / 2;
-
-        // Apply boundary detection
-        const toolbarWidth = el.offsetWidth || 320;
-        const viewportWidth = window.innerWidth;
-        const padding = 12;
-        const toolbarHalfWidth = toolbarWidth / 2;
-        const minLeft = padding + toolbarHalfWidth;
-        const maxLeft = viewportWidth - padding - toolbarHalfWidth;
-
-        if (left < minLeft) {
-          left = minLeft;
-        } else if (left > maxLeft) {
-          left = maxLeft;
-        }
-
-        el.style.top = `${top}px`;
-        el.style.left = `${left}px`;
-        el.style.display = 'block'; // Ensure toolbar is visible
+        positionToolbar(from, to);
       });
     };
 
-    // Attach scroll listener to the editor's scrollable parent and window
     const editorDom = editor.view.dom;
     const scrollableParent = editorDom.closest('[data-scrollable="true"]') || editorDom.parentElement;
 
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('scroll', handleScroll, true); // Capture phase for all scroll events
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("scroll", handleScroll, true);
     if (scrollableParent && scrollableParent !== document.body && scrollableParent !== document.documentElement) {
-      scrollableParent.addEventListener('scroll', handleScroll);
+      scrollableParent.addEventListener("scroll", handleScroll);
     }
 
-    // Also handle keyboard selection (no mouse involved)
-    editor.on('selectionUpdate', () => {
-      if (!isMouseDown) {
-        handleSelectionUpdate();
-      }
+    editor.on("selectionUpdate", () => {
+      if (!isMouseDown) handleSelectionUpdate();
     });
 
-    // Initial state - hidden
-    el.style.display = 'none';
+    el.style.display = "none";
     setBubbleReady(true);
 
     return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('scroll', handleScroll, true);
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("scroll", handleScroll, true);
       if (scrollableParent && scrollableParent !== document.body && scrollableParent !== document.documentElement) {
-        scrollableParent.removeEventListener('scroll', handleScroll);
+        scrollableParent.removeEventListener("scroll", handleScroll);
       }
-
-      // Release toolbar ownership - manager will handle cleanup
       toolbarManager.releaseToolbar(editorId);
-
       bubbleElRef.current = null;
       setBubbleReady(false);
     };
@@ -563,8 +438,12 @@ export default function RichEditor({
 
   if (!editor) return <div className="rte-content" />;
 
+  // Derived from live editor state — always reflects active formatting
+  const activeTextColor = (editor.getAttributes("textStyle").color as string | undefined) ?? "#000000";
+  const activeHighlightColor = (editor.getAttributes("highlight").color as string | undefined) ?? "#fef08a";
+
   const toolbar = (
-    <div className={`rte-toolbar-modern${isToolbarCollapsed ? " collapsed" : ""}`} role="toolbar" aria-label="Formatting toolbar">
+    <div className="rte-toolbar-modern" role="toolbar" aria-label="Formatting toolbar">
       {/* Text Formatting Group */}
       <div className="rte-toolbar-group">
         <button
@@ -652,11 +531,7 @@ export default function RichEditor({
           type="button"
           className={`rte-btn-icon${isInList("bulletList") ? " active" : ""}`}
           title="Bullet list"
-          onClick={() => {
-            isToolbarButtonClickRef.current = true;
-            editor.chain().focus().toggleBulletList().run();
-            setTimeout(() => { isToolbarButtonClickRef.current = false; }, 100);
-          }}
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         </button>
@@ -664,11 +539,7 @@ export default function RichEditor({
           type="button"
           className={`rte-btn-icon${isInList("orderedList") ? " active" : ""}`}
           title="Numbered list"
-          onClick={() => {
-            isToolbarButtonClickRef.current = true;
-            editor.chain().focus().toggleOrderedList().run();
-            setTimeout(() => { isToolbarButtonClickRef.current = false; }, 100);
-          }}
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
         </button>
@@ -684,13 +555,7 @@ export default function RichEditor({
             type="button"
             className={`rte-btn-icon${editor.isActive("link") ? " active" : ""}`}
             title={editor.isActive("link") ? "Edit link" : "Add link"}
-            onClick={() => {
-              if (editor.isActive("link")) {
-                setShowLinkInput(!showLinkInput);
-              } else {
-                setShowLinkInput(!showLinkInput);
-              }
-            }}
+            onClick={() => setShowLinkInput(!showLinkInput)}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           </button>
@@ -733,210 +598,174 @@ export default function RichEditor({
             <button onClick={insertImage} className="rte-link-btn-apply">✓</button>
           </DropdownPortal>
         </div>
-        <button
-          type="button"
-          className="rte-btn-icon"
-          title="Insert table"
-          onClick={insertTable}
-        >
+        <button type="button" className="rte-btn-icon" title="Insert table" onClick={insertTable}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
         </button>
-        <button
-          type="button"
-          className="rte-btn-icon"
-          title="Horizontal divider"
-          onClick={insertHorizontalRule}
-        >
+        <button type="button" className="rte-btn-icon" title="Horizontal divider" onClick={insertHorizontalRule}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/></svg>
         </button>
       </div>
 
       <div className="rte-toolbar-divider" />
 
-      {/* Color Group */}
-      <div className="rte-toolbar-group rte-color-group">
-        <span className="rte-color-label">Highlight</span>
-        {EDITOR_HIGHLIGHT_COLORS.map((color) => (
-          color === "custom" ? (
-            <div key="custom" className="rte-dropdown">
-              <button
-                ref={customHighlightBtnRef}
-                type="button"
-                className="rte-color-swatch-btn"
-                title="Custom highlight color"
-                onClick={() => {
-                  setShowCustomHighlightPicker(!showCustomHighlightPicker);
-                  setShowCustomTextColorPicker(false);
-                }}
-              >
-                <div className="rte-color-swatch rte-color-swatch-custom">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2v20M2 12h20"/>
-                  </svg>
-                </div>
-              </button>
-              {showCustomHighlightPicker && (
-                <DropdownPortal
-                  triggerRef={customHighlightBtnRef}
-                  isOpen={showCustomHighlightPicker}
-                  className="rte-custom-color-picker-portal"
-                >
-                  <input
-                    type="color"
-                    className="rte-custom-color-picker-input"
-                    onChange={(e) => {
-                      setHighlight(e.target.value);
-                      setShowCustomHighlightPicker(false);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                  />
-                </DropdownPortal>
-              )}
+      {/* Color Group — A (text color) + H (highlight) */}
+      <div className="rte-toolbar-group">
+        <div className="rte-dropdown">
+          <button
+            ref={textColorBtnRef}
+            type="button"
+            className="rte-btn-text-color"
+            title="Text color"
+            onClick={() => {
+              setShowTextColorPicker(!showTextColorPicker);
+              setShowHighlightPicker(false);
+            }}
+          >
+            <span className="rte-btn-color-letter" style={{ color: activeTextColor }}>A</span>
+            <span className="rte-color-indicator-bar" style={{ background: activeTextColor }} />
+          </button>
+          <DropdownPortal triggerRef={textColorBtnRef} isOpen={showTextColorPicker} className="rte-color-picker-panel">
+            <div className="rte-color-preset-row">
+              {TEXT_COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="rte-color-preset-swatch"
+                  style={{ background: c }}
+                  title={c}
+                  onClick={() => { setColor(c); setShowTextColorPicker(false); }}
+                />
+              ))}
             </div>
-          ) : (
-            <button
-              key={color || "none"}
-              type="button"
-              className="rte-color-swatch-btn"
-              title={color ? `Highlight: ${color}` : "Remove highlight"}
-              onClick={() => setHighlight(color)}
-            >
-              <div
-                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-                style={color ? { background: color } : undefined}
+            <div className="rte-color-picker-row">
+              <button
+                type="button"
+                className="rte-color-preset-swatch rte-color-swatch-clear"
+                title="Remove color"
+                onClick={() => { setColor(""); setShowTextColorPicker(false); }}
               />
-            </button>
-          )
-        ))}
+              <input
+                type="color"
+                className="rte-custom-color-picker-input"
+                defaultValue={activeTextColor}
+                onChange={(e) => setColor(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                title="Custom color"
+              />
+            </div>
+          </DropdownPortal>
+        </div>
+
+        <div className="rte-dropdown">
+          <button
+            ref={highlightBtnRef}
+            type="button"
+            className="rte-btn-highlight-color"
+            title="Highlight color"
+            onClick={() => {
+              setShowHighlightPicker(!showHighlightPicker);
+              setShowTextColorPicker(false);
+            }}
+          >
+            <span className="rte-btn-color-letter" style={{ background: activeHighlightColor }}>H</span>
+          </button>
+          <DropdownPortal triggerRef={highlightBtnRef} isOpen={showHighlightPicker} className="rte-color-picker-panel">
+            <div className="rte-color-preset-row">
+              {HIGHLIGHT_COLOR_PRESETS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="rte-color-preset-swatch"
+                  style={{ background: c }}
+                  title={c}
+                  onClick={() => { setHighlight(c); setShowHighlightPicker(false); }}
+                />
+              ))}
+            </div>
+            <div className="rte-color-picker-row">
+              <button
+                type="button"
+                className="rte-color-preset-swatch rte-color-swatch-clear"
+                title="Remove highlight"
+                onClick={() => { setHighlight(""); setShowHighlightPicker(false); }}
+              />
+              <input
+                type="color"
+                className="rte-custom-color-picker-input"
+                defaultValue={activeHighlightColor}
+                onChange={(e) => setHighlight(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                title="Custom highlight"
+              />
+            </div>
+          </DropdownPortal>
+        </div>
       </div>
 
-      <div className="rte-toolbar-divider" />
-
-      <div className="rte-toolbar-group rte-color-group">
-        <span className="rte-color-label">Text</span>
-        {EDITOR_TEXT_COLORS.map((color) => (
-          color === "custom" ? (
-            <div key="custom" className="rte-dropdown">
-              <button
-                ref={customTextBtnRef}
-                type="button"
-                className="rte-color-swatch-btn"
-                title="Custom text color"
-                onClick={() => {
-                  setShowCustomTextColorPicker(!showCustomTextColorPicker);
-                  setShowCustomHighlightPicker(false);
-                }}
-              >
-                <div className="rte-color-swatch rte-color-swatch-custom">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2v20M2 12h20"/>
-                  </svg>
-                </div>
-              </button>
-              {showCustomTextColorPicker && (
-                <DropdownPortal
-                  triggerRef={customTextBtnRef}
-                  isOpen={showCustomTextColorPicker}
-                  className="rte-custom-color-picker-portal"
-                >
-                  <input
-                    type="color"
-                    className="rte-custom-color-picker-input"
-                    onChange={(e) => {
-                      setColor(e.target.value);
-                      setShowCustomTextColorPicker(false);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                  />
-                </DropdownPortal>
-              )}
-            </div>
-          ) : (
-            <button
-              key={color || "none"}
-              type="button"
-              className="rte-color-swatch-btn"
-              title={color ? `Color: ${color}` : "Default color"}
-              onClick={() => setColor(color)}
-            >
-              <div
-                className={`rte-color-swatch${color ? "" : " rte-color-swatch-empty"}`}
-                style={color ? { background: color } : undefined}
-              />
-            </button>
-          )
-        ))}
-      </div>
-
-      {/* AI Regenerate - Always visible in toolbar row */}
+      {/* AI button — square, toggles panel below */}
       {onRegenerateSelection && (
         <>
           <div className="rte-toolbar-divider" />
-          {showRegenPrompt ? (
-            <input
-              type="text"
-              className="rte-regen-input-inline"
-              placeholder="How should AI rewrite this?"
-              value={regenPrompt}
-              onChange={(e) => setRegenPrompt(e.target.value)}
-              onKeyDown={handleRegenKeyDown}
-              autoFocus
-              disabled={regenLoading}
-            />
-          ) : (
+          <div className="rte-toolbar-group">
             <button
               type="button"
-              className="rte-btn-ai"
+              className={`rte-btn-ai${showRegenPrompt ? " active" : ""}`}
               title="Regenerate selection with AI"
               disabled={regenLoading}
-              onClick={openRegenPrompt}
+              onClick={handleAiButtonClick}
             >
-              <span>AI</span>
+              AI
             </button>
-          )}
+          </div>
         </>
       )}
-
-      {/* Expand/Collapse Button */}
-      <button
-        type="button"
-        className="rte-toolbar-expand-btn"
-        title={isToolbarCollapsed ? "Show more options" : "Show less options"}
-        onClick={() => {
-          setIsToolbarCollapsed(!isToolbarCollapsed);
-          setUserExpandedToolbar(!isToolbarCollapsed);
-        }}
-      >
-        {isToolbarCollapsed ? (
-          <>
-            <span>More</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </>
-        ) : (
-          <>
-            <span>Less</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>
-          </>
-        )}
-      </button>
     </div>
   );
 
-  // Combined toolbar container
+  // AI input panel — appears below toolbar when AI button is toggled
+  const aiInputPanel = onRegenerateSelection && showRegenPrompt ? (
+    <div className="rte-ai-input-panel">
+      <Input
+        inputSize="sm"
+        placeholder="How should AI improve this?"
+        value={regenPrompt}
+        onChange={(e) => setRegenPrompt(e.target.value)}
+        onKeyDown={handleRegenKeyDown}
+        autoFocus
+        disabled={regenLoading}
+      />
+      <button
+        type="button"
+        className="rte-ai-send-btn"
+        onClick={() => void handleRegenerateSubmit()}
+        disabled={regenLoading}
+        title="Submit (Enter)"
+      >
+        {regenLoading ? (
+          <svg className="rte-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5" />
+            <polyline points="5 12 12 5 19 12" />
+          </svg>
+        )}
+      </button>
+    </div>
+  ) : null;
+
   const toolbarWithPanel = (
-    <div className="rte-toolbar-container-floating">
+    // onMouseDown prevents editor blur when interacting with the floating toolbar
+    <div className="rte-toolbar-container-floating" onMouseDown={(e) => e.preventDefault()}>
       {toolbar}
+      {aiInputPanel}
     </div>
   );
 
   return (
     <div className="rte-wrapper">
-      {/* Render toolbar + panel into bubble mount via portal when text is selected */}
       {bubbleReady && hasSelection && bubbleElRef.current && createPortal(toolbarWithPanel, bubbleElRef.current)}
-
-      {/* Editor content */}
       <div className="rte-content">
         <EditorContent editor={editor} />
       </div>

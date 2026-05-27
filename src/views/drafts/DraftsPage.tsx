@@ -2,14 +2,18 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
-import { FileText, Clock, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { FileText } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
+import SearchBar from "@/components/common/SearchBar/SearchBar";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import styles from "./DraftsPage.module.scss";
 
+import { removeDraftTemplateMeta } from "@/utils/draftTemplateCache";
+import DraftCard from "@/components/common/DraftCard";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDrafts } from "@/hooks/useDrafts";
@@ -35,10 +39,11 @@ const DeleteAllDraftsModal = dynamic(() => import("@/components/modals/DeleteAll
 });
 
 export default function DraftsPage(): JSX.Element {
-  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId } = useWizardActions();
+  const { updateProposalData, setCurrentStep, setMaxStepReached, setGeneratedProposalId, setCurrentProposalId } = useWizardActions();
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
   const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
   const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
+  const setFromHistory = useDraftSessionStore((s) => s.setFromHistory);
   const router = useRouter();
 
   const { drafts, isLoading, refetch } = useDrafts();
@@ -58,6 +63,18 @@ export default function DraftsPage(): JSX.Element {
   const [deleteModalData, setDeleteModalData] = useState<{ id: string; name: string } | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const filteredDrafts = useMemo(() => {
+    if (!debouncedSearch) return drafts;
+    const q = debouncedSearch.toLowerCase();
+    return drafts.filter(
+      (d) =>
+        (d.title?.toLowerCase().includes(q) ?? false) ||
+        (d.clientName?.toLowerCase().includes(q) ?? false)
+    );
+  }, [drafts, debouncedSearch]);
 
   useEffect(() => {
     setMounted(true);
@@ -83,10 +100,10 @@ export default function DraftsPage(): JSX.Element {
 
 
   const handleNewProposalClick = useCallback((): void => {
-    // Clear draft ID to ensure new proposal doesn't update existing draft
     setCurrentDraftId(null);
+    setFromHistory(false);
     setShowTemplateModal(true);
-  }, [setCurrentDraftId]);
+  }, [setCurrentDraftId, setFromHistory]);
 
   const handleNewClientFromModal = useCallback((): void => {
     setShowTemplateModal(false);
@@ -101,10 +118,9 @@ export default function DraftsPage(): JSX.Element {
 
   const handleLoadDraft = useCallback(async (draftId: string): Promise<void> => {
     try {
+      setFromHistory(false);
       setLoadingDraftId(draftId);
-      console.log('[DraftsPage] Loading draft:', draftId);
       const fullDraft: SavedDraft = await getDraftFromStore(draftId);
-      console.log('[DraftsPage] Draft loaded successfully:', fullDraft);
 
       // Restore wizard state with generated content included in proposalData
       const proposalData = fullDraft.wizardState.proposalData as any;
@@ -148,6 +164,7 @@ export default function DraftsPage(): JSX.Element {
       // Restore proposal ID if exists
       if (fullDraft.proposalId) {
         setGeneratedProposalId(fullDraft.proposalId);
+        setCurrentProposalId(fullDraft.proposalId);
       }
 
       // Store UI state for restoration after navigation
@@ -187,7 +204,7 @@ export default function DraftsPage(): JSX.Element {
     } finally {
       setLoadingDraftId(null);
     }
-  }, [getDraftFromStore, updateProposalData, setCurrentStep, setDraftStage, setCompletedSteps, setMaxStepReached, setCurrentDraftId, setGeneratedProposalId, router]);
+  }, [getDraftFromStore, updateProposalData, setCurrentStep, setDraftStage, setCompletedSteps, setMaxStepReached, setCurrentDraftId, setGeneratedProposalId, setFromHistory, router]);
 
   const handleDeleteDraft = useCallback((id: string, name: string, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -199,6 +216,7 @@ export default function DraftsPage(): JSX.Element {
 
     try {
       await deleteDraftFromStore(deleteModalData.id);
+      removeDraftTemplateMeta(deleteModalData.id);
       toast.success("Draft deleted");
       setDeleteModalData(null);
     } catch (error) {
@@ -218,27 +236,6 @@ export default function DraftsPage(): JSX.Element {
     }
   }, [deleteAllDraftsFromStore]);
 
-  const getStatusLabel = useCallback((status: string): string => {
-    if (status === "draft") return "Draft";
-    if (status === "generating") return "Generating";
-    if (status === "completed") return "Completed";
-    return "In Progress";
-  }, []);
-
-  const getLocationLabel = useCallback((location: string): string => {
-    switch (location) {
-      case "wizard_parameters":
-        return "Parameters";
-      case "wizard_review":
-        return "Review";
-      case "web_view":
-        return "Generated";
-      case "ai_sections":
-        return "AI Generation";
-      default:
-        return "Unknown";
-    }
-  }, []);
 
   return (
     <PageLayout>
@@ -258,12 +255,7 @@ export default function DraftsPage(): JSX.Element {
         }
       />
 
-        {!mounted ? (
-          <SkeletonGrid
-            className={styles.draftsGrid}
-            renderItem={() => <DraftCardSkeleton />}
-          />
-        ) : isLoading ? (
+        {!mounted || isLoading ? (
           <SkeletonGrid
             className={styles.draftsGrid}
             renderItem={() => <DraftCardSkeleton />}
@@ -277,67 +269,36 @@ export default function DraftsPage(): JSX.Element {
             onCtaClick={handleNewProposalClick}
           />
         ) : (
+          <>
+            <div className={styles.toolbar}>
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by title or client..."
+                className={styles.searchBar}
+              />
+            </div>
+
+            {filteredDrafts.length === 0 ? (
+              <EmptyState
+                icon={<FileText size={48} />}
+                title="No matching drafts"
+                subtitle="Try adjusting your search."
+              />
+            ) : (
           <div className={styles.draftsGrid}>
-            {drafts.map((draft) => (
-              <article
+            {filteredDrafts.map((draft) => (
+              <DraftCard
                 key={draft.id}
-                className={styles.draftCard}
-                onClick={() => void handleLoadDraft(draft.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void handleLoadDraft(draft.id);
-                }}
-              >
-                <div className={styles.draftHeader}>
-                  <div className={styles.draftIcon}>
-                    <FileText size={20} />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    iconOnly
-                    onClick={(e) => handleDeleteDraft(draft.id, draft.title || "Untitled Proposal", e)}
-                    aria-label="Delete draft"
-                    title="Delete this draft"
-                    className={styles.deleteBtn}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-
-                <div className={styles.draftBody}>
-                  <div className={styles.draftTitle}>{draft.title || "Untitled Proposal"}</div>
-                  {draft.clientName && (
-                    <div className={styles.draftClient}>{draft.clientName}</div>
-                  )}
-                  <div className={styles.draftMeta}>
-                    <span className={styles.draftStatus}>
-                      <span className={styles.statusDot} />
-                      {getStatusLabel(draft.status)}
-                    </span>
-                    <span className={styles.draftDate}>
-                      <Clock size={12} />
-                      {formatDateWithTime(draft.updatedAt)}
-                    </span>
-                  </div>
-                  <div className={styles.draftLocation}>
-                    {getLocationLabel(draft.lastLocation)}
-                  </div>
-                </div>
-
-                <div className={styles.draftFooter}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    fullWidth
-                    loading={loadingDraftId === draft.id}
-                  >
-                    Resume Editing
-                  </Button>
-                </div>
-              </article>
+                draft={draft}
+                loadingDraftId={loadingDraftId}
+                onLoad={(id) => void handleLoadDraft(id)}
+                onDelete={handleDeleteDraft}
+              />
             ))}
           </div>
+            )}
+          </>
         )}
 
       {showTemplateModal && (

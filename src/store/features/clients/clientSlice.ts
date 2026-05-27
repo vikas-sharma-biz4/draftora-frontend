@@ -35,7 +35,7 @@ function loadClientsFromLocalStorage(): ClientWithDocuments[] | null {
     if (!cached) return null;
     return JSON.parse(cached);
   } catch (error) {
-    console.warn('[clientSlice] Failed to load clients from localStorage:', error);
+    logger.warn('[clientSlice] Failed to load clients from localStorage:', error);
     return null;
   }
 }
@@ -50,7 +50,7 @@ function saveClientsToLocalStorage(clients: ClientWithDocuments[]): void {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(clients));
     localStorage.setItem(LOCAL_STORAGE_TIMESTAMP_KEY, Date.now().toString());
   } catch (error) {
-    console.warn('[clientSlice] Failed to save clients to localStorage:', error);
+    logger.warn('[clientSlice] Failed to save clients to localStorage:', error);
   }
 }
 
@@ -64,7 +64,7 @@ function clearClientsFromLocalStorage(): void {
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     localStorage.removeItem(LOCAL_STORAGE_TIMESTAMP_KEY);
   } catch (error) {
-    console.warn('[clientSlice] Failed to clear clients from localStorage:', error);
+    logger.warn('[clientSlice] Failed to clear clients from localStorage:', error);
   }
 }
 
@@ -137,24 +137,13 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
   // Actions
   fetchClients: async (force = false) => {
-    const { isCacheValid, isLoading, clients: currentClients } = get();
+    const { isCacheValid, isLoading } = get();
 
-    console.log('[clientSlice] fetchClients called:', { 
-      force, 
-      isCacheValid: isCacheValid(), 
-      isLoading,
-      currentClientsCount: currentClients.length 
-    });
-
-    // Return cached data if valid and not forced
     if (!force && isCacheValid()) {
-      console.log('[clientSlice] Using cached data');
       return;
     }
 
-    // Prevent duplicate concurrent requests
     if (isLoading) {
-      console.log('[clientSlice] Already loading, skipping');
       return;
     }
 
@@ -162,11 +151,6 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
     try {
       const clients = await clientApi.listClientsFullData();
-      console.log('[clientSlice] Fetched clients from API:', {
-        count: clients.length,
-        isArray: Array.isArray(clients),
-        clients: clients.map(c => ({ id: c.id, name: c.name, documentsCount: c.documents?.length || 0 }))
-      });
       set({
         clients,
         isLoading: false,
@@ -174,17 +158,14 @@ export const useClientStore = create<ClientState>((set, get) => ({
         lastFetched: Date.now(),
         error: null,
       });
-      // Save to localStorage for persistence
       saveClientsToLocalStorage(clients);
-      console.log('[clientSlice] Saved to localStorage');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch clients';
-      console.error('[clientSlice] Failed to fetch clients:', errorMessage, error);
+      logger.error('[clientSlice] Failed to fetch clients:', error);
       set({
         isLoading: false,
         error: errorMessage,
       });
-      // Don't re-throw - silently fail and let components handle the error state
     }
   },
 
@@ -288,23 +269,14 @@ export const useClientStore = create<ClientState>((set, get) => ({
   },
 
   removeDocument: (clientId: number, documentId: number) => {
-    console.log('[clientSlice] removeDocument called:', { clientId, documentId });
     set(state => {
       const updatedClients = state.clients.map(c =>
         c.id === clientId
           ? { ...c, documents: c.documents.filter(d => d.id !== documentId) }
           : c
       );
-      console.log('[clientSlice] Document removed from store:', {
-        clientId,
-        documentId,
-        newDocCount: updatedClients.find(c => c.id === clientId)?.documents.length
-      });
       saveClientsToLocalStorage(updatedClients);
-      return {
-        clients: updatedClients,
-        // Don't update lastFetched to avoid triggering unnecessary refetches
-      };
+      return { clients: updatedClients };
     });
   },
 
@@ -377,11 +349,8 @@ export const useClientStore = create<ClientState>((set, get) => ({
 
   uploadDocument: async (clientId: number, file: File) => {
     try {
-      console.log('[clientSlice] Uploading document:', { clientId, fileName: file.name, fileSize: file.size });
       const document = await clientApi.uploadDocument(clientId, file);
-      console.log('[clientSlice] Document uploaded successfully:', { clientId, documentId: document.id, documentName: document.name, backendSize: document.sizeBytes });
 
-      // Ensure sizeBytes is set correctly - use backend value if available, otherwise use file.size
       const documentWithSize = {
         ...document,
         sizeBytes: document.sizeBytes || file.size,
@@ -397,7 +366,7 @@ export const useClientStore = create<ClientState>((set, get) => ({
         logger.warn('[clientSlice] Client not found for document upload (likely already deleted), cannot upload document:', clientId);
         return;
       }
-      console.error('[clientSlice] Failed to upload document:', error);
+      logger.error('[clientSlice] Failed to upload document:', error);
       throw error;
     }
   },

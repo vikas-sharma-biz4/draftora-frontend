@@ -140,10 +140,10 @@
   white-space: nowrap;
 }
 
-// When regen panel is open, toolbar has only top rounded corners
-.rte-toolbar-container-floating:has(.rte-regen-panel) .rte-toolbar-modern {
+// When AI panel is open, toolbar merges with panel — flatten bottom corners
+.rte-toolbar-container-floating:has(.rte-ai-input-panel) .rte-toolbar-modern {
   border-radius: 12px 12px 0 0;
-  box-shadow: none; // Panel will have the shadow
+  box-shadow: none;
 }
 
 .rte-toolbar-separator {
@@ -440,14 +440,6 @@
   box-sizing: border-box;
 }
 
-.rte-toolbar-modern.collapsed .rte-toolbar-group:nth-child(n+3) {
-  display: none;
-}
-
-.rte-toolbar-modern.collapsed .rte-toolbar-divider:nth-child(n+2) {
-  display: none;
-}
-
 // Each group is a horizontal row of buttons
 .rte-toolbar-modern .rte-toolbar-group {
   display: flex;
@@ -469,38 +461,6 @@
     rgba(0, 0, 0, 0.1) 80%,
     transparent
   );
-}
-
-// Expand button spans full width
-.rte-toolbar-modern .rte-toolbar-expand-btn {
-  width: 100%;
-  margin-left: 0;
-  justify-content: center;
-}
-
-.rte-toolbar-expand-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-left: auto;
-}
-
-.rte-toolbar-expand-btn:hover {
-  background: rgba(var(--color-primary-rgb), 0.08);
-  color: var(--color-primary);
 }
 
 // ─── Toolbar groups & dividers ────────────────────────────────────────────────
@@ -828,99 +788,195 @@
   background: transparent;
 }
 
-// ─── AI regenerate button ─────────────────────────────────────────────────────
+// ─── AI regenerate button (square icon-style) ─────────────────────────────────
 .rte-btn-ai {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  width: 32px;
   height: 32px;
-  padding: 0 14px;
+  padding: 0;
   border: none;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   font-family: var(--font-sans);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow:
-    0 4px 12px rgba(102, 126, 234, 0.3),
-    0 2px 4px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
+  letter-spacing: 0.03em;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
 }
 
-// ─── Inline regenerate input (replaces button when clicked) ─────────────────
-.rte-regen-input-inline {
-  height: 36px;
-  padding: 0 14px;
-  font-size: 13px;
-  border: 2px solid var(--color-border);
-  border-radius: 8px;
-  background: white;
-  color: var(--color-text);
-  outline: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-family: var(--font-sans);
-  font-weight: 500;
-  flex: 1;
-  min-width: 200px;
-  max-width: 260px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-
-  &::placeholder {
-    color: var(--color-text-light);
-    font-weight: 400;
-  }
-
-  &:focus {
-    background: white;
-    border-color: var(--color-primary);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), 0 0 0 4px rgba(102, 126, 234, 0.15);
-    transform: translateY(-1px);
-    min-width: 280px;
-    max-width: 320px;
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-  }
-}
-
-.rte-btn-ai::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
-}
-
-.rte-btn-ai:hover::before { left: 100%; }
-
 .rte-btn-ai:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 6px 20px rgba(102, 126, 234, 0.4),
-    0 3px 8px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, #5a6fd6 0%, #6a3d96 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
 }
 
-.rte-btn-ai:active { transform: translateY(0) scale(0.98); }
+.rte-btn-ai:active { transform: translateY(0) scale(0.96); }
+
+.rte-btn-ai.active {
+  background: linear-gradient(135deg, #4f5fc0 0%, #5e3488 100%);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4) inset;
+}
 
 .rte-btn-ai:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-.rte-btn-ai span { position: relative; z-index: 1; }
+// ─── Text color / Highlight button ────────────────────────────────────────────
+.rte-btn-text-color,
+.rte-btn-highlight-color {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  gap: 2px;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.08);
+  }
+
+  &:active { transform: scale(0.96); }
+}
+
+.rte-btn-color-letter {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  line-height: 1;
+  display: block;
+}
+
+.rte-color-indicator-bar {
+  display: block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+// ─── Color picker panel ────────────────────────────────────────────────────────
+.rte-color-picker-panel {
+  background: white;
+  border-radius: 10px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 10px;
+  z-index: 10001;
+  animation: dropdownSlideIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 180px;
+}
+
+.rte-color-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.rte-color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.rte-color-preset-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  &:active { transform: scale(0.96); }
+}
+
+.rte-color-swatch-clear {
+  background: white;
+  border: 1.5px dashed var(--color-border-dark);
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    width: 12px;
+    height: 1.5px;
+    background: var(--color-danger);
+  }
+}
+
+// ─── AI input panel (below toolbar) ───────────────────────────────────────────
+.rte-ai-input-panel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+  margin-top: -1px;
+}
+
+.rte-ai-send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  padding: 0;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  &:active:not(:disabled) { transform: scale(0.94); }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
 
 // ─── ProseMirror global styles ────────────────────────────────────────────────
 .ProseMirror {
