@@ -16,6 +16,8 @@ import { create } from 'zustand';
 import type { DraftStage } from '@/interfaces/draftInterfaces';
 
 const SESSION_DRAFT_ID_KEY = 'draftora_current_draft_id';
+const SESSION_DRAFT_STAGE_KEY = 'draftora_draft_stage';
+const SESSION_COMPLETED_STEPS_KEY = 'draftora_completed_steps';
 
 const isBrowser = typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
 
@@ -32,15 +34,43 @@ function writeDraftIdToSession(id: string | null): void {
   } catch { /* ignore */ }
 }
 
+function readDraftStageFromSession(): DraftStage {
+  if (!isBrowser) return "template_selection";
+  try {
+    return (sessionStorage.getItem(SESSION_DRAFT_STAGE_KEY) as DraftStage) || "template_selection";
+  } catch { return "template_selection"; }
+}
+
+function writeDraftStageToSession(stage: DraftStage): void {
+  if (!isBrowser) return;
+  try { sessionStorage.setItem(SESSION_DRAFT_STAGE_KEY, stage); } catch { /* ignore */ }
+}
+
+function readCompletedStepsFromSession(): number[] {
+  if (!isBrowser) return [];
+  try {
+    const raw = sessionStorage.getItem(SESSION_COMPLETED_STEPS_KEY);
+    return raw ? (JSON.parse(raw) as number[]) : [];
+  } catch { return []; }
+}
+
+function writeCompletedStepsToSession(steps: number[]): void {
+  if (!isBrowser) return;
+  try { sessionStorage.setItem(SESSION_COMPLETED_STEPS_KEY, JSON.stringify(steps)); } catch { /* ignore */ }
+}
+
 export const INITIAL_DRAFT_SESSION_STATE = {
   currentDraftId: null as string | null,
   autoSaveEnabled: true,
   draftStage: "template_selection" as DraftStage,
   completedSteps: [] as number[],
   isSaving: false as boolean,
+  fromHistory: false as boolean,
 };
 
 const restoredDraftId = readDraftIdFromSession();
+const restoredDraftStage = readDraftStageFromSession();
+const restoredCompletedSteps = readCompletedStepsFromSession();
 
 interface DraftSessionState {
   currentDraftId: string | null;
@@ -48,6 +78,7 @@ interface DraftSessionState {
   draftStage: DraftStage;
   completedSteps: number[];
   isSaving: boolean;
+  fromHistory: boolean;
 
   setCurrentDraftId: (id: string | null) => void;
   setAutoSaveEnabled: (enabled: boolean) => void;
@@ -55,6 +86,7 @@ interface DraftSessionState {
   setCompletedSteps: (steps: number[]) => void;
   markStepCompleted: (stepId: number) => void;
   setIsSaving: (saving: boolean) => void;
+  setFromHistory: (value: boolean) => void;
   resetDraftSession: () => void;
   reset: () => void;
 }
@@ -62,9 +94,10 @@ interface DraftSessionState {
 export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   currentDraftId: restoredDraftId,
   autoSaveEnabled: true,
-  draftStage: "template_selection",
-  completedSteps: [],
+  draftStage: restoredDraftStage,
+  completedSteps: restoredCompletedSteps,
   isSaving: false,
+  fromHistory: false,
 
   setCurrentDraftId: (id: string | null) => {
     writeDraftIdToSession(id);
@@ -76,21 +109,23 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   },
 
   setDraftStage: (stage: DraftStage) => {
+    writeDraftStageToSession(stage);
     set({ draftStage: stage });
   },
 
   setCompletedSteps: (steps: number[]) => {
+    writeCompletedStepsToSession(steps);
     set({ completedSteps: steps });
   },
 
   markStepCompleted: (stepId: number) => {
     set(state => {
       const currentSteps = state.completedSteps || [];
-      return {
-        completedSteps: currentSteps.includes(stepId)
-          ? currentSteps
-          : [...currentSteps, stepId],
-      };
+      const newSteps = currentSteps.includes(stepId)
+        ? currentSteps
+        : [...currentSteps, stepId];
+      writeCompletedStepsToSession(newSteps);
+      return { completedSteps: newSteps };
     });
   },
 
@@ -98,13 +133,21 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
     set({ isSaving: saving });
   },
 
+  setFromHistory: (value: boolean) => {
+    set({ fromHistory: value });
+  },
+
   resetDraftSession: () => {
     writeDraftIdToSession(null);
+    writeDraftStageToSession("template_selection");
+    writeCompletedStepsToSession([]);
     set(INITIAL_DRAFT_SESSION_STATE);
   },
 
   reset: () => {
     writeDraftIdToSession(null);
+    writeDraftStageToSession("template_selection");
+    writeCompletedStepsToSession([]);
     set(INITIAL_DRAFT_SESSION_STATE);
   },
 }));

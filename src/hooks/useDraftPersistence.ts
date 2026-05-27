@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import { getDraftByProposalId, getDraft, updateDraft as updateDraftApi } from "@/services/draft.service";
@@ -18,6 +18,7 @@ interface UseDraftPersistenceOptions {
   wizardStep: number;
   skipIfApproved: boolean;
   approvalStatus?: "pending" | "approved" | "rejected";
+  saveOnMount?: boolean;
 }
 
 /**
@@ -39,7 +40,10 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     wizardStep,
     skipIfApproved,
     approvalStatus,
+    saveOnMount,
   } = options;
+
+  const hasMountSavedRef = useRef(false);
 
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
@@ -72,16 +76,19 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         lastVisibleSection: null,
       };
 
-      // Fetch existing draft to preserve generated content if proposal exists
-      let existingGeneratedContent: Record<string, string> = {};
-      if (proposalId) {
+      // Use live proposal sections if non-empty; otherwise fall back to existing draft content
+      let generatedContent: Record<string, string> = {};
+      const proposalSections = proposal.sections as Record<string, string> | undefined;
+      if (proposalSections && Object.keys(proposalSections).length > 0) {
+        generatedContent = proposalSections;
+      } else if (proposalId) {
         try {
           const existingDraft = await getDraftByProposalId(proposalId);
           if (existingDraft) {
             const fullDraft = await getDraft(existingDraft.id);
-            existingGeneratedContent = fullDraft.generatedContent || {};
+            generatedContent = fullDraft.generatedContent || {};
             logger.debug('[useDraftPersistence] Preserved existing generated content', {
-              sectionCount: Object.keys(existingGeneratedContent).length
+              sectionCount: Object.keys(generatedContent).length
             });
           }
         } catch (error) {
@@ -105,7 +112,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         lastLocation,
         stage: stage as any,
         wizardState,
-        generatedContent: existingGeneratedContent,
+        generatedContent,
         uiState,
       };
 
@@ -118,9 +125,22 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
       });
 
       if (currentDraftId) {
-        // Update existing draft
-        await updateDraftInStore(currentDraftId, draftPayload);
-        logger.info('[useDraftPersistence] Draft updated', { draftId: currentDraftId });
+        try {
+          await updateDraftInStore(currentDraftId, draftPayload);
+          logger.info('[useDraftPersistence] Draft updated', { draftId: currentDraftId });
+        } catch (updateError) {
+          const is404 = updateError instanceof Error && (updateError as any).statusCode === 404;
+          if (is404) {
+            // Draft was deleted from backend — clear stale ID and create fresh
+            logger.warn('[useDraftPersistence] Draft not found (404), creating new draft', { currentDraftId });
+            setCurrentDraftId(null);
+            const saved = await saveDraftToStore(draftPayload);
+            setCurrentDraftId(saved.id);
+            logger.info('[useDraftPersistence] Replacement draft created', { draftId: saved.id });
+          } else {
+            logger.error('[useDraftPersistence] Draft update failed', updateError);
+          }
+        }
       } else {
         // Create new draft and store ID
         const saved = await saveDraftToStore(draftPayload);
@@ -145,6 +165,13 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     updateDraftInStore,
     saveDraftToStore,
   ]);
+
+  // One-time save when the component mounts (e.g., web view page load after generation)
+  useEffect(() => {
+    if (!saveOnMount || hasMountSavedRef.current || !enabled || !proposal) return;
+    hasMountSavedRef.current = true;
+    void saveDraft();
+  }, [saveOnMount, enabled, proposal, saveDraft]);
 
   // Save on beforeunload (browser close/refresh)
   useEffect(() => {

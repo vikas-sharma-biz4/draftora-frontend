@@ -50,7 +50,11 @@ export default function KnowledgeBaseSelectorModal({
   const [hasNewUploads, setHasNewUploads] = useState<boolean>(false);
   const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
   const clients = useClientStore(state => state.clients);
+  const isStoreInitialized = useClientStore(state => state.isInitialized);
   const initializedRef = useRef<boolean>(false);
+
+  // True when the store has loaded but the client isn't found — uploads must be blocked
+  const clientNotFound = isStoreInitialized && !!clientId && !clients.some(c => c.id === clientId);
 
   // Sync selected state with selectedDocumentIds prop only on initial mount
   useEffect(() => {
@@ -161,6 +165,22 @@ export default function KnowledgeBaseSelectorModal({
     allDocuments: allDocuments.length,
   });
 
+  // Auto-remove parsed files from the uploaded list once they appear in the document list below
+  useEffect(() => {
+    const parsedAndListed = uploadedFiles.filter(
+      (f) => f.status === "parsed" && f.uploadedDocId && allDocuments.some((d) => d.id === f.uploadedDocId)
+    );
+    if (parsedAndListed.length === 0) return;
+
+    const timers = parsedAndListed.map((f) =>
+      setTimeout(() => {
+        setUploadedFiles((prev) => prev.filter((u) => u.id !== f.id));
+      }, 1500)
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [uploadedFiles, allDocuments]);
+
   // Filter all documents by search query
   const filteredAllDocuments = allDocuments;
 
@@ -202,6 +222,17 @@ export default function KnowledgeBaseSelectorModal({
 
   function processFileList(files: FileList | null): void {
     if (!files || files.length === 0) return;
+
+    if (!clientId) {
+      toast.error("No client selected. Please select a client first to upload documents.");
+      return;
+    }
+
+    if (clientNotFound) {
+      toast.error("This client no longer exists. Please update the client details before uploading.");
+      return;
+    }
+
     const validFiles = Array.from(files).filter(isValidFile);
     if (validFiles.length === 0) return;
 
@@ -213,7 +244,7 @@ export default function KnowledgeBaseSelectorModal({
 
     logger.debug('[KnowledgeBaseSelectorModal] Adding files to uploadedFiles:', newFiles.map(f => ({ name: f.file.name, id: f.id })));
     setUploadedFiles((prev) => [...prev, ...newFiles]);
-    setHasNewUploads(true); // Mark that new documents were uploaded
+    setHasNewUploads(true);
     newFiles.forEach((f) => startRealParsing(f.file, f.id));
   }
 
@@ -300,7 +331,7 @@ export default function KnowledgeBaseSelectorModal({
       const uploadResult = await uploadDocumentToStore(clientId, file);
 
       if (!uploadResult) {
-        throw new Error('Failed to upload document: uploadResult is undefined');
+        throw new Error('Client not found — document could not be saved');
       }
 
       logger.debug('[KnowledgeBaseSelectorModal] Document uploaded to client:', { clientId, documentId: uploadResult.id, fileName: file.name });
@@ -372,7 +403,6 @@ export default function KnowledgeBaseSelectorModal({
     // Only use the selected set - uploaded files are already auto-selected and included
     const allSelected = Array.from(selected);
     onSave(allSelected, hasNewUploads);
-    toast.success(`${allSelected.length} document(s) selected`);
     onClose();
   }
 
@@ -393,19 +423,28 @@ export default function KnowledgeBaseSelectorModal({
           </button>
         </div>
 
-        <div className={styles.modalBody}>
-          {/* Upload Zone */}
+        {/* Upload section — always visible, outside the scrollable document list */}
+        <div className={styles.uploadSection}>
+          {clientNotFound && (
+            <div className={styles.clientNotFoundBanner}>
+              <AlertCircle size={16} />
+              <span>
+                This client no longer exists in the system. Uploads are disabled.
+                To add new documents, update the client details first.
+              </span>
+            </div>
+          )}
           <label
             htmlFor="kb-file-upload"
-            className={`${styles.uploadZone} ${isDragOver ? styles.dragOver : ""}`}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            className={`${styles.uploadZone} ${isDragOver && !clientNotFound ? styles.dragOver : ""} ${clientNotFound ? styles.uploadZoneDisabled : ""}`}
+            onDragOver={!clientNotFound ? handleDragOver : undefined}
+            onDragEnter={!clientNotFound ? handleDragEnter : undefined}
+            onDragLeave={!clientNotFound ? handleDragLeave : undefined}
+            onDrop={!clientNotFound ? handleDrop : undefined}
           >
-            <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
+            <Upload size={20} className={styles.uploadIcon} aria-hidden="true" />
             <div className={styles.uploadText}>
-              Click to upload or drag and drop
+              {clientNotFound ? "Uploads unavailable" : "Click to upload or drag and drop"}
             </div>
             <div className={styles.uploadHint}>
               PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
@@ -417,45 +456,54 @@ export default function KnowledgeBaseSelectorModal({
               accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
               multiple
               onChange={handleFileChange}
+              disabled={clientNotFound}
               className={styles.visuallyHidden}
             />
           </label>
 
-          {/* Uploaded Files List - Show all uploaded files (pending, parsing, parsed, error) */}
+          {/* Uploaded Files List */}
           {uploadedFiles.length > 0 && (
             <div className={styles.uploadedFilesList}>
               {uploadedFiles
                 .map(({ file, id, status, error, parsedData, uploadedDocId }) => (
-                <div key={id} className={styles.uploadedFileItem}>
-                  <div className={styles.fileIconWrapper}>
+                <div
+                  key={id}
+                  className={`${styles.uploadedFileItem}${status === "parsed" ? ` ${styles.uploadedFileItemParsed}` : ""}`}
+                >
+                  <div className={`${styles.fileIconWrapper}${
+                    status === "parsed" ? ` ${styles.fileIconWrapperSuccess}`
+                    : status === "error" ? ` ${styles.fileIconWrapperError}`
+                    : status === "parsing" ? ` ${styles.fileIconWrapperParsing}`
+                    : ""
+                  }`}>
                     {status === "parsing" ? (
-                      <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                      <Loader2 size={22} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
                     ) : status === "error" ? (
-                      <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                      <AlertCircle size={22} className={`${styles.fileIcon} ${styles.errorIcon}`} />
                     ) : status === "parsed" ? (
-                      <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                      <CheckCircle size={22} className={`${styles.fileIcon} ${styles.successIcon}`} />
                     ) : (
-                      <FileText size={18} className={styles.fileIcon} />
+                      <FileText size={22} className={styles.fileIcon} />
                     )}
                   </div>
                   <div className={styles.fileDetails}>
                     <div className={styles.fileName} title={file.name}>{file.name}</div>
                     <div className={styles.fileMeta}>
-                      {formatFileSize(file.size)}
+                      <span>{formatFileSize(file.size)}</span>
                       {status === "pending" && (
-                        <span className={styles.parsingStatus}>Waiting to upload...</span>
+                        <span className={styles.parsingStatus}>· Waiting to upload...</span>
                       )}
                       {status === "parsing" && (
-                        <span className={styles.parsingStatus}>Parsing on server...</span>
+                        <span className={styles.parsingStatus}>· Parsing on server...</span>
                       )}
                       {status === "parsed" && parsedData && uploadedDocId && (
-                        <span className={styles.parsedStatus}>Parsing Complete</span>
+                        <span className={styles.parsedStatus}>· Parsing Complete</span>
                       )}
                       {status === "parsed" && !parsedData && (
-                        <span className={styles.parsedStatus}>Parsed successfully</span>
+                        <span className={styles.parsedStatus}>· Parsed successfully</span>
                       )}
                       {status === "error" && error && (
-                        <span className={styles.errorStatus}>{error}</span>
+                        <span className={styles.errorStatus}>· {error}</span>
                       )}
                     </div>
                   </div>
@@ -471,7 +519,10 @@ export default function KnowledgeBaseSelectorModal({
               ))}
             </div>
           )}
+        </div>
 
+        {/* Scrollable document list */}
+        <div className={styles.modalBody}>
           <div className={styles.knowledgeBaseScrollContainer}>
             <div className={styles.actionBar}>
               <button className={styles.toggleAllButton} onClick={toggleAll}>

@@ -38,6 +38,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
     notes: "",
   });
 
+  const [otherIndustry, setOtherIndustry] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<
     { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
   >([]);
@@ -212,6 +213,11 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
       return;
     }
 
+    if (formData.industry === "Other" && !otherIndustry.trim()) {
+      toast.error("Please specify your industry");
+      return;
+    }
+
     // Check for duplicate client name
     const isDuplicate = existingClients.some(
       (client) => client.name.toLowerCase().trim() === formData.clientName.toLowerCase().trim()
@@ -232,9 +238,11 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
     try {
       // Create client via Zustand store
+      const resolvedIndustry = formData.industry === "Other" ? otherIndustry.trim() : formData.industry;
+
       const newClient = await createClientInStore({
         name: formData.clientName,
-        industry: formData.industry,
+        industry: resolvedIndustry,
         notes: formData.notes || undefined,
       });
 
@@ -296,18 +304,32 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
             <FormField label="Industry">
               {(fieldProps) => (
-                <Select
-                  {...fieldProps}
-                  value={formData.industry}
-                  onChange={(e) => handleInputChange("industry", e.target.value)}
-                >
-                  <option value="">Select industry...</option>
-                  {INDUSTRIES.map((industry) => (
-                    <option key={industry} value={industry}>
-                      {industry}
-                    </option>
-                  ))}
-                </Select>
+                <>
+                  <Select
+                    {...fieldProps}
+                    value={formData.industry}
+                    onChange={(e) => {
+                      handleInputChange("industry", e.target.value);
+                      if (e.target.value !== "Other") setOtherIndustry("");
+                    }}
+                  >
+                    <option value="" disabled hidden>Select industry...</option>
+                    {INDUSTRIES.map((industry) => (
+                      <option key={industry} value={industry}>
+                        {industry}
+                      </option>
+                    ))}
+                  </Select>
+                  {formData.industry === "Other" && (
+                    <Input
+                      type="text"
+                      placeholder="Please specify your industry"
+                      value={otherIndustry}
+                      onChange={(e) => setOtherIndustry(e.target.value)}
+                      style={{ marginTop: "8px" }}
+                    />
+                  )}
+                </>
               )}
             </FormField>
           </div>
@@ -411,7 +433,11 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
           <Button
             variant="primary"
             onClick={handleCreate}
-            disabled={!formData.clientName.trim() || !formData.industry}
+            disabled={
+              !formData.clientName.trim() ||
+              !formData.industry ||
+              (formData.industry === "Other" && !otherIndustry.trim())
+            }
             loading={isCreating}
           >
             Create Client

@@ -2,16 +2,15 @@
  * Zustand store for global UI state management
  *
  * Manages:
- * - Sidebar open/collapsed state
+ * - Sidebar open/collapsed state (persisted to localStorage)
  * - Global loading overlay
  * - Active modal tracking
- *
- * Note: Theme is managed by ThemeContext (src/context/ThemeContext.tsx)
  */
 
-import { create } from 'zustand';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = "light" | "dark" | "system";
 
 export const INITIAL_UI_STATE = {
   sidebarOpen: true,
@@ -42,24 +41,34 @@ interface UIState {
   reset: () => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  // Initial state
-  sidebarOpen: true,
-  globalLoading: false,
-  loadingMessage: null,
-  activeModal: null,
+export const useUIStore = create<UIState>()(
+  persist(
+    (set) => ({
+      // Initial state
+      sidebarOpen: true,
+      globalLoading: false,
+      loadingMessage: null,
+      activeModal: null,
 
-  // Sidebar actions
-  setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      // Sidebar actions
+      setSidebarOpen: (open: boolean) => set({ sidebarOpen: open }),
+      toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
 
-  // Loading actions
-  setGlobalLoading: (loading: boolean, message?: string) =>
-    set({ globalLoading: loading, loadingMessage: message ?? null }),
+      // Loading actions
+      setGlobalLoading: (loading: boolean, message?: string) =>
+        set({ globalLoading: loading, loadingMessage: message ?? null }),
 
-  // Modal actions
-  openModal: (name: string) => set({ activeModal: name }),
-  closeModal: () => set({ activeModal: null }),
+      // Modal actions
+      openModal: (name: string) => set({ activeModal: name }),
+      closeModal: () => set({ activeModal: null }),
 
-  reset: () => set(INITIAL_UI_STATE),
-}));
+      reset: () => set(INITIAL_UI_STATE),
+    }),
+    {
+      name: "draftora-ui",
+      storage: createJSONStorage(() => localStorage),
+      // Only persist sidebar state — loading and modal state is always ephemeral
+      partialize: (state) => ({ sidebarOpen: state.sidebarOpen }),
+    }
+  )
+);

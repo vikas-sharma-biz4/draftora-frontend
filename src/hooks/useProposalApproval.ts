@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useProposalDownload } from '@/hooks/useProposalDownload';
 import { updateApprovalStatus } from '@/services/proposal.service';
 import { deleteDraft, getDraftByProposalId } from '@/services/draft.service';
+import { setProposalHistoryVersion } from '@/utils/proposalVersionCache';
 import { toast } from '@/utils/toast';
 import { MESSAGES } from '@/constants/messages';
 import { logger } from '@/utils/logger';
@@ -52,10 +53,12 @@ export function useProposalApproval(options: UseProposalApprovalOptions): UsePro
       // Update approval status via API
       await updateApprovalStatus(proposalId, status);
 
-      // Remove from drafts via API
+      // Remove from drafts via API, capturing version label before deletion
       try {
         const proposalDraft = await getDraftByProposalId(proposalId);
         if (proposalDraft) {
+          const hasEdits = proposalDraft.hasEdits ?? false;
+          setProposalHistoryVersion(proposalId, hasEdits ? "v2" : "v1");
           await deleteDraft(proposalDraft.id);
         }
       } catch (draftError) {

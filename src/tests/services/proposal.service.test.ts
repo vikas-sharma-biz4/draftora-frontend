@@ -40,6 +40,8 @@ const minimalProposalData: ProposalData = {
   contextualInstructions: "",
   webReferences: [],
   files: [],
+  filesMeta: [],
+  aiModel: "gpt-4o",
   templateId: null,
   templateType: "scratch",
 };

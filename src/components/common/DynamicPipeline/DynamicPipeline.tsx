@@ -7,6 +7,7 @@ import { Check } from "lucide-react";
 import styles from "./DynamicPipeline.module.scss";
 import type { DraftStage } from "@/interfaces/draftInterfaces";
 import { PIPELINE_STEPS } from "@/interfaces/draftInterfaces";
+import { toast } from "@/utils/toast";
 
 interface DynamicPipelineProps {
   currentStage: DraftStage;
@@ -33,16 +34,24 @@ export default function DynamicPipeline({
   function handleStepClick(stepId: number, path: string): void {
     if (onStepClick) {
       onStepClick(stepId, path);
-    } else {
-      // If clicking Web View step and we have a proposalId, navigate to that proposal
-      if (stepId === 3 && proposalId) {
+      return;
+    }
+
+    if (stepId === 3) {
+      // Web View requires a generated proposal — guard against /web-view 404
+      if (proposalId) {
         router.push(`/proposal/${proposalId}`);
-      } else if (proposalId) {
-        // If we have a proposalId, append it to preserve context when navigating to earlier steps
-        router.push(`${path}?proposalId=${proposalId}`);
       } else {
-        router.push(path);
+        toast.error("Generate a proposal first to view it here.");
       }
+      return;
+    }
+
+    if (proposalId) {
+      // Append proposalId to preserve context when navigating to earlier steps
+      router.push(`${path}?proposalId=${proposalId}`);
+    } else {
+      router.push(path);
     }
   }
 

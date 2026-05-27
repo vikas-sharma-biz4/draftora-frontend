@@ -20,6 +20,8 @@ import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import { toast } from "@/utils/toast";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useProposalPageData } from "@/hooks/useProposalPageData";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
 
 const ProposalSectionEditor = dynamic(
   () => import("@/components/proposal/ProposalSectionEditor"),
@@ -78,8 +80,17 @@ export default function ProposalOutputPage(): JSX.Element {
   const invalidateCache = useProposalStore(state => state.invalidateCache);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
   const proposalId = Number(params.id);
+  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
+  const fromHistory = useDraftSessionStore(state => state.fromHistory);
+  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
   const [mounted, setMounted] = useState<boolean>(false);
   const currentActiveSectionRef = useRef<string | null>(null);
+  const pendingEditsRef = useRef<Record<string, string>>({});
+  const draftUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const proposalSectionsRef = useRef<Record<string, string>>({});
+  // Prevents the IntersectionObserver from overriding active section during programmatic scroll
+  const isProgrammaticScrollRef = useRef<boolean>(false);
+  const programmaticScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -94,6 +105,13 @@ export default function ProposalOutputPage(): JSX.Element {
     activeSection,
     setActiveSection,
   } = useProposalPageData(proposalId, searchParams);
+
+  // Keep proposalSectionsRef in sync so the debounced draft update can access latest sections
+  useEffect(() => {
+    if (proposal?.sections) {
+      proposalSectionsRef.current = proposal.sections as Record<string, string>;
+    }
+  }, [proposal?.sections]);
 
   // Sync ref when activeSection changes from user clicks (not from scroll)
   useEffect(() => {
@@ -117,7 +135,10 @@ export default function ProposalOutputPage(): JSX.Element {
 
   /**
    * Scroll spy: Automatically highlight the active section in sidebar based on scroll position.
-   * Uses scroll event listener to detect which section is closest to the top of viewport.
+   *
+   * Uses IntersectionObserver with `.main-content` as root because the page's
+   * scroll container is `.main-content` (overflow-y: auto), not the window.
+   * A window scroll listener would never fire in this layout.
    */
   useEffect(() => {
     if (!proposal || !mounted) return;
@@ -125,47 +146,42 @@ export default function ProposalOutputPage(): JSX.Element {
     const sectionKeys = proposal.selectedSections ?? [];
     if (sectionKeys.length === 0) return;
 
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY + 100; // Offset for header
-      let closestSection = currentActiveSectionRef.current;
-      let closestDistance = Infinity;
+    // The scrollable ancestor is .main-content, not the window
+    const scrollRoot = document.querySelector<HTMLElement>(".main-content");
 
-      sectionKeys.forEach((key) => {
-        const element = document.getElementById(`section-${key}`);
-        if (element) {
-          const elementTop = element.offsetTop;
-          const distance = Math.abs(scrollPosition - elementTop);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Ignore observer callbacks triggered by a click-to-scroll action
+        if (isProgrammaticScrollRef.current) return;
 
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestSection = key;
-          }
+        // Among all newly-intersecting entries pick the one nearest the top
+        const visible = entries.filter((e) => e.isIntersecting);
+        if (visible.length === 0) return;
+
+        const topEntry = visible.reduce((best, entry) =>
+          entry.boundingClientRect.top < best.boundingClientRect.top ? entry : best
+        );
+
+        const sectionKey = topEntry.target.id.replace("section-", "");
+        if (sectionKey && sectionKey !== currentActiveSectionRef.current) {
+          currentActiveSectionRef.current = sectionKey;
+          setActiveSection(sectionKey);
         }
-      });
-
-      if (closestSection && closestSection !== currentActiveSectionRef.current) {
-        currentActiveSectionRef.current = closestSection;
-        setActiveSection(closestSection);
+      },
+      {
+        root: scrollRoot ?? null,
+        // Section is "active" when its top is within the upper 45% of the container
+        rootMargin: "0px 0px -55% 0px",
+        threshold: 0,
       }
-    };
+    );
 
-    // Initial check
-    handleScroll();
+    sectionKeys.forEach((key) => {
+      const el = document.getElementById(`section-${key}`);
+      if (el) observer.observe(el);
+    });
 
-    // Add scroll listener with throttle
-    let scrollTimeout: NodeJS.Timeout;
-    const throttledScroll = () => {
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(handleScroll, 50);
-    };
-
-    window.addEventListener("scroll", throttledScroll);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener("scroll", throttledScroll);
-      if (scrollTimeout) clearTimeout(scrollTimeout);
-    };
+    return () => observer.disconnect();
   }, [proposal, mounted, setActiveSection]);
 
   // Approval workflow state
@@ -181,10 +197,34 @@ export default function ProposalOutputPage(): JSX.Element {
 
   function handleScrollToSection(key: string): void {
     setActiveSection(key);
-    const el = document.getElementById(`section-${key}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    currentActiveSectionRef.current = key;
+
+    // Suppress IntersectionObserver for 1.5s so it doesn't override the click-selected section
+    isProgrammaticScrollRef.current = true;
+    if (programmaticScrollTimerRef.current) clearTimeout(programmaticScrollTimerRef.current);
+    programmaticScrollTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 1500);
+
+    // Defer scroll to the next animation frame so React can commit the state update first.
+    // Using getBoundingClientRect inside rAF gives stable layout coordinates.
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`section-${key}`);
+      if (!el) return;
+
+      const container = document.querySelector<HTMLElement>(".main-content");
+      if (!container) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+      // Viewport-relative positions are stable within a single animation frame.
+      // Adding container.scrollTop converts to absolute scroll-container coordinates.
+      const elTop = el.getBoundingClientRect().top;
+      const containerTop = container.getBoundingClientRect().top;
+      const targetScrollTop = container.scrollTop + (elTop - containerTop) - 24;
+      container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: "smooth" });
+    });
   }
 
   const handleContentChange = useCallback((key: string, html: string): void => {
@@ -197,11 +237,36 @@ export default function ProposalOutputPage(): JSX.Element {
   const handleSaveSection = useCallback(async (key: string, content: string): Promise<void> => {
     try {
       await updateSection(proposalId, key, content);
-      // toast.success("Section saved");
+
+      // Debounce-update the draft with edited content (1.5s) so reopening the draft shows edits
+      if (currentDraftId && !fromHistory) {
+        pendingEditsRef.current = { ...pendingEditsRef.current, [key]: content };
+
+        if (draftUpdateTimerRef.current) clearTimeout(draftUpdateTimerRef.current);
+        draftUpdateTimerRef.current = setTimeout(async () => {
+          const edits = pendingEditsRef.current;
+          pendingEditsRef.current = {};
+          // Merge edits into the full sections to avoid wiping out other sections via PUT
+          const fullContent = { ...proposalSectionsRef.current, ...edits };
+          try {
+            await updateDraftInStore(currentDraftId, { generatedContent: fullContent, lastLocation: "web_view", stage: "generated", hasEdits: true });
+          } catch (err) {
+            logger.warn("[ProposalOutputPage] Draft update after edit failed", err);
+          }
+        }, 1500);
+      }
     } catch {
       toast.error("Failed to save section");
     }
-  }, [proposalId]);
+  }, [proposalId, currentDraftId, fromHistory, updateDraftInStore]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (draftUpdateTimerRef.current) clearTimeout(draftUpdateTimerRef.current);
+      if (programmaticScrollTimerRef.current) clearTimeout(programmaticScrollTimerRef.current);
+    };
+  }, []);
 
   const handleRegenerate = useCallback(async (key: string, instructions?: string): Promise<string | null> => {
     // This callback is now used for selection-based regeneration
@@ -453,7 +518,7 @@ export default function ProposalOutputPage(): JSX.Element {
             approvalStatus={proposal.approvalStatus}
             isApproving={isApproving}
             isRejecting={isRejecting}
-            onSaveDraft={handleSaveDraft}
+            onSaveDraft={fromHistory ? undefined : handleSaveDraft}
             onApprove={handleApprove}
             onReject={handleReject}
             onExecuteAction={executeApprovalAction}

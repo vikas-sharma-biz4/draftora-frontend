@@ -452,7 +452,7 @@
 
 .template-bento-row-secondary {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -516,6 +516,8 @@
 .tmpl-preview-gradient-1 { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
 .tmpl-preview-gradient-2 { background: linear-gradient(135deg, #0891b2 0%, #0d9488 100%); }
 .tmpl-preview-gradient-3 { background: linear-gradient(135deg, #d97706 0%, #dc2626 100%); }
+.tmpl-preview-gradient-scratch { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
+.tmpl-preview-gradient-recreate { background: linear-gradient(135deg, #15803d 0%, #16a34a 100%); }
 
 .tmpl-preview-lines {
   display: flex;
@@ -729,87 +731,12 @@
 }
 
 // ─── Scratch card ─────────────────────────────────────────────────────────────
-.tmpl-scratch {
-  background: var(--color-bg);
-  justify-content: center;
-  align-items: center;
-  min-height: 130px;
-}
+.tmpl-scratch { /* inherits all layout from .tmpl-card */ }
 
-.tmpl-scratch-inner {
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-}
-
-.tmpl-scratch-icon {
-  width: 40px;
-  height: 40px;
-  background: var(--color-white);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  margin-bottom: 2px;
-}
-
-.tmpl-scratch-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.tmpl-scratch-hint {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-// ─── Upload card ──────────────────────────────────────────────────────────────
+// ─── Upload card (legacy — kept for any other usages) ─────────────────────────
 .tmpl-upload { min-height: 130px; border-style: dashed; }
 .tmpl-upload:hover { background: var(--color-primary-light); }
 .tmpl-upload.tmpl-selected { background: var(--color-primary-light); border-style: solid; }
-
-.tmpl-upload-inner {
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.tmpl-upload-icon {
-  width: 40px;
-  height: 40px;
-  background: var(--color-primary-light);
-  border: 1.5px solid var(--color-primary-medium);
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  color: var(--color-primary);
-  margin-bottom: 2px;
-}
-
-.tmpl-upload-label {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.tmpl-upload-hint {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
 
 // ─── Extracted sections panel ─────────────────────────────────────────────────
 .tmpl-extracted-panel {
@@ -880,26 +807,7 @@
 }
 
 // ─── Recreate template card ───────────────────────────────────────────────────
-.tmpl-recreate {
-  cursor: pointer;
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  border: 1.5px solid #bbf7d0;
-  border-radius: var(--radius-xl);
-  transition: all 0.18s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.tmpl-recreate:hover {
-  border-color: #4ade80;
-  box-shadow: 0 4px 20px rgba(74, 222, 128, 0.18);
-  transform: translateY(-1px);
-}
-
-.tmpl-recreate.tmpl-selected {
-  border-color: #16a34a;
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
-}
+.tmpl-recreate { /* inherits all layout and hover/selected from .tmpl-card */ }
 
 // ─── Recreate mode banner ─────────────────────────────────────────────────────
 .recreate-banner {

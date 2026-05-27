@@ -15,6 +15,7 @@ import {
   useCurrentStep,
   useMaxStepReached,
   useCurrentProposalId,
+  useGeneratedProposalId,
   useProposalTitle,
   useClientName,
   useClientId,
@@ -73,9 +74,11 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
   const currentProposalId = useCurrentProposalId();
+  const generatedProposalId = useGeneratedProposalId();
   const draftStage = useDraftSessionStore(state => state.draftStage);
   const completedSteps = useDraftSessionStore(state => state.completedSteps);
   const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
+  const fromHistory = useDraftSessionStore(state => state.fromHistory);
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
@@ -138,6 +141,21 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     // Skip auto-save for approved or rejected proposals (in History)
     if (approvalStatus === "approved" || approvalStatus === "rejected") {
       logger.debug('[useWizardAutoSave] Skipping save for history proposal', { approvalStatus });
+      return;
+    }
+
+    // If a proposal ID is linked but approval status hasn't been fetched yet, defer the save.
+    // Sending a PUT with proposal_id before we know it's not rejected/approved triggers a 400.
+    if (currentProposalId && approvalStatus === undefined) {
+      logger.debug('[useWizardAutoSave] Deferring save — approvalStatus not yet loaded', { currentProposalId });
+      isSavingRef.current = false;
+      return;
+    }
+
+    // Skip auto-save when viewing from History to prevent spurious draft creation
+    if (fromHistory) {
+      logger.debug('[useWizardAutoSave] Skipping save — viewing from History');
+      isSavingRef.current = false;
       return;
     }
 
@@ -240,8 +258,10 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         webReferences,
       } as any; // Type assertion for backward compatibility
 
+      const resolvedProposalId = currentProposalId ?? generatedProposalId;
+
       const draftPayload: SaveDraftPayload = {
-        proposalId: currentProposalId,
+        proposalId: resolvedProposalId,
         title: title || "Untitled Proposal",
         clientName: clientName || "",
         status: "draft",
@@ -255,10 +275,11 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
         },
         generatedContent: Object.keys(sectionsContent).length > 0 ? sectionsContent : existingGeneratedContent,
         uiState,
+        hasEdits: draftStage === "generated" ? true : undefined,
       };
 
       logger.info('[useWizardAutoSave] Saving draft', {
-        proposalId: currentProposalId,
+        proposalId: resolvedProposalId,
         hasGeneratedContent: Object.keys(draftPayload.generatedContent).length > 0,
         sectionCount: Object.keys(draftPayload.generatedContent).length,
         stage: draftStage,
@@ -266,9 +287,24 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
       });
 
       if (effectiveDraftId) {
-        // Update existing draft
-        await updateDraftInStore(effectiveDraftId, draftPayload);
-        logger.info('[useWizardAutoSave] Draft updated', { draftId: effectiveDraftId });
+        try {
+          await updateDraftInStore(effectiveDraftId, draftPayload);
+          logger.info('[useWizardAutoSave] Draft updated', { draftId: effectiveDraftId });
+        } catch (updateError) {
+          const is404 = updateError instanceof Error && (updateError as any).statusCode === 404;
+          if (is404) {
+            // Draft was deleted from backend — clear stale ID and create fresh
+            logger.warn('[useWizardAutoSave] Draft not found (404), creating new draft', { effectiveDraftId });
+            pendingDraftIdRef.current = null;
+            setCurrentDraftId(null);
+            const saved = await saveDraftToStore(draftPayload);
+            pendingDraftIdRef.current = saved.id;
+            setCurrentDraftId(saved.id);
+            logger.info('[useWizardAutoSave] Replacement draft created', { draftId: saved.id });
+          } else {
+            throw updateError;
+          }
+        }
       } else {
         // Create new draft
         const saved = await saveDraftToStore(draftPayload);
@@ -325,6 +361,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
     updateDraftInStore,
     setCurrentDraftId,
     approvalStatus,
+    fromHistory,
   ]);
 
   // Debounced auto-save on data changes

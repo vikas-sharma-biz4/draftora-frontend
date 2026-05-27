@@ -41,6 +41,7 @@ interface SectionManagerProps {
   proposalData: ProposalData;
   onUpdateProposalData: (updates: Partial<ProposalData>) => void;
   isRecreateMode: boolean;
+  proposalId: number | null;
 }
 
 export default function SectionManager({
@@ -49,6 +50,7 @@ export default function SectionManager({
   proposalData,
   onUpdateProposalData,
   isRecreateMode,
+  proposalId,
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
@@ -294,6 +296,7 @@ export default function SectionManager({
           (proposalData.filesMeta?.map((f) => f.name).join(", ") ?? "")
         }
         onAddSection={addSectionToProposal}
+        proposalId={proposalId}
       />
 
       {/* Add Section Modal */}
