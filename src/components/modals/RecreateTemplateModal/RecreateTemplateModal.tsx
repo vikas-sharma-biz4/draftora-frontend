@@ -1214,7 +1214,10 @@ export default function RecreateTemplateModal({
             </>
           ) : (
             <>
-              <div className={styles.footerInfo}>
+              <Button variant="secondary" onClick={onClose}>
+                Cancel
+              </Button>
+              <div className={styles.footerActions}>
                 {isParsing && (
                   <span className={styles.parsingIndicator}>
                     <Loader2 size={14} className={styles.spinIcon} />
@@ -1227,11 +1230,6 @@ export default function RecreateTemplateModal({
                     {exactDocument.sections?.length} section(s) ready
                   </span>
                 )}
-              </div>
-              <div className={styles.footerActions}>
-                <Button variant="ghost" onClick={onClose}>
-                  Cancel
-                </Button>
                 <Button
                   variant="primary"
                   onClick={handleContinue}

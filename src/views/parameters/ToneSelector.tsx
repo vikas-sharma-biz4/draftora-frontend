@@ -24,9 +24,9 @@ interface ToneSelectorProps {
 
 export default function ToneSelector({ value, onChange }: ToneSelectorProps): JSX.Element {
   return (
-    <div className="mb-14">
-      <div className="form-label mb-14">
-        Parameters
+    <div className="mt-24 mb-16">
+      <div className="form-label mb-24">
+        Tone
       </div>
       <div className="tone-grid">
         {TONE_OPTIONS.map(({ value: optionValue, label, description }) => {

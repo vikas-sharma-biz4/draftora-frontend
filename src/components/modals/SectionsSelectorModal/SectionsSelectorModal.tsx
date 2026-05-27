@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useMemo } from "react";
 import { X, Search, AlertCircle, Plus } from "lucide-react";
@@ -8,13 +8,15 @@ import styles from "../EditModal.module.scss";
 import BaseModal from "@/components/common/BaseModal";
 import Button from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
+import AddSectionModal from "@/components/modals/AddSectionModal/AddSectionModal";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_DISPLAY_NAMES } from "@/constants";
+import type { CustomSection } from "@/interfaces/proposalInterfaces";
 
 interface SectionsSelectorModalProps {
   selectedSections: string[];
   sectionDisplayNames: Record<string, string>;
   onClose: () => void;
-  onSave: (sections: string[]) => void;
+  onSave: (sections: string[], newCustomSections?: CustomSection[]) => void;
 }
 
 const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> = {
@@ -68,9 +70,30 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
   },
 };
 
+const SECTIONS_GROUP: string[] = [
+  ...SECTION_CATEGORIES.core.sections,
+  ...SECTION_CATEGORIES.technical.sections,
+  ...SECTION_CATEGORIES.planning.sections,
+  ...SECTION_CATEGORIES.risk.sections,
+  ...SECTION_CATEGORIES.company.sections,
+];
+
+const STATIC_SECTIONS_GROUP: string[] = SECTION_CATEGORIES.static.sections;
+
 const ALL_CATEGORIZED_SECTIONS = new Set(
   Object.values(SECTION_CATEGORIES).flatMap((c) => c.sections)
 );
+
+function buildSectionKey(name: string): string {
+  return (
+    "custom_" +
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 40)
+  );
+}
 
 export default function SectionsSelectorModal({
   selectedSections,
@@ -80,38 +103,31 @@ export default function SectionsSelectorModal({
 }: SectionsSelectorModalProps): JSX.Element | null {
   const [selected, setSelected] = useState<Set<string>>(new Set(selectedSections));
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set([...Object.keys(SECTION_CATEGORIES), "other"])
-  );
-  const [customSections, setCustomSections] = useState<Record<string, string>>({});
-  const [showAddCustom, setShowAddCustom] = useState<boolean>(false);
-  const [customSectionName, setCustomSectionName] = useState<string>("");
+  // key → displayName for custom sections added in this session
+  const [customSectionNames, setCustomSectionNames] = useState<Record<string, string>>({});
+  // key → AI instructions for custom sections added in this session
+  const [customSectionInstructions, setCustomSectionInstructions] = useState<Record<string, string>>({});
+  const [showAddSectionModal, setShowAddSectionModal] = useState<boolean>(false);
+  const [isAddingSection, setIsAddingSection] = useState<boolean>(false);
 
   const allDisplayNames = useMemo(
-    () => ({ ...SECTION_DISPLAY_NAMES, ...STATIC_SECTION_DISPLAY_NAMES, ...sectionDisplayNames, ...customSections }),
-    [sectionDisplayNames, customSections]
+    () => ({ ...SECTION_DISPLAY_NAMES, ...STATIC_SECTION_DISPLAY_NAMES, ...sectionDisplayNames, ...customSectionNames }),
+    [sectionDisplayNames, customSectionNames]
   );
 
   const uncategorizedSections = useMemo(() => {
-    const allCustomKeys = Object.keys(customSections);
+    const allCustomKeys = Object.keys(customSectionNames);
     const allUncategorized = [...selectedSections.filter((s) => !ALL_CATEGORIZED_SECTIONS.has(s)), ...allCustomKeys];
     return Array.from(new Set(allUncategorized));
-  }, [selectedSections, customSections]);
+  }, [selectedSections, customSectionNames]);
 
-  const categoriesToRender = useMemo(() => {
-    if (uncategorizedSections.length === 0) return SECTION_CATEGORIES;
-    return {
-      ...SECTION_CATEGORIES,
-      other: { label: "Other Sections", sections: uncategorizedSections },
-    };
-  }, [uncategorizedSections]);
+  const allSectionsGroup = useMemo(
+    () => [...SECTIONS_GROUP, ...uncategorizedSections],
+    [uncategorizedSections]
+  );
 
   const totalSections = useMemo(() => {
-    const all = new Set([
-      ...Object.values(SECTION_CATEGORIES).flatMap((c) => c.sections),
-      ...uncategorizedSections,
-    ]);
-    return all.size;
+    return new Set([...SECTIONS_GROUP, ...STATIC_SECTIONS_GROUP, ...uncategorizedSections]).size;
   }, [uncategorizedSections]);
 
   function getDisplayName(sectionKey: string): string {
@@ -133,49 +149,50 @@ export default function SectionsSelectorModal({
     });
   }
 
-  function toggleCategory(categoryKey: string): void {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(categoryKey)) {
-        newSet.delete(categoryKey);
-      } else {
-        newSet.add(categoryKey);
-      }
-      return newSet;
-    });
-  }
-
-  function selectAllCore(): void {
+  function selectAllSections(): void {
     setSelected((prev) => {
       const newSet = new Set(prev);
-      SECTION_CATEGORIES.core.sections.forEach((s) => newSet.add(s));
+      allSectionsGroup.forEach((s) => newSet.add(s));
       return newSet;
     });
   }
 
-  function deselectAll(): void {
-    setSelected(new Set());
+  function deselectAllSections(): void {
+    setSelected((prev) => {
+      const newSet = new Set(prev);
+      allSectionsGroup.forEach((s) => newSet.delete(s));
+      return newSet;
+    });
   }
 
-  function handleAddCustomSection(): void {
-    const trimmedName = customSectionName.trim();
-    if (!trimmedName) {
-      toast.error("Section name cannot be empty");
-      return;
-    }
+  function selectAllStatic(): void {
+    setSelected((prev) => {
+      const newSet = new Set(prev);
+      STATIC_SECTIONS_GROUP.forEach((s) => newSet.add(s));
+      return newSet;
+    });
+  }
 
-    const sectionKey = trimmedName.toLowerCase().replace(/\s+/g, "_");
-    
-    if (allDisplayNames[sectionKey]) {
-      toast.error("A section with this name already exists");
-      return;
-    }
+  function deselectAllStatic(): void {
+    setSelected((prev) => {
+      const newSet = new Set(prev);
+      STATIC_SECTIONS_GROUP.forEach((s) => newSet.delete(s));
+      return newSet;
+    });
+  }
 
-    setCustomSections((prev) => ({ ...prev, [sectionKey]: trimmedName }));
-    setSelected((prev) => new Set([...Array.from(prev), sectionKey]));
-    setCustomSectionName("");
-    setShowAddCustom(false);
-    toast.success(`Custom section "${trimmedName}" added`);
+  async function handleAddSectionSubmit(name: string, instructions: string): Promise<void> {
+    setIsAddingSection(true);
+    try {
+      const sectionKey = buildSectionKey(name);
+      setCustomSectionNames((prev) => ({ ...prev, [sectionKey]: name }));
+      setCustomSectionInstructions((prev) => ({ ...prev, [sectionKey]: instructions }));
+      setSelected((prev) => new Set([...Array.from(prev), sectionKey]));
+      setShowAddSectionModal(false);
+      toast.success(`Section "${name}" added`);
+    } finally {
+      setIsAddingSection(false);
+    }
   }
 
   function handleSave(): void {
@@ -183,12 +200,35 @@ export default function SectionsSelectorModal({
       toast.error("Please select at least 3 sections");
       return;
     }
-    onSave(Array.from(selected));
+
+    const newCustomSections: CustomSection[] = Object.entries(customSectionNames).map(
+      ([key, label]) => ({
+        key,
+        label,
+        description: customSectionInstructions[key] ?? "",
+      })
+    );
+
+    onSave(Array.from(selected), newCustomSections.length > 0 ? newCustomSections : undefined);
     toast.success(`${selected.size} section(s) selected`);
   }
 
+  const filteredSectionsGroup = allSectionsGroup.filter((s) =>
+    getDisplayName(s).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredStaticGroup = STATIC_SECTIONS_GROUP.filter((s) =>
+    getDisplayName(s).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const sectionsSelectedCount = allSectionsGroup.filter((s) => selected.has(s)).length;
+  const staticSelectedCount = STATIC_SECTIONS_GROUP.filter((s) => selected.has(s)).length;
+
+  const allExistingKeys = [...allSectionsGroup, ...STATIC_SECTIONS_GROUP];
+
   return (
-    <BaseModal isOpen={true} onClose={onClose} size="md" labelId="sections-modal-title">
+    <>
+      <BaseModal isOpen={true} onClose={onClose} size="md" labelId="sections-modal-title">
         <div className={styles.modalHeader}>
           <div>
             <h2 id="sections-modal-title" className={styles.modalTitle}>Select Proposal Sections</h2>
@@ -220,29 +260,11 @@ export default function SectionsSelectorModal({
           </div>
 
           <div className={styles.actionBar}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={selectAllCore}
-                className={styles.toggleAllButton}
-              >
-                Select All Core
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={deselectAll}
-                className={styles.toggleAllButton}
-              >
-                Deselect All
-              </Button>
-            </div>
+            <div />
             <Button
               variant="primary"
               size="sm"
-              onClick={() => setShowAddCustom(!showAddCustom)}
-              className={styles.toggleAllButton}
+              onClick={() => setShowAddSectionModal(true)}
             >
               <Plus size={14} />
               Add Custom Section
@@ -256,93 +278,112 @@ export default function SectionsSelectorModal({
             </div>
           )}
 
-          {showAddCustom && (
-            <div className={styles.formGroup}>
-              <label className={styles.label}>Custom Section Name</label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <Input
-                  type="text"
-                  placeholder="e.g., Budget Breakdown"
-                  value={customSectionName}
-                  onChange={(e) => setCustomSectionName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddCustomSection();
-                    }
-                  }}
-                  autoFocus
-                />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleAddCustomSection}
-                >
-                  Add
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    setShowAddCustom(false);
-                    setCustomSectionName("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
           <div className={styles.categoriesList}>
-            {Object.entries(categoriesToRender).map(([categoryKey, category]) => {
-              const isExpanded = expandedCategories.has(categoryKey);
-              const filteredSections = category.sections.filter((sectionKey) =>
-                getDisplayName(sectionKey).toLowerCase().includes(searchQuery.toLowerCase())
-              );
-
-              if (searchQuery && filteredSections.length === 0) return null;
-
-              return (
-                <div key={categoryKey} className={styles.category}>
-                  <button
-                    className={styles.categoryHeader}
-                    onClick={() => toggleCategory(categoryKey)}
-                  >
-                    <span className={styles.categoryLabel}>{category.label}</span>
+            {/* Sections group */}
+            {(!searchQuery || filteredSectionsGroup.length > 0) && (
+              <div className={styles.category}>
+                <div className={styles.categoryHeader} style={{ cursor: "default" }}>
+                  <span className={styles.categoryLabel}>Sections</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span className={styles.categoryCount}>
-                      {category.sections.filter((s) => selected.has(s)).length}/{category.sections.length}
+                      {sectionsSelectedCount}/{allSectionsGroup.length}
                     </span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className={styles.sectionsList}>
-                      {filteredSections.map((sectionKey) => {
-                        const isSelected = selected.has(sectionKey);
-                        return (
-                          <div
-                            key={sectionKey}
-                            className={`${styles.sectionItem} ${isSelected ? styles.selected : ""}`}
-                            onClick={() => toggleSection(sectionKey)}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSection(sectionKey)}
-                              className={styles.checkbox}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <span className={styles.sectionName}>{getDisplayName(sectionKey)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={selectAllSections}
+                      className={styles.toggleAllButton}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={deselectAllSections}
+                      className={styles.toggleAllButton}
+                    >
+                      Deselect All
+                    </Button>
+                  </div>
                 </div>
-              );
-            })}
+                <div className={styles.sectionsList}>
+                  {filteredSectionsGroup.map((sectionKey) => {
+                    const isSelected = selected.has(sectionKey);
+                    return (
+                      <div
+                        key={sectionKey}
+                        className={`${styles.sectionItem} ${isSelected ? styles.selected : ""}`}
+                        onClick={() => toggleSection(sectionKey)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSection(sectionKey)}
+                          className={styles.checkbox}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className={styles.sectionName}>{getDisplayName(sectionKey)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Static Sections group */}
+            {(!searchQuery || filteredStaticGroup.length > 0) && (
+              <div className={styles.category}>
+                <div className={styles.categoryHeader} style={{ cursor: "default" }}>
+                  <span className={styles.categoryLabel}>Static Sections</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span className={styles.categoryCount}>
+                      {staticSelectedCount}/{STATIC_SECTIONS_GROUP.length}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={selectAllStatic}
+                      className={styles.toggleAllButton}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={deselectAllStatic}
+                      className={styles.toggleAllButton}
+                    >
+                      Deselect All
+                    </Button>
+                  </div>
+                </div>
+                <div className={styles.sectionsList}>
+                  {filteredStaticGroup.map((sectionKey) => {
+                    const isSelected = selected.has(sectionKey);
+                    return (
+                      <div
+                        key={sectionKey}
+                        className={`${styles.sectionItem} ${isSelected ? styles.selected : ""}`}
+                        onClick={() => toggleSection(sectionKey)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSection(sectionKey)}
+                          className={styles.checkbox}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className={styles.sectionName}>{getDisplayName(sectionKey)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -354,6 +395,15 @@ export default function SectionsSelectorModal({
             Save Changes
           </Button>
         </div>
-    </BaseModal>
+      </BaseModal>
+
+      <AddSectionModal
+        isOpen={showAddSectionModal}
+        isGenerating={isAddingSection}
+        existingKeys={allExistingKeys}
+        onClose={() => setShowAddSectionModal(false)}
+        onSubmit={handleAddSectionSubmit}
+      />
+    </>
   );
 }

@@ -44,6 +44,21 @@
   margin-bottom: 24px;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.searchBar {
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
+}
+
 .clientsGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

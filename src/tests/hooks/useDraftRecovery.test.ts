@@ -105,6 +105,7 @@ const savedDraft: SavedDraft = {
     maxStepReached: 3,
     completedSteps: [1, 2],
   },
+  hasEdits: false,
   generatedContent: {},
   uiState: {
     scrollPosition: 500,

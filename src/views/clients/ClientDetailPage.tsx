@@ -14,8 +14,10 @@ import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice"
 import { useProposalDownload } from "@/hooks/useProposalDownload";
 import type { ClientDocument } from "@/services/client.service";
 import { listProposals } from "@/services/proposal.service";
+import { listDrafts } from "@/services/draft.service";
 import * as clientApi from "@/services/client.service";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
+import type { DraftMetadata } from "@/interfaces/draftInterfaces";
 import { formatDate } from "@/utils/dateUtils";
 import PageLayout from "@/layouts/AppLayout";
 import ClientDetailSkeleton from "@/components/common/skeletons/ClientDetailSkeleton";
@@ -63,6 +65,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [proposalSearchQuery, setProposalSearchQuery] = useState<string>("");
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
   const [clientProposals, setClientProposals] = useState<ProposalListItem[]>([]);
+  const [clientDrafts, setClientDrafts] = useState<DraftMetadata[]>([]);
   const [isLoadingProposals, setIsLoadingProposals] = useState<boolean>(true);
   const [downloadingProposalId, setDownloadingProposalId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -120,9 +123,24 @@ export default function ClientWorkspacePage(): JSX.Element {
   async function loadClientProposals(): Promise<void> {
     setIsLoadingProposals(true);
     try {
-      const proposals = await listProposals();
+      const [proposals, drafts] = await Promise.all([listProposals(), listDrafts()]);
       const clientHistory = proposals.filter((p) => p.clientId === clientId);
       setClientProposals(clientHistory);
+      // Drafts matched by clientId (proposalId link) or clientName fallback
+      const proposalIds = new Set(clientHistory.map((p) => p.id));
+      const clientName = client?.name ?? "";
+      const clientDraftList = drafts.filter(
+        (d) =>
+          (d.proposalId != null && proposalIds.has(d.proposalId)) ||
+          d.clientName.toLowerCase() === clientName.toLowerCase()
+      );
+      // Exclude drafts that already have a proposal entry (stage=generated → already in proposals list)
+      const linkedProposalIds = new Set(clientHistory.map((p) => p.id));
+      setClientDrafts(
+        clientDraftList.filter(
+          (d) => d.proposalId == null || !linkedProposalIds.has(d.proposalId)
+        )
+      );
     } catch (error) {
       logger.error("Failed to load client proposals:", error);
     } finally {
@@ -144,7 +162,6 @@ export default function ClientWorkspacePage(): JSX.Element {
 
       // Optimistic update: update store
       removeDocumentFromStore(client.id, deleteDocModalData.id);
-      toast.success("Document deleted");
       setDeleteDocModalData(null);
 
       // Call API in background
@@ -170,7 +187,6 @@ export default function ClientWorkspacePage(): JSX.Element {
       client.documents.forEach((doc) => {
         removeDocumentFromStore(client.id, doc.id);
       });
-      toast.success("All documents deleted");
       setDeleteAllDocsModalOpen(false);
 
       // Call API in background
@@ -216,12 +232,6 @@ export default function ClientWorkspacePage(): JSX.Element {
           throw new Error('Failed to upload document: uploadedDoc is undefined');
         }
 
-        // Show parsing status based on uploaded document
-        if (uploadedDoc.status === 'parsed') {
-          toast.success(`${file.name} uploaded and parsed`);
-        } else {
-          toast.success(`${file.name} uploaded successfully`);
-        }
       } catch (error) {
         logger.error(`Failed to upload ${file.name}:`, error);
         toast.error(`Failed to upload ${file.name}`);
@@ -293,9 +303,22 @@ export default function ClientWorkspacePage(): JSX.Element {
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredProposals = clientProposals.filter((proposal) =>
-    proposal.title.toLowerCase().includes(proposalSearchQuery.toLowerCase())
-  );
+  const filteredProposals = clientProposals.filter((proposal) => {
+    if (!proposalSearchQuery) return true;
+    const q = proposalSearchQuery.toLowerCase();
+    return (
+      proposal.title.toLowerCase().includes(q) ||
+      proposal.clientName.toLowerCase().includes(q) ||
+      String(proposal.id).includes(q) ||
+      (proposal.version != null && String(proposal.version).includes(q))
+    );
+  });
+
+  const filteredDraftRows = clientDrafts.filter((d) => {
+    if (!proposalSearchQuery) return true;
+    const q = proposalSearchQuery.toLowerCase();
+    return d.title.toLowerCase().includes(q) || d.clientName.toLowerCase().includes(q);
+  });
 
   return (
     <PageLayout>
@@ -449,7 +472,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               <div className={styles.emptyState}>
                 <div className={styles.emptyTitle}>Loading proposals...</div>
               </div>
-            ) : filteredProposals.length === 0 ? (
+            ) : filteredProposals.length === 0 && filteredDraftRows.length === 0 ? (
               <div className={styles.emptyState}>
                 <FileText size={48} />
                 <p>No proposals yet</p>
@@ -470,14 +493,16 @@ export default function ClientWorkspacePage(): JSX.Element {
                   <tbody>
                     {filteredProposals.map((proposal) => (
                       <tr
-                        key={proposal.id}
+                        key={`proposal-${proposal.id}`}
                         className={styles.proposalRow}
                         onClick={() => router.push(`/proposal/${proposal.id}`)}
                         style={{ cursor: 'pointer' }}
                       >
                         <td>
                           <div className={styles.proposalName}>{proposal.title}</div>
-                          <div className={styles.proposalVersion}>Version 1.0</div>
+                          {proposal.version != null && (
+                            <div className={styles.proposalVersion}>v{proposal.version}</div>
+                          )}
                         </td>
                         <td>
                           <span className={styles.typeBadge}>{getTemplateTypeLabel(proposal)}</span>
@@ -490,13 +515,13 @@ export default function ClientWorkspacePage(): JSX.Element {
                             {proposal.approvalStatus === 'approved' && (
                               <>
                                 <CheckCircle size={16} className={styles.statusIconFinalized} />
-                                <span>Finalized</span>
+                                <span>Approved</span>
                               </>
                             )}
                             {proposal.approvalStatus === 'rejected' && (
                               <>
-                                <Clock size={16} className={styles.statusIconReview} />
-                                <span className={styles.statusReview}>In Review</span>
+                                <X size={16} className={styles.statusIconReview} />
+                                <span className={styles.statusReview}>Rejected</span>
                               </>
                             )}
                             {proposal.approvalStatus === 'pending' && (
@@ -530,6 +555,50 @@ export default function ClientWorkspacePage(): JSX.Element {
                                   <span className={styles.actionLabel}>DOCX</span>
                                 </>
                               )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {filteredDraftRows.map((draft) => (
+                      <tr
+                        key={`draft-${draft.id}`}
+                        className={styles.proposalRow}
+                        onClick={() => router.push("/drafts")}
+                        style={{ cursor: 'pointer' }}
+                        title="View in Drafts"
+                      >
+                        <td>
+                          <div className={styles.proposalName}>{draft.title || "Untitled Draft"}</div>
+                          <div className={styles.proposalVersion} style={{ color: 'var(--color-text-muted)' }}>
+                            In Progress
+                          </div>
+                        </td>
+                        <td>
+                          <span className={styles.typeBadge}>
+                            {draft.templateType === "scratch" || !draft.templateType ? "From Scratch" : draft.templateType}
+                          </span>
+                        </td>
+                        <td className={styles.dateCell}>
+                          {formatDate(draft.updatedAt)}
+                        </td>
+                        <td>
+                          <div className={styles.statusCell}>
+                            <Edit size={16} className={styles.statusIconDraft} />
+                            <span>Draft</span>
+                          </div>
+                        </td>
+                        <td className={styles.actionsCol}>
+                          <div className={styles.actionsCol}>
+                            <button
+                              className={styles.actionBtn}
+                              style={{ minWidth: '80px' }}
+                              onClick={(e) => { e.stopPropagation(); router.push("/drafts"); }}
+                              title="Resume editing this draft"
+                            >
+                              <Edit size={16} />
+                              <span className={styles.actionLabel}>Resume</span>
                             </button>
                           </div>
                         </td>
