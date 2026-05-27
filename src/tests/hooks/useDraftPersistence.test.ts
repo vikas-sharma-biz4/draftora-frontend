@@ -74,6 +74,8 @@ const defaultOptions = {
   activeSection: "executive_summary",
   lastLocation: "wizard_parameters" as const,
   stage: "wizard_in_progress" as const,
+  wizardStep: 1,
+  skipIfApproved: false,
 };
 
 beforeEach(() => {

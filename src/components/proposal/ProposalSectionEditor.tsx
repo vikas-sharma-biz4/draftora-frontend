@@ -43,7 +43,9 @@
 
 import { memo, useEffect, useState, useCallback } from "react";
 import SectionEditMode from "./SectionEditMode";
+import ImageSectionHeader from "./ImageSectionHeader";
 import { regenerateSelection, type RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
+import { isGeneratedImageContent } from "@/utils/contentParser";
 
 interface RegenerateSelectionParams {
   selectedText: string;
@@ -140,20 +142,34 @@ const ProposalSectionEditor = memo(function ProposalSectionEditor({
     [proposalId, sectionKey]
   );
 
+  const isImageSection = isGeneratedImageContent(localContent);
+
   return (
     <div className="proposal-page" id={`section-${sectionKey}`}>
-      <div className="proposal-page-header">
-        <h2 className="proposal-page-title">{label}</h2>
-      </div>
-
-      <SectionEditMode
-        sectionKey={sectionKey}
-        content={localContent}
-        onContentChange={handleContentChange}
-        onSave={onSave}
-        onRegenerateSelection={handleRegenerateSelection}
-        placeholder={`Write the ${label} section here…`}
-      />
+      {isImageSection ? (
+        <ImageSectionHeader
+          proposalId={proposalId}
+          sectionKey={sectionKey}
+          label={label}
+          content={localContent}
+          onContentChange={onContentChange}
+          onSave={onSave}
+        />
+      ) : (
+        <>
+          <div className="proposal-page-header">
+            <h2 className="proposal-page-title">{label}</h2>
+          </div>
+          <SectionEditMode
+            sectionKey={sectionKey}
+            content={localContent}
+            onContentChange={handleContentChange}
+            onSave={onSave}
+            onRegenerateSelection={handleRegenerateSelection}
+            placeholder={`Write the ${label} section here…`}
+          />
+        </>
+      )}
     </div>
   );
 }, (prevProps, nextProps) => {

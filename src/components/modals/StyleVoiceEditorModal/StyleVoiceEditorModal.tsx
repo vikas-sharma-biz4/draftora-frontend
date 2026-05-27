@@ -2,8 +2,6 @@
 
 import React, { useState } from "react";
 import { X } from "lucide-react";
-import { toast } from "@/utils/toast";
-
 import styles from "../EditModal.module.scss";
 import BaseModal from "@/components/common/BaseModal";
 import Button from "@/components/common/Button";
@@ -37,7 +35,6 @@ export default function StyleVoiceEditorModal({
       lengthPreference: selectedLength,
       language: selectedLanguage,
     });
-    toast.success("Style & voice updated");
   }
 
   return (

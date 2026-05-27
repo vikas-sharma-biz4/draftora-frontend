@@ -46,6 +46,7 @@ export function useProposalPageData(
   const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
   const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
   const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
+  const setFromHistoryInStore = useDraftSessionStore(state => state.setFromHistory);
   const updateProposalInStore = useProposalStore(state => state.updateProposal);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
@@ -62,11 +63,13 @@ export function useProposalPageData(
     activeSectionRef.current = activeSection;
   }, [activeSection]);
 
-  // Check if navigating from History
+  // Check if navigating from History and sync to session store
   useEffect(() => {
     const fromParam = searchParams.get("from");
-    setFromHistory(fromParam === "history");
-  }, [searchParams]);
+    const isFromHistory = fromParam === "history";
+    setFromHistory(isFromHistory);
+    setFromHistoryInStore(isFromHistory);
+  }, [searchParams, setFromHistoryInStore]);
 
   // Mark step 3 as visited when this page loads
   useEffect(() => {
@@ -205,6 +208,7 @@ export function useProposalPageData(
     wizardStep: 5,
     skipIfApproved: false,
     approvalStatus: proposal?.approvalStatus,
+    saveOnMount: true,
   });
 
   return {

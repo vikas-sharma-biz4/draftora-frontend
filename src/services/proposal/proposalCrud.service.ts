@@ -265,6 +265,7 @@ interface ProposalListApiItem {
   template_type: "predefined" | "custom" | "scratch" | "recreate";
   created_at: string;
   updated_at: string;
+  version?: number | null;
 }
 
 export interface ListProposalsParams {
@@ -285,6 +286,7 @@ function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
     templateType: parseTemplateType(item.template_type),
     createdAt: item.created_at,
     updatedAt: item.updated_at,
+    version: item.version ?? null,
   };
 }
 

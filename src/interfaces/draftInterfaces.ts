@@ -38,6 +38,7 @@ export interface SavedDraft {
   wizardState: DraftWizardState;
   generatedContent: Record<string, string>;
   uiState: DraftUIState;
+  hasEdits: boolean;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -52,6 +53,9 @@ export interface DraftMetadata {
   lastLocation: DraftLocation;
   stage: DraftStage;
   updatedAt: string;
+  hasEdits?: boolean;
+  templateId?: string | null;
+  templateType?: string;
 }
 
 export interface SaveDraftPayload {
@@ -64,6 +68,7 @@ export interface SaveDraftPayload {
   wizardState: DraftWizardState;
   generatedContent: Record<string, string>;
   uiState: DraftUIState;
+  hasEdits?: boolean;
 }
 
 export interface PipelineStep {

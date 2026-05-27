@@ -7,7 +7,6 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import Button from "@/components/common/Button";
-import BackButton from "@/components/common/BackButton";
 
 import styles from "./ReviewPage.module.scss";
 
@@ -45,6 +44,7 @@ import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useClients } from "@/hooks/useClients";
+import { useClientStore } from "@/store/features/clients/clientSlice";
 import { formatBytes } from "@/utils/formatBytes";
 import { formatDate } from "@/utils/dateUtils";
 
@@ -133,7 +133,7 @@ export default function ReviewPage(): JSX.Element {
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
   const approvalStatus = useApprovalStatus();
-  const { clients, refetch: refetchClients } = useClients({ autoFetch: true });
+  const { clients, isLoading: isLoadingClients, refetch: refetchClients } = useClients({ autoFetch: true });
 
   // Enable auto-save when user is in pipeline stage (but NOT during generation)
   useWizardAutoSave({ enabled: !isGenerating, debounceMs: 2000, approvalStatus });
@@ -209,6 +209,7 @@ export default function ReviewPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
+  const [isOpeningKBModal, setIsOpeningKBModal] = useState<boolean>(false);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -293,14 +294,27 @@ export default function ReviewPage(): JSX.Element {
     }, 0);
   }
 
+  async function handleOpenKnowledgeBase(): Promise<void> {
+    setIsOpeningKBModal(true);
+    try {
+      // Force-refresh from API so the modal has accurate data:
+      // - client existence is confirmed (not stale localStorage cache)
+      // - document list reflects current backend state
+      await refetchClients();
+    } finally {
+      setIsOpeningKBModal(false);
+    }
+    setShowKnowledgeBaseModal(true);
+  }
+
   async function handleSaveKnowledgeBase(selectedIds: string[], hasNewUploads: boolean): Promise<void> {
-    // Only refresh clients if new documents were uploaded (to get newly uploaded docs)
     if (hasNewUploads) {
       await refetchClients();
     }
 
-    // Rebuild filesMeta from selected documents using client data
-    const currentClient = clients.find((c) => c.id === proposalData.clientId);
+    // Read fresh clients directly from store after any refetch — avoids stale closure capture
+    const freshClients = useClientStore.getState().clients;
+    const currentClient = freshClients.find((c) => c.id === proposalData.clientId);
     const newFilesMeta = currentClient
       ? currentClient.documents
           .filter((doc) => selectedIds.includes(String(doc.id)))
@@ -309,7 +323,7 @@ export default function ReviewPage(): JSX.Element {
             size: doc.sizeBytes > 0 ? doc.sizeBytes : 0,
             type: doc.fileType || "application/pdf",
           }))
-      : [];
+      : filesMeta; // Preserve existing filesMeta when the client is not in the store
 
     updateProposalData({
       selectedDocumentIds: selectedIds.map(Number),
@@ -317,7 +331,6 @@ export default function ReviewPage(): JSX.Element {
     });
 
     setShowKnowledgeBaseModal(false);
-    // toast.success(`${selectedIds.length} document(s) selected for Knowledge Base`);
   }
 
   function handleSaveStyleVoice(data: { tone: ToneOption; lengthPreference: LengthOption; language: string }): void {
@@ -325,9 +338,11 @@ export default function ReviewPage(): JSX.Element {
     setShowStyleVoiceModal(false);
   }
 
-  function handleSaveSections(sections: string[]): void {
+  function handleSaveSections(sections: string[], newCustomSections?: Array<{ key: string; label: string; description: string }>): void {
+    const existingCustomSections: Array<{ key: string; label: string; description: string }> = [];
     updateProposalData({
       selectedSections: sections,
+      customSections: [...existingCustomSections, ...(newCustomSections ?? [])],
     });
     setShowSectionsModal(false);
   }
@@ -469,12 +484,12 @@ export default function ReviewPage(): JSX.Element {
           completedSteps={completedSteps}
           visitedSteps={visitedPipelineSteps}
           visible={true}
-          proposalId={currentProposalId}
+          proposalId={currentProposalId ?? generatedProposalId}
           maxStepReached={maxStepReached}
         />
         <div className="page-badge">Phase 05</div>
         <h1 className="page-title">Final Review</h1>
-        <p className="page-subtitle">
+        <p className={`page-subtitle ${styles.reviewPageSubtitle}`}>
           Verify your proposal configuration before the AI architect constructs
           your final document. Everything looks right? Hit Generate.
         </p>
@@ -563,9 +578,10 @@ export default function ReviewPage(): JSX.Element {
                 <span className="review-card-title">KNOWLEDGE BASE</span>
                 <button
                   className="link-plain"
-                  onClick={() => setShowKnowledgeBaseModal(true)}
+                  onClick={handleOpenKnowledgeBase}
+                  disabled={isOpeningKBModal}
                 >
-                  Edit
+                  {isOpeningKBModal ? "Loading…" : "Edit"}
                 </button>
               </div>
               {proposalData.filesMeta.length > 0 ? (
@@ -579,6 +595,12 @@ export default function ReviewPage(): JSX.Element {
                     </li>
                   ))}
                 </ul>
+              ) : isLoadingClients ? (
+                <span className="text-muted text-small">Loading documents…</span>
+              ) : (proposalData.selectedDocumentIds?.length ?? 0) > 0 ? (
+                <span className="text-muted text-small">
+                  Previously selected documents unavailable — click Edit to reselect
+                </span>
               ) : (
                 <span className="text-muted text-small">
                   No files uploaded
@@ -651,25 +673,6 @@ export default function ReviewPage(): JSX.Element {
                 Save Draft
               </Button>
             </div>
-          </div>
-        </div>
-
-        <div className="page-footer">
-          <div className="page-footer-left">
-            <BackButton
-              onClick={() => {
-                if (generatedProposalId) {
-                  router.push(`/proposal/${generatedProposalId}`);
-                } else {
-                  router.push("/parameters");
-                }
-              }}
-            />
-          </div>
-          <div className="page-footer-right">
-            <Button variant="secondary" onClick={handleSaveDraft}>
-              Save Draft
-            </Button>
           </div>
         </div>
 

@@ -86,8 +86,17 @@
   }
 }
 
+// Upload zone + uploaded files — sits above the scrollable document list, always visible
+.uploadSection {
+  padding: 20px 24px 0;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
 .modalBody {
-  padding: 24px;
+  padding: 16px 24px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -588,6 +597,7 @@
 
 .sectionsList {
   background: white;
+  overflow-x: auto;
 }
 
 .sectionItem {
@@ -597,14 +607,12 @@
   padding: 10px 16px;
   border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s;
+  white-space: nowrap;
+  min-width: min-content;
 
   &:last-child {
     border-bottom: none;
-  }
-
-  &:hover {
-    background: var(--color-bg);
   }
 
   &.selected {
@@ -616,6 +624,7 @@
 .sectionName {
   font-size: 13px;
   color: var(--color-text);
+  white-space: nowrap;
 }
 
 // Upload zone styles
@@ -624,13 +633,13 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 24px;
+  padding: 16px 20px;
   border: 2px dashed var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s;
   background: var(--color-bg);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 
   &:hover {
     border-color: var(--color-primary);
@@ -641,11 +650,36 @@
     border-color: var(--color-primary);
     background: rgba(55, 48, 163, 0.05);
   }
+
+  &.uploadZoneDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+.clientNotFoundBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: #856404;
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #856404;
+  }
 }
 
 .uploadIcon {
   color: var(--color-text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .uploadText {
@@ -675,11 +709,11 @@
 
 // Uploaded files list
 .uploadedFilesList {
-  max-height: 300px;
   overflow-y: auto;
+  max-height: 180px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 
   // Hide scrollbar for Chrome, Safari and Opera
   &::-webkit-scrollbar {
@@ -705,21 +739,30 @@
 .uploadedFileItem {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 16px;
+  padding: 16px 20px;
+  min-height: 72px;
   border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s;
 
   &:last-child {
     border-bottom: none;
   }
 }
 
+.uploadedFileItemParsed {
+  background: rgba(16, 185, 129, 0.06);
+  border-left: 4px solid var(--color-success);
+}
+
 .fileIconWrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-bg);
   flex-shrink: 0;
 }
 
@@ -744,6 +787,18 @@
   color: var(--color-success);
 }
 
+.fileIconWrapperSuccess {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.fileIconWrapperError {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.fileIconWrapperParsing {
+  background: rgba(var(--color-primary-rgb), 0.08);
+}
+
 .errorIcon {
   color: var(--color-danger);
 }
@@ -752,13 +807,13 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
   min-width: 0;
 }
 
 .fileName {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -766,8 +821,11 @@
 }
 
 .fileMeta {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .parsingStatus {
@@ -776,6 +834,8 @@
 
 .parsedStatus {
   color: var(--color-success);
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .errorStatus {

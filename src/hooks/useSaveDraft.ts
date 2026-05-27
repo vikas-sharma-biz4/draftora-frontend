@@ -10,6 +10,7 @@ import {
   useCurrentStep,
   useMaxStepReached,
   useCurrentProposalId,
+  useGeneratedProposalId,
   useWizardActions,
   useFilesMeta,
   useSelectedDocumentIds,
@@ -26,6 +27,7 @@ import {
   useAiModel,
   useTemplateId,
   useTemplateType,
+  useApprovalStatus,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { updateDraft as updateDraftApi, getDraftByProposalId, getDraft } from "@/services/draft.service";
@@ -59,6 +61,7 @@ export function useSaveDraft(): () => Promise<void> {
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
   const currentProposalId = useCurrentProposalId();
+  const generatedProposalId = useGeneratedProposalId();
   const { resetProposal } = useWizardActions();
   const completedSteps = useDraftSessionStore(state => state.completedSteps);
   const router = useRouter();
@@ -68,8 +71,22 @@ export function useSaveDraft(): () => Promise<void> {
   const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
   const saveDraftToStore = useDraftStore(state => state.saveDraft);
   const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
+  const approvalStatus = useApprovalStatus();
 
   return async function saveDraft(): Promise<void> {
+    // Never save drafts for proposals that have been reviewed (approved or rejected)
+    if (approvalStatus === "approved" || approvalStatus === "rejected") {
+      toast.error(MESSAGES.DRAFT_SAVE_REJECTED);
+      return;
+    }
+
+    // If a proposal ID is linked but approval status hasn't loaded from the API yet,
+    // block the save. Sending proposal_id before we know its approval state risks a 400.
+    if (currentProposalId && approvalStatus === undefined) {
+      toast.error(MESSAGES.DRAFT_SAVE_LOADING);
+      return;
+    }
+
     // Use localStorage-based lock to prevent concurrent saves across page navigations
     const lockValue = localStorage.getItem(DRAFT_SAVE_LOCK_KEY);
     if (lockValue === 'locked') {
@@ -153,7 +170,7 @@ export function useSaveDraft(): () => Promise<void> {
       } as any;
 
       const draftPayload = {
-        proposalId: currentProposalId,
+        proposalId: currentProposalId ?? generatedProposalId,
         title: title || "Untitled Proposal",
         clientName: clientName || "",
         status: "draft" as const,
@@ -185,29 +202,22 @@ export function useSaveDraft(): () => Promise<void> {
         sectionDisplayNamesKeys: Object.keys(sectionDisplayNames).length,
       });
 
-      console.log('[useSaveDraft] Draft payload being saved:', {
-        proposalId: currentProposalId,
-        title,
-        clientName,
-        selectedSections,
-        sectionDisplayNames,
-        filesMeta,
-        selectedDocumentIds,
-        webReferences,
-        tone,
-        lengthPreference,
-        language,
-        aiModel,
-        templateId,
-        templateType,
-        stage: draftStage,
-        lastLocation,
-      });
-
       if (currentDraftId) {
-        // Update existing draft
-        await updateDraftInStore(currentDraftId, draftPayload);
-        toast.success(MESSAGES.DRAFT_SAVED);
+        try {
+          await updateDraftInStore(currentDraftId, draftPayload);
+          toast.success(MESSAGES.DRAFT_SAVED);
+        } catch (updateError) {
+          const is404 = updateError instanceof Error && (updateError as any).statusCode === 404;
+          if (is404) {
+            // Draft was deleted from backend — create fresh
+            setCurrentDraftId(null);
+            const saved = await saveDraftToStore(draftPayload);
+            setCurrentDraftId(saved.id);
+            toast.success(MESSAGES.DRAFT_SAVED);
+          } else {
+            throw updateError;
+          }
+        }
       } else {
         // Create new draft and store ID
         const saved = await saveDraftToStore(draftPayload);
@@ -225,7 +235,6 @@ export function useSaveDraft(): () => Promise<void> {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to save draft";
       toast.error(message);
-      throw error;
     } finally {
       localStorage.removeItem(DRAFT_SAVE_LOCK_KEY);
     }

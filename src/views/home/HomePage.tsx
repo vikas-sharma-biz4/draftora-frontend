@@ -176,10 +176,19 @@ export default function HomePage(): JSX.Element {
                 ✓
               </div>
             )}
-            <div className="tmpl-scratch-inner">
-              <div className="tmpl-scratch-icon">{SPECIAL_CARDS.START_FROM_SCRATCH.icon}</div>
-              <div className="tmpl-scratch-label">{SPECIAL_CARDS.START_FROM_SCRATCH.name}</div>
-              <div className="tmpl-scratch-hint">{SPECIAL_CARDS.START_FROM_SCRATCH.description}</div>
+            <div className="tmpl-preview tmpl-preview-gradient-scratch">
+              <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+              </div>
+              <span className="tmpl-preview-icon" aria-hidden="true">
+                {SPECIAL_CARDS.START_FROM_SCRATCH.name}
+              </span>
+            </div>
+            <div className="tmpl-body">
+              <div className="tmpl-desc">{SPECIAL_CARDS.START_FROM_SCRATCH.description}</div>
             </div>
           </article>
 
@@ -199,10 +208,19 @@ export default function HomePage(): JSX.Element {
             }}
             aria-label="Recreate an existing document with new context"
           >
-            <div className="tmpl-upload-inner">
-              <div className="tmpl-upload-icon">{SPECIAL_CARDS.RECREATE_TEMPLATE.icon}</div>
-              <div className="tmpl-upload-label">{SPECIAL_CARDS.RECREATE_TEMPLATE.name}</div>
-              <div className="tmpl-upload-hint">{SPECIAL_CARDS.RECREATE_TEMPLATE.description}</div>
+            <div className="tmpl-preview tmpl-preview-gradient-recreate">
+              <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+                <div className="tmpl-preview-line" />
+              </div>
+              <span className="tmpl-preview-icon" aria-hidden="true">
+                {SPECIAL_CARDS.RECREATE_TEMPLATE.name}
+              </span>
+            </div>
+            <div className="tmpl-body">
+              <div className="tmpl-desc">{SPECIAL_CARDS.RECREATE_TEMPLATE.description}</div>
             </div>
           </article>
 

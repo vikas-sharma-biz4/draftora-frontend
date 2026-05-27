@@ -83,6 +83,7 @@ export interface ProposalListItem {
   templateId?: string | null;
   createdAt: string;
   updatedAt: string;
+  version?: number | null;
 }
 
 export type TemplateCategory = "Popular" | "Business" | "Technical" | "Creative" | "Documentation";

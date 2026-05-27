@@ -31,9 +31,6 @@ interface ProposalWizardContextType {
   setShouldStartBackgroundFetch: (val: boolean) => void;
 }
 
-// Module-level flag to ensure hydration only happens once
-let hasHydratedGlobally = false;
-
 /**
  * ProposalWizardProvider — thin hydration wrapper around the Zustand wizard store.
  *
@@ -53,10 +50,10 @@ export function ProposalWizardProvider({
   // Hydrate from localStorage on mount — read store actions via getState() to
   // avoid subscribing to state and causing an extra re-render cycle.
   useEffect(() => {
-    if (hasHydratedGlobally) return;
-    hasHydratedGlobally = true;
+    // Guard using the store's own hydrated flag so this survives HMR re-mounts correctly
+    if (useProposalWizardStore.getState().hydrated) return;
 
-    const { updateProposalData, setCurrentStep, setHydrated, setCurrentProposalId, setMaxStepReached } =
+    const { updateProposalData, setCurrentStep, setHydrated, setCurrentProposalId, setMaxStepReached, setGeneratedProposalId } =
       useProposalWizardStore.getState();
     try {
       const raw = localStorage.getItem(PROPOSAL_WIZARD_STORAGE_KEY);
@@ -65,6 +62,7 @@ export function ProposalWizardProvider({
           proposalData?: Partial<ProposalData>;
           currentStep?: WizardStep;
           currentProposalId?: number | null;
+          generatedProposalId?: number | null;
           maxStepReached?: WizardStep;
         };
         if (saved.proposalData) {
@@ -89,6 +87,9 @@ export function ProposalWizardProvider({
         if (saved.currentProposalId !== undefined) {
           setCurrentProposalId(saved.currentProposalId);
         }
+        if (saved.generatedProposalId !== undefined) {
+          setGeneratedProposalId(saved.generatedProposalId);
+        }
         if (saved.maxStepReached) {
           setMaxStepReached(saved.maxStepReached);
         }
@@ -110,6 +111,7 @@ export function ProposalWizardProvider({
         const proposalData = state.proposalData;
         const currentStep = state.currentStep;
         const currentProposalId = state.currentProposalId;
+        const generatedProposalId = state.generatedProposalId;
         const maxStepReached = state.maxStepReached;
 
         // Only save if there's meaningful data
@@ -126,6 +128,7 @@ export function ProposalWizardProvider({
           },
           currentStep,
           currentProposalId,
+          generatedProposalId,
           maxStepReached,
         };
         localStorage.setItem(PROPOSAL_WIZARD_STORAGE_KEY, JSON.stringify(toSave));

@@ -109,6 +109,8 @@
   color: var(--color-text);
   line-height: 1.6;
   margin-bottom: 12px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 
   strong {
     font-weight: 600;

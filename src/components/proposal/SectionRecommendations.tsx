@@ -5,13 +5,17 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/utils/toast";
 import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
+import Spinner from "@/components/common/Spinner";
 import styles from "./SectionRecommendations.module.scss";
 import { logger } from "@/utils/logger";
+
+const RECOMMENDATIONS_SESSION_KEY = "section_recommendations_cache_v1";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
   startBackgroundFetch: () => void;
   restoreRecommendation: (sectionKey: string, recommendation: SectionRecommendation, originalIndex?: number) => void;
+  clearRecommendations: () => void;
 }
 
 interface SectionRecommendationsProps {
@@ -21,6 +25,7 @@ interface SectionRecommendationsProps {
   documentContext: string;
   onAddSection: (sectionKey: string, title: string, recommendation?: SectionRecommendation, originalIndex?: number) => void;
   onSectionAdded?: (sectionKey: string) => void;
+  proposalId?: number | null;
 }
 
 const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionRecommendationsProps>((
@@ -31,12 +36,40 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     documentContext,
     onAddSection,
     onSectionAdded,
+    proposalId,
   }: SectionRecommendationsProps,
   ref
 ) => {
-  const [recommendations, setRecommendations] = useState<SectionRecommendation[]>([]);
+  // For new proposals (no proposalId), always start fresh — ignore any cached state
+  const isNewProposal = proposalId === null || proposalId === undefined;
+
+  const [recommendations, setRecommendations] = useState<SectionRecommendation[]>(() => {
+    if (isNewProposal || typeof window === "undefined") return [];
+    try {
+      const cached = sessionStorage.getItem(RECOMMENDATIONS_SESSION_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { recommendations: SectionRecommendation[]; isRevealed: boolean; proposalId?: number };
+        if (parsed.proposalId === proposalId && Array.isArray(parsed.recommendations)) {
+          return parsed.recommendations;
+        }
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isRevealed, setIsRevealed] = useState<boolean>(false);
+  const [isRevealed, setIsRevealed] = useState<boolean>(() => {
+    if (isNewProposal || typeof window === "undefined") return false;
+    try {
+      const cached = sessionStorage.getItem(RECOMMENDATIONS_SESSION_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { recommendations: SectionRecommendation[]; isRevealed: boolean; proposalId?: number };
+        if (parsed.proposalId === proposalId) {
+          return parsed.isRevealed === true;
+        }
+      }
+    } catch { /* ignore */ }
+    return false;
+  });
   const [showPromptInput, setShowPromptInput] = useState<boolean>(false);
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
@@ -52,6 +85,16 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     templateIdRef.current = templateId;
     existingSectionsRef.current = existingSections;
   });
+
+  useEffect(() => {
+    if (isNewProposal) return;
+    try {
+      sessionStorage.setItem(
+        RECOMMENDATIONS_SESSION_KEY,
+        JSON.stringify({ recommendations, isRevealed, proposalId })
+      );
+    } catch { /* ignore */ }
+  }, [recommendations, isRevealed, proposalId, isNewProposal]);
 
 
   const fetchRecommendations = async (customPrompt?: string): Promise<void> => {
@@ -219,6 +262,15 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         return [...prev, recommendation];
       });
     },
+    clearRecommendations: () => {
+      setRecommendations([]);
+      setIsRevealed(false);
+      setShowPromptInput(false);
+      setUserPrompt("");
+      try {
+        sessionStorage.removeItem(RECOMMENDATIONS_SESSION_KEY);
+      } catch { /* ignore */ }
+    },
   }));
 
   return (
@@ -229,16 +281,19 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         </div>
         <button
           className={styles.ctaBtn}
-          onClick={handleGenerateClick}
           disabled={isLoading}
+          aria-busy={isLoading || undefined}
+          onClick={handleGenerateClick}
         >
-          {isRevealed ? 'Regenerate' : 'Generate'}
+          {isLoading ? (
+            <span className={styles.ctaBtnLoadingContent}>
+              <Spinner size="sm" />
+              <span>{isRevealed ? "Regenerating..." : "Generating..."}</span>
+            </span>
+          ) : (
+            isRevealed ? "Regenerate" : "Generate"
+          )}
         </button>
-        {isLoading && (
-          <div className={styles.loadingState}>
-            <p>generating...</p>
-          </div>
-        )}
       </div>
 
       {showPromptInput && (
