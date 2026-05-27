@@ -7,7 +7,7 @@
     "dev:clean": "powershell -Command \"Remove-Item -Path .next -Recurse -Force -ErrorAction SilentlyContinue\" && next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "clean": "powershell -Command \"Remove-Item -Path .next -Recurse -Force -ErrorAction SilentlyContinue\""
@@ -51,6 +51,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/turndown": "^5.0.6",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.6",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "sass": "^1.98.0",

@@ -216,7 +216,7 @@ export default function HistoryPage(): JSX.Element {
 
           {!hasActiveFilter && !hasMore && historyItems.length > 0 && (
             <div className={styles.endOfList}>
-              <p>You've reached the end of your proposal history</p>
+              <p>You&apos;ve reached the end of your proposal history</p>
             </div>
           )}
         </>

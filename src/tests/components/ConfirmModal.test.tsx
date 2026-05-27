@@ -185,6 +185,7 @@ describe("ConfirmModal — interactions", () => {
   });
 
   it("shows toast.error when onConfirm rejects", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { toast } = require("@/utils/toast");
     const errorOnConfirm = jest.fn(() =>
       Promise.reject(new Error("Something went wrong"))

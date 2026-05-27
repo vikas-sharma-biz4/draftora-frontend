@@ -66,8 +66,13 @@ export function ProposalWizardProvider({
           maxStepReached?: WizardStep;
         };
         if (saved.proposalData) {
-          // Only update if there's meaningful data to avoid unnecessary updates
-          const hasMeaningfulData = saved.proposalData.title || saved.proposalData.clientName || saved.proposalData.description;
+          // Restore if there is any meaningful state: filled fields, non-default template, or sections
+          const hasMeaningfulData =
+            saved.proposalData.title ||
+            saved.proposalData.clientName ||
+            saved.proposalData.description ||
+            (saved.proposalData.templateType && saved.proposalData.templateType !== "scratch") ||
+            (Array.isArray(saved.proposalData.selectedSections) && saved.proposalData.selectedSections.length > 0);
           if (hasMeaningfulData) {
             updateProposalData({
               ...DEFAULT_PROPOSAL_DATA,
@@ -114,8 +119,14 @@ export function ProposalWizardProvider({
         const generatedProposalId = state.generatedProposalId;
         const maxStepReached = state.maxStepReached;
 
-        // Only save if there's meaningful data
-        if (!proposalData.title && !proposalData.clientName && !proposalData.description) {
+        // Only save if there's any meaningful state to preserve
+        const hasAnyData =
+          proposalData.title ||
+          proposalData.clientName ||
+          proposalData.description ||
+          (proposalData.templateType && proposalData.templateType !== "scratch") ||
+          (proposalData.selectedSections && proposalData.selectedSections.length > 0);
+        if (!hasAnyData) {
           return;
         }
 

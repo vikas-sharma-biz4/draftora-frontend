@@ -1,5 +1,5 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+# #!/usr/bin/env sh
+# . "$(dirname -- "$0")/_/husky.sh"
 
 echo "▶ Running pre-commit checks..."
 
@@ -10,8 +10,8 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Lint
-npm run lint
+# Lint (--quiet suppresses warnings, only shows errors)
+npx eslint . --quiet
 if [ $? -ne 0 ]; then
   echo "✖ ESLint check failed. Commit aborted."
   exit 1

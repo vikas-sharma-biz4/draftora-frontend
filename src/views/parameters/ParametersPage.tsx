@@ -277,7 +277,7 @@ export default function ParametersPage(): JSX.Element {
         customSections: [],
       });
     }
-  }, [sections, hasModifiedSections, selectedSections, sectionDisplayNames, updateProposalData]);
+  }, [sections, selectedSections, sectionDisplayNames, updateProposalData]);
 
 
   // Sync computed sections to store when they change (only for non-template modes)
