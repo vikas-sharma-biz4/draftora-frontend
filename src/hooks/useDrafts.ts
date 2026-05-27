@@ -28,7 +28,7 @@ export function useDrafts(options: UseDraftsOptions = {}): UseDraftsReturn {
   const isLoading = useDraftStore(state => state.isLoading);
   const error = useDraftStore(state => state.error);
   const fetchDrafts = useDraftStore(state => state.fetchDrafts);
-  const getDraftById = (id: string) => useDraftStore(state => state.getDraftById(id));
+  const getDraftById = useDraftStore(state => state.getDraftById);
 
   useEffect(() => {
     if (autoFetch) {

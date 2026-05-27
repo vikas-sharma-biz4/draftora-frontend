@@ -573,7 +573,7 @@ export default function TemplateSelectionModal({
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
       templateType: isScratch ? "scratch" : (template?.templateType ?? "predefined"),
-      selectedSections,
+      selectedSections: isScratch ? SCRATCH_TEMPLATE_DEFAULT_SECTIONS : (template?.sections ? [...template.sections] : selectedSections),
       sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
@@ -977,7 +977,7 @@ export default function TemplateSelectionModal({
                 {showClientDropdown && filteredClients.length === 0 && clientSearchQuery.trim() && (
                   <div className={styles.clientDropdown}>
                     <div className={styles.noResults}>
-                      No clients found matching "{clientSearchQuery}"
+                      No clients found matching &ldquo;{clientSearchQuery}&rdquo;
                     </div>
                   </div>
                 )}

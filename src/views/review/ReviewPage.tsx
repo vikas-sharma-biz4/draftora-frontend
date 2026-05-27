@@ -354,7 +354,7 @@ export default function ReviewPage(): JSX.Element {
     if (selectedTemplate) {
       updateProposalData({
         templateId,
-        templateType: "predefined" as const,
+        templateType: selectedTemplate.templateType,
         selectedSections: [...selectedTemplate.sections],
       });
       toast.success(`Template updated to ${selectedTemplate.name}`);
@@ -547,7 +547,7 @@ export default function ReviewPage(): JSX.Element {
                 <div className="review-field">
                   <span className="review-field-label">Strategic Prompt Snippet</span>
                   <span className="review-field-value dark-bold">
-                    "{descriptionSnippet}"
+                    &ldquo;{descriptionSnippet}&rdquo;
                   </span>
                 </div>
               </div>
