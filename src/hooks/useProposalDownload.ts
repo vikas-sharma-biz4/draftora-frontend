@@ -45,13 +45,20 @@ export function useProposalDownload(): UseProposalDownloadReturn {
         throw new Error("Downloaded file is empty");
       }
 
-      // Get filename from Content-Disposition header if available
+      // Get filename from Content-Disposition header (must be exposed via CORS expose_headers)
       const contentDisposition = response.headers.get("content-disposition");
       let filename = `proposal-${proposalId}.docx`;
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, "");
+        // Prefer RFC 5987 encoded filename* (handles Unicode and spaces)
+        const rfc5987Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;\s]+)/i);
+        if (rfc5987Match?.[1]) {
+          filename = decodeURIComponent(rfc5987Match[1]);
+        } else {
+          // Fall back to classic quoted or unquoted filename=
+          const classicMatch = contentDisposition.match(/filename\s*=\s*(?:"([^"]+)"|([^;\s]+))/i);
+          if (classicMatch) {
+            filename = classicMatch[1] ?? classicMatch[2] ?? filename;
+          }
         }
       }
       logger.debug("[useProposalDownload] Using filename:", filename);

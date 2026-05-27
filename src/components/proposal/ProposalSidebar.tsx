@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -253,6 +253,17 @@ export default function ProposalSidebar({
   onSectionsReordered,
   templateType,
 }: ProposalSidebarProps): JSX.Element {
+  // ── Sidebar list ref for active-section scroll sync ──────────────────────
+  const listRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    if (!listRef.current) return;
+    const activeItem = listRef.current.querySelector<HTMLElement>(".proposal-sidebar-section-row.active");
+    if (activeItem) {
+      activeItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [activeSection]);
+
   // ── Local ordered state — reconciled with props ───────────────────────────
   const [orderedSections, setOrderedSections] = useState<SectionMeta[]>(sections);
 
@@ -286,8 +297,13 @@ export default function ProposalSidebar({
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   // ── DnD sensors ──────────────────────────────────────────────────────────
+  // activationConstraint prevents the PointerSensor from intercepting normal clicks.
+  // Without it, any pointerdown inside DndContext enters drag-tracking mode which
+  // can suppress subsequent click events on section rows.
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
@@ -422,7 +438,7 @@ export default function ProposalSidebar({
             items={orderedSections.map((s) => s.key)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="proposal-sidebar-links">
+            <ul ref={listRef} className="proposal-sidebar-links">
               {orderedSections.map(({ key, label, hasContent, isStatic }) => (
                 <SortableProposalSection
                   key={key}

@@ -14,6 +14,7 @@
 import { create } from 'zustand';
 import type { DraftMetadata, SavedDraft, SaveDraftPayload, DraftStage } from '@/interfaces/draftInterfaces';
 import * as draftApi from '@/services/draft.service';
+import { setDraftTemplateMeta } from '@/utils/draftTemplateCache';
 import { logger } from '@/utils/logger';
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (drafts change frequently)
@@ -175,6 +176,14 @@ export const useDraftStore = create<DraftState>((set, get) => ({
 
     get().addDraft(draftMetadata);
 
+    // Persist template metadata for draft card display
+    const proposalData = payload.wizardState?.proposalData as unknown as Record<string, unknown> | undefined;
+    if (proposalData) {
+      const templateId = (proposalData.templateId as string | null | undefined) ?? null;
+      const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
+      setDraftTemplateMeta(savedDraft.id, { templateId, templateType });
+    }
+
     return savedDraft;
   },
 
@@ -192,6 +201,14 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     };
 
     get().updateDraft(draftId, draftMetadata);
+
+    // Keep template cache in sync if payload includes wizard state
+    const proposalData = payload.wizardState?.proposalData as unknown as Record<string, unknown> | undefined;
+    if (proposalData) {
+      const templateId = (proposalData.templateId as string | null | undefined) ?? null;
+      const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
+      setDraftTemplateMeta(draftId, { templateId, templateType });
+    }
 
     return updatedDraft;
   },

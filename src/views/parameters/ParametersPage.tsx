@@ -6,7 +6,6 @@ import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import dynamic from "next/dynamic";
 import Button from "@/components/common/Button";
-import BackButton from "@/components/common/BackButton";
 import { getProposal } from "@/services/proposal.service";
 
 import {
@@ -27,7 +26,6 @@ import {
   useEditMode,
   useMaxStepReached,
   useWizardActions,
-  useGeneratedProposalId,
   useApprovalStatus,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/hooks";
@@ -108,7 +106,6 @@ export default function ParametersPage(): JSX.Element {
   const originalSections = useOriginalSections();
   const currentStep = useCurrentStep();
   const isGenerating = useIsGenerating();
-  const generatedProposalId = useGeneratedProposalId();
   const currentProposalId = useCurrentProposalId();
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
@@ -351,34 +348,13 @@ export default function ParametersPage(): JSX.Element {
     }
   }, []);
 
-  const handleBack = useCallback((): void => {
-    if (generatedProposalId) {
-      router.push(`/proposal/${generatedProposalId}`);
-    } else {
-      setCurrentStep(1);
-      router.push("/");
-    }
-  }, [setCurrentStep, router, generatedProposalId]);
-
   const handleSaveDraftWithSync = useCallback(async (): Promise<void> => {
-    console.log('[ParametersPage] handleSaveDraftWithSync called', {
-      localSectionsCount: sections.length,
-      localSectionsKeys: sections.map(s => s.key),
-      storeSelectedSections: selectedSections,
-      storeSectionDisplayNames: sectionDisplayNames
-    });
-
     // Sync local sections state to store before saving
     const keys = sections.map((s) => s.key);
     const displayNames: Record<string, string> = {};
     for (const s of sections) {
       displayNames[s.key] = s.label;
     }
-
-    console.log('[ParametersPage] Syncing sections to store', {
-      keys,
-      displayNames
-    });
 
     updateProposalData({
       selectedSections: keys,
@@ -389,13 +365,9 @@ export default function ParametersPage(): JSX.Element {
     // Wait longer for state update to complete
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    console.log('[ParametersPage] After sync, calling handleSaveDraft');
-
     // Then call the save draft function
     await handleSaveDraft();
-
-    console.log('[ParametersPage] handleSaveDraft completed');
-  }, [sections, updateProposalData, handleSaveDraft, selectedSections, sectionDisplayNames]);
+  }, [sections, updateProposalData, handleSaveDraft]);
 
   const handleNext = useCallback(async (): Promise<void> => {
     if (sections.length === 0) {
@@ -436,22 +408,10 @@ export default function ParametersPage(): JSX.Element {
 
 
   const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
-    logger.info('[ParametersPage] handleSectionsChange called', {
-      isFunction: typeof newSections === 'function',
-      currentLength: sections.length
-    });
-    console.log('[ParametersPage] handleSectionsChange called', {
-      isFunction: typeof newSections === 'function',
-      currentLength: sections.length,
-      currentSections: sections.map(s => s.key)
-    });
-
     // Mark that user has made manual modifications
     setHasModifiedSections(true);
     setSections(newSections);
-
-    console.log('[ParametersPage] handleSectionsChange completed');
-  }, [sections.length, sections]);
+  }, []);
 
   return (
     <PageLayout noPadding>
@@ -494,6 +454,7 @@ export default function ParametersPage(): JSX.Element {
           } as any}
           onUpdateProposalData={updateProposalData}
           isRecreateMode={isRecreateMode}
+          proposalId={currentProposalId}
         />
 
         <ToneSelector
@@ -511,15 +472,12 @@ export default function ParametersPage(): JSX.Element {
         />
 
         <div className="page-footer">
-          <div className="page-footer-left">
-            <BackButton onClick={handleBack} />
-          </div>
-          <div className="page-footer-right">
-            <Button variant="secondary" onClick={handleSaveDraftWithSync}>
-              Save Draft
-            </Button>
+          <Button variant="secondary" onClick={handleSaveDraftWithSync}>
+            Save Draft
+          </Button>
+          <div className="ml-auto">
             <Button variant="primary" onClick={handleNext}>
-              Next: Review &amp; Generate
+              Next
             </Button>
           </div>
         </div>

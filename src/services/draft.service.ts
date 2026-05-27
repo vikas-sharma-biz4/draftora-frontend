@@ -93,6 +93,9 @@ interface RawDraftListItem {
   last_location: string;
   stage: string;
   updated_at: string;
+  has_edits?: boolean;
+  template_id?: string | null;
+  template_type?: string;
 }
 
 interface RawSavedDraft {
@@ -106,6 +109,7 @@ interface RawSavedDraft {
   wizard_state: RawWizardState;
   generated_content: Record<string, string>;
   ui_state: RawUIState;
+  has_edits: boolean;
   created_at: string;
   updated_at: string;
   version: number;
@@ -115,11 +119,6 @@ interface RawSavedDraft {
  * Maps raw wizard state from API to typed DraftWizardState
  */
 function mapWizardState(raw: RawWizardState): SavedDraft["wizardState"] {
-  console.log('[draft.service] mapWizardState called with:', {
-    rawProposalData: raw.proposalData,
-    rawProposalDataKeys: raw.proposalData ? Object.keys(raw.proposalData) : [],
-  });
-
   return {
     currentStep: raw.currentStep as SavedDraft["wizardState"]["currentStep"],
     maxStepReached: raw.maxStepReached as SavedDraft["wizardState"]["maxStepReached"],
@@ -155,6 +154,7 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
     wizardState: mapWizardState(data.wizard_state),
     generatedContent: data.generated_content,
     uiState: mapUIState(data.ui_state),
+    hasEdits: data.has_edits ?? false,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     version: data.version,
@@ -180,18 +180,6 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     sectionDisplayNames: payload.wizardState.proposalData?.sectionDisplayNames,
   });
 
-  console.log('[draft.service] Sending to backend (without snake_case conversion):', {
-    title: payload.title,
-    clientName: payload.clientName,
-    wizardState: payload.wizardState,
-    selectedSections: payload.wizardState.proposalData?.selectedSections,
-    filesMeta: payload.wizardState.proposalData?.filesMeta,
-    selectedDocumentIds: payload.wizardState.proposalData?.selectedDocumentIds,
-    webReferences: payload.wizardState.proposalData?.webReferences,
-    sectionDisplayNames: payload.wizardState.proposalData?.sectionDisplayNames,
-  });
-
-  // TEMPORARILY DISABLE snake_case conversion to test
   const data = await http.post<RawSavedDraft>("/drafts/", {
     proposal_id: payload.proposalId,
     title: payload.title,
@@ -202,17 +190,7 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     wizard_state: payload.wizardState,
     generated_content: payload.generatedContent,
     ui_state: payload.uiState,
-  });
-
-  console.log('[draft.service] Received from backend:', {
-    id: data.id,
-    wizardState: data.wizard_state,
-    proposalData: data.wizard_state.proposalData,
-    selectedSections: data.wizard_state.proposalData?.selectedSections,
-    filesMeta: data.wizard_state.proposalData?.filesMeta,
-    selectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
-    webReferences: data.wizard_state.proposalData?.webReferences,
-    sectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
+    ...(payload.hasEdits !== undefined && { has_edits: payload.hasEdits }),
   });
 
   logger.info('[draft.service] Draft saved successfully', {
@@ -244,27 +222,13 @@ export async function updateDraft(
     wizard_state: payload.wizardState,
     generated_content: payload.generatedContent,
     ui_state: payload.uiState,
+    ...(payload.hasEdits !== undefined && { has_edits: payload.hasEdits }),
   });
   return mapSavedDraft(data);
 }
 
 export async function getDraft(draftId: string): Promise<SavedDraft> {
-  console.log('[draft.service] Fetching draft from backend:', { draftId });
-
   const data = await http.get<RawSavedDraft>(`/drafts/${draftId}`, { cache: "no-store" });
-
-  console.log('[draft.service] Received draft from backend:', {
-    id: data.id,
-    title: data.title,
-    clientName: data.client_name,
-    wizardState: data.wizard_state,
-    proposalData: data.wizard_state.proposalData,
-    selectedSections: data.wizard_state.proposalData?.selectedSections,
-    filesMeta: data.wizard_state.proposalData?.filesMeta,
-    selectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
-    webReferences: data.wizard_state.proposalData?.webReferences,
-    sectionDisplayNames: data.wizard_state.proposalData?.sectionDisplayNames,
-  });
 
   logger.info('[draft.service] Draft fetched successfully', {
     draftId: data.id,
@@ -314,6 +278,9 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
     lastLocation: parseDraftLocation(d.last_location),
     stage: parseDraftStage(d.stage),
     updatedAt: d.updated_at,
+    hasEdits: d.has_edits ?? false,
+    templateId: d.template_id,
+    templateType: d.template_type,
   }));
 }
 
@@ -352,6 +319,9 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
       lastLocation: parseDraftLocation(first.last_location),
       stage: parseDraftStage(first.stage),
       updatedAt: first.updated_at,
+      hasEdits: first.has_edits ?? false,
+      templateId: first.template_id,
+      templateType: first.template_type,
     };
   } catch (error: unknown) {
     // 404 means "no draft exists yet" — not a fatal error

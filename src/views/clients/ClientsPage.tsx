@@ -2,11 +2,13 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
+import SearchBar from "@/components/common/SearchBar/SearchBar";
+import { useDebounce } from "@/hooks/useDebounce";
 
 import styles from "./ClientsPage.module.scss";
 
@@ -43,6 +45,18 @@ export default function ClientsPage(): JSX.Element {
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const filteredClients = useMemo(() => {
+    if (!debouncedSearch) return clients;
+    const q = debouncedSearch.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.industry.toLowerCase().includes(q)
+    );
+  }, [clients, debouncedSearch]);
 
   function handleClientClick(clientId: number): void {
     router.push(`/clients/${clientId}`);
@@ -101,8 +115,25 @@ export default function ClientsPage(): JSX.Element {
           onCtaClick={handleNewClient}
         />
       ) : (
+        <>
+          <div className={styles.toolbar}>
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search by name or industry..."
+              className={styles.searchBar}
+            />
+          </div>
+
+          {filteredClients.length === 0 ? (
+            <EmptyState
+              icon={<Users size={48} />}
+              title="No matching clients"
+              subtitle="Try adjusting your search."
+            />
+          ) : (
         <div className={styles.clientsGrid}>
-          {clients.map((client) => (
+          {filteredClients.map((client) => (
             <article
               key={client.id}
               className={styles.clientCard}
@@ -152,6 +183,8 @@ export default function ClientsPage(): JSX.Element {
             </article>
           ))}
         </div>
+          )}
+        </>
       )}
 
         {showTemplateModal && (

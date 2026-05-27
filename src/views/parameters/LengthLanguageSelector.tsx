@@ -30,7 +30,7 @@ export default function LengthLanguageSelector({
   return (
     <div className="grid-2 mb-14">
       <div className="card">
-        <div className="form-label mb-14">
+        <div className="form-label mb-16">
           Proposal Length
         </div>
         <div className="flex-col gap-8">
@@ -58,11 +58,11 @@ export default function LengthLanguageSelector({
       </div>
 
       <div className="card">
-        <div className="form-label mb-14">
+        <div className="form-label mb-16">
           Language &amp; Locale
         </div>
         <Select
-          className="form-select mb-14"
+          className="form-select mb-24"
           value={language}
           onChange={(e) => onLanguageChange(e.target.value)}
         >
@@ -72,7 +72,7 @@ export default function LengthLanguageSelector({
             </option>
           ))}
         </Select>
-        <div className="form-label mb-24">
+        <div className="form-label mb-16">
           AI Model
         </div>
         <div className="grid-2">

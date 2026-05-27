@@ -1,0 +1,167 @@
+.card {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-light);
+}
+
+.card:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.2);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #000;
+  line-height: 1.4;
+  flex: 1;
+  word-break: break-word;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.versionBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+
+.deleteBtn {
+  color: var(--color-text-light);
+
+  &:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  flex: 1;
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.clientLabel {
+  color: #000;
+  font-weight: 500;
+}
+
+.clientName {
+  color: #000;
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #000;
+}
+
+.template {
+  font-size: 12px;
+  color: #000;
+}
+
+.location {
+  font-size: 12px;
+  color: #000;
+}
+
+.generated {
+  font-size: 12px;
+  font-weight: 600;
+  color: #000;
+}
+
+.footer {
+  background: white;
+}
+
+.resumeBtn {
+  color: #000 !important;
+}

@@ -142,6 +142,7 @@ export default function TemplateSelectionModal({
     notes: "",
   });
   const [isCreatingClient, setIsCreatingClient] = useState<boolean>(false);
+  const [newClientOtherIndustry, setNewClientOtherIndustry] = useState<string>("");
   const [showTemplateSelector, setShowTemplateSelector] = useState<boolean>(false);
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
 
@@ -599,6 +600,7 @@ export default function TemplateSelectionModal({
 
   function handleBackToTemplateSelection(): void {
     setModalView("template_selection");
+    setNewClientOtherIndustry("");
     setNewClientFormData({
       clientName: "",
       industry: "",
@@ -624,6 +626,11 @@ export default function TemplateSelectionModal({
       return;
     }
 
+    if (newClientFormData.industry === "Other" && !newClientOtherIndustry.trim()) {
+      toast.error("Please specify your industry");
+      return;
+    }
+
     const isDuplicate = clients.some(
       (client) => client.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
     );
@@ -642,9 +649,13 @@ export default function TemplateSelectionModal({
 
     try {
       const createClientInStore = useClientStore.getState().createClient;
+      const resolvedIndustry = newClientFormData.industry === "Other"
+        ? newClientOtherIndustry.trim()
+        : newClientFormData.industry;
+
       const newClient = await createClientInStore({
         name: newClientFormData.clientName,
-        industry: newClientFormData.industry,
+        industry: resolvedIndustry,
         notes: newClientFormData.notes || undefined,
       });
 
@@ -665,10 +676,17 @@ export default function TemplateSelectionModal({
       setSelectedClientId(newClient.id);
       setClientSearchQuery(newClient.name);
       setInitialContextNotes(newClientFormData.notes || "");
-      setSelectedTemplateIdState(null);
       setUploadedFiles([]);
-      setShowTemplateSelector(true); // Show template selector after creating client
+
+      // If a template was already selected from the home screen (templateId prop), keep it.
+      // Only prompt template selection when no template was pre-selected.
+      if (!templateId) {
+        setSelectedTemplateIdState(null);
+        setShowTemplateSelector(true);
+      }
+
       setModalView("template_selection");
+      setNewClientOtherIndustry("");
       setNewClientFormData({
         clientName: "",
         industry: "",
@@ -697,7 +715,7 @@ export default function TemplateSelectionModal({
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {modalView === "new_client" && (
+            {modalView === "new_client" && initialView !== "new_client" && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -753,18 +771,32 @@ export default function TemplateSelectionModal({
 
                 <FormField label="Industry">
                   {(fieldProps) => (
-                    <Select
-                      {...fieldProps}
-                      value={newClientFormData.industry}
-                      onChange={(e) => handleNewClientInputChange("industry", e.target.value)}
-                    >
-                      <option value="">Select industry...</option>
-                      {INDUSTRIES.map((industry) => (
-                        <option key={industry} value={industry}>
-                          {industry}
-                        </option>
-                      ))}
-                    </Select>
+                    <>
+                      <Select
+                        {...fieldProps}
+                        value={newClientFormData.industry}
+                        onChange={(e) => {
+                          handleNewClientInputChange("industry", e.target.value);
+                          if (e.target.value !== "Other") setNewClientOtherIndustry("");
+                        }}
+                      >
+                        <option value="" disabled hidden>Select industry...</option>
+                        {INDUSTRIES.map((industry) => (
+                          <option key={industry} value={industry}>
+                            {industry}
+                          </option>
+                        ))}
+                      </Select>
+                      {newClientFormData.industry === "Other" && (
+                        <Input
+                          type="text"
+                          placeholder="Please specify your industry"
+                          value={newClientOtherIndustry}
+                          onChange={(e) => setNewClientOtherIndustry(e.target.value)}
+                          style={{ marginTop: "8px" }}
+                        />
+                      )}
+                    </>
                   )}
                 </FormField>
               </div>
@@ -1139,7 +1171,11 @@ export default function TemplateSelectionModal({
               <Button
                 variant="primary"
                 onClick={handleCreateClient}
-                disabled={!newClientFormData.clientName.trim() || !newClientFormData.industry}
+                disabled={
+                  !newClientFormData.clientName.trim() ||
+                  !newClientFormData.industry ||
+                  (newClientFormData.industry === "Other" && !newClientOtherIndustry.trim())
+                }
                 loading={isCreatingClient}
               >
                 Create Client

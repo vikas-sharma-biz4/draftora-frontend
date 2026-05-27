@@ -20,7 +20,7 @@ interface ProposalApprovalBarProps {
   approvalStatus?: "pending" | "approved" | "rejected";
   isApproving: boolean;
   isRejecting: boolean;
-  onSaveDraft: () => void;
+  onSaveDraft?: () => void;
   onApprove: () => void;
   onReject: () => void;
   onExecuteAction: (actionType: "approve" | "reject") => Promise<void>;
@@ -69,7 +69,7 @@ export default function ProposalApprovalBar({
           )}
         </Button>
 
-        {isPending && (
+        {isPending && onSaveDraft && (
           <Button
             variant="secondary"
             size="sm"
@@ -87,6 +87,7 @@ export default function ProposalApprovalBar({
               size="sm"
               onClick={onApprove}
               loading={isApproving}
+              disabled={isDownloading}
             >
               Approve
             </Button>
@@ -95,6 +96,7 @@ export default function ProposalApprovalBar({
               size="sm"
               onClick={onReject}
               loading={isRejecting}
+              disabled={isDownloading}
             >
               Reject
             </Button>
