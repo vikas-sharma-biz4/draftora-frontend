@@ -573,7 +573,7 @@ export default function TemplateSelectionModal({
       clientId: selectedClientId,
       templateId: isScratch ? null : finalTemplateId ?? null,
       templateType: isScratch ? "scratch" : (template?.templateType ?? "predefined"),
-      selectedSections: isScratch ? SCRATCH_TEMPLATE_DEFAULT_SECTIONS : (template?.sections ? [...template.sections] : selectedSections),
+      selectedSections: isScratch ? [...SCRATCH_TEMPLATE_DEFAULT_SECTIONS] : (template?.sections ? [...template.sections] : selectedSections),
       sectionDisplayNames: isScratch ? scratchSectionDisplayNames : {},
       selectedDocumentIds: selectedDocIds,
       filesMeta: selectedDocsMeta,
