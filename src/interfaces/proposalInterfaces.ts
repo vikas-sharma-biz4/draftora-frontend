@@ -1,3 +1,21 @@
+export interface TeamRoleEstimate {
+  role: string;
+  hours: number;
+  description: string;
+}
+
+export interface TotalEstimate {
+  hours: number;
+  description: string;
+}
+
+export interface EstimatedHoursData {
+  totalEstimatedHours: TotalEstimate;
+  teamBreakdown: TeamRoleEstimate[];
+  featureListUsed: string;
+  customPromptUsed?: string | null;
+}
+
 export interface ProposalSection {
   key: string;
   displayName: string;
@@ -10,7 +28,19 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch" | "recreate" | "mvp" | "poc" | "design" | "brd" | "frd" | "srs" | "architecture" | "sow";
+export type TemplateType =
+  | "predefined"
+  | "custom"
+  | "scratch"
+  | "recreate"
+  | "mvp"
+  | "poc"
+  | "design"
+  | "brd"
+  | "frd"
+  | "srs"
+  | "architecture"
+  | "sow";
 
 export interface OriginalSection {
   id: string;
@@ -62,6 +92,7 @@ export interface ProposalData {
   /** Maps section_key → content type: "table" | "bullets" | "diagram" | "paragraph" */
   sectionTypes?: Record<string, string>;
   generatingSection?: string | null;
+  estimatedHoursData?: EstimatedHoursData | null;
   createdAt?: string;
   updatedAt?: string;
 }
