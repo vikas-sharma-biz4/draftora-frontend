@@ -130,6 +130,7 @@ export default function ProposalOutputPage(): JSX.Element {
   // Prevents the IntersectionObserver from overriding active section during programmatic scroll
   const isProgrammaticScrollRef = useRef<boolean>(false);
   const programmaticScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoEstimatedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
@@ -241,6 +242,29 @@ export default function ProposalOutputPage(): JSX.Element {
       setEstimatedHoursData(proposal.estimatedHoursData);
     }
   }, [proposal?.estimatedHoursData]);
+
+  // Auto-estimate when a proposal first loads with no existing estimate
+  useEffect(() => {
+    if (!proposal || autoEstimatedRef.current || proposal.estimatedHoursData) return;
+    autoEstimatedRef.current = true;
+    setIsEstimatingHours(true);
+    estimateProposalHours(proposalId, {})
+      .then((result) => {
+        setEstimatedHoursData(result);
+        toast.success("Hours estimated successfully.");
+      })
+      .catch((error) => {
+        const message =
+          error instanceof HttpError
+            ? error.message
+            : "Failed to estimate hours. Please try again.";
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsEstimatingHours(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal]);
 
   async function handleEstimateHours(
     customFeatureList?: string,
