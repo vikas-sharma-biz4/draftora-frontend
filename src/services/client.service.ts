@@ -34,6 +34,7 @@ export interface ClientDocument {
   fileType: string;
   sizeBytes: number;
   status: "processing" | "parsed" | "error";
+  s3FileUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +47,7 @@ interface ClientDocumentApiResponse {
   file_type: string;
   size_bytes: number;
   status: "processing" | "parsed" | "error";
+  s3_file_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +80,7 @@ function transformClientDocument(apiDoc: ClientDocumentApiResponse): ClientDocum
     fileType: apiDoc.file_type,
     sizeBytes: apiDoc.size_bytes,
     status: apiDoc.status,
+    s3FileUrl: apiDoc.s3_file_url,
     createdAt: apiDoc.created_at,
     updatedAt: apiDoc.updated_at,
   };
@@ -123,9 +126,9 @@ export async function listClients(): Promise<Client[]> {
  * Get a single client with documents
  */
 export async function getClient(clientId: number): Promise<ClientWithDocuments> {
-  const clientData = await http.get<
-    ClientApiResponse & { documents: ClientDocumentApiResponse[] }
-  >(`/clients/${clientId}`);
+  const clientData = await http.get<ClientApiResponse & { documents: ClientDocumentApiResponse[] }>(
+    `/clients/${clientId}`
+  );
   return {
     ...transformClient(clientData),
     documents: clientData.documents.map(transformClientDocument),
@@ -135,10 +138,7 @@ export async function getClient(clientId: number): Promise<ClientWithDocuments> 
 /**
  * Update a client
  */
-export async function updateClient(
-  clientId: number,
-  data: UpdateClientRequest
-): Promise<Client> {
+export async function updateClient(clientId: number, data: UpdateClientRequest): Promise<Client> {
   const response = await http.patch<ClientApiResponse>(`/clients/${clientId}`, data);
   return transformClient(response);
 }
@@ -158,13 +158,15 @@ export async function deleteClient(clientId: number): Promise<void> {
  * List all clients with full documents array, automatically fetching all pages.
  * @param includeDeleted - If true, includes soft-deleted clients (for debugging)
  */
-export async function listClientsFullData(includeDeleted: boolean = false): Promise<ClientWithDocuments[]> {
+export async function listClientsFullData(
+  includeDeleted: boolean = false
+): Promise<ClientWithDocuments[]> {
   const allClients: ClientWithDocuments[] = [];
   let currentPage = 1;
   let totalPages = 1;
   const perPage = 50; // Maximum allowed by backend
 
-  console.log('[client.service] Starting to fetch all clients...', { includeDeleted });
+  console.log("[client.service] Starting to fetch all clients...", { includeDeleted });
 
   // Fetch all pages
   while (currentPage <= totalPages) {
@@ -178,30 +180,34 @@ export async function listClientsFullData(includeDeleted: boolean = false): Prom
         total_pages: number;
       };
       message: string;
-    }>(`/clients/full-data?page=${currentPage}&per_page=${perPage}${includeDeleted ? '&include_deleted=true' : ''}`);
+    }>(
+      `/clients/full-data?page=${currentPage}&per_page=${perPage}${includeDeleted ? "&include_deleted=true" : ""}`
+    );
 
     console.log(`[client.service] Fetched page ${currentPage}/${totalPages}:`, {
       clientsInPage: response.data?.length || 0,
       total: response.meta?.total || 0,
-      totalPages: response.meta?.total_pages || 1
+      totalPages: response.meta?.total_pages || 1,
     });
 
     // Update total pages from first response
     if (currentPage === 1) {
       totalPages = response.meta?.total_pages || 1;
-      console.log(`[client.service] Total pages to fetch: ${totalPages}, Total clients: ${response.meta?.total || 0}`);
+      console.log(
+        `[client.service] Total pages to fetch: ${totalPages}, Total clients: ${response.meta?.total || 0}`
+      );
     }
 
     // Transform and add clients from this page
     if (response.data && Array.isArray(response.data)) {
-      const clientsFromPage = response.data.map(clientData => ({
+      const clientsFromPage = response.data.map((clientData) => ({
         ...transformClient(clientData),
         documents: clientData.documents.map(transformClientDocument),
       }));
 
       allClients.push(...clientsFromPage);
     }
-    
+
     currentPage++;
   }
 
@@ -229,23 +235,31 @@ export function invalidateClientsCache(): void {
 /**
  * Upload and parse a document for a client
  */
-export async function uploadDocument(
-  clientId: number,
-  file: File
-): Promise<ClientDocument> {
+export async function uploadDocument(clientId: number, file: File): Promise<ClientDocument> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await http.post<ClientDocumentApiResponse>(`/clients/${clientId}/documents`, formData);
+  const response = await http.post<ClientDocumentApiResponse>(
+    `/clients/${clientId}/documents`,
+    formData
+  );
   return transformClientDocument(response);
 }
 
 /**
  * Delete a document (soft delete)
  */
-export async function deleteDocument(
-  clientId: number,
-  documentId: number
-): Promise<void> {
+export async function deleteDocument(clientId: number, documentId: number): Promise<void> {
   await http.delete<null>(`/clients/${clientId}/documents/${documentId}`);
+}
+
+/**
+ * Get a presigned S3 URL to view the original uploaded document.
+ * Opens the file in the browser (PDF viewer, image preview, etc.).
+ */
+export async function getDocumentViewUrl(clientId: number, documentId: number): Promise<string> {
+  const response = await http.get<{ view_url: string; expires_in: number }>(
+    `/clients/${clientId}/documents/${documentId}/view-url`
+  );
+  return response.view_url;
 }

@@ -3,14 +3,21 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Upload, Search, FileText, Edit, CheckCircle, Clock, X } from "lucide-react";
+import { Upload, Search, FileText, Edit, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import Button from "@/components/common/Button";
 import { logger } from "@/utils/logger";
 
 import styles from "./page.module.scss";
 
-import { getClient, uploadDocument, deleteDocument, type ClientWithDocuments, type ClientDocument } from "@/services/client.service";
+import {
+  getClient,
+  uploadDocument,
+  deleteDocument,
+  getDocumentViewUrl,
+  type ClientWithDocuments,
+  type ClientDocument,
+} from "@/services/client.service";
 import { listProposals } from "@/services/proposal.service";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
@@ -34,6 +41,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [clientProposals, setClientProposals] = useState<ProposalListItem[]>([]);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [viewingDocId, setViewingDocId] = useState<number | null>(null);
 
   useEffect(() => {
     loadClient();
@@ -86,6 +94,26 @@ export default function ClientWorkspacePage(): JSX.Element {
     }
   }
 
+  async function handleViewDocument(doc: ClientDocument): Promise<void> {
+    if (!client) return;
+
+    if (!doc.s3FileUrl) {
+      toast.error("This document has no stored file — it was uploaded before S3 was enabled.");
+      return;
+    }
+
+    try {
+      setViewingDocId(doc.id);
+      const viewUrl = await getDocumentViewUrl(client.id, doc.id);
+      window.open(viewUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      logger.error("Failed to get document view URL:", error);
+      toast.error("Could not open document. Please try again.");
+    } finally {
+      setViewingDocId(null);
+    }
+  }
+
   async function handleFileUpload(files: FileList | null): Promise<void> {
     if (!files || !client) return;
 
@@ -93,7 +121,7 @@ export default function ClientWorkspacePage(): JSX.Element {
 
     for (const file of fileArray) {
       try {
-        setUploadingFiles(prev => new Set(prev).add(file.name));
+        setUploadingFiles((prev) => new Set(prev).add(file.name));
         await uploadDocument(client.id, file);
         toast.success(`${file.name} uploaded`);
         await loadClient();
@@ -101,7 +129,7 @@ export default function ClientWorkspacePage(): JSX.Element {
         logger.error(`Failed to upload ${file.name}:`, error);
         toast.error(`Failed to upload ${file.name}`);
       } finally {
-        setUploadingFiles(prev => {
+        setUploadingFiles((prev) => {
           const next = new Set(prev);
           next.delete(file.name);
           return next;
@@ -113,7 +141,7 @@ export default function ClientWorkspacePage(): JSX.Element {
   function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>): void {
     handleFileUpload(e.target.files);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   }
 
@@ -171,7 +199,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               disabled={uploadingFiles.size > 0}
             >
               <Upload size={18} />
-              {uploadingFiles.size > 0 ? `Uploading ${uploadingFiles.size}...` : 'Upload Document'}
+              {uploadingFiles.size > 0 ? `Uploading ${uploadingFiles.size}...` : "Upload Document"}
             </Button>
             <input
               ref={fileInputRef}
@@ -179,7 +207,7 @@ export default function ClientWorkspacePage(): JSX.Element {
               accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
               multiple
               onChange={handleFileInputChange}
-              style={{ display: 'none' }}
+              style={{ display: "none" }}
             />
           </div>
 
@@ -196,25 +224,43 @@ export default function ClientWorkspacePage(): JSX.Element {
           {filteredDocuments.length === 0 ? (
             <div className={styles.emptyState}>
               <div className={styles.emptyTitle}>No documents yet</div>
-              <div className={styles.emptyDesc}>
-                Upload documents to get started
-              </div>
+              <div className={styles.emptyDesc}>Upload documents to get started</div>
             </div>
           ) : (
             <div className={styles.documentsGrid}>
               {filteredDocuments.map((doc) => (
                 <div key={doc.id} className={styles.documentCard}>
-                  <div className={styles.documentIcon}>
-                    <FileText size={24} />
+                  <div
+                    className={styles.documentIcon}
+                    onClick={() => handleViewDocument(doc)}
+                    style={{ cursor: doc.s3FileUrl ? "pointer" : "default" }}
+                    title={doc.s3FileUrl ? "Click to view file" : undefined}
+                  >
+                    {viewingDocId === doc.id ? (
+                      <ExternalLink size={24} style={{ opacity: 0.5 }} />
+                    ) : (
+                      <FileText size={24} />
+                    )}
                   </div>
                   <div className={styles.documentInfo}>
-                    <h3>{doc.name}</h3>
-                    <p>{doc.fileType?.toUpperCase() || 'FILE'} {Math.round((doc.sizeBytes || 0) / 1024)} KB</p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteDocument(doc.id)}
+                    <h3
+                      onClick={() => handleViewDocument(doc)}
+                      style={{ cursor: doc.s3FileUrl ? "pointer" : "default" }}
+                      title={doc.s3FileUrl ? "Click to view file" : undefined}
                     >
+                      {doc.name}
+                      {doc.s3FileUrl && (
+                        <ExternalLink
+                          size={12}
+                          style={{ marginLeft: 4, opacity: 0.6, display: "inline" }}
+                        />
+                      )}
+                    </h3>
+                    <p>
+                      {doc.fileType?.toUpperCase() || "FILE"}{" "}
+                      {Math.round((doc.sizeBytes || 0) / 1024)} KB
+                    </p>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(doc.id)}>
                       <X size={18} />
                     </Button>
                   </div>
