@@ -15,6 +15,17 @@ const config: Config = {
     "src/context/**/*.{ts,tsx}",
     "src/hooks/**/*.{ts,tsx}",
     "src/utils/**/*.{ts,tsx}",
+    "src/validationSchema/**/*.{ts,tsx}",
+    "src/store/features/**/*.{ts,tsx}",
+    "src/components/common/Button/**/*.{ts,tsx}",
+    "src/components/common/Alert/**/*.{ts,tsx}",
+    "src/components/common/EmptyState/**/*.{ts,tsx}",
+    "src/components/common/PageHeader/**/*.{ts,tsx}",
+    "src/components/common/StatusBadge/**/*.{ts,tsx}",
+    "src/components/common/ErrorBoundary/**/*.{ts,tsx}",
+    "src/components/dashboard/ProposalSearch.tsx",
+    "src/components/proposal/ProposalCard.tsx",
+    "src/views/dashboard/DashboardPage.tsx",
   ],
   coverageThreshold: {
     global: {

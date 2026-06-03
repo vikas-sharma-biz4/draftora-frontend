@@ -4,9 +4,10 @@
  * Provides automatic data fetching and memoized selectors
  */
 
-import { useEffect, useCallback } from 'react';
-import { useDraftStore } from '@/store/features/drafts/draftSlice';
-import type { DraftMetadata } from '@/interfaces/draftInterfaces';
+import { useEffect, useCallback } from "react";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
+import type { DraftMetadata } from "@/interfaces/draftInterfaces";
 
 interface UseDraftsOptions {
   autoFetch?: boolean;
@@ -24,11 +25,11 @@ interface UseDraftsReturn {
 export function useDrafts(options: UseDraftsOptions = {}): UseDraftsReturn {
   const { autoFetch = true, force = false } = options;
 
-  const drafts = useDraftStore(state => state.drafts);
-  const isLoading = useDraftStore(state => state.isLoading);
-  const error = useDraftStore(state => state.error);
-  const fetchDrafts = useDraftStore(state => state.fetchDrafts);
-  const getDraftById = useDraftStore(state => state.getDraftById);
+  const drafts = useDraftStore((state) => state.drafts);
+  const isLoading = useDraftStore((state) => state.isLoading);
+  const error = useDraftStore((state) => state.error);
+  const fetchDrafts = useDraftStore((state) => state.fetchDrafts);
+  const getDraftById = useDraftStore((state) => state.getDraftById);
 
   useEffect(() => {
     if (autoFetch) {
@@ -36,6 +37,12 @@ export function useDrafts(options: UseDraftsOptions = {}): UseDraftsReturn {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-fetch when the tab becomes visible again — respects TTL (2 min) so
+  // rapid tab switches within the cache window produce no network call.
+  usePageVisibility(() => {
+    if (autoFetch) void fetchDrafts();
+  });
 
   const refetch = useCallback(async () => {
     await fetchDrafts(true);

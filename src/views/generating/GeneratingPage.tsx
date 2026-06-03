@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { cancelProposal } from "@/services/proposal.service";
+import { cancelProposal, getProposalStatus } from "@/services/proposal.service";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { logger } from "@/utils/logger";
 import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";
@@ -55,15 +55,43 @@ export default function GeneratingPage(): JSX.Element {
   const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    // Reset generation state to start fresh
+    if (isNaN(proposalId)) return;
+
+    let cancelled = false;
+
+    // Initialise the generation UI immediately so the generating screen shows
+    // right away without waiting for the status check round-trip.
     resetGenerationState();
-    setMounted(true);
     setProposalId(proposalId);
     setStartedAt(new Date().toISOString());
-  }, [proposalId, setProposalId, setStartedAt, resetGenerationState]);
+    setMounted(true);
+
+    // Check in the background whether the proposal is already completed.
+    // If it is, redirect without ever interacting with the generating UI.
+    getProposalStatus(proposalId)
+      .then((statusData) => {
+        if (cancelled) return;
+        if (statusData.status === "completed") {
+          logger.info(
+            "[GeneratingPage] Proposal already completed on mount, skipping generating screen",
+            { proposalId }
+          );
+          router.replace(`/proposal/${proposalId}`);
+        }
+      })
+      .catch(() => {
+        // Status check failed — SSE-based flow will handle it.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [proposalId, router, setProposalId, setStartedAt, resetGenerationState]);
 
   const handleCompleted = useCallback(() => {
-    logger.info("[GeneratingPage] Generation completed, navigating to proposal view", { proposalId });
+    logger.info("[GeneratingPage] Generation completed, navigating to proposal view", {
+      proposalId,
+    });
     setIsGenerating(false);
     setCompletedAt(new Date().toISOString());
 
@@ -74,11 +102,14 @@ export default function GeneratingPage(): JSX.Element {
     router.replace(`/proposal/${proposalId}`);
   }, [proposalId, router, setIsGenerating, setCompletedAt, setGeneratedProposalId]);
 
-  const handleFailed = useCallback((message: string) => {
-    logger.error("[GeneratingPage] Generation failed", { message, proposalId });
-    setIsGenerating(false);
-    setError(message);
-  }, [proposalId, setIsGenerating, setError]);
+  const handleFailed = useCallback(
+    (message: string) => {
+      logger.error("[GeneratingPage] Generation failed", { message, proposalId });
+      setIsGenerating(false);
+      setError(message);
+    },
+    [proposalId, setIsGenerating, setError]
+  );
 
   const handleCancelled = useCallback(() => {
     logger.info("[GeneratingPage] Generation cancelled", { proposalId });
@@ -86,46 +117,69 @@ export default function GeneratingPage(): JSX.Element {
     router.push("/review");
   }, [proposalId, router, setIsGenerating]);
 
-  const handleStageChanged = useCallback((stage: string) => {
-    logger.info("[GeneratingPage] Stage changed", { stage, proposalId });
-    setCurrentStage(stage);
-  }, [proposalId, setCurrentStage]);
+  const handleStageChanged = useCallback(
+    (stage: string) => {
+      logger.info("[GeneratingPage] Stage changed", { stage, proposalId });
+      setCurrentStage(stage);
+    },
+    [proposalId, setCurrentStage]
+  );
 
-  const handleSectionStarted = useCallback((section: string) => {
-    logger.info("[GeneratingPage] Section started", { section, proposalId });
-    setCurrentSection(section);
-  }, [proposalId, setCurrentSection]);
+  const handleSectionStarted = useCallback(
+    (section: string) => {
+      logger.info("[GeneratingPage] Section started", { section, proposalId });
+      setCurrentSection(section);
+    },
+    [proposalId, setCurrentSection]
+  );
 
-  const handleSectionCompleted = useCallback((section: string, completed: number, total: number) => {
-    logger.info("[GeneratingPage] Section completed", { section, completed, total, proposalId });
-    addCompletedSection(section);
-    if (total > 0) {
-      setTotalSections(total);
-      setCompletedSections(completed);
-    }
-    const progress = total > 0 ? (completed / total) * 100 : 0;
-    setProgressPercent(progress);
-  }, [proposalId, addCompletedSection, setTotalSections, setCompletedSections, setProgressPercent]);
+  const handleSectionCompleted = useCallback(
+    (section: string, completed: number, total: number) => {
+      logger.info("[GeneratingPage] Section completed", { section, completed, total, proposalId });
+      addCompletedSection(section);
+      if (total > 0) {
+        setTotalSections(total);
+        setCompletedSections(completed);
+      }
+      const progress = total > 0 ? (completed / total) * 100 : 0;
+      setProgressPercent(progress);
+    },
+    [proposalId, addCompletedSection, setTotalSections, setCompletedSections, setProgressPercent]
+  );
 
-  const handleProgress = useCallback((percent: number) => {
-    setProgressPercent(percent);
-  }, [setProgressPercent]);
+  const handleProgress = useCallback(
+    (percent: number) => {
+      setProgressPercent(percent);
+    },
+    [setProgressPercent]
+  );
 
-  const handleError = useCallback((err: Error) => {
-    logger.error("[GeneratingPage] Stream error", { error: err.message, proposalId });
-    setError(err.message);
-    // If the SSE endpoint is unavailable (fatal error), mark status as failed
-    // so the error UI renders instead of the infinite connecting spinner
-    if (err.message.includes("unavailable") || err.message.includes("rejected")) {
-      setStatus("failed");
-    }
-  }, [proposalId, setError, setStatus]);
+  const handleError = useCallback(
+    (err: Error) => {
+      logger.error("[GeneratingPage] Stream error", { error: err.message, proposalId });
+      setError(err.message);
+      // If the SSE endpoint is unavailable (fatal error), mark status as failed
+      // so the error UI renders instead of the infinite connecting spinner
+      if (err.message.includes("unavailable") || err.message.includes("rejected")) {
+        setStatus("failed");
+      }
+    },
+    [proposalId, setError, setStatus]
+  );
 
   // SSE streaming hook
-  const { disconnect, isConnected: sseConnected, error: sseError } = useProposalGenerationStream({
+  const {
+    disconnect,
+    isConnected: sseConnected,
+    error: sseError,
+  } = useProposalGenerationStream({
     proposalId,
     enabled: mounted && !isNaN(proposalId),
-    onConnected: (data: { selectedSections: string[]; totalSections: number; proposalStatus: string }) => {
+    onConnected: (data: {
+      selectedSections: string[];
+      totalSections: number;
+      proposalStatus: string;
+    }) => {
       logger.info("[GeneratingPage] SSE connected", { proposalId, ...data });
       setConnectionState(true, false);
       // Populate section list from connected event metadata
@@ -157,7 +211,9 @@ export default function GeneratingPage(): JSX.Element {
       } else {
         // Proposal is still generating but without SSE support.
         // Show a simplified waiting state and poll.
-        setError("This proposal was created before real-time streaming was enabled. Please wait...");
+        setError(
+          "This proposal was created before real-time streaming was enabled. Please wait..."
+        );
         setStatus("queued");
       }
     },
@@ -240,17 +296,18 @@ export default function GeneratingPage(): JSX.Element {
 
   const isAllDone = status === "completed" || status === "cancelled";
   const displayProgress = isAllDone ? 100 : progressPercent;
-  const sectionLabel = totalSections > 0
-    ? `Generating Sections (${completedSections} / ${totalSections})`
-    : "Generating Sections...";
+  const sectionLabel =
+    totalSections > 0
+      ? `Generating Sections (${completedSections} / ${totalSections})`
+      : "Generating Sections...";
 
   return (
     <div className="generating-page">
       <div className="generating-container">
         <h1 className="generating-main-title">Architecting Your Proposal...</h1>
         <p className="generating-main-subtitle">
-          The AI is weaving together your context, source materials, and
-          parameters into a production-grade document.
+          The AI is weaving together your context, source materials, and parameters into a
+          production-grade document.
         </p>
 
         <div className="generating-content">
@@ -276,12 +333,33 @@ export default function GeneratingPage(): JSX.Element {
                 <span className="generating-sequence-icon">
                   {isAllDone ? (
                     <svg viewBox="0 0 24 24" fill="currentColor" width={20} height={20}>
-                      <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                      <path
+                        fillRule="evenodd"
+                        d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z"
+                        clipRule="evenodd"
+                      />
                     </svg>
                   ) : (
-                    <svg className="gen-spinner" viewBox="0 0 24 24" fill="none" width={20} height={20}>
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" style={{ opacity: 0.25 }} />
-                      <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" style={{ opacity: 0.85 }} />
+                    <svg
+                      className="gen-spinner"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      width={20}
+                      height={20}
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        style={{ opacity: 0.25 }}
+                      />
+                      <path
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        fill="currentColor"
+                        style={{ opacity: 0.85 }}
+                      />
                     </svg>
                   )}
                 </span>

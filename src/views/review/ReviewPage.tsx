@@ -12,6 +12,7 @@ import styles from "./ReviewPage.module.scss";
 
 import { generateProposal, getProposal } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
+import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import {
   useProposalTitle,
   useClientName,
@@ -40,7 +41,12 @@ import {
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
-import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
+import type {
+  ToneOption,
+  LengthOption,
+  ProposalWizardData,
+  ProposalData,
+} from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useClients } from "@/hooks/useClients";
@@ -133,7 +139,7 @@ export default function ReviewPage(): JSX.Element {
         customSections: [],
         contextualInstructions: "",
         webReferences,
-      }) as any,
+      }) as ProposalWizardData,
     [
       title,
       clientName,
@@ -189,7 +195,7 @@ export default function ReviewPage(): JSX.Element {
       const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
       if (proposalIdToFetch) {
         getProposal(proposalIdToFetch)
-          .then((data: any) => {
+          .then((data: ProposalData) => {
             if (data?.approvalStatus) {
               updateProposalData({ approvalStatus: data.approvalStatus });
             }
@@ -276,7 +282,7 @@ export default function ReviewPage(): JSX.Element {
   // Restore scroll position from draft UI state
   useEffect(() => {
     try {
-      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      const uiStateStr = sessionStorage.getItem(DRAFT_UI_STATE_STORAGE_KEY);
       if (uiStateStr) {
         const uiState = JSON.parse(uiStateStr);
         if (uiState.scrollPosition > 0) {
@@ -287,7 +293,7 @@ export default function ReviewPage(): JSX.Element {
             });
           }, 300);
         }
-        sessionStorage.removeItem("draft_ui_state");
+        sessionStorage.removeItem(DRAFT_UI_STATE_STORAGE_KEY);
       }
     } catch {
       // Ignore errors restoring UI state

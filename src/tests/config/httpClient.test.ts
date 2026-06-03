@@ -34,27 +34,26 @@ function mockSuccessResponse<T>(data: T): void {
   });
 }
 
-function mockErrorResponse(
-  status: number,
-  error?: { code: string; message: string }
-): void {
+function mockErrorResponse(status: number, error?: { code: string; message: string }): void {
   mockFetch.mockResolvedValueOnce({
     ok: false,
     status,
-    text: async () => JSON.stringify({
-      success: false,
-      error,
-    }),
+    text: async () =>
+      JSON.stringify({
+        success: false,
+        error,
+      }),
   });
 }
 
 function mockEnvelopeFailure(message: string): void {
   mockFetch.mockResolvedValueOnce({
     ok: true,
-    text: async () => JSON.stringify({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message },
-    }),
+    text: async () =>
+      JSON.stringify({
+        success: false,
+        error: { code: "VALIDATION_ERROR", message },
+      }),
   });
 }
 
@@ -135,25 +134,19 @@ describe("httpClient — error responses", () => {
       message: "Proposal not found",
     });
 
-    await expect(http.get("/proposals/999/")).rejects.toThrow(
-      "Proposal not found"
-    );
+    await expect(http.get("/proposals/999/")).rejects.toThrow("Proposal not found");
   });
 
   it("throws with status fallback when error.message is missing", async () => {
     mockErrorResponse(500);
 
-    await expect(http.get("/proposals/")).rejects.toThrow(
-      "Request failed with status 500"
-    );
+    await expect(http.get("/proposals/")).rejects.toThrow("Request failed with status 500");
   });
 
   it("throws with API failure fallback on envelope success:false with ok:true", async () => {
     mockEnvelopeFailure("Validation failed");
 
-    await expect(http.post("/proposals/", {})).rejects.toThrow(
-      "Validation failed"
-    );
+    await expect(http.post("/proposals/", {})).rejects.toThrow("Validation failed");
   });
 
   it("throws generic message when both ok:true and success:false with no error", async () => {
@@ -205,6 +198,26 @@ describe("httpClient — config passthrough", () => {
     expect(init.credentials).toBe("include");
   });
 
+  it("attaches a default AbortSignal when no signal is provided", async () => {
+    mockSuccessResponse([]);
+
+    await http.get("/proposals/");
+
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.signal).toBeDefined();
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("respects a custom requestTimeout over the default", async () => {
+    mockSuccessResponse([]);
+
+    await http.get("/proposals/", { requestTimeout: 5_000 });
+
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.signal).toBeDefined();
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it("merges custom headers with base headers", async () => {
     mockSuccessResponse([]);
 
@@ -227,3 +240,94 @@ describe("buildUrl", () => {
     expect(buildUrl("/proposals/1/download/")).toContain("/proposals/1/download/");
   });
 });
+
+// ---------------------------------------------------------------------------
+// GET request deduplication
+// ---------------------------------------------------------------------------
+
+describe("httpClient — GET request deduplication", () => {
+  it("returns the same promise for concurrent requests to the same path", () => {
+    let resolveFetch!: (r: Response) => void;
+    const pendingResponse = new Promise<Response>((r) => {
+      resolveFetch = r;
+    });
+    mockFetch.mockReturnValueOnce(pendingResponse);
+
+    const p1 = http.get<number[]>("/proposals/");
+    const p2 = http.get<number[]>("/proposals/");
+
+    // Both callers must receive the exact same Promise instance.
+    expect(p1).toBe(p2);
+
+    // Settle the underlying fetch so the test does not leak a dangling promise.
+    resolveFetch({
+      ok: true,
+      text: async () => JSON.stringify({ success: true, data: [] }),
+    } as unknown as Response);
+
+    return p1;
+  });
+
+  it("issues only one network call for concurrent duplicate GET requests", async () => {
+    let resolveFetch!: (r: Response) => void;
+    const pendingResponse = new Promise<Response>((r) => {
+      resolveFetch = r;
+    });
+    mockFetch.mockReturnValueOnce(pendingResponse);
+
+    const p1 = http.get<number[]>("/proposals/");
+    const p2 = http.get<number[]>("/proposals/");
+
+    resolveFetch({
+      ok: true,
+      text: async () => JSON.stringify({ success: true, data: [1, 2] }),
+    } as unknown as Response);
+
+    await Promise.all([p1, p2]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a fresh network call after the previous one settles", async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ success: true, data: [1] }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ success: true, data: [2] }),
+      } as unknown as Response);
+
+    const r1 = await http.get<number[]>("/proposals/");
+    const r2 = await http.get<number[]>("/proposals/");
+
+    expect(r1).toEqual([1]);
+    expect(r2).toEqual([2]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not deduplicate when a custom signal is provided", async () => {
+    mockSuccessResponse([]);
+    mockSuccessResponse([]);
+
+    const controller = new AbortController();
+    await http.get("/proposals/", { signal: controller.signal });
+    await http.get("/proposals/", { signal: controller.signal });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not deduplicate requests for different paths", async () => {
+    mockSuccessResponse({ id: 1 });
+    mockSuccessResponse({ id: 2 });
+
+    await Promise.all([http.get("/proposals/1/"), http.get("/proposals/2/")]);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SSR guard — see httpClient.ssr.test.ts (runs under @jest-environment node
+// where typeof window === "undefined" is naturally true)
+// ---------------------------------------------------------------------------

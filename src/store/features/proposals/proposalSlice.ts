@@ -5,35 +5,59 @@
  *
  * Features:
  * - Centralized proposal state
- * - Smart caching with configurable TTL
+ * - Smart caching with configurable TTL — allProposals and historyProposals have
+ *   independent lastFetched timestamps so Dashboard and History never overwrite each other
  * - Computed selectors for filtering
  * - Automatic cache invalidation
+ * - Paginated fetching with infinite-scroll support (fetchMoreProposals)
  */
 
-import { create } from 'zustand';
-import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
-import * as proposalApi from '@/services/proposal.service';
+import { create } from "zustand";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
+import * as proposalApi from "@/services/proposal.service";
+import { sortByCreatedAtDesc } from "@/utils/sortUtils";
 
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const DEFAULT_PAGE_SIZE = 20;
 
 export const INITIAL_PROPOSAL_STATE = {
+  // All proposals — Dashboard
   proposals: [] as ProposalListItem[],
   isLoading: false,
+  isLoadingMore: false,
   isInitialized: false,
   lastFetched: null as number | null,
   error: null as string | null,
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE,
+  hasMore: false,
+
+  // History proposals (approved/rejected) — History page
+  historyProposals: [] as ProposalListItem[],
+  historyLastFetched: null as number | null,
+  historyInitialized: false,
 };
 
 interface ProposalState {
-  // State
+  // All proposals state (Dashboard)
   proposals: ProposalListItem[];
   isLoading: boolean;
+  isLoadingMore: boolean;
   isInitialized: boolean;
   lastFetched: number | null;
   error: string | null;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+
+  // History proposals state (History page)
+  historyProposals: ProposalListItem[];
+  historyLastFetched: number | null;
+  historyInitialized: boolean;
 
   // Computed selectors
   isCacheValid: () => boolean;
+  isHistoryCacheValid: () => boolean;
   getProposalById: (id: number) => ProposalListItem | undefined;
   getApprovedProposals: () => ProposalListItem[];
   getRejectedProposals: () => ProposalListItem[];
@@ -42,6 +66,7 @@ interface ProposalState {
 
   // Actions
   fetchProposals: (force?: boolean) => Promise<void>;
+  fetchMoreProposals: () => Promise<void>;
   fetchProposalHistory: (force?: boolean) => Promise<void>;
   setProposals: (proposals: ProposalListItem[]) => void;
   addProposal: (proposal: ProposalListItem) => void;
@@ -53,74 +78,63 @@ interface ProposalState {
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
   // Initial state
-  proposals: [],
-  isLoading: false,
-  isInitialized: false,
-  lastFetched: null,
-  error: null,
+  ...INITIAL_PROPOSAL_STATE,
 
-  // Computed selectors
+  // --- All-proposals cache validator (Dashboard) ---
   isCacheValid: () => {
     const { lastFetched, isInitialized } = get();
     if (!isInitialized || lastFetched === null) return false;
     return Date.now() - lastFetched < CACHE_TTL_MS;
   },
 
-  getProposalById: (id: number) => {
-    return get().proposals.find(p => p.id === id);
+  // --- History-proposals cache validator (History page) ---
+  isHistoryCacheValid: () => {
+    const { historyLastFetched, historyInitialized } = get();
+    if (!historyInitialized || historyLastFetched === null) return false;
+    return Date.now() - historyLastFetched < CACHE_TTL_MS;
   },
 
+  getProposalById: (id: number) => {
+    return get().proposals.find((p) => p.id === id);
+  },
+
+  // History selectors — all filter from historyProposals so Dashboard's
+  // all-proposals array is never contaminated by history fetches.
   getApprovedProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'approved');
+    return get().historyProposals.filter((p) => p.approvalStatus === "approved");
   },
 
   getRejectedProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'rejected');
+    return get().historyProposals.filter((p) => p.approvalStatus === "rejected");
   },
 
   getHistoryProposals: () => {
-    return get().proposals.filter(
-      p => p.approvalStatus === 'approved' || p.approvalStatus === 'rejected'
-    );
+    return get().historyProposals;
   },
 
+  // Pending proposals come from the all-proposals list
   getPendingProposals: () => {
-    return get().proposals.filter(p => p.approvalStatus === 'pending');
+    return get().proposals.filter((p) => p.approvalStatus === "pending");
   },
 
   // Actions
   fetchProposals: async (force = false) => {
     const { isCacheValid, isLoading } = get();
 
-    // Return cached data if valid and not forced
     if (!force && isCacheValid()) {
-      console.log('[proposalSlice] Using cached data - cache is still valid');
       return;
     }
 
-    // Prevent duplicate concurrent requests
     if (isLoading) {
-      console.log('[proposalSlice] Fetch already in progress - skipping');
       return;
     }
 
-    console.log('[proposalSlice] Fetching proposals from API', { force, cacheValid: isCacheValid() });
     set({ isLoading: true, error: null });
 
     try {
-      const proposals = await proposalApi.listProposals();
+      const items = await proposalApi.listProposals({ page: 1, limit: DEFAULT_PAGE_SIZE });
 
-      // Sort by creation date (newest first)
-      const sorted = [...proposals].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      console.log('[proposalSlice] Proposals fetched successfully', { 
-        count: sorted.length,
-        approved: sorted.filter(p => p.approvalStatus === 'approved').length,
-        rejected: sorted.filter(p => p.approvalStatus === 'rejected').length,
-        pending: sorted.filter(p => p.approvalStatus === 'pending').length,
-      });
+      const sorted = sortByCreatedAtDesc(items);
 
       set({
         proposals: sorted,
@@ -128,10 +142,12 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
         isInitialized: true,
         lastFetched: Date.now(),
         error: null,
+        page: 1,
+        pageSize: DEFAULT_PAGE_SIZE,
+        hasMore: items.length === DEFAULT_PAGE_SIZE,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch proposals';
-      console.error('[proposalSlice] Failed to fetch proposals', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch proposals";
       set({
         isLoading: false,
         error: errorMessage,
@@ -140,49 +156,68 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     }
   },
 
+  fetchMoreProposals: async () => {
+    const { isLoading, isLoadingMore, hasMore, page, pageSize } = get();
+
+    if (!hasMore || isLoading || isLoadingMore) {
+      return;
+    }
+
+    const nextPage = page + 1;
+    set({ isLoadingMore: true, error: null });
+
+    try {
+      const items = await proposalApi.listProposals({ page: nextPage, limit: pageSize });
+
+      const sorted = sortByCreatedAtDesc(items);
+
+      set((state) => ({
+        proposals: [...state.proposals, ...sorted],
+        isLoadingMore: false,
+        lastFetched: Date.now(),
+        page: nextPage,
+        hasMore: items.length === pageSize,
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to load more proposals";
+      set({
+        isLoadingMore: false,
+        error: errorMessage,
+      });
+      throw error;
+    }
+  },
+
+  // Writes to historyProposals — never touches the all-proposals array so
+  // Dashboard and History maintain fully independent cached state.
   fetchProposalHistory: async (force = false) => {
-    const { isCacheValid, isLoading } = get();
+    const { isHistoryCacheValid, isLoading } = get();
 
-    // Return cached data if valid and not forced
-    if (!force && isCacheValid()) {
-      console.log('[proposalSlice] Using cached history data - cache is still valid');
+    if (!force && isHistoryCacheValid()) {
       return;
     }
 
-    // Prevent duplicate concurrent requests
     if (isLoading) {
-      console.log('[proposalSlice] Fetch already in progress - skipping');
       return;
     }
 
-    console.log('[proposalSlice] Fetching proposal history from API', { force, cacheValid: isCacheValid() });
     set({ isLoading: true, error: null });
 
     try {
       const response = await proposalApi.listProposalHistory(1, 100);
 
-      // Sort by creation date (newest first)
-      const sorted = [...response.items].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      console.log('[proposalSlice] Proposal history fetched successfully', { 
-        count: sorted.length,
-        total: response.total,
-        approved: sorted.filter(p => p.approvalStatus === 'approved').length,
-        rejected: sorted.filter(p => p.approvalStatus === 'rejected').length,
-      });
+      const sorted = sortByCreatedAtDesc(response.items);
 
       set({
-        proposals: sorted,
+        historyProposals: sorted,
         isLoading: false,
-        isInitialized: true,
-        lastFetched: Date.now(),
+        historyInitialized: true,
+        historyLastFetched: Date.now(),
         error: null,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch proposal history';
-      console.error('[proposalSlice] Failed to fetch proposal history', error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to fetch proposal history";
       set({
         isLoading: false,
         error: errorMessage,
@@ -200,33 +235,31 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
   },
 
   addProposal: (proposal: ProposalListItem) => {
-    set(state => ({
+    set((state) => ({
       proposals: [proposal, ...state.proposals],
       lastFetched: Date.now(),
     }));
   },
 
   updateProposal: (id: number, updates: Partial<ProposalListItem>) => {
-    console.log('[proposalSlice] Updating proposal in store', { id, updates });
-    set(state => ({
-      proposals: state.proposals.map(p =>
-        p.id === id ? { ...p, ...updates } : p
-      ),
+    set((state) => ({
+      proposals: state.proposals.map((p) => (p.id === id ? { ...p, ...updates } : p)),
       lastFetched: Date.now(),
     }));
   },
 
   removeProposal: (id: number) => {
-    set(state => ({
-      proposals: state.proposals.filter(p => p.id !== id),
+    set((state) => ({
+      proposals: state.proposals.filter((p) => p.id !== id),
       lastFetched: Date.now(),
     }));
   },
 
+  // Invalidates both caches so the next fetch re-fetches from the API
   invalidateCache: () => {
-    console.log('[proposalSlice] Cache invalidated - next fetch will be fresh');
     set({
       lastFetched: null,
+      historyLastFetched: null,
     });
   },
 

@@ -7,9 +7,10 @@
  * - Memoized selectors for performance
  */
 
-import { useEffect, useRef } from 'react';
-import { useClientStore } from '@/store/features/clients/clientSlice';
-import type { ClientWithDocuments } from '@/services/client.service';
+import { useEffect, useRef } from "react";
+import { useClientStore } from "@/store/features/clients/clientSlice";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
+import type { ClientWithDocuments } from "@/services/client.service";
 
 interface UseClientsOptions {
   autoFetch?: boolean;
@@ -27,18 +28,24 @@ interface UseClientsReturn {
 export function useClients(options: UseClientsOptions = {}): UseClientsReturn {
   const { autoFetch = true, force = false } = options;
 
-  const clients = useClientStore(state => state.clients);
-  const isLoading = useClientStore(state => state.isLoading);
-  const error = useClientStore(state => state.error);
-  const fetchClients = useClientStore(state => state.fetchClients);
-  const getClientById = useClientStore(state => state.getClientById);
+  const clients = useClientStore((state) => state.clients);
+  const isLoading = useClientStore((state) => state.isLoading);
+  const error = useClientStore((state) => state.error);
+  const fetchClients = useClientStore((state) => state.fetchClients);
+  const getClientById = useClientStore((state) => state.getClientById);
 
   useEffect(() => {
     if (autoFetch) {
       fetchClients(force);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFetch, force]);
+
+  // Re-fetch when the tab becomes visible again — respects TTL so a fresh tab
+  // switch within the cache window produces no network call.
+  usePageVisibility(() => {
+    if (autoFetch) void fetchClients();
+  });
 
   const refetch = async () => {
     await fetchClients(true);
@@ -59,12 +66,11 @@ export function useClient(clientId: number): {
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const getClientById = useClientStore(state => state.getClientById);
-  const isLoading = useClientStore(state => state.isLoading);
-  const error = useClientStore(state => state.error);
-  const fetchClients = useClientStore(state => state.fetchClients);
-  const isInitialized = useClientStore(state => state.isInitialized);
-  const clients = useClientStore(state => state.clients);
+  const getClientById = useClientStore((state) => state.getClientById);
+  const isLoading = useClientStore((state) => state.isLoading);
+  const error = useClientStore((state) => state.error);
+  const fetchClients = useClientStore((state) => state.fetchClients);
+  const isInitialized = useClientStore((state) => state.isInitialized);
   const hasFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -73,7 +79,7 @@ export function useClient(clientId: number): {
       hasFetchedRef.current = true;
       fetchClients();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const client = getClientById(clientId);
