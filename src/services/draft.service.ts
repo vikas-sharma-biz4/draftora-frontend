@@ -6,6 +6,7 @@ import type {
   DraftStage,
   DraftLocation,
 } from "@/interfaces/draftInterfaces";
+import type { TemplateType } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
 // ─── Runtime Validation ─────────────────────────────────────────────────────
@@ -300,7 +301,7 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
     updatedAt: d.updated_at,
     hasEdits: d.has_edits ?? false,
     templateId: d.template_id,
-    templateType: d.template_type,
+    templateType: d.template_type as TemplateType | undefined,
   }));
 }
 
@@ -342,7 +343,7 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
       updatedAt: first.updated_at,
       hasEdits: first.has_edits ?? false,
       templateId: first.template_id,
-      templateType: first.template_type,
+      templateType: first.template_type as TemplateType | undefined,
     };
   } catch (error: unknown) {
     // 404 means "no draft exists yet" — not a fatal error
