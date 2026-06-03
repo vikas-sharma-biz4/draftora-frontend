@@ -15,6 +15,11 @@ for (const key of REQUIRED_ENV_VARS) {
 const nextConfig = {
   reactStrictMode: true,
 
+  eslint: {
+    // ESLint runs in pre-commit hooks; skip the duplicate pass during next build
+    ignoreDuringBuilds: true,
+  },
+
   async headers() {
     return [
       {

@@ -760,7 +760,7 @@ export default function ReviewPage(): JSX.Element {
         <ScopeEditorModal
           proposalTitle={proposalData.title}
           clientName={proposalData.clientName}
-          clientId={proposalData.clientId}
+          clientId={proposalData.clientId ?? null}
           description={proposalData.description}
           onClose={() => setShowScopeModal(false)}
           onSave={handleSaveScope}
