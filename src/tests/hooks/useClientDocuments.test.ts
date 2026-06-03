@@ -1,0 +1,399 @@
+/**
+ * Tests for useClientDocuments.ts
+ *
+ * Coverage targets:
+ *   - filteredDocuments: empty query returns all; substring match is case-insensitive
+ *   - handleDeleteDocument: sets deleteDocModalData
+ *   - confirmDeleteDocument: calls store deleteDocument action; error shows toast
+ *   - confirmDeleteAllDocuments: optimistic remove; partial-failure toast with count
+ *   - handleViewDocument: opens window for valid https URL; specific toasts for 400/404/generic errors
+ *   - handleDeleteAllDocuments: skips when no documents
+ */
+
+import { renderHook, act } from "@testing-library/react";
+
+import { useClientDocuments } from "@/hooks/useClientDocuments";
+import type { ClientWithDocuments, ClientDocument } from "@/interfaces/clientInterfaces";
+
+// ---------------------------------------------------------------------------
+// Mocks — store
+// ---------------------------------------------------------------------------
+
+const mockUploadDocument = jest.fn();
+const mockRemoveDocument = jest.fn();
+const mockDeleteDocument = jest.fn();
+const mockUpdateDocument = jest.fn();
+
+jest.mock("@/store/features/clients/clientSlice", () => ({
+  useClientStore: (selector: (s: unknown) => unknown) => {
+    const state = {
+      uploadDocument: mockUploadDocument,
+      removeDocument: mockRemoveDocument,
+      deleteDocument: mockDeleteDocument,
+      updateDocument: mockUpdateDocument,
+    };
+    return selector(state);
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Mocks — client service
+// ---------------------------------------------------------------------------
+
+const mockGetDocumentViewUrl = jest.fn();
+const mockDeleteClientDocument = jest.fn();
+const mockMigrateDocumentsToS3 = jest.fn();
+const mockRestoreDocumentToS3 = jest.fn();
+
+jest.mock("@/services/client.service", () => ({
+  getDocumentViewUrl: (...args: unknown[]) => mockGetDocumentViewUrl(...args),
+  deleteDocument: (...args: unknown[]) => mockDeleteClientDocument(...args),
+  migrateDocumentsToS3: (...args: unknown[]) => mockMigrateDocumentsToS3(...args),
+  restoreDocumentToS3: (...args: unknown[]) => mockRestoreDocumentToS3(...args),
+  // re-export named imports used by the hook
+  migrateDocumentsToS3: (...args: unknown[]) => mockMigrateDocumentsToS3(...args),
+  restoreDocumentToS3: (...args: unknown[]) => mockRestoreDocumentToS3(...args),
+}));
+
+// ---------------------------------------------------------------------------
+// Mocks — toast / logger
+// ---------------------------------------------------------------------------
+
+const mockToastError = jest.fn();
+const mockToastSuccess = jest.fn();
+
+jest.mock("@/utils/toast", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+  },
+}));
+
+jest.mock("@/utils/logger", () => ({
+  logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+}));
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+const makeDocument = (id: number, name: string, s3Url?: string): ClientDocument => ({
+  id,
+  name,
+  s3FileUrl: s3Url ?? `https://s3.example.com/${name}`,
+  status: "parsed",
+  createdAt: "2025-01-01T00:00:00Z",
+});
+
+const makeClient = (docs: ClientDocument[]): ClientWithDocuments => ({
+  id: 1,
+  name: "Test Client",
+  status: "active",
+  documents: docs,
+});
+
+// ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+// Mock window.open (jsdom doesn't implement it)
+const mockWindowOpen = jest.fn();
+Object.defineProperty(window, "open", { value: mockWindowOpen, writable: true });
+
+class MockHttpError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode;
+  }
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockDeleteDocument.mockResolvedValue(undefined);
+  mockDeleteClientDocument.mockResolvedValue(undefined);
+});
+
+// ---------------------------------------------------------------------------
+// filteredDocuments
+// ---------------------------------------------------------------------------
+
+describe("useClientDocuments — filteredDocuments", () => {
+  it("returns all documents when searchQuery is empty", () => {
+    const client = makeClient([makeDocument(1, "contract.pdf"), makeDocument(2, "proposal.docx")]);
+
+    const { result } = renderHook(() => useClientDocuments(client));
+    expect(result.current.filteredDocuments).toHaveLength(2);
+  });
+
+  it("filters documents by name substring (case-insensitive)", () => {
+    const client = makeClient([makeDocument(1, "Contract.pdf"), makeDocument(2, "proposal.docx")]);
+
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.setSearchQuery("contract");
+    });
+
+    expect(result.current.filteredDocuments).toHaveLength(1);
+    expect(result.current.filteredDocuments[0].id).toBe(1);
+  });
+
+  it("returns empty array when query matches nothing", () => {
+    const client = makeClient([makeDocument(1, "report.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.setSearchQuery("zzz_no_match");
+    });
+
+    expect(result.current.filteredDocuments).toHaveLength(0);
+  });
+
+  it("returns empty array when client is undefined", () => {
+    const { result } = renderHook(() => useClientDocuments(undefined));
+    expect(result.current.filteredDocuments).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleDeleteDocument / confirmDeleteDocument
+// ---------------------------------------------------------------------------
+
+describe("useClientDocuments — handleDeleteDocument", () => {
+  it("sets deleteDocModalData with the correct id and name", () => {
+    const client = makeClient([makeDocument(10, "invoice.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.handleDeleteDocument(10, "invoice.pdf");
+    });
+
+    expect(result.current.deleteDocModalData).toEqual({ id: 10, name: "invoice.pdf" });
+  });
+});
+
+describe("useClientDocuments — confirmDeleteDocument", () => {
+  it("calls the store deleteDocument action with the correct clientId and docId", async () => {
+    const client = makeClient([makeDocument(10, "invoice.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.handleDeleteDocument(10, "invoice.pdf");
+    });
+
+    await act(async () => {
+      await result.current.confirmDeleteDocument();
+    });
+
+    expect(mockDeleteDocument).toHaveBeenCalledWith(1, 10);
+  });
+
+  it("shows an error toast when the store deleteDocument throws", async () => {
+    mockDeleteDocument.mockRejectedValue(new Error("Delete failed"));
+    const client = makeClient([makeDocument(10, "invoice.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.handleDeleteDocument(10, "invoice.pdf");
+    });
+
+    await act(async () => {
+      await result.current.confirmDeleteDocument();
+    });
+
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastError.mock.calls[0][0]).toMatch(/delete|restore/i);
+  });
+
+  it("does nothing when deleteDocModalData is null", async () => {
+    const client = makeClient([makeDocument(10, "invoice.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    // Do NOT call handleDeleteDocument first
+    await act(async () => {
+      await result.current.confirmDeleteDocument();
+    });
+
+    expect(mockDeleteDocument).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// confirmDeleteAllDocuments
+// ---------------------------------------------------------------------------
+
+describe("useClientDocuments — confirmDeleteAllDocuments", () => {
+  it("calls removeDocumentFromStore for every document optimistically", async () => {
+    const docs = [makeDocument(1, "a.pdf"), makeDocument(2, "b.pdf")];
+    const client = makeClient(docs);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.setDeleteAllDocsModalOpen(true);
+    });
+
+    await act(async () => {
+      await result.current.confirmDeleteAllDocuments();
+    });
+
+    expect(mockRemoveDocument).toHaveBeenCalledTimes(2);
+    expect(mockRemoveDocument).toHaveBeenCalledWith(1, 1);
+    expect(mockRemoveDocument).toHaveBeenCalledWith(1, 2);
+  });
+
+  it("shows a failure-count toast when some API calls are rejected", async () => {
+    const docs = [makeDocument(1, "a.pdf"), makeDocument(2, "b.pdf"), makeDocument(3, "c.pdf")];
+    const client = makeClient(docs);
+
+    // First call succeeds, last two fail
+    mockDeleteClientDocument
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("fail"))
+      .mockRejectedValueOnce(new Error("fail"));
+
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.confirmDeleteAllDocuments();
+    });
+
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastError.mock.calls[0][0]).toMatch(/2 document/i);
+  });
+
+  it("shows a singular error message when exactly one document fails", async () => {
+    const docs = [makeDocument(1, "a.pdf"), makeDocument(2, "b.pdf")];
+    const client = makeClient(docs);
+
+    mockDeleteClientDocument
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("fail"));
+
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.confirmDeleteAllDocuments();
+    });
+
+    const errorMsg: string = mockToastError.mock.calls[0][0];
+    // Should NOT say "documents" (plural) for a single failure
+    expect(errorMsg).toMatch(/1 document[^s]/);
+  });
+
+  it("shows no error toast when all deletes succeed", async () => {
+    const docs = [makeDocument(1, "a.pdf"), makeDocument(2, "b.pdf")];
+    const client = makeClient(docs);
+    mockDeleteClientDocument.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.confirmDeleteAllDocuments();
+    });
+
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleViewDocument
+// ---------------------------------------------------------------------------
+
+describe("useClientDocuments — handleViewDocument", () => {
+  it("opens a new tab for a valid https:// URL", async () => {
+    mockGetDocumentViewUrl.mockResolvedValue("https://s3.example.com/file.pdf");
+    const client = makeClient([makeDocument(5, "file.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.handleViewDocument(client.documents[0]);
+    });
+
+    expect(mockWindowOpen).toHaveBeenCalledWith(
+      "https://s3.example.com/file.pdf",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it("shows an error toast (no open) when the URL is not https://", async () => {
+    mockGetDocumentViewUrl.mockResolvedValue("http://insecure.example.com/file.pdf");
+    const client = makeClient([makeDocument(5, "file.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.handleViewDocument(client.documents[0]);
+    });
+
+    expect(mockWindowOpen).not.toHaveBeenCalled();
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a 400-specific toast when the API returns HTTP 400", async () => {
+    mockGetDocumentViewUrl.mockRejectedValue(new MockHttpError(400, "Bad Request"));
+    const client = makeClient([makeDocument(5, "file.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.handleViewDocument(client.documents[0]);
+    });
+
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastError.mock.calls[0][0]).toMatch(/no stored file|S3/i);
+  });
+
+  it("shows a 404-specific toast when the API returns HTTP 404", async () => {
+    mockGetDocumentViewUrl.mockRejectedValue(new MockHttpError(404, "Not Found"));
+    const client = makeClient([makeDocument(5, "file.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.handleViewDocument(client.documents[0]);
+    });
+
+    expect(mockToastError.mock.calls[0][0]).toMatch(/not found/i);
+  });
+
+  it("shows a generic error toast for all other API errors", async () => {
+    mockGetDocumentViewUrl.mockRejectedValue(new MockHttpError(500, "Server Error"));
+    const client = makeClient([makeDocument(5, "file.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    await act(async () => {
+      await result.current.handleViewDocument(client.documents[0]);
+    });
+
+    expect(mockToastError).toHaveBeenCalledTimes(1);
+    expect(mockToastError.mock.calls[0][0]).toMatch(/could not open|try again/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleDeleteAllDocuments guard
+// ---------------------------------------------------------------------------
+
+describe("useClientDocuments — handleDeleteAllDocuments", () => {
+  it("does not open the modal when the client has no documents", () => {
+    const client = makeClient([]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.handleDeleteAllDocuments();
+    });
+
+    expect(result.current.deleteAllDocsModalOpen).toBe(false);
+  });
+
+  it("opens the modal when the client has at least one document", () => {
+    const client = makeClient([makeDocument(1, "doc.pdf")]);
+    const { result } = renderHook(() => useClientDocuments(client));
+
+    act(() => {
+      result.current.handleDeleteAllDocuments();
+    });
+
+    expect(result.current.deleteAllDocsModalOpen).toBe(true);
+  });
+});

@@ -4,10 +4,11 @@
  * Provides automatic loading of more proposals as user scrolls
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { ProposalListItem } from '@/interfaces/proposalInterfaces';
-import * as proposalApi from '@/services/proposal.service';
-import { logger } from '@/utils/logger';
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
+import * as proposalApi from "@/services/proposal.service";
+import { logger } from "@/utils/logger";
+import { usePageVisibility } from "@/hooks/usePageVisibility";
 
 interface UseInfiniteProposalHistoryReturn {
   proposals: ProposalListItem[];
@@ -21,6 +22,7 @@ interface UseInfiniteProposalHistoryReturn {
 }
 
 const PER_PAGE = 20;
+const HISTORY_REFRESH_INTERVAL_MS = 2 * 60 * 1_000;
 
 export function useInfiniteProposalHistory(): UseInfiniteProposalHistoryReturn {
   const [proposals, setProposals] = useState<ProposalListItem[]>([]);
@@ -33,30 +35,34 @@ export function useInfiniteProposalHistory(): UseInfiniteProposalHistoryReturn {
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadingRef = useRef(false);
+  // Track when data was last fetched so visibility sync respects a minimum
+  // interval (2 min) — avoids refetching on every rapid tab switch.
+  const lastFetchedAtRef = useRef<number>(0);
 
   // Fetch initial page
   const fetchInitialPage = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      logger.info('[useInfiniteProposalHistory] Fetching initial page');
+      logger.info("[useInfiniteProposalHistory] Fetching initial page");
       const response = await proposalApi.listProposalHistory(1, PER_PAGE);
-      
+
       setProposals(response.items);
       setCurrentPage(1);
       setTotalPages(response.totalPages);
       setHasMore(response.hasMore);
-      
-      logger.info('[useInfiniteProposalHistory] Initial page loaded', {
+      lastFetchedAtRef.current = Date.now();
+
+      logger.info("[useInfiniteProposalHistory] Initial page loaded", {
         count: response.items.length,
         total: response.total,
         hasMore: response.hasMore,
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load proposal history';
+      const errorMessage = err instanceof Error ? err.message : "Failed to load proposal history";
       setError(errorMessage);
-      logger.error('[useInfiniteProposalHistory] Failed to fetch initial page', err);
+      logger.error("[useInfiniteProposalHistory] Failed to fetch initial page", err);
     } finally {
       setIsLoading(false);
     }
@@ -75,24 +81,24 @@ export function useInfiniteProposalHistory(): UseInfiniteProposalHistoryReturn {
 
     loadingRef.current = true;
     setIsLoadingMore(true);
-    
+
     try {
-      logger.info('[useInfiniteProposalHistory] Loading more', { page: nextPage });
+      logger.info("[useInfiniteProposalHistory] Loading more", { page: nextPage });
       const response = await proposalApi.listProposalHistory(nextPage, PER_PAGE);
-      
-      setProposals(prev => [...prev, ...response.items]);
+
+      setProposals((prev) => [...prev, ...response.items]);
       setCurrentPage(nextPage);
       setHasMore(response.hasMore);
-      
-      logger.info('[useInfiniteProposalHistory] More proposals loaded', {
+
+      logger.info("[useInfiniteProposalHistory] More proposals loaded", {
         page: nextPage,
         count: response.items.length,
         totalLoaded: proposals.length + response.items.length,
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load more proposals';
+      const errorMessage = err instanceof Error ? err.message : "Failed to load more proposals";
       setError(errorMessage);
-      logger.error('[useInfiniteProposalHistory] Failed to load more', err);
+      logger.error("[useInfiniteProposalHistory] Failed to load more", err);
     } finally {
       setIsLoadingMore(false);
       loadingRef.current = false;
@@ -107,25 +113,31 @@ export function useInfiniteProposalHistory(): UseInfiniteProposalHistoryReturn {
   }, [fetchInitialPage]);
 
   // Intersection Observer callback for infinite scroll
-  const observerCallback = useCallback((node: HTMLDivElement | null) => {
-    if (isLoading || isLoadingMore) return;
+  const observerCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isLoading || isLoadingMore) return;
 
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    observerRef.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
-        loadMore();
+      if (observerRef.current) {
+        observerRef.current.disconnect();
       }
-    }, {
-      rootMargin: '200px', // Start loading 200px before reaching the bottom
-    });
 
-    if (node) {
-      observerRef.current.observe(node);
-    }
-  }, [isLoading, isLoadingMore, hasMore, loadMore]);
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+            loadMore();
+          }
+        },
+        {
+          rootMargin: "200px", // Start loading 200px before reaching the bottom
+        }
+      );
+
+      if (node) {
+        observerRef.current.observe(node);
+      }
+    },
+    [isLoading, isLoadingMore, hasMore, loadMore]
+  );
 
   // Initial fetch
   useEffect(() => {
@@ -140,6 +152,13 @@ export function useInfiniteProposalHistory(): UseInfiniteProposalHistoryReturn {
       }
     };
   }, []);
+
+  // Re-fetch from page 1 when the tab becomes visible and data is stale.
+  usePageVisibility(() => {
+    if (Date.now() - lastFetchedAtRef.current > HISTORY_REFRESH_INTERVAL_MS) {
+      void refetch();
+    }
+  });
 
   return {
     proposals,

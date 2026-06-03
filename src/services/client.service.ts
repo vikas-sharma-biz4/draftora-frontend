@@ -3,18 +3,24 @@
  */
 
 import { http } from "@/config/httpClient";
+import type {
+  Client,
+  ClientDocument,
+  ClientWithDocuments,
+  CreateClientRequest,
+  UpdateClientRequest,
+} from "@/interfaces/clientInterfaces";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Re-export so existing imports from this module continue to work
+export type {
+  Client,
+  ClientDocument,
+  ClientWithDocuments,
+  CreateClientRequest,
+  UpdateClientRequest,
+};
 
-export interface Client {
-  id: number;
-  name: string;
-  industry: string;
-  status: "active" | "inactive";
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+// ─── Internal API response shapes (snake_case) ────────────────────────────────
 
 // Raw API response interface (snake_case)
 interface ClientApiResponse {
@@ -25,18 +31,6 @@ interface ClientApiResponse {
   notes: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface ClientDocument {
-  id: number;
-  clientId: number;
-  name: string;
-  fileType: string;
-  sizeBytes: number;
-  status: "processing" | "parsed" | "error";
-  s3FileUrl?: string;
-  createdAt: string;
-  updatedAt: string;
 }
 
 // Raw API response interface for document (snake_case)
@@ -84,23 +78,6 @@ function transformClientDocument(apiDoc: ClientDocumentApiResponse): ClientDocum
     createdAt: apiDoc.created_at,
     updatedAt: apiDoc.updated_at,
   };
-}
-
-export interface ClientWithDocuments extends Client {
-  documents: ClientDocument[];
-}
-
-export interface CreateClientRequest {
-  name: string;
-  industry: string;
-  notes?: string;
-}
-
-export interface UpdateClientRequest {
-  name?: string;
-  industry?: string;
-  status?: "active" | "inactive";
-  notes?: string;
 }
 
 // ─── Client CRUD ──────────────────────────────────────────────────────────────
@@ -156,62 +133,44 @@ export async function deleteClient(clientId: number): Promise<void> {
 
 /**
  * List all clients with full documents array, automatically fetching all pages.
+ * Page 1 is fetched first to obtain total_pages; remaining pages are then
+ * fetched in parallel so N pages cost one serial RTT + one parallel batch
+ * instead of N sequential RTTs.
  * @param includeDeleted - If true, includes soft-deleted clients (for debugging)
  */
 export async function listClientsFullData(
   includeDeleted: boolean = false
 ): Promise<ClientWithDocuments[]> {
-  const allClients: ClientWithDocuments[] = [];
-  let currentPage = 1;
-  let totalPages = 1;
   const perPage = 50; // Maximum allowed by backend
+  const queryBase = `/clients/full-data?per_page=${perPage}${includeDeleted ? "&include_deleted=true" : ""}`;
 
-  console.log("[client.service] Starting to fetch all clients...", { includeDeleted });
+  type RawClient = ClientApiResponse & { documents: ClientDocumentApiResponse[] };
 
-  // Fetch all pages
-  while (currentPage <= totalPages) {
-    const response = await http.get<{
-      success: boolean;
-      data: (ClientApiResponse & { documents: ClientDocumentApiResponse[] })[];
-      meta: {
-        page: number;
-        per_page: number;
-        total: number;
-        total_pages: number;
-      };
-      message: string;
-    }>(
-      `/clients/full-data?page=${currentPage}&per_page=${perPage}${includeDeleted ? "&include_deleted=true" : ""}`
-    );
+  const transformPage = (data: RawClient[]): ClientWithDocuments[] =>
+    data.map((clientData) => ({
+      ...transformClient(clientData),
+      documents: clientData.documents.map(transformClientDocument),
+    }));
 
-    console.log(`[client.service] Fetched page ${currentPage}/${totalPages}:`, {
-      clientsInPage: response.data?.length || 0,
-      total: response.meta?.total || 0,
-      totalPages: response.meta?.total_pages || 1,
-    });
+  // Fetch page 1 to discover total_pages
+  const { data: firstPageData, meta } = await http.getPaginated<RawClient>(`${queryBase}&page=1`);
 
-    // Update total pages from first response
-    if (currentPage === 1) {
-      totalPages = response.meta?.total_pages || 1;
-      console.log(
-        `[client.service] Total pages to fetch: ${totalPages}, Total clients: ${response.meta?.total || 0}`
-      );
-    }
+  const allClients: ClientWithDocuments[] = transformPage(firstPageData);
 
-    // Transform and add clients from this page
-    if (response.data && Array.isArray(response.data)) {
-      const clientsFromPage = response.data.map((clientData) => ({
-        ...transformClient(clientData),
-        documents: clientData.documents.map(transformClientDocument),
-      }));
-
-      allClients.push(...clientsFromPage);
-    }
-
-    currentPage++;
+  if (meta.total_pages <= 1) {
+    return allClients;
   }
 
-  console.log(`[client.service] Finished fetching all clients. Total: ${allClients.length}`);
+  // Fetch all remaining pages in parallel
+  const remainingFetches = Array.from({ length: meta.total_pages - 1 }, (_, i) =>
+    http.getPaginated<RawClient>(`${queryBase}&page=${i + 2}`)
+  );
+
+  const remainingResults = await Promise.all(remainingFetches);
+  for (const { data } of remainingResults) {
+    allClients.push(...transformPage(data));
+  }
+
   return allClients;
 }
 
@@ -262,4 +221,66 @@ export async function getDocumentViewUrl(clientId: number, documentId: number): 
     `/clients/${clientId}/documents/${documentId}/view-url`
   );
   return response.view_url;
+}
+
+// ─── S3 Migration ─────────────────────────────────────────────────────────────
+
+export interface MigratedDocumentItem {
+  id: number;
+  name: string;
+  s3FileUrl?: string;
+  error?: string;
+}
+
+export interface MigrateToS3Result {
+  migrated: number;
+  failed: number;
+  skipped: number;
+  results: MigratedDocumentItem[];
+}
+
+/**
+ * Bulk-migrate all documents for a client that lack an S3 URL.
+ * The backend uploads each document's extracted text as a .txt file to S3.
+ * No original file required — uses parsed_text already in the database.
+ */
+export async function migrateDocumentsToS3(clientId: number): Promise<MigrateToS3Result> {
+  const response = await http.post<{
+    migrated: number;
+    failed: number;
+    skipped: number;
+    results: Array<{ id: number; name: string; s3_file_url?: string; error?: string }>;
+  }>(`/clients/${clientId}/documents/migrate-to-s3`);
+
+  return {
+    migrated: response.migrated,
+    failed: response.failed,
+    skipped: response.skipped,
+    results: response.results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      s3FileUrl: r.s3_file_url,
+      error: r.error,
+    })),
+  };
+}
+
+/**
+ * Re-upload a document's original file to S3 without re-parsing.
+ * Used to backfill documents that were saved before S3 was enabled.
+ * Preserves existing parsed text — only the s3_file_url is updated.
+ */
+export async function restoreDocumentToS3(
+  clientId: number,
+  documentId: number,
+  file: File
+): Promise<{ id: number; s3FileUrl: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await http.post<{ id: number; s3_file_url: string }>(
+    `/clients/${clientId}/documents/${documentId}/restore-s3`,
+    formData
+  );
+  return { id: response.id, s3FileUrl: response.s3_file_url };
 }

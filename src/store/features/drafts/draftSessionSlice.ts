@@ -12,18 +12,22 @@
  * re-renders in components that only care about session state.
  */
 
-import { create } from 'zustand';
-import type { DraftStage } from '@/interfaces/draftInterfaces';
+import { create } from "zustand";
+import type { DraftStage } from "@/interfaces/draftInterfaces";
 
-const SESSION_DRAFT_ID_KEY = 'draftora_current_draft_id';
-const SESSION_DRAFT_STAGE_KEY = 'draftora_draft_stage';
-const SESSION_COMPLETED_STEPS_KEY = 'draftora_completed_steps';
+const SESSION_DRAFT_ID_KEY = "draftora_current_draft_id";
+const SESSION_DRAFT_STAGE_KEY = "draftora_draft_stage";
+const SESSION_COMPLETED_STEPS_KEY = "draftora_completed_steps";
 
-const isBrowser = typeof window !== 'undefined' && typeof sessionStorage !== 'undefined';
+const isBrowser = typeof window !== "undefined" && typeof sessionStorage !== "undefined";
 
 function readDraftIdFromSession(): string | null {
   if (!isBrowser) return null;
-  try { return sessionStorage.getItem(SESSION_DRAFT_ID_KEY); } catch { return null; }
+  try {
+    return sessionStorage.getItem(SESSION_DRAFT_ID_KEY);
+  } catch {
+    return null;
+  }
 }
 
 function writeDraftIdToSession(id: string | null): void {
@@ -31,19 +35,27 @@ function writeDraftIdToSession(id: string | null): void {
   try {
     if (id) sessionStorage.setItem(SESSION_DRAFT_ID_KEY, id);
     else sessionStorage.removeItem(SESSION_DRAFT_ID_KEY);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function readDraftStageFromSession(): DraftStage {
   if (!isBrowser) return "template_selection";
   try {
     return (sessionStorage.getItem(SESSION_DRAFT_STAGE_KEY) as DraftStage) || "template_selection";
-  } catch { return "template_selection"; }
+  } catch {
+    return "template_selection";
+  }
 }
 
 function writeDraftStageToSession(stage: DraftStage): void {
   if (!isBrowser) return;
-  try { sessionStorage.setItem(SESSION_DRAFT_STAGE_KEY, stage); } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(SESSION_DRAFT_STAGE_KEY, stage);
+  } catch {
+    /* ignore */
+  }
 }
 
 function readCompletedStepsFromSession(): number[] {
@@ -51,12 +63,18 @@ function readCompletedStepsFromSession(): number[] {
   try {
     const raw = sessionStorage.getItem(SESSION_COMPLETED_STEPS_KEY);
     return raw ? (JSON.parse(raw) as number[]) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 function writeCompletedStepsToSession(steps: number[]): void {
   if (!isBrowser) return;
-  try { sessionStorage.setItem(SESSION_COMPLETED_STEPS_KEY, JSON.stringify(steps)); } catch { /* ignore */ }
+  try {
+    sessionStorage.setItem(SESSION_COMPLETED_STEPS_KEY, JSON.stringify(steps));
+  } catch {
+    /* ignore */
+  }
 }
 
 export const INITIAL_DRAFT_SESSION_STATE = {
@@ -66,6 +84,7 @@ export const INITIAL_DRAFT_SESSION_STATE = {
   completedSteps: [] as number[],
   isSaving: false as boolean,
   fromHistory: false as boolean,
+  generatedContent: {} as Record<string, string>,
 };
 
 const restoredDraftId = readDraftIdFromSession();
@@ -79,6 +98,7 @@ interface DraftSessionState {
   completedSteps: number[];
   isSaving: boolean;
   fromHistory: boolean;
+  generatedContent: Record<string, string>;
 
   setCurrentDraftId: (id: string | null) => void;
   setAutoSaveEnabled: (enabled: boolean) => void;
@@ -87,6 +107,7 @@ interface DraftSessionState {
   markStepCompleted: (stepId: number) => void;
   setIsSaving: (saving: boolean) => void;
   setFromHistory: (value: boolean) => void;
+  setGeneratedContent: (content: Record<string, string>) => void;
   resetDraftSession: () => void;
   reset: () => void;
 }
@@ -98,6 +119,7 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   completedSteps: restoredCompletedSteps,
   isSaving: false,
   fromHistory: false,
+  generatedContent: {},
 
   setCurrentDraftId: (id: string | null) => {
     writeDraftIdToSession(id);
@@ -119,11 +141,9 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
   },
 
   markStepCompleted: (stepId: number) => {
-    set(state => {
+    set((state) => {
       const currentSteps = state.completedSteps || [];
-      const newSteps = currentSteps.includes(stepId)
-        ? currentSteps
-        : [...currentSteps, stepId];
+      const newSteps = currentSteps.includes(stepId) ? currentSteps : [...currentSteps, stepId];
       writeCompletedStepsToSession(newSteps);
       return { completedSteps: newSteps };
     });
@@ -135,6 +155,10 @@ export const useDraftSessionStore = create<DraftSessionState>((set) => ({
 
   setFromHistory: (value: boolean) => {
     set({ fromHistory: value });
+  },
+
+  setGeneratedContent: (content: Record<string, string>) => {
+    set({ generatedContent: content });
   },
 
   resetDraftSession: () => {

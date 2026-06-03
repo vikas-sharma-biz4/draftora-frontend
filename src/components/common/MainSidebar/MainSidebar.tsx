@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, FileText, History, PanelLeft } from "lucide-react";
 
+import styles from "./MainSidebar.module.scss";
 import { MAIN_NAV_ITEMS } from "@/constants";
 import { useUIStore } from "@/store/features/ui/uiSlice";
-
-const MOBILE_BREAKPOINT = 768;
+import { MOBILE_BREAKPOINT } from "@/constants/breakpoints";
 
 /** Maps nav item id → lucide icon */
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -32,16 +32,12 @@ export default function MainSidebar(): JSX.Element {
 
   // Keep isMobile in sync on resize
   useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+    const handler = (): void => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
 
   const collapsed = !sidebarOpen;
-
-  function handleToggle(): void {
-    toggleSidebar();
-  }
 
   function isActive(path: string): boolean {
     if (path === "/") return pathname === "/";
@@ -53,35 +49,36 @@ export default function MainSidebar(): JSX.Element {
       {/* Mobile backdrop — click outside to close */}
       {isMobile && !collapsed && (
         <div
-          className="sidebar-backdrop"
+          className={styles.sidebarBackdrop}
           aria-hidden="true"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={`sidebar${collapsed ? " collapsed" : ""}${isMobile ? " sidebar-mobile" : ""}`}
+        className={`${styles.sidebar}${isMobile ? ` ${styles.sidebarMobile}` : ""}`}
+        data-collapsed={collapsed}
         aria-label="Main navigation"
       >
-        {/* ── Header: Logo (left) + Toggle (right) — hidden when collapsed ─ */}
-        <div className="sidebar-header">
+        {/* ── Header: Logo (left) + Toggle (right) — hidden when collapsed ── */}
+        <div className={styles.sidebarHeader}>
           <Link
             href="/"
-            className="sidebar-logo-link"
+            className={styles.sidebarLogoLink}
             aria-label="Draftora home"
             prefetch={false}
           >
             <img
               src="/images/draftora-logo.png"
               alt="Draftora"
-              className="sidebar-logo-full"
+              className={styles.sidebarLogoFull}
             />
           </Link>
 
           <button
             type="button"
-            className="sidebar-toggle sidebar-toggle-header"
-            onClick={handleToggle}
+            className={styles.sidebarToggle}
+            onClick={toggleSidebar}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
@@ -89,40 +86,40 @@ export default function MainSidebar(): JSX.Element {
           </button>
         </div>
 
-        {/* ── Navigation ───────────────────────────────────────────────── */}
-        <nav className="sidebar-nav">
+        {/* ── Navigation ─────────────────────────────────────────────────── */}
+        <nav className={styles.sidebarNav}>
           {/* Toggle as first nav item — only visible when collapsed so it
               sits flush with the other icons, no separate header section */}
           <button
             type="button"
-            className="sidebar-toggle-nav"
-            onClick={handleToggle}
+            className={styles.sidebarToggleNav}
+            onClick={toggleSidebar}
             aria-label="Expand sidebar"
             title="Expand sidebar"
           >
-            <span className="sidebar-nav-icon"><PanelLeft size={18} /></span>
+            <span className={styles.sidebarNavIcon}>
+              <PanelLeft size={18} />
+            </span>
           </button>
 
-          <ul className="sidebar-steps">
+          <ul className={styles.sidebarSteps}>
             {MAIN_NAV_ITEMS.map((item) => {
               const active = isActive(item.path);
               return (
                 <li
                   key={item.id}
-                  className={`sidebar-step-item${active ? " active" : ""}`}
+                  className={`${styles.sidebarStepItem}${active ? ` ${styles.active}` : ""}`}
                 >
                   <Link
                     href={item.path}
-                    className="sidebar-nav-link"
+                    className={styles.sidebarNavLink}
                     aria-current={active ? "page" : undefined}
                     prefetch={false}
                     title={collapsed ? item.label : undefined}
                     onClick={() => isMobile && setSidebarOpen(false)}
                   >
-                    <span className="sidebar-nav-icon">
-                      {NAV_ICONS[item.id] ?? item.icon}
-                    </span>
-                    <span className="sidebar-step-label">{item.label}</span>
+                    <span className={styles.sidebarNavIcon}>{NAV_ICONS[item.id] ?? item.icon}</span>
+                    <span className={styles.sidebarStepLabel}>{item.label}</span>
                   </Link>
                 </li>
               );

@@ -16,7 +16,7 @@ export async function updateSection(
   sectionKey: string,
   content: string
 ): Promise<void> {
-  await http.put<null>(`/proposals/${id}/sections/${sectionKey}/`, { content });
+  await http.put<null>(`/proposals/${id}/sections/${sectionKey}`, { content });
 }
 
 export async function regenerateSection(
@@ -24,7 +24,7 @@ export async function regenerateSection(
   sectionKey: string,
   instructions?: string
 ): Promise<string> {
-  const data = await http.post<RegenerateResponse>(`/proposals/${id}/regenerate/`, {
+  const data = await http.post<RegenerateResponse>(`/proposals/${id}/regenerate`, {
     section_key: sectionKey,
     additional_instructions: instructions ?? null,
   });
@@ -49,12 +49,15 @@ export async function regenerateSelection(
   selectionContext?: string,
   instructions?: string
 ): Promise<RegenerateSelectionResult> {
-  const data = await http.post<RegenerateSelectionResponse>(`/proposals/${id}/regenerate-selection/`, {
-    section_key: sectionKey,
-    selected_text: selectedText,
-    selection_context: selectionContext ?? null,
-    instructions: instructions ?? null,
-  });
+  const data = await http.post<RegenerateSelectionResponse>(
+    `/proposals/${id}/regenerate-selection`,
+    {
+      section_key: sectionKey,
+      selected_text: selectedText,
+      selection_context: selectionContext ?? null,
+      instructions: instructions ?? null,
+    }
+  );
   return {
     regeneratedText: data.regenerated_text,
     format: data.format ?? null,
@@ -78,29 +81,30 @@ export async function addProposalSection(
   id: number,
   payload: AddSectionPayload
 ): Promise<{ key: string; label: string; content: string; formatType?: string }> {
-  return http.post<{ key: string; label: string; content: string; format_type?: string }>(
-    `/proposals/${id}/sections/`,
-    payload
-  ).then(data => ({
-    key: data.key,
-    label: data.label,
-    content: data.content,
-    formatType: data.format_type,
-  }));
+  return http
+    .post<{
+      key: string;
+      label: string;
+      content: string;
+      format_type?: string;
+    }>(`/proposals/${id}/sections`, payload)
+    .then((data) => ({
+      key: data.key,
+      label: data.label,
+      content: data.content,
+      formatType: data.format_type,
+    }));
 }
 
-export async function removeProposalSection(
-  id: number,
-  sectionKey: string
-): Promise<void> {
-  await http.delete<null>(`/proposals/${id}/sections/${sectionKey}/`);
+export async function removeProposalSection(id: number, sectionKey: string): Promise<void> {
+  await http.delete<null>(`/proposals/${id}/sections/${sectionKey}`);
 }
 
 export async function reorderProposalSections(
   id: number,
   payload: ReorderSectionsPayload
 ): Promise<void> {
-  await http.patch<null>(`/proposals/${id}/sections/reorder/`, {
+  await http.patch<null>(`/proposals/${id}/sections/reorder`, {
     order: payload.order,
     section_display_names: payload.sectionDisplayNames,
   });

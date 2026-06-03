@@ -1,4 +1,4 @@
-import type { ProposalData, WizardStep } from "./proposalInterfaces";
+import type { ProposalWizardData, WizardStep, TemplateType } from "./proposalInterfaces";
 
 export type DraftStage =
   | "template_selection"
@@ -7,11 +7,7 @@ export type DraftStage =
   | "review_complete"
   | "generated";
 
-export type DraftLocation =
-  | "wizard_parameters"
-  | "wizard_review"
-  | "web_view"
-  | "ai_sections";
+export type DraftLocation = "wizard_parameters" | "wizard_review" | "web_view" | "ai_sections";
 
 export interface DraftUIState {
   scrollPosition: number;
@@ -24,7 +20,7 @@ export interface DraftWizardState {
   currentStep: WizardStep;
   maxStepReached: WizardStep;
   completedSteps: number[];
-  proposalData: ProposalData;
+  proposalData: ProposalWizardData;
 }
 
 export interface SavedDraft {
@@ -55,7 +51,7 @@ export interface DraftMetadata {
   updatedAt: string;
   hasEdits?: boolean;
   templateId?: string | null;
-  templateType?: string;
+  templateType?: TemplateType;
 }
 
 export interface SaveDraftPayload {

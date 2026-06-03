@@ -59,7 +59,13 @@ export interface ProposalSidebarProps {
   onSectionRenamed: (key: string, newLabel: string) => void;
   onSectionRemoved: (key: string) => void;
   /** afterKey is the key of the section after which the new one is inserted */
-  onSectionAdded: (key: string, label: string, content: string, afterKey?: string, formatType?: string) => void;
+  onSectionAdded: (
+    key: string,
+    label: string,
+    content: string,
+    afterKey?: string,
+    formatType?: string
+  ) => void;
   /** Called after drag-end with the new ordered list of section keys */
   onSectionsReordered: (newOrder: string[]) => void;
   /** Template type for format rules */
@@ -118,14 +124,9 @@ function SortableProposalSection({
   onAddAfter,
 }: SortableSectionProps): JSX.Element {
   const isStatic = section.isStatic || false;
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: section.key });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: section.key,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -156,9 +157,7 @@ function SortableProposalSection({
           </span>
         )}
 
-        <span
-          className={`proposal-sidebar-dot ${section.hasContent ? "has-content" : "empty"}`}
-        />
+        <span className={`proposal-sidebar-dot ${section.hasContent ? "has-content" : "empty"}`} />
 
         {isRenaming ? (
           <input
@@ -184,14 +183,20 @@ function SortableProposalSection({
             <button
               className="proposal-sidebar-icon-btn"
               title="Save rename"
-              onClick={(e) => { e.stopPropagation(); onSaveRename(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSaveRename();
+              }}
             >
               <Check size={11} />
             </button>
             <button
               className="proposal-sidebar-icon-btn"
               title="Cancel rename"
-              onClick={(e) => { e.stopPropagation(); onCancelRename(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelRename();
+              }}
             >
               <X size={11} />
             </button>
@@ -258,7 +263,9 @@ export default function ProposalSidebar({
 
   useEffect(() => {
     if (!listRef.current) return;
-    const activeItem = listRef.current.querySelector<HTMLElement>(".proposal-sidebar-section-row.active");
+    const activeItem = listRef.current.querySelector<HTMLElement>(
+      ".proposal-sidebar-section-row.active"
+    );
     if (activeItem) {
       activeItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -281,9 +288,7 @@ export default function ProposalSidebar({
 
       // No new sections — preserve drag order; update metadata & drop removals
       const currentKeySet = new Set(sections.map((s) => s.key));
-      return prev
-        .filter((s) => currentKeySet.has(s.key))
-        .map((s) => sectionMap.get(s.key) ?? s);
+      return prev.filter((s) => currentKeySet.has(s.key)).map((s) => sectionMap.get(s.key) ?? s);
     });
   }, [sections]);
 
@@ -325,7 +330,7 @@ export default function ProposalSidebar({
 
   async function handleRemoveSection(key: string): Promise<void> {
     // Prevent removal of static sections
-    if (STATIC_SECTION_KEYS.includes(key as any)) {
+    if ((STATIC_SECTION_KEYS as readonly string[]).includes(key)) {
       toast.error("Not allowed on static sections");
       return;
     }
@@ -367,10 +372,10 @@ export default function ProposalSidebar({
       setIsGenerating(true);
       try {
         toast.info(MESSAGES.PROPOSAL_SECTION_GENERATING);
-        
+
         // Generate format rules based on template type and section name
         const formatRules = generateFormatRules(templateType, name, instructions);
-        
+
         const result = await addProposalSection(proposalId, {
           key,
           label: name,
@@ -383,9 +388,7 @@ export default function ProposalSidebar({
         toast.success(MESSAGES.PROPOSAL_SECTION_ADDED(name));
       } catch (error) {
         const message =
-          error instanceof Error
-            ? error.message
-            : MESSAGES.PROPOSAL_SECTION_ADD_FAILED;
+          error instanceof Error ? error.message : MESSAGES.PROPOSAL_SECTION_ADD_FAILED;
         toast.error(message);
       } finally {
         setIsGenerating(false);
@@ -409,8 +412,9 @@ export default function ProposalSidebar({
     const newKeys = newOrder.map((s) => s.key);
     onSectionsReordered(newKeys);
 
-    reorderProposalSections(proposalId, { order: newKeys })
-      .catch(() => toast.error(MESSAGES.PROPOSAL_SECTIONS_REORDER_FAILED));
+    reorderProposalSections(proposalId, { order: newKeys }).catch(() =>
+      toast.error(MESSAGES.PROPOSAL_SECTIONS_REORDER_FAILED)
+    );
   }
 
   // ── Derived helpers ───────────────────────────────────────────────────────

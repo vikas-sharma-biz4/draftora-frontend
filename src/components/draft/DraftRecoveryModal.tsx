@@ -1,6 +1,7 @@
 import React from "react";
 import { X, Clock, FileText } from "lucide-react";
 import type { DraftMetadata } from "@/interfaces/draftInterfaces";
+import { formatRelativeTime } from "@/utils/formatters";
 import styles from "./DraftRecoveryModal.module.scss";
 
 interface DraftRecoveryModalProps {
@@ -21,29 +22,6 @@ export function DraftRecoveryModal({
   if (!isOpen) {
     return null;
   }
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) {
-      return "Just now";
-    }
-    if (diffMins < 60) {
-      return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`;
-    }
-    if (diffHours < 24) {
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    }
-    if (diffDays < 7) {
-      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-    }
-    return date.toLocaleDateString();
-  };
 
   const getLocationLabel = (location: DraftMetadata["lastLocation"]): string => {
     switch (location) {
@@ -89,8 +67,8 @@ export function DraftRecoveryModal({
 
         <div className={styles.content}>
           <p className={styles.description}>
-            We found {drafts.length} unsaved draft{drafts.length > 1 ? "s" : ""}.
-            Would you like to continue where you left off?
+            We found {drafts.length} unsaved draft{drafts.length > 1 ? "s" : ""}. Would you like to
+            continue where you left off?
           </p>
 
           <div className={styles.draftList}>
@@ -103,15 +81,13 @@ export function DraftRecoveryModal({
                   <h3 className={styles.draftTitle}>{draft.title}</h3>
                   <p className={styles.draftClient}>{draft.clientName}</p>
                   <div className={styles.draftMeta}>
-                    <span className={styles.location}>
-                      {getLocationLabel(draft.lastLocation)}
-                    </span>
+                    <span className={styles.location}>{getLocationLabel(draft.lastLocation)}</span>
                     <span className={styles.separator}></span>
                     {getStatusBadge(draft.status)}
                   </div>
                   <div className={styles.draftTime}>
                     <Clock size={14} />
-                    <span>{formatDate(draft.updatedAt)}</span>
+                    <span>{formatRelativeTime(draft.updatedAt)}</span>
                   </div>
                 </div>
                 <button
@@ -126,11 +102,7 @@ export function DraftRecoveryModal({
           </div>
 
           <div className={styles.actions}>
-            <button
-              onClick={onDismiss}
-              className={styles.dismissButton}
-              disabled={isRecovering}
-            >
+            <button onClick={onDismiss} className={styles.dismissButton} disabled={isRecovering}>
               Start Fresh
             </button>
           </div>

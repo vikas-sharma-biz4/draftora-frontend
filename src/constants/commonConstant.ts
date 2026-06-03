@@ -43,9 +43,21 @@ export const TONE_OPTIONS = [
 ] as const;
 
 export const LENGTH_OPTIONS = [
-  { value: "concise", label: "Concise", description: "150–250 words per section. Sharp and to the point." },
-  { value: "balanced", label: "Balanced", description: "300–450 words per section. Comprehensive yet readable." },
-  { value: "comprehensive", label: "Comprehensive", description: "500–700 words per section. Full depth and detail." },
+  {
+    value: "concise",
+    label: "Concise",
+    description: "150–250 words per section. Sharp and to the point.",
+  },
+  {
+    value: "balanced",
+    label: "Balanced",
+    description: "300–450 words per section. Comprehensive yet readable.",
+  },
+  {
+    value: "comprehensive",
+    label: "Comprehensive",
+    description: "500–700 words per section. Full depth and detail.",
+  },
 ] as const;
 
 export const SECTION_OPTIONS = [
@@ -169,7 +181,6 @@ export const PROPOSAL_TEMPLATES = [
       "introduction",
       "purpose",
       "high_level_scope",
-      "key_goals_of_poc",
       "poc_feature_list",
       "proposed_technology_stack",
       "poc_milestone_timeline",
@@ -346,19 +357,22 @@ export const SPECIAL_CARDS = {
   START_FROM_SCRATCH: {
     id: "start-from-scratch",
     name: "Start From Scratch",
-    description: "Build your proposal from the ground up with AI-powered section suggestions tailored to your project needs.",
+    description:
+      "Build your proposal from the ground up with AI-powered section suggestions tailored to your project needs.",
     icon: "✎",
   },
   CUSTOM_TEMPLATE: {
     id: "custom-template",
     name: "Custom Template",
-    description: "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
+    description:
+      "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
     icon: "⇪",
   },
   RECREATE_TEMPLATE: {
     id: "recreate-template",
     name: "Recreate Template",
-    description: "Upload an existing document and rewrite it with new context while preserving the original structure.",
+    description:
+      "Upload an existing document and rewrite it with new context while preserving the original structure.",
     icon: "↺",
   },
 } as const;
@@ -384,11 +398,7 @@ export const PIPELINE_STAGES = [
   "Closed Lost",
 ] as const;
 
-export const CLIENT_TIERS = [
-  "Enterprise",
-  "Mid-Market",
-  "Small Business",
-] as const;
+export const CLIENT_TIERS = ["Enterprise", "Mid-Market", "Small Business"] as const;
 
 // ── Template TOCs (Table of Contents) ───────────────────────────────────────────
 // Maps template types to their predefined section structures
@@ -422,11 +432,10 @@ export const TEMPLATE_TOCS = {
   poc: [
     { key: "introduction", label: "Introduction" },
     { key: "purpose", label: "Purpose" },
-    { key: "high_level_scope", label: "High-Level Scope" },
-    { key: "key_goals_of_poc", label: "Key Goals of POC" },
-    { key: "poc_feature_list", label: "POC Feature List" },
+    { key: "high_level_scope", label: "High Level Scope" },
+    { key: "poc_feature_list", label: "Feature List" },
     { key: "proposed_technology_stack", label: "Proposed Technology Stack" },
-    { key: "poc_milestone_timeline", label: "POC Milestone Timeline" },
+    { key: "poc_milestone_timeline", label: "Milestone Timeline" },
     { key: "client_dependencies", label: "Client Dependencies" },
     { key: "future_vision", label: "Future Vision" },
     { key: "our_approach_methodology", label: "Our Approach & Methodology" },
@@ -435,8 +444,8 @@ export const TEMPLATE_TOCS = {
 
 // ── Breakpoints (must match SCSS $bp-* in _variables.scss) ────────────────────
 export const BREAKPOINTS = {
-  mobile:  640,
-  tablet:  1024,
+  mobile: 640,
+  tablet: 1024,
   desktop: 1280,
-  wide:    1536,
+  wide: 1536,
 } as const;

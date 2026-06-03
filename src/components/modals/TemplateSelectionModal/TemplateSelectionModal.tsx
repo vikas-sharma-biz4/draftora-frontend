@@ -53,6 +53,7 @@ import {
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
+import type { ProposalWizardData } from "@/interfaces/proposalInterfaces";
 import { formatDate } from "@/utils/dateUtils";
 
 interface TemplateSelectionModalProps {
@@ -121,7 +122,7 @@ export default function TemplateSelectionModal({
     customSections: [],
     contextualInstructions: "",
     webReferences: [],
-  } as any;
+  } as ProposalWizardData;
 
   const draftStage = useDraftSessionStore((state) => state.draftStage);
   const setDraftStage = useDraftSessionStore((state) => state.setDraftStage);

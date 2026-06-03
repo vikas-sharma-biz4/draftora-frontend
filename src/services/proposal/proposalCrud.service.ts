@@ -8,6 +8,7 @@ import { DEFAULT_AI_MODEL } from "@/config/config";
 import { http, buildUrl, HttpError } from "@/config/httpClient";
 import type {
   ProposalData,
+  ProposalWizardData,
   ProposalListItem,
   ToneOption,
   LengthOption,
@@ -34,8 +35,22 @@ function parseLengthOption(raw: string): LengthOption {
 }
 
 function parseTemplateType(raw: string | null): TemplateType {
-  const valid: TemplateType[] = ["predefined", "custom", "scratch", "recreate"];
+  const valid: TemplateType[] = [
+    "predefined",
+    "custom",
+    "scratch",
+    "recreate",
+    "mvp",
+    "poc",
+    "design",
+    "brd",
+    "frd",
+    "srs",
+    "architecture",
+    "sow",
+  ];
   if (raw && (valid as string[]).includes(raw)) return raw as TemplateType;
+  logger.warn(`[proposalCrud] Unknown TemplateType "${raw}" — defaulting to "scratch"`);
   return "scratch";
 }
 
@@ -45,7 +60,7 @@ interface CreateProposalResponse {
   jobId?: string | null;
 }
 
-export async function generateProposal(data: ProposalData): Promise<CreateProposalResponse> {
+export async function generateProposal(data: ProposalWizardData): Promise<CreateProposalResponse> {
   logger.info(
     "[generateProposal] Starting proposal generation request at",
     new Date().toISOString()
@@ -252,7 +267,6 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
     contextualInstructions: d.contextual_instructions ?? "",
     webReferences: d.web_references ?? [],
     selectedDocumentIds: d.selected_document_ids ?? [],
-    files: [],
     filesMeta: [],
     templateId: null,
     templateType: parseTemplateType(d.template_type),
@@ -326,6 +340,7 @@ interface ProposalListApiItem {
 export interface ListProposalsParams {
   limit?: number;
   offset?: number;
+  page?: number;
 }
 
 function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
@@ -346,24 +361,24 @@ function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
 }
 
 export async function listProposals(params?: ListProposalsParams): Promise<ProposalListItem[]> {
-  // If explicit limit/offset params are passed, use them directly (legacy behaviour)
-  if (params?.limit !== undefined || params?.offset !== undefined) {
+  // Legacy: offset-based pagination path (kept for backward compatibility)
+  if (params?.offset !== undefined) {
     const queryParams = new URLSearchParams();
     if (params.limit) queryParams.set("per_page", String(params.limit));
-    if (params.offset)
-      queryParams.set("page", String(Math.floor((params.offset ?? 0) / (params.limit ?? 10)) + 1));
-    const url = `/proposals?${queryParams.toString()}`;
-    const raw = await http.get<ProposalListApiItem[]>(url, { cache: "no-store" });
+    queryParams.set("page", String(Math.floor((params.offset ?? 0) / (params.limit ?? 10)) + 1));
+    const raw = await http.get<ProposalListApiItem[]>(`/proposals?${queryParams.toString()}`, {
+      cache: "no-store",
+    });
     return raw.map(mapProposalListItem);
   }
 
-  // Fetch only the first page (100 items max) to avoid multiple sequential API calls.
-  // This is optimized for performance - if you need all proposals, use pagination params.
-  const PER_PAGE = 100;
-  const items = await http.get<ProposalListApiItem[]>(`/proposals?page=1&per_page=${PER_PAGE}`, {
-    cache: "no-store",
-  });
-
+  // Page-based pagination: page + limit params (used by proposalSlice for infinite scroll)
+  const page = params?.page ?? 1;
+  const perPage = params?.limit ?? 100;
+  const items = await http.get<ProposalListApiItem[]>(
+    `/proposals?page=${page}&per_page=${perPage}`,
+    { cache: "no-store" }
+  );
   return items.map(mapProposalListItem);
 }
 

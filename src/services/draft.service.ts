@@ -1,22 +1,33 @@
-import { http } from "@/config/httpClient";
-import type { SavedDraft, SaveDraftPayload, DraftMetadata, DraftStage, DraftLocation } from "@/interfaces/draftInterfaces";
+import { http, HttpError } from "@/config/httpClient";
+import type {
+  SavedDraft,
+  SaveDraftPayload,
+  DraftMetadata,
+  DraftStage,
+  DraftLocation,
+} from "@/interfaces/draftInterfaces";
 import { logger } from "@/utils/logger";
 
 // ─── Runtime Validation ─────────────────────────────────────────────────────
 
 const VALID_STAGES: DraftStage[] = [
-  "template_selection", "wizard_in_progress", "parameters_complete", "review_complete", "generated",
+  "template_selection",
+  "wizard_in_progress",
+  "parameters_complete",
+  "review_complete",
+  "generated",
 ];
 
 const VALID_LOCATIONS: DraftLocation[] = [
-  "wizard_parameters", "wizard_review", "web_view", "ai_sections",
+  "wizard_parameters",
+  "wizard_review",
+  "web_view",
+  "ai_sections",
 ];
 
-const VALID_STATUSES = [
-  "draft", "generating", "completed", "pending_approval",
-] as const;
+const VALID_STATUSES = ["draft", "generating", "completed", "pending_approval"] as const;
 
-type DraftStatus = typeof VALID_STATUSES[number];
+type DraftStatus = (typeof VALID_STATUSES)[number];
 
 function parseDraftStage(raw: string): DraftStage {
   if ((VALID_STAGES as readonly string[]).includes(raw)) return raw as DraftStage;
@@ -47,14 +58,14 @@ function camelToSnakeCase(obj: unknown): unknown {
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(item => camelToSnakeCase(item));
+    return obj.map((item) => camelToSnakeCase(item));
   }
 
-  if (typeof obj === 'object' && obj !== null) {
+  if (typeof obj === "object" && obj !== null) {
     const result: Record<string, unknown> = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
         result[snakeKey] = camelToSnakeCase((obj as Record<string, unknown>)[key]);
       }
     }
@@ -164,7 +175,7 @@ function mapSavedDraft(data: RawSavedDraft): SavedDraft {
 // ─── API Functions ───────────────────────────────────────────────────────────
 
 export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> {
-  logger.info('[draft.service] Saving draft to backend', {
+  logger.info("[draft.service] Saving draft to backend", {
     proposalId: payload.proposalId,
     title: payload.title,
     clientName: payload.clientName,
@@ -172,7 +183,9 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     lastLocation: payload.lastLocation,
     // Log wizardState structure
     wizardStateKeys: Object.keys(payload.wizardState),
-    proposalDataKeys: payload.wizardState.proposalData ? Object.keys(payload.wizardState.proposalData) : [],
+    proposalDataKeys: payload.wizardState.proposalData
+      ? Object.keys(payload.wizardState.proposalData)
+      : [],
     selectedSections: payload.wizardState.proposalData?.selectedSections,
     filesMeta: payload.wizardState.proposalData?.filesMeta,
     selectedDocumentIds: payload.wizardState.proposalData?.selectedDocumentIds,
@@ -180,7 +193,7 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     sectionDisplayNames: payload.wizardState.proposalData?.sectionDisplayNames,
   });
 
-  const data = await http.post<RawSavedDraft>("/drafts/", {
+  const data = await http.post<RawSavedDraft>("/drafts", {
     proposal_id: payload.proposalId,
     title: payload.title,
     client_name: payload.clientName,
@@ -193,10 +206,12 @@ export async function saveDraft(payload: SaveDraftPayload): Promise<SavedDraft> 
     ...(payload.hasEdits !== undefined && { has_edits: payload.hasEdits }),
   });
 
-  logger.info('[draft.service] Draft saved successfully', {
+  logger.info("[draft.service] Draft saved successfully", {
     draftId: data.id,
     responseWizardStateKeys: Object.keys(data.wizard_state),
-    responseProposalDataKeys: data.wizard_state.proposalData ? Object.keys(data.wizard_state.proposalData) : [],
+    responseProposalDataKeys: data.wizard_state.proposalData
+      ? Object.keys(data.wizard_state.proposalData)
+      : [],
     responseSelectedSections: data.wizard_state.proposalData?.selectedSections,
     responseFilesMeta: data.wizard_state.proposalData?.filesMeta,
     responseSelectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
@@ -230,10 +245,12 @@ export async function updateDraft(
 export async function getDraft(draftId: string): Promise<SavedDraft> {
   const data = await http.get<RawSavedDraft>(`/drafts/${draftId}`, { cache: "no-store" });
 
-  logger.info('[draft.service] Draft fetched successfully', {
+  logger.info("[draft.service] Draft fetched successfully", {
     draftId: data.id,
     responseWizardStateKeys: Object.keys(data.wizard_state),
-    responseProposalDataKeys: data.wizard_state.proposalData ? Object.keys(data.wizard_state.proposalData) : [],
+    responseProposalDataKeys: data.wizard_state.proposalData
+      ? Object.keys(data.wizard_state.proposalData)
+      : [],
     responseSelectedSections: data.wizard_state.proposalData?.selectedSections,
     responseFilesMeta: data.wizard_state.proposalData?.filesMeta,
     responseSelectedDocumentIds: data.wizard_state.proposalData?.selectedDocumentIds,
@@ -254,14 +271,17 @@ export async function listDrafts(params?: ListDraftsParams): Promise<DraftMetada
   if (params?.limit) queryParams.set("limit", String(params.limit));
   if (params?.offset) queryParams.set("offset", String(params.offset));
   const qs = queryParams.toString();
-  const url = `/drafts/${qs ? `?${qs}` : ""}`;
+  const url = `/drafts${qs ? `?${qs}` : ""}`;
 
-  const response = await http.get<{ drafts: RawDraftListItem[] } | unknown>(url, { cache: "no-store" });
+  const response = await http.get<{ drafts: RawDraftListItem[] } | unknown>(url, {
+    cache: "no-store",
+  });
 
   // Extract drafts array from response envelope
-  const data = typeof response === 'object' && response !== null && 'drafts' in response
-    ? (response as { drafts: RawDraftListItem[] }).drafts
-    : [];
+  const data =
+    typeof response === "object" && response !== null && "drafts" in response
+      ? (response as { drafts: RawDraftListItem[] }).drafts
+      : [];
 
   // Defensive check: ensure data is an array before mapping
   if (!Array.isArray(data)) {
@@ -293,13 +313,14 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
   try {
     const response = await http.get<{ drafts: RawDraftListItem[] } | unknown>(
       `/drafts?proposal_id=${proposalId}`,
-      { cache: "no-store" },
+      { cache: "no-store" }
     );
 
     // Extract drafts array from response envelope
-    const data = typeof response === 'object' && response !== null && 'drafts' in response
-      ? (response as { drafts: RawDraftListItem[] }).drafts
-      : [];
+    const data =
+      typeof response === "object" && response !== null && "drafts" in response
+        ? (response as { drafts: RawDraftListItem[] }).drafts
+        : [];
 
     // Defensive check: ensure data is an array before accessing
     if (!Array.isArray(data)) {
@@ -325,7 +346,7 @@ export async function getDraftByProposalId(proposalId: number): Promise<DraftMet
     };
   } catch (error: unknown) {
     // 404 means "no draft exists yet" — not a fatal error
-    if (error instanceof Error && "statusCode" in error && (error as any).statusCode === 404) {
+    if (error instanceof HttpError && error.statusCode === 404) {
       logger.info("[draft.service] No draft found for proposal_id=%d (404)", proposalId);
       return null;
     }
@@ -340,5 +361,5 @@ export async function deleteDraft(draftId: string): Promise<void> {
 }
 
 export async function deleteAllDrafts(): Promise<void> {
-  await http.delete<null>("/drafts/");
+  await http.delete<null>("/drafts?confirm=delete-all");
 }

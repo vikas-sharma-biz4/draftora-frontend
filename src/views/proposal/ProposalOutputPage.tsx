@@ -404,7 +404,7 @@ export default function ProposalOutputPage(): JSX.Element {
 
   function handleSectionRemoved(key: string): void {
     // Prevent removal of static sections
-    if (STATIC_SECTION_KEYS.includes(key as any)) {
+    if ((STATIC_SECTION_KEYS as readonly string[]).includes(key)) {
       toast.error("Not allowed on static sections");
       return;
     }
@@ -560,7 +560,7 @@ export default function ProposalOutputPage(): JSX.Element {
     key,
     label: resolveSectionLabel(key, displayNames),
     hasContent: Boolean(proposal?.sections?.[key]),
-    isStatic: STATIC_SECTION_KEYS.includes(key as any),
+    isStatic: (STATIC_SECTION_KEYS as readonly string[]).includes(key),
   }));
 
   // Show loading state while fetching

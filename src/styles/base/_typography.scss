@@ -1,17 +1,43 @@
 // ─── Page-level headings ─────────────────────────────────────────────────────
+// Shared across PageHeader, ReviewPage, ParametersPage, HomePage, etc.
+// Previously duplicated in _page-header.scss (now removed).
 .page-title {
-  font-size: clamp(1.25rem, 2vw, 1.5rem);
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 800;
   color: var(--color-text);
-  letter-spacing: -0.02em;
-  line-height: 1.3;
+  letter-spacing: -0.8px;
+  margin-bottom: 8px;
+  line-height: 1.15;
 }
 
 .page-subtitle {
-  font-size: 0.9rem;
+  font-size: 14px;
   color: var(--color-text-muted);
+  margin-bottom: 14px;
+  max-width: 620px;
   line-height: 1.6;
-  margin-top: 0.25rem;
+}
+
+// ─── Page badge ───────────────────────────────────────────────────────────────
+// Phase label used on wizard pages (e.g. "Phase 01").
+.page-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 24px;
+  }
 }
 
 // ─── Section headings ────────────────────────────────────────────────────────
