@@ -5,9 +5,9 @@
  * and connection lifecycle management.
  */
 
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { useProposalGenerationStream } from '../useProposalGenerationStream';
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { useProposalGenerationStream } from "../useProposalGenerationStream";
 
 // Mock EventSource
 class MockEventSource {
@@ -18,27 +18,27 @@ class MockEventSource {
   onerror: ((event: Event) => void) | null = null;
 
   constructor(url: string | URL) {
-    this.url = typeof url === 'string' ? url : url.toString();
+    this.url = typeof url === "string" ? url : url.toString();
     this.readyState = 0; // CONNECTING
   }
 
   connect() {
     this.readyState = 1; // OPEN
     if (this.onopen) {
-      this.onopen(new Event('open'));
+      this.onopen(new Event("open"));
     }
   }
 
   emitMessage(data: string) {
     if (this.onmessage) {
-      this.onmessage(new MessageEvent('message', { data }));
+      this.onmessage(new MessageEvent("message", { data }));
     }
   }
 
   emitError() {
     this.readyState = 2; // CLOSED
     if (this.onerror) {
-      this.onerror(new Event('error'));
+      this.onerror(new Event("error"));
     }
   }
 
@@ -50,13 +50,13 @@ class MockEventSource {
 // Mock global EventSource
 (global as any).EventSource = MockEventSource;
 
-describe('useProposalGenerationStream', () => {
+describe("useProposalGenerationStream", () => {
   let mockEventSource: MockEventSource;
 
   beforeEach(() => {
-    mockEventSource = new MockEventSource('http://test.com/proposals/123/stream');
-    jest.spyOn(window, 'EventSource').mockImplementation((url: string | URL) => {
-      mockEventSource.url = typeof url === 'string' ? url : url.toString();
+    mockEventSource = new MockEventSource("http://test.com/proposals/123/stream");
+    jest.spyOn(window, "EventSource").mockImplementation((url: string | URL) => {
+      mockEventSource.url = typeof url === "string" ? url : url.toString();
       return mockEventSource as any;
     });
   });
@@ -65,7 +65,7 @@ describe('useProposalGenerationStream', () => {
     jest.restoreAllMocks();
   });
 
-  it('should connect to SSE endpoint when enabled', async () => {
+  it("should connect to SSE endpoint when enabled", async () => {
     const onConnected = jest.fn();
     const onProgress = jest.fn();
 
@@ -78,9 +78,12 @@ describe('useProposalGenerationStream', () => {
       })
     );
 
-    // Simulate connection
+    // Simulate connection + "connected" event (isConnected/onConnected fire on message, not onopen)
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
@@ -90,7 +93,7 @@ describe('useProposalGenerationStream', () => {
     expect(result.current.isConnected).toBe(true);
   });
 
-  it('should not connect when disabled', () => {
+  it("should not connect when disabled", () => {
     const onConnected = jest.fn();
 
     renderHook(() =>
@@ -104,7 +107,7 @@ describe('useProposalGenerationStream', () => {
     expect(onConnected).not.toHaveBeenCalled();
   });
 
-  it('should parse and handle stage_changed events', async () => {
+  it("should parse and handle stage_changed events", async () => {
     const onStageChanged = jest.fn();
 
     renderHook(() =>
@@ -124,9 +127,9 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'stage_changed',
-      data: { stage: 'generating' },
-      message: 'AI generation in progress',
+      type: "stage_changed",
+      data: { stage: "generating" },
+      message: "AI generation in progress",
       timestamp: new Date().toISOString(),
     });
 
@@ -135,11 +138,11 @@ describe('useProposalGenerationStream', () => {
     });
 
     await waitFor(() => {
-      expect(onStageChanged).toHaveBeenCalledWith('generating');
+      expect(onStageChanged).toHaveBeenCalledWith("generating");
     });
   });
 
-  it('should parse and handle section_started events', async () => {
+  it("should parse and handle section_started events", async () => {
     const onSectionStarted = jest.fn();
 
     renderHook(() =>
@@ -159,8 +162,8 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'section_started',
-      data: { section: 'Executive Summary' },
+      type: "section_started",
+      data: { section: "Executive Summary" },
       timestamp: new Date().toISOString(),
     });
 
@@ -169,11 +172,11 @@ describe('useProposalGenerationStream', () => {
     });
 
     await waitFor(() => {
-      expect(onSectionStarted).toHaveBeenCalledWith('Executive Summary');
+      expect(onSectionStarted).toHaveBeenCalledWith("Executive Summary");
     });
   });
 
-  it('should parse and handle section_completed events', async () => {
+  it("should parse and handle section_completed events", async () => {
     const onSectionCompleted = jest.fn();
 
     renderHook(() =>
@@ -193,8 +196,8 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'section_completed',
-      data: { section: 'Executive Summary', completed: 3, total: 12 },
+      type: "section_completed",
+      data: { section: "Executive Summary", completed: 3, total: 12 },
       timestamp: new Date().toISOString(),
     });
 
@@ -203,11 +206,11 @@ describe('useProposalGenerationStream', () => {
     });
 
     await waitFor(() => {
-      expect(onSectionCompleted).toHaveBeenCalledWith('Executive Summary', 3, 12);
+      expect(onSectionCompleted).toHaveBeenCalledWith("Executive Summary", 3, 12);
     });
   });
 
-  it('should parse and handle progress events', async () => {
+  it("should parse and handle progress events", async () => {
     const onProgress = jest.fn();
 
     renderHook(() =>
@@ -227,7 +230,7 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'progress',
+      type: "progress",
       data: { percent: 50 },
       timestamp: new Date().toISOString(),
     });
@@ -241,7 +244,7 @@ describe('useProposalGenerationStream', () => {
     });
   });
 
-  it('should handle completed event', async () => {
+  it("should handle completed event", async () => {
     const onCompleted = jest.fn();
 
     renderHook(() =>
@@ -261,7 +264,7 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'completed',
+      type: "completed",
       timestamp: new Date().toISOString(),
     });
 
@@ -274,7 +277,7 @@ describe('useProposalGenerationStream', () => {
     });
   });
 
-  it('should handle failed event', async () => {
+  it("should handle failed event", async () => {
     const onFailed = jest.fn();
 
     renderHook(() =>
@@ -294,8 +297,8 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'failed',
-      message: 'Generation failed: AI timeout',
+      type: "failed",
+      message: "Generation failed: AI timeout",
       timestamp: new Date().toISOString(),
     });
 
@@ -304,11 +307,11 @@ describe('useProposalGenerationStream', () => {
     });
 
     await waitFor(() => {
-      expect(onFailed).toHaveBeenCalledWith('Generation failed: AI timeout');
+      expect(onFailed).toHaveBeenCalledWith("Generation failed: AI timeout");
     });
   });
 
-  it('should handle cancelled event', async () => {
+  it("should handle cancelled event", async () => {
     const onCancelled = jest.fn();
 
     renderHook(() =>
@@ -328,7 +331,7 @@ describe('useProposalGenerationStream', () => {
     });
 
     const event = JSON.stringify({
-      type: 'cancelled',
+      type: "cancelled",
       timestamp: new Date().toISOString(),
     });
 
@@ -341,7 +344,7 @@ describe('useProposalGenerationStream', () => {
     });
   });
 
-  it('should handle connection errors', async () => {
+  it("should handle connection errors", async () => {
     const onError = jest.fn();
 
     const { result } = renderHook(() =>
@@ -370,7 +373,7 @@ describe('useProposalGenerationStream', () => {
     });
   });
 
-  it('should disconnect when disconnect function is called', async () => {
+  it("should disconnect when disconnect function is called", async () => {
     const { result } = renderHook(() =>
       useProposalGenerationStream({
         proposalId: 123,
@@ -380,6 +383,9 @@ describe('useProposalGenerationStream', () => {
 
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
@@ -393,7 +399,7 @@ describe('useProposalGenerationStream', () => {
     expect(mockEventSource.readyState).toBe(2); // CLOSED
   });
 
-  it('should cleanup on unmount', async () => {
+  it("should cleanup on unmount", async () => {
     const { unmount } = renderHook(() =>
       useProposalGenerationStream({
         proposalId: 123,
@@ -409,7 +415,7 @@ describe('useProposalGenerationStream', () => {
       expect(mockEventSource.readyState).toBe(1);
     });
 
-    const closeSpy = jest.spyOn(mockEventSource, 'close');
+    const closeSpy = jest.spyOn(mockEventSource, "close");
 
     act(() => {
       unmount();
@@ -418,7 +424,7 @@ describe('useProposalGenerationStream', () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
-  it('should handle heartbeat events', async () => {
+  it("should handle heartbeat events", async () => {
     const { result } = renderHook(() =>
       useProposalGenerationStream({
         proposalId: 123,
@@ -426,16 +432,20 @@ describe('useProposalGenerationStream', () => {
       })
     );
 
+    // Emit "connected" so isConnected becomes true (set on message, not onopen)
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
-      expect(mockEventSource.readyState).toBe(1);
+      expect(result.current.isConnected).toBe(true);
     });
 
     const event = JSON.stringify({
-      type: 'heartbeat',
+      type: "heartbeat",
       timestamp: new Date().toISOString(),
     });
 
@@ -447,7 +457,7 @@ describe('useProposalGenerationStream', () => {
     expect(result.current.isConnected).toBe(true);
   });
 
-  it('should track reconnect count', async () => {
+  it("should track reconnect count", async () => {
     const onError = jest.fn();
 
     const { result } = renderHook(() =>
@@ -458,27 +468,29 @@ describe('useProposalGenerationStream', () => {
       })
     );
 
+    // Must emit "connected" first — onerror only retries when hasReceivedConnectedEvent=true
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
-      expect(mockEventSource.readyState).toBe(1);
+      expect(result.current.isConnected).toBe(true);
     });
 
-    // Trigger multiple errors to test reconnection
-    for (let i = 0; i < 3; i++) {
-      act(() => {
-        mockEventSource.emitError();
-      });
-    }
+    // Trigger error to test reconnection
+    act(() => {
+      mockEventSource.emitError();
+    });
 
     await waitFor(() => {
       expect(result.current.reconnectCount).toBeGreaterThan(0);
     });
   });
 
-  it('should parse malformed events gracefully', async () => {
+  it("should parse malformed events gracefully", async () => {
     const { result } = renderHook(() =>
       useProposalGenerationStream({
         proposalId: 123,
@@ -486,24 +498,28 @@ describe('useProposalGenerationStream', () => {
       })
     );
 
+    // Emit "connected" so isConnected becomes true before testing resilience
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
-      expect(mockEventSource.readyState).toBe(1);
+      expect(result.current.isConnected).toBe(true);
     });
 
     // Send malformed JSON
     act(() => {
-      mockEventSource.emitMessage('invalid json');
+      mockEventSource.emitMessage("invalid json");
     });
 
     // Should not throw error
     expect(result.current.isConnected).toBe(true);
   });
 
-  it('should handle unknown event types', async () => {
+  it("should handle unknown event types", async () => {
     const { result } = renderHook(() =>
       useProposalGenerationStream({
         proposalId: 123,
@@ -511,16 +527,20 @@ describe('useProposalGenerationStream', () => {
       })
     );
 
+    // Emit "connected" so isConnected becomes true before testing unknown events
     act(() => {
       mockEventSource.connect();
+      mockEventSource.emitMessage(
+        JSON.stringify({ type: "connected", timestamp: new Date().toISOString() })
+      );
     });
 
     await waitFor(() => {
-      expect(mockEventSource.readyState).toBe(1);
+      expect(result.current.isConnected).toBe(true);
     });
 
     const event = JSON.stringify({
-      type: 'unknown_event',
+      type: "unknown_event",
       timestamp: new Date().toISOString(),
     });
 

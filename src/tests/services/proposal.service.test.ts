@@ -218,7 +218,7 @@ describe("updateSection", () => {
     mockFetch({ success: true, data: null });
     await updateSection(1, "executive_summary", "New content");
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/proposals/1/sections/executive_summary/"),
+      expect.stringContaining("/proposals/1/sections/executive_summary"),
       expect.objectContaining({
         method: "PUT",
         body: JSON.stringify({ content: "New content" }),
@@ -334,7 +334,7 @@ describe("addProposalSection", () => {
       label: "New Section",
     });
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/proposals/1/sections/"),
+      expect.stringContaining("/proposals/1/sections"),
       expect.objectContaining({ method: "POST" })
     );
   });
@@ -345,7 +345,7 @@ describe("removeProposalSection", () => {
     mockFetch({ success: true, data: null });
     await removeProposalSection(1, "intro");
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/proposals/1/sections/intro/"),
+      expect.stringContaining("/proposals/1/sections/intro"),
       expect.objectContaining({ method: "DELETE" })
     );
   });
