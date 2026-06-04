@@ -16,6 +16,7 @@ import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 
 import styles from "../EditModal.module.scss";
+import DocumentViewerModal from "@/components/modals/DocumentViewerModal";
 import { getDocumentViewUrl } from "@/services/client.service";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
@@ -54,6 +55,11 @@ export default function KnowledgeBaseSelectorModal({
   const [mounted, setMounted] = useState<boolean>(false);
   const [selected, setSelected] = useState<Set<string>>(new Set(selectedDocumentIds));
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
+  const [viewingDocModal, setViewingDocModal] = useState<{
+    url: string;
+    fileName: string;
+    fileType: string;
+  } | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<
     {
       file: File;
@@ -486,7 +492,8 @@ export default function KnowledgeBaseSelectorModal({
     try {
       setViewingDocId(doc.id);
       const viewUrl = await getDocumentViewUrl(clientId, Number(doc.id));
-      window.open(viewUrl, "_blank", "noopener,noreferrer");
+      setViewingDocId(null);
+      setViewingDocModal({ url: viewUrl, fileName: doc.name, fileType: doc.fileType });
     } catch {
       // silently ignore
     } finally {
@@ -509,208 +516,227 @@ export default function KnowledgeBaseSelectorModal({
 
   if (!mounted) return null;
 
-  return createPortal(
-    <div className={styles.modalOverlay}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <div>
-            <h2 className={styles.modalTitle}>Select Knowledge Base Documents</h2>
-            <p className={styles.modalSubtitle}>
-              Choose documents to include as context for this proposal
-            </p>
-          </div>
-          <button className={styles.closeButton} onClick={onClose} aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Upload section — always visible, outside the scrollable document list */}
-        <div className={styles.uploadSection}>
-          {clientNotFound && (
-            <div className={styles.clientNotFoundBanner}>
-              <AlertCircle size={16} />
-              <span>
-                This client no longer exists in the system. Uploads are disabled. To add new
-                documents, update the client details first.
-              </span>
-            </div>
-          )}
-          <label
-            htmlFor="kb-file-upload"
-            className={`${styles.uploadZone} ${isDragOver && !clientNotFound ? styles.dragOver : ""} ${clientNotFound ? styles.uploadZoneDisabled : ""}`}
-            onDragOver={!clientNotFound ? handleDragOver : undefined}
-            onDragEnter={!clientNotFound ? handleDragEnter : undefined}
-            onDragLeave={!clientNotFound ? handleDragLeave : undefined}
-            onDrop={!clientNotFound ? handleDrop : undefined}
-          >
-            <Upload size={20} className={styles.uploadIcon} aria-hidden="true" />
-            <div className={styles.uploadText}>
-              {clientNotFound ? "Uploads unavailable" : "Click to upload or drag and drop"}
-            </div>
-            <div className={styles.uploadHint}>
-              PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
-            </div>
-            <input
-              id="kb-file-upload"
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
-              multiple
-              onChange={handleFileChange}
-              disabled={clientNotFound}
-              className={styles.visuallyHidden}
-            />
-          </label>
-
-          {/* Uploaded Files List */}
-          {uploadedFiles.length > 0 && (
-            <div className={styles.uploadedFilesList}>
-              {uploadedFiles.map(({ file, id, status, error, parsedData, uploadedDocId }) => (
-                <div
-                  key={id}
-                  className={`${styles.uploadedFileItem}${status === "parsed" ? ` ${styles.uploadedFileItemParsed}` : ""}`}
-                >
-                  <div
-                    className={`${styles.fileIconWrapper}${
-                      status === "parsed"
-                        ? ` ${styles.fileIconWrapperSuccess}`
-                        : status === "error"
-                          ? ` ${styles.fileIconWrapperError}`
-                          : status === "parsing"
-                            ? ` ${styles.fileIconWrapperParsing}`
-                            : ""
-                    }`}
-                  >
-                    {status === "parsing" ? (
-                      <Loader2 size={22} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
-                    ) : status === "error" ? (
-                      <AlertCircle size={22} className={`${styles.fileIcon} ${styles.errorIcon}`} />
-                    ) : status === "parsed" ? (
-                      <CheckCircle
-                        size={22}
-                        className={`${styles.fileIcon} ${styles.successIcon}`}
-                      />
-                    ) : (
-                      <FileText size={22} className={styles.fileIcon} />
-                    )}
-                  </div>
-                  <div className={styles.fileDetails}>
-                    <div className={styles.fileName} title={file.name}>
-                      {file.name}
-                    </div>
-                    <div className={styles.fileMeta}>
-                      <span>{formatFileSize(file.size)}</span>
-                      {status === "pending" && (
-                        <span className={styles.parsingStatus}>· Waiting to upload...</span>
-                      )}
-                      {status === "parsing" && (
-                        <span className={styles.parsingStatus}>· Parsing on server...</span>
-                      )}
-                      {status === "parsed" && parsedData && uploadedDocId && (
-                        <span className={styles.parsedStatus}>· Parsing Complete</span>
-                      )}
-                      {status === "parsed" && !parsedData && (
-                        <span className={styles.parsedStatus}>· Parsed successfully</span>
-                      )}
-                      {status === "error" && error && (
-                        <span className={styles.errorStatus}>· {error}</span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    className={styles.removeFileBtn}
-                    onClick={() => handleRemoveFile(id)}
-                    title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
-                    aria-label="Remove file"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Scrollable document list */}
-        <div className={styles.modalBody}>
-          <div className={styles.knowledgeBaseScrollContainer}>
-            <div className={styles.actionBar}>
-              <button className={styles.toggleAllButton} onClick={toggleAll}>
-                {selected.size === allDocuments.length ? "Deselect All" : "Select All"}
+  return (
+    <>
+      {createPortal(
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <h2 className={styles.modalTitle}>Select Knowledge Base Documents</h2>
+                <p className={styles.modalSubtitle}>
+                  Choose documents to include as context for this proposal
+                </p>
+              </div>
+              <button className={styles.closeButton} onClick={onClose} aria-label="Close">
+                <X size={20} />
               </button>
-              <span className={styles.counter}>{selected.size} document(s) selected</span>
             </div>
 
-            {filteredAllDocuments.length === 0 ? (
-              <div className={styles.emptyState}>
-                <FileText size={48} className={styles.emptyIcon} />
-                <p className={styles.emptyText}>No documents available</p>
-              </div>
-            ) : (
-              <div className={styles.documentList}>
-                {filteredAllDocuments.map((doc) => {
-                  const isSelected = selected.has(doc.id);
-                  return (
-                    <div
-                      key={doc.id}
-                      className={`${styles.documentItem} ${isSelected ? styles.selected : ""}`}
-                      onClick={() => toggleDocument(doc.id)}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleDocument(doc.id)}
-                        className={styles.checkbox}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                      <div className={styles.documentInfo}>
-                        <span className={styles.documentName}>{doc.name}</span>
-                        <span className={styles.documentMeta}>
-                          {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""} {doc.date}
-                          {"isNew" in doc && doc.isNew ? (
-                            <span className="badge badge-success">New</span>
-                          ) : null}
-                        </span>
-                      </div>
-                      {doc.s3FileUrl && clientId && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewDocument(doc);
-                          }}
-                          title="View file"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            padding: "2px 4px",
-                            opacity: viewingDocId === doc.id ? 0.4 : 0.6,
-                            flexShrink: 0,
-                          }}
-                        >
-                          <ExternalLink size={14} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+            {/* Upload section — always visible, outside the scrollable document list */}
+            <div className={styles.uploadSection}>
+              {clientNotFound && (
+                <div className={styles.clientNotFoundBanner}>
+                  <AlertCircle size={16} />
+                  <span>
+                    This client no longer exists in the system. Uploads are disabled. To add new
+                    documents, update the client details first.
+                  </span>
+                </div>
+              )}
+              <label
+                htmlFor="kb-file-upload"
+                className={`${styles.uploadZone} ${isDragOver && !clientNotFound ? styles.dragOver : ""} ${clientNotFound ? styles.uploadZoneDisabled : ""}`}
+                onDragOver={!clientNotFound ? handleDragOver : undefined}
+                onDragEnter={!clientNotFound ? handleDragEnter : undefined}
+                onDragLeave={!clientNotFound ? handleDragLeave : undefined}
+                onDrop={!clientNotFound ? handleDrop : undefined}
+              >
+                <Upload size={20} className={styles.uploadIcon} aria-hidden="true" />
+                <div className={styles.uploadText}>
+                  {clientNotFound ? "Uploads unavailable" : "Click to upload or drag and drop"}
+                </div>
+                <div className={styles.uploadHint}>
+                  PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
+                </div>
+                <input
+                  id="kb-file-upload"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                  multiple
+                  onChange={handleFileChange}
+                  disabled={clientNotFound}
+                  className={styles.visuallyHidden}
+                />
+              </label>
 
-        <div className={styles.modalFooter}>
-          <button className={styles.cancelButton} onClick={onClose}>
-            Cancel
-          </button>
-          <button className={styles.saveButton} onClick={handleSave}>
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+              {/* Uploaded Files List */}
+              {uploadedFiles.length > 0 && (
+                <div className={styles.uploadedFilesList}>
+                  {uploadedFiles.map(({ file, id, status, error, parsedData, uploadedDocId }) => (
+                    <div
+                      key={id}
+                      className={`${styles.uploadedFileItem}${status === "parsed" ? ` ${styles.uploadedFileItemParsed}` : ""}`}
+                    >
+                      <div
+                        className={`${styles.fileIconWrapper}${
+                          status === "parsed"
+                            ? ` ${styles.fileIconWrapperSuccess}`
+                            : status === "error"
+                              ? ` ${styles.fileIconWrapperError}`
+                              : status === "parsing"
+                                ? ` ${styles.fileIconWrapperParsing}`
+                                : ""
+                        }`}
+                      >
+                        {status === "parsing" ? (
+                          <Loader2
+                            size={22}
+                            className={`${styles.fileIcon} ${styles.spinningIcon}`}
+                          />
+                        ) : status === "error" ? (
+                          <AlertCircle
+                            size={22}
+                            className={`${styles.fileIcon} ${styles.errorIcon}`}
+                          />
+                        ) : status === "parsed" ? (
+                          <CheckCircle
+                            size={22}
+                            className={`${styles.fileIcon} ${styles.successIcon}`}
+                          />
+                        ) : (
+                          <FileText size={22} className={styles.fileIcon} />
+                        )}
+                      </div>
+                      <div className={styles.fileDetails}>
+                        <div className={styles.fileName} title={file.name}>
+                          {file.name}
+                        </div>
+                        <div className={styles.fileMeta}>
+                          <span>{formatFileSize(file.size)}</span>
+                          {status === "pending" && (
+                            <span className={styles.parsingStatus}>· Waiting to upload...</span>
+                          )}
+                          {status === "parsing" && (
+                            <span className={styles.parsingStatus}>· Parsing on server...</span>
+                          )}
+                          {status === "parsed" && parsedData && uploadedDocId && (
+                            <span className={styles.parsedStatus}>· Parsing Complete</span>
+                          )}
+                          {status === "parsed" && !parsedData && (
+                            <span className={styles.parsedStatus}>· Parsed successfully</span>
+                          )}
+                          {status === "error" && error && (
+                            <span className={styles.errorStatus}>· {error}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className={styles.removeFileBtn}
+                        onClick={() => handleRemoveFile(id)}
+                        title={status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
+                        aria-label="Remove file"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Scrollable document list */}
+            <div className={styles.modalBody}>
+              <div className={styles.knowledgeBaseScrollContainer}>
+                <div className={styles.actionBar}>
+                  <button className={styles.toggleAllButton} onClick={toggleAll}>
+                    {selected.size === allDocuments.length ? "Deselect All" : "Select All"}
+                  </button>
+                  <span className={styles.counter}>{selected.size} document(s) selected</span>
+                </div>
+
+                {filteredAllDocuments.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <FileText size={48} className={styles.emptyIcon} />
+                    <p className={styles.emptyText}>No documents available</p>
+                  </div>
+                ) : (
+                  <div className={styles.documentList}>
+                    {filteredAllDocuments.map((doc) => {
+                      const isSelected = selected.has(doc.id);
+                      return (
+                        <div
+                          key={doc.id}
+                          className={`${styles.documentItem} ${isSelected ? styles.selected : ""}`}
+                          onClick={() => toggleDocument(doc.id)}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleDocument(doc.id)}
+                            className={styles.checkbox}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className={styles.documentInfo}>
+                            <span className={styles.documentName}>{doc.name}</span>
+                            <span className={styles.documentMeta}>
+                              {doc.size ? `${(Number(doc.size) / 1024).toFixed(1)} KB` : ""}{" "}
+                              {doc.date}
+                              {"isNew" in doc && doc.isNew ? (
+                                <span className="badge badge-success">New</span>
+                              ) : null}
+                            </span>
+                          </div>
+                          {doc.s3FileUrl && clientId && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDocument(doc);
+                              }}
+                              title="View file"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                padding: "2px 4px",
+                                opacity: viewingDocId === doc.id ? 0.4 : 0.6,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <ExternalLink size={14} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelButton} onClick={onClose}>
+                Cancel
+              </button>
+              <button className={styles.saveButton} onClick={handleSave}>
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {viewingDocModal && (
+        <DocumentViewerModal
+          url={viewingDocModal.url}
+          fileName={viewingDocModal.fileName}
+          fileType={viewingDocModal.fileType}
+          onClose={() => setViewingDocModal(null)}
+        />
+      )}
+    </>
   );
 }

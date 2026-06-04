@@ -261,7 +261,6 @@ export default function ReviewPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
-  const [isOpeningKBModal, setIsOpeningKBModal] = useState<boolean>(false);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -361,17 +360,10 @@ export default function ReviewPage(): JSX.Element {
     }, 0);
   }
 
-  async function handleOpenKnowledgeBase(): Promise<void> {
-    setIsOpeningKBModal(true);
-    try {
-      // Force-refresh from API so the modal has accurate data:
-      // - client existence is confirmed (not stale localStorage cache)
-      // - document list reflects current backend state
-      await refetchClients();
-    } finally {
-      setIsOpeningKBModal(false);
-    }
+  function handleOpenKnowledgeBase(): void {
     setShowKnowledgeBaseModal(true);
+    // Refresh client data in the background so the modal has up-to-date info
+    refetchClients();
   }
 
   async function handleSaveKnowledgeBase(
@@ -666,12 +658,8 @@ export default function ReviewPage(): JSX.Element {
           <div className="review-card">
             <div className="review-card-header">
               <span className="review-card-title">KNOWLEDGE BASE</span>
-              <button
-                className="link-plain"
-                onClick={handleOpenKnowledgeBase}
-                disabled={isOpeningKBModal}
-              >
-                {isOpeningKBModal ? "Loading…" : "Edit"}
+              <button className="link-plain" onClick={handleOpenKnowledgeBase}>
+                Edit
               </button>
             </div>
             {proposalData.filesMeta.length > 0 ? (
