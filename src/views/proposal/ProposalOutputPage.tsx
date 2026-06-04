@@ -13,30 +13,29 @@ import {
   regenerateSection,
   updateApprovalStatus,
   reorderProposalSections,
+  estimateProposalHours,
 } from "@/services/proposal.service";
+import { HttpError } from "@/config/httpClient";
 import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
-import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import type { ProposalData, EstimatedHoursData } from "@/interfaces/proposalInterfaces";
 import { toast } from "@/utils/toast";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useProposalPageData } from "@/hooks/useProposalPageData";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
 
-const ProposalSectionEditor = dynamic(
-  () => import("@/components/proposal/ProposalSectionEditor"),
-  { ssr: false }
-);
+const ProposalSectionEditor = dynamic(() => import("@/components/proposal/ProposalSectionEditor"), {
+  ssr: false,
+});
 
-const SectionViewMode = dynamic(
-  () => import("@/components/proposal/SectionViewMode"),
-  { ssr: false }
-);
+const SectionViewMode = dynamic(() => import("@/components/proposal/SectionViewMode"), {
+  ssr: false,
+});
 
-const ProposalSkeleton = dynamic(
-  () => import("@/components/proposal/ProposalSkeleton"),
-  { ssr: false }
-);
+const ProposalSkeleton = dynamic(() => import("@/components/proposal/ProposalSkeleton"), {
+  ssr: false,
+});
 
 const PageLayout = dynamic(() => import("@/layouts/AppLayout"), { ssr: false });
 
@@ -52,6 +51,14 @@ const ProposalApprovalBar = dynamic(() => import("@/components/proposal/Proposal
   ssr: false,
 });
 
+const EstimateHoursButton = dynamic(() => import("@/components/proposal/EstimateHoursButton"), {
+  ssr: false,
+});
+
+const EstimateHoursModal = dynamic(() => import("@/components/proposal/EstimateHoursModal"), {
+  ssr: false,
+});
+
 interface SectionMeta {
   key: string;
   label: string;
@@ -59,10 +66,42 @@ interface SectionMeta {
   isStatic?: boolean;
 }
 
-function resolveSectionLabel(
-  key: string,
-  displayNames: Record<string, string>
-): string {
+function stripHtml(html: string): string {
+  if (!html) return "";
+  if (typeof window === "undefined")
+    return html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
+// Same priority order as the backend's _FEATURE_LIST_SECTION_KEYS.
+// First non-empty section wins — covers MVP, design, POC, and scratch layouts.
+const FEATURE_LIST_SECTION_KEYS = [
+  "high_level_feature_list",
+  "poc_feature_list",
+  "scope_of_prototype",
+  "key_objectives",
+  "high_level_scope",
+  "proposed_solution",
+  "scope",
+  "deliverables",
+  "implementation_plan",
+  "functional_requirements",
+  "requirements",
+] as const;
+
+function extractFeatureList(sections: Record<string, string>): string {
+  for (const key of FEATURE_LIST_SECTION_KEYS) {
+    const raw = sections[key];
+    if (raw) return stripHtml(raw);
+  }
+  return "";
+}
+
+function resolveSectionLabel(key: string, displayNames: Record<string, string>): string {
   return (
     displayNames[key] ??
     SECTION_DISPLAY_NAMES[key] ??
@@ -77,12 +116,12 @@ export default function ProposalOutputPage(): JSX.Element {
   const resetProposal = useProposalWizardStore((s) => s.resetProposal);
   const visitedPipelineSteps = useVisitedPipelineSteps();
   const handleSaveDraft = useSaveDraft();
-  const invalidateCache = useProposalStore(state => state.invalidateCache);
-  const updateProposalInStore = useProposalStore(state => state.updateProposal);
+  const invalidateCache = useProposalStore((state) => state.invalidateCache);
+  const updateProposalInStore = useProposalStore((state) => state.updateProposal);
   const proposalId = Number(params.id);
-  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
-  const fromHistory = useDraftSessionStore(state => state.fromHistory);
-  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
+  const currentDraftId = useDraftSessionStore((state) => state.currentDraftId);
+  const fromHistory = useDraftSessionStore((state) => state.fromHistory);
+  const updateDraftInStore = useDraftStore((state) => state.updateDraftApi);
   const [mounted, setMounted] = useState<boolean>(false);
   const currentActiveSectionRef = useRef<string | null>(null);
   const pendingEditsRef = useRef<Record<string, string>>({});
@@ -91,20 +130,15 @@ export default function ProposalOutputPage(): JSX.Element {
   // Prevents the IntersectionObserver from overriding active section during programmatic scroll
   const isProgrammaticScrollRef = useRef<boolean>(false);
   const programmaticScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoEstimatedRef = useRef<boolean>(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   // Data fetching + auto-save hook
-  const {
-    proposal,
-    setProposal,
-    isLoading,
-    errorMessage,
-    activeSection,
-    setActiveSection,
-  } = useProposalPageData(proposalId, searchParams);
+  const { proposal, setProposal, isLoading, errorMessage, activeSection, setActiveSection } =
+    useProposalPageData(proposalId, searchParams);
 
   // Keep proposalSectionsRef in sync so the debounced draft update can access latest sections
   useEffect(() => {
@@ -123,13 +157,13 @@ export default function ProposalOutputPage(): JSX.Element {
     const handlePopState = (event: PopStateEvent) => {
       // Intercept browser back navigation and redirect to review
       event.preventDefault();
-      router.push('/review');
+      router.push("/review");
     };
 
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
-      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, [router]);
 
@@ -187,11 +221,72 @@ export default function ProposalOutputPage(): JSX.Element {
   // Approval workflow state
   const [isApproving, setIsApproving] = useState<boolean>(false);
   const [isRejecting, setIsRejecting] = useState<boolean>(false);
-  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; message: string; actionType: "approve" | "reject" | null }>({
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    actionType: "approve" | "reject" | null;
+  }>({
     isOpen: false,
     message: "",
     actionType: null,
   });
+
+  // Hours estimation state
+  const [estimatedHoursData, setEstimatedHoursData] = useState<EstimatedHoursData | null>(null);
+  const [isEstimatingHours, setIsEstimatingHours] = useState<boolean>(false);
+  const [isEstimateModalOpen, setIsEstimateModalOpen] = useState<boolean>(false);
+
+  // Seed estimated hours from the loaded proposal (no extra API call on refresh)
+  useEffect(() => {
+    if (proposal?.estimatedHoursData) {
+      setEstimatedHoursData(proposal.estimatedHoursData);
+    }
+  }, [proposal?.estimatedHoursData]);
+
+  // Auto-estimate when a proposal first loads with no existing estimate
+  useEffect(() => {
+    if (!proposal || autoEstimatedRef.current || proposal.estimatedHoursData) return;
+    autoEstimatedRef.current = true;
+    setIsEstimatingHours(true);
+    estimateProposalHours(proposalId, {})
+      .then((result) => {
+        setEstimatedHoursData(result);
+        toast.success("Hours estimated successfully.");
+      })
+      .catch((error) => {
+        const message =
+          error instanceof HttpError
+            ? error.message
+            : "Failed to estimate hours. Please try again.";
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsEstimatingHours(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal]);
+
+  async function handleEstimateHours(
+    customFeatureList?: string,
+    customPrompt?: string
+  ): Promise<void> {
+    setIsEstimatingHours(true);
+    try {
+      const result = await estimateProposalHours(proposalId, {
+        custom_feature_list: customFeatureList,
+        custom_prompt: customPrompt,
+      });
+      setEstimatedHoursData(result);
+      setIsEstimateModalOpen(false);
+      toast.success("Hours estimated successfully.");
+    } catch (error) {
+      const message =
+        error instanceof HttpError ? error.message : "Failed to estimate hours. Please try again.";
+      toast.error(message);
+    } finally {
+      setIsEstimatingHours(false);
+    }
+  }
 
   // ── Section editing callbacks ────────────────────────────────────────────────
 
@@ -234,31 +329,39 @@ export default function ProposalOutputPage(): JSX.Element {
     });
   }, []);
 
-  const handleSaveSection = useCallback(async (key: string, content: string): Promise<void> => {
-    try {
-      await updateSection(proposalId, key, content);
+  const handleSaveSection = useCallback(
+    async (key: string, content: string): Promise<void> => {
+      try {
+        await updateSection(proposalId, key, content);
 
-      // Debounce-update the draft with edited content (1.5s) so reopening the draft shows edits
-      if (currentDraftId && !fromHistory) {
-        pendingEditsRef.current = { ...pendingEditsRef.current, [key]: content };
+        // Debounce-update the draft with edited content (1.5s) so reopening the draft shows edits
+        if (currentDraftId && !fromHistory) {
+          pendingEditsRef.current = { ...pendingEditsRef.current, [key]: content };
 
-        if (draftUpdateTimerRef.current) clearTimeout(draftUpdateTimerRef.current);
-        draftUpdateTimerRef.current = setTimeout(async () => {
-          const edits = pendingEditsRef.current;
-          pendingEditsRef.current = {};
-          // Merge edits into the full sections to avoid wiping out other sections via PUT
-          const fullContent = { ...proposalSectionsRef.current, ...edits };
-          try {
-            await updateDraftInStore(currentDraftId, { generatedContent: fullContent, lastLocation: "web_view", stage: "generated", hasEdits: true });
-          } catch (err) {
-            logger.warn("[ProposalOutputPage] Draft update after edit failed", err);
-          }
-        }, 1500);
+          if (draftUpdateTimerRef.current) clearTimeout(draftUpdateTimerRef.current);
+          draftUpdateTimerRef.current = setTimeout(async () => {
+            const edits = pendingEditsRef.current;
+            pendingEditsRef.current = {};
+            // Merge edits into the full sections to avoid wiping out other sections via PUT
+            const fullContent = { ...proposalSectionsRef.current, ...edits };
+            try {
+              await updateDraftInStore(currentDraftId, {
+                generatedContent: fullContent,
+                lastLocation: "web_view",
+                stage: "generated",
+                hasEdits: true,
+              });
+            } catch (err) {
+              logger.warn("[ProposalOutputPage] Draft update after edit failed", err);
+            }
+          }, 1500);
+        }
+      } catch {
+        toast.error("Failed to save section");
       }
-    } catch {
-      toast.error("Failed to save section");
-    }
-  }, [proposalId, currentDraftId, fromHistory, updateDraftInStore]);
+    },
+    [proposalId, currentDraftId, fromHistory, updateDraftInStore]
+  );
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -268,21 +371,24 @@ export default function ProposalOutputPage(): JSX.Element {
     };
   }, []);
 
-  const handleRegenerate = useCallback(async (key: string, instructions?: string): Promise<string | null> => {
-    // This callback is now used for selection-based regeneration
-    // The RichEditor passes selectedText via the RegenerateSelectionParams
-    // For now, we keep the old signature for backward compatibility
-    // The actual selection regeneration happens in ProposalSectionEditor
-    try {
-      const newContent = await regenerateSection(proposalId, key, instructions);
-      handleContentChange(key, newContent);
-      toast.success("Section regenerated.");
-      return newContent;
-    } catch {
-      toast.error("Regeneration failed");
-      return null;
-    }
-  }, [proposalId, handleContentChange]);
+  const handleRegenerate = useCallback(
+    async (key: string, instructions?: string): Promise<string | null> => {
+      // This callback is now used for selection-based regeneration
+      // The RichEditor passes selectedText via the RegenerateSelectionParams
+      // For now, we keep the old signature for backward compatibility
+      // The actual selection regeneration happens in ProposalSectionEditor
+      try {
+        const newContent = await regenerateSection(proposalId, key, instructions);
+        handleContentChange(key, newContent);
+        toast.success("Section regenerated.");
+        return newContent;
+      } catch {
+        toast.error("Regeneration failed");
+        return null;
+      }
+    },
+    [proposalId, handleContentChange]
+  );
 
   // ── Sidebar callbacks ───────────────────────────────────────────────────────
 
@@ -298,7 +404,7 @@ export default function ProposalOutputPage(): JSX.Element {
 
   function handleSectionRemoved(key: string): void {
     // Prevent removal of static sections
-    if (STATIC_SECTION_KEYS.includes(key as any)) {
+    if ((STATIC_SECTION_KEYS as readonly string[]).includes(key)) {
       toast.error("Not allowed on static sections");
       return;
     }
@@ -316,22 +422,29 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleSectionAdded(key: string, label: string, content: string, afterKey?: string, formatType?: string): void {
+  function handleSectionAdded(
+    key: string,
+    label: string,
+    content: string,
+    afterKey?: string,
+    formatType?: string
+  ): void {
     const currentSections = proposal?.selectedSections ?? [];
     let newSelected: string[];
     if (afterKey) {
       const idx = currentSections.indexOf(afterKey);
-      newSelected = idx >= 0
-        ? [...currentSections.slice(0, idx + 1), key, ...currentSections.slice(idx + 1)]
-        : [...currentSections, key];
+      newSelected =
+        idx >= 0
+          ? [...currentSections.slice(0, idx + 1), key, ...currentSections.slice(idx + 1)]
+          : [...currentSections, key];
     } else {
       newSelected = [...currentSections, key];
     }
 
     const newDisplayNames = { ...(proposal?.sectionDisplayNames ?? {}), [key]: label };
-    
+
     // Update sectionTypes if formatType is provided
-    const newSectionTypes = formatType 
+    const newSectionTypes = formatType
       ? { ...(proposal?.sectionTypes ?? {}), [key]: formatType }
       : proposal?.sectionTypes;
 
@@ -389,9 +502,10 @@ export default function ProposalOutputPage(): JSX.Element {
   async function executeApprovalAction(actionType: "approve" | "reject"): Promise<void> {
     const status = actionType === "approve" ? "approved" : "rejected";
     const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
-    const successMessage = actionType === "approve"
-      ? "Proposal approved and moved to history!"
-      : "Proposal rejected and moved to history";
+    const successMessage =
+      actionType === "approve"
+        ? "Proposal approved and moved to history!"
+        : "Proposal rejected and moved to history";
 
     logger.info(`[Approval Flow] Starting ${actionType} action for proposal ${proposalId}`);
     setLoading(true);
@@ -428,7 +542,7 @@ export default function ProposalOutputPage(): JSX.Element {
       toast.success(successMessage);
 
       logger.info(`[Approval Flow] Redirecting to /history in 500ms`);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       router.push("/history");
     } catch (error) {
       const message = error instanceof Error ? error.message : `Failed to ${actionType} proposal`;
@@ -442,14 +556,12 @@ export default function ProposalOutputPage(): JSX.Element {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   const displayNames = proposal?.sectionDisplayNames ?? {};
-  const sectionMetas: SectionMeta[] = (proposal?.selectedSections ?? []).map(
-    (key) => ({
-      key,
-      label: resolveSectionLabel(key, displayNames),
-      hasContent: Boolean(proposal?.sections?.[key]),
-      isStatic: STATIC_SECTION_KEYS.includes(key as any)
-    })
-  );
+  const sectionMetas: SectionMeta[] = (proposal?.selectedSections ?? []).map((key) => ({
+    key,
+    label: resolveSectionLabel(key, displayNames),
+    hasContent: Boolean(proposal?.sections?.[key]),
+    isStatic: (STATIC_SECTION_KEYS as readonly string[]).includes(key),
+  }));
 
   // Show loading state while fetching
   if (!mounted || (isLoading && !proposal)) {
@@ -466,23 +578,22 @@ export default function ProposalOutputPage(): JSX.Element {
   if (errorMessage && !proposal) {
     return (
       <PageLayout noPadding>
-        <div className="proposal-content" style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}>
+        <div
+          className="proposal-content"
+          style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}
+        >
           <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
-            <h2 style={{ color: "var(--color-danger)", marginBottom: "1rem" }}>Failed to Load Proposal</h2>
+            <h2 style={{ color: "var(--color-danger)", marginBottom: "1rem" }}>
+              Failed to Load Proposal
+            </h2>
             <p style={{ color: "var(--color-text-muted)", marginBottom: "1.5rem" }}>
               {errorMessage}
             </p>
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
-              <button
-                className="btn btn-primary"
-                onClick={() => router.push("/review")}
-              >
+              <button className="btn btn-primary" onClick={() => router.push("/review")}>
                 ← Back to Review
               </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => window.location.reload()}
-              >
+              <button className="btn btn-secondary" onClick={() => window.location.reload()}>
                 Try Again
               </button>
             </div>
@@ -505,29 +616,47 @@ export default function ProposalOutputPage(): JSX.Element {
 
   return (
     <PageLayout noPadding>
-        <div className="proposal-header-bar">
-          <DynamicPipeline
-            currentStage="generated"
-            completedSteps={[1, 2, 3]}
-            visitedSteps={visitedPipelineSteps}
-            visible={true}
-            proposalId={proposalId}
+      <div className="proposal-header-bar">
+        <DynamicPipeline
+          currentStage="generated"
+          completedSteps={[1, 2, 3]}
+          visitedSteps={visitedPipelineSteps}
+          visible={true}
+          proposalId={proposalId}
+        />
+        {proposal.status === "completed" && (
+          <EstimateHoursButton
+            estimatedHoursData={estimatedHoursData}
+            isEstimating={isEstimatingHours}
+            onOpenModal={() => setIsEstimateModalOpen(true)}
           />
-          <ProposalApprovalBar
-            proposalId={proposalId}
-            approvalStatus={proposal.approvalStatus}
-            isApproving={isApproving}
-            isRejecting={isRejecting}
-            onSaveDraft={fromHistory ? undefined : handleSaveDraft}
-            onApprove={handleApprove}
-            onReject={handleReject}
-            onExecuteAction={executeApprovalAction}
-            confirmModal={confirmModal}
-            onConfirmModalClose={() => setConfirmModal({ isOpen: false, message: "", actionType: null })}
-          />
-        </div>
+        )}
+        <ProposalApprovalBar
+          proposalId={proposalId}
+          approvalStatus={proposal.approvalStatus}
+          isApproving={isApproving}
+          isRejecting={isRejecting}
+          onSaveDraft={fromHistory ? undefined : handleSaveDraft}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onExecuteAction={executeApprovalAction}
+          confirmModal={confirmModal}
+          onConfirmModalClose={() =>
+            setConfirmModal({ isOpen: false, message: "", actionType: null })
+          }
+        />
+      </div>
 
-        <div className="proposal-layout">
+      <EstimateHoursModal
+        isOpen={isEstimateModalOpen}
+        onClose={() => setIsEstimateModalOpen(false)}
+        onSubmit={handleEstimateHours}
+        defaultFeatureList={extractFeatureList(proposal.sections ?? {})}
+        previousEstimate={estimatedHoursData}
+        isSubmitting={isEstimatingHours}
+      />
+
+      <div className="proposal-layout">
         <ProposalSidebar
           proposalId={proposalId}
           sections={sectionMetas}
@@ -541,24 +670,17 @@ export default function ProposalOutputPage(): JSX.Element {
         />
 
         <div className="proposal-content">
-          {errorMessage && (
-            <div className="alert-error">
-              {errorMessage}
-            </div>
-          )}
+          {errorMessage && <div className="alert-error">{errorMessage}</div>}
 
           {isLoading && sectionMetas.length === 0 && <ProposalSkeleton />}
 
-          {sectionMetas.map(({ key, label, isStatic }) => (
+          {sectionMetas.map(({ key, label, isStatic }) =>
             isStatic ? (
               <div key={key} className="proposal-page" id={`section-${key}`}>
                 <div className="proposal-page-header">
                   <h2 className="proposal-page-title">{label}</h2>
                 </div>
-                <SectionViewMode
-                  sectionKey={key}
-                  content={proposal?.sections?.[key] ?? ""}
-                />
+                <SectionViewMode sectionKey={key} content={proposal?.sections?.[key] ?? ""} />
               </div>
             ) : (
               <ProposalSectionEditor
@@ -571,7 +693,7 @@ export default function ProposalOutputPage(): JSX.Element {
                 onSave={handleSaveSection}
               />
             )
-          ))}
+          )}
 
           {proposal?.status === "completed" &&
             sectionMetas.length > 0 &&
@@ -582,14 +704,17 @@ export default function ProposalOutputPage(): JSX.Element {
                 </p>
                 <button
                   className="btn btn-primary mt-16"
-                  onClick={() => { resetProposal(); router.push("/"); }}
+                  onClick={() => {
+                    resetProposal();
+                    router.push("/");
+                  }}
                 >
                   Start Over
                 </button>
               </div>
             )}
-          </div>
         </div>
+      </div>
     </PageLayout>
   );
 }

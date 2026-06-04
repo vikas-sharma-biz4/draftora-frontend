@@ -15,6 +15,7 @@ import {
   RefreshCw,
   FileSearch,
   ArrowLeft,
+  ExternalLink,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/utils/toast";
@@ -27,6 +28,7 @@ import FormField from "@/components/common/FormField";
 
 import {
   uploadDocument,
+  getDocumentViewUrl,
   type ClientWithDocuments,
 } from "@/services/client.service";
 import { INDUSTRIES } from "@/constants";
@@ -36,10 +38,7 @@ import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice"
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
-import {
-  parseRecreateDocument,
-  type RecreateExtractedSection,
-} from "@/services/proposal.service";
+import { parseRecreateDocument, type RecreateExtractedSection } from "@/services/proposal.service";
 import type { OriginalSection } from "@/interfaces/proposalInterfaces";
 
 interface RecreateTemplateModalProps {
@@ -63,12 +62,12 @@ export default function RecreateTemplateModal({
 }: RecreateTemplateModalProps): JSX.Element | null {
   const router = useRouter();
   const { updateProposalData, setCurrentStep } = useWizardActions();
-  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
-  const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
-  const fetchClients = useClientStore(state => state.fetchClients);
-  const clients = useClientStore(state => state.clients);
-  const invalidateClientsCache = useClientStore(state => state.invalidateCache);
-  const isLoadingClients = useClientStore(state => state.isLoading);
+  const setDraftStage = useDraftSessionStore((state) => state.setDraftStage);
+  const markStepCompleted = useDraftSessionStore((state) => state.markStepCompleted);
+  const fetchClients = useClientStore((state) => state.fetchClients);
+  const clients = useClientStore((state) => state.clients);
+  const invalidateClientsCache = useClientStore((state) => state.invalidateCache);
+  const isLoadingClients = useClientStore((state) => state.isLoading);
 
   const [mounted, setMounted] = useState<boolean>(false);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
@@ -110,7 +109,8 @@ export default function RecreateTemplateModal({
     notes: "",
   });
   const [isCreatingClient, setIsCreatingClient] = useState<boolean>(false);
-  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
+  const [viewingDocId, setViewingDocId] = useState<number | null>(null);
+  const uploadDocumentToStore = useClientStore((state) => state.uploadDocument);
 
   const MAX_FILE_SIZE = 10 * 1024 * 1024;
   const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".xlsx", ".pptx"];
@@ -146,16 +146,21 @@ export default function RecreateTemplateModal({
 
         // Only auto-select all documents if this is the first time selecting this client
         // (i.e., when selectedClientId changes, not when clients array updates)
-        if (initialDocIdsRef.current.size === 0 || !currentDocIds.isSupersetOf(initialDocIdsRef.current)) {
+        if (
+          initialDocIdsRef.current.size === 0 ||
+          !currentDocIds.isSupersetOf(initialDocIdsRef.current)
+        ) {
           setSelectedDocuments(currentDocIds);
           initialDocIdsRef.current = currentDocIds;
         } else {
           // If clients array updated but client hasn't changed, only add new documents
-          const newDocIds = new Set(Array.from(currentDocIds).filter(id => !initialDocIdsRef.current.has(id)));
+          const newDocIds = new Set(
+            Array.from(currentDocIds).filter((id) => !initialDocIdsRef.current.has(id))
+          );
           if (newDocIds.size > 0) {
             setSelectedDocuments((prev) => {
               const next = new Set(prev);
-              newDocIds.forEach(id => next.add(id));
+              newDocIds.forEach((id) => next.add(id));
               return next;
             });
             initialDocIdsRef.current = currentDocIds;
@@ -192,9 +197,7 @@ export default function RecreateTemplateModal({
    * 2. Track parent context based on level changes
    * 3. Support any document category (technical, legal, business, etc.)
    */
-  function buildSectionHierarchy(
-    sections: RecreateExtractedSection[]
-  ): RecreateExtractedSection[] {
+  function buildSectionHierarchy(sections: RecreateExtractedSection[]): RecreateExtractedSection[] {
     if (sections.length === 0) return [];
 
     const result: RecreateExtractedSection[] = [];
@@ -408,9 +411,10 @@ export default function RecreateTemplateModal({
         fullText: result.fullText,
       });
 
-      const message = removedCount > 0
-        ? `"${file.name}" parsed â€” ${filteredSections.length} dynamic section(s) extracted (${removedCount} static section(s) excluded)`
-        : `"${file.name}" parsed â€” ${filteredSections.length} section(s) extracted`;
+      const message =
+        removedCount > 0
+          ? `"${file.name}" parsed â€” ${filteredSections.length} dynamic section(s) extracted (${removedCount} static section(s) excluded)`
+          : `"${file.name}" parsed â€” ${filteredSections.length} section(s) extracted`;
 
       toast.success(message);
     } catch (err) {
@@ -475,9 +479,7 @@ export default function RecreateTemplateModal({
 
       const result = response.results[0];
       setContextUploads((prev) =>
-        prev.map((f) =>
-          f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f
-        )
+        prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
       );
 
       // Save to client KB and auto-select
@@ -545,6 +547,22 @@ export default function RecreateTemplateModal({
       else next.add(docId);
       return next;
     });
+  }
+
+  async function handleViewDocument(
+    clientId: number,
+    doc: { id: number; s3FileUrl?: string }
+  ): Promise<void> {
+    if (!doc.s3FileUrl) return;
+    try {
+      setViewingDocId(doc.id);
+      const viewUrl = await getDocumentViewUrl(clientId, doc.id);
+      window.open(viewUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      // silently ignore
+    } finally {
+      setViewingDocId(null);
+    }
   }
 
   function toggleAllDocuments(): void {
@@ -684,7 +702,8 @@ export default function RecreateTemplateModal({
     }
 
     const isDuplicate = clients.some(
-      (client) => client.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
+      (client) =>
+        client.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
     );
     if (isDuplicate) {
       toast.error("A client with this name already exists");
@@ -750,8 +769,7 @@ export default function RecreateTemplateModal({
     c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
   );
   const isParsing =
-    exactDocument?.status === "parsing" ||
-    contextUploads.some((f) => f.status === "parsing");
+    exactDocument?.status === "parsing" || contextUploads.some((f) => f.status === "parsing");
 
   if (!mounted) return null;
 
@@ -849,15 +867,24 @@ export default function RecreateTemplateModal({
                 <label
                   htmlFor="new-client-file-upload-recreate"
                   className={`${styles.uploadZone} ${contextDragOver ? styles.dragOver : ""}`}
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setContextDragOver(true); }}
-                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setContextDragOver(false); }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextDragOver(false);
+                  }}
                   onDrop={handleContextDrop}
                 >
                   <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
-                  <div className={styles.uploadText}>
-                    Click to upload or drag and drop
-                  </div>
+                  <div className={styles.uploadText}>Click to upload or drag and drop</div>
                   <input
                     id="new-client-file-upload-recreate"
                     ref={contextInputRef}
@@ -875,27 +902,48 @@ export default function RecreateTemplateModal({
                       <div key={entry.id} className={styles.uploadedFileItem}>
                         <div className={styles.fileIconWrapper}>
                           {entry.status === "parsing" ? (
-                            <Loader2 size={18} className={`${styles.fileIcon} ${styles.spinningIcon}`} />
+                            <Loader2
+                              size={18}
+                              className={`${styles.fileIcon} ${styles.spinningIcon}`}
+                            />
                           ) : entry.status === "error" ? (
-                            <AlertCircle size={18} className={`${styles.fileIcon} ${styles.errorIcon}`} />
+                            <AlertCircle
+                              size={18}
+                              className={`${styles.fileIcon} ${styles.errorIcon}`}
+                            />
                           ) : entry.status === "parsed" ? (
-                            <CheckCircle size={18} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                            <CheckCircle
+                              size={18}
+                              className={`${styles.fileIcon} ${styles.successIcon}`}
+                            />
                           ) : (
                             <FileText size={18} className={styles.fileIcon} />
                           )}
                         </div>
                         <div className={styles.fileDetails}>
-                          <div className={styles.fileName} title={entry.file.name}>{entry.file.name}</div>
+                          <div className={styles.fileName} title={entry.file.name}>
+                            {entry.file.name}
+                          </div>
                           <div className={styles.fileMeta}>
-                            {entry.status === "parsing" && <span className={styles.parsingStatus}>Parsing on server...</span>}
-                            {entry.status === "parsed" && entry.parsedData && <span className={styles.parsedStatus}>Parsing Complete</span>}
-                            {entry.status === "error" && entry.error && <span className={styles.errorStatus}>{entry.error}</span>}
+                            {entry.status === "parsing" && (
+                              <span className={styles.parsingStatus}>Parsing on server...</span>
+                            )}
+                            {entry.status === "parsed" && entry.parsedData && (
+                              <span className={styles.parsedStatus}>Parsing Complete</span>
+                            )}
+                            {entry.status === "error" && entry.error && (
+                              <span className={styles.errorStatus}>{entry.error}</span>
+                            )}
                           </div>
                         </div>
                         <button
                           className={styles.removeFileBtn}
-                          onClick={() => setContextUploads((prev) => prev.filter((f) => f.id !== entry.id))}
-                          title={entry.status === "parsing" ? "Cancel parsing and remove" : "Remove file"}
+                          onClick={() =>
+                            setContextUploads((prev) => prev.filter((f) => f.id !== entry.id))
+                          }
+                          title={
+                            entry.status === "parsing" ? "Cancel parsing and remove" : "Remove file"
+                          }
                           aria-label="Remove file"
                         >
                           <X size={16} />
@@ -910,288 +958,334 @@ export default function RecreateTemplateModal({
             <>
               {}
               <div className={styles.section}>
-                <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>Client Name</label>
-            {isLoadingClients ? (
-              <div className={styles.noClients}>
-                <p>Loading clients...</p>
-              </div>
-            ) : clients.length === 0 ? (
-              <div className={styles.noClients}>
-                <p>No clients found.</p>
-                <Button variant="primary" size="sm" onClick={handleNewClientClick}>
-                  <Plus size={16} /> New Client
-                </Button>
-              </div>
-            ) : (
-              <div className={styles.searchWrapper}>
-                <div className={styles.searchInputWrapper}>
-                  <Input
-                    type="text"
-                    placeholder="Search for a client..."
-                    value={clientSearchQuery}
-                    onChange={(e) => handleClientSearchChange(e.target.value)}
-                    onFocus={() => setShowClientDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    className={styles.searchInput}
-                  />
-                  <Button variant="secondary" size="sm" onClick={handleNewClientClick} className={styles.newClientBtn}>
-                    <Plus size={16} /> New Client
-                  </Button>
-                </div>
-                {showClientDropdown && filteredClients.length > 0 && (
-                  <div className={styles.clientDropdown}>
-                    {filteredClients.map((client) => (
-                      <button
-                        key={client.id}
-                        className={`${styles.clientOption} ${
-                          selectedClientId === client.id ? styles.selectedClient : ""
-                        }`}
-                        onClick={() => handleClientSelect(client.id, client.name)}
+                <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
+                  Client Name
+                </label>
+                {isLoadingClients ? (
+                  <div className={styles.noClients}>
+                    <p>Loading clients...</p>
+                  </div>
+                ) : clients.length === 0 ? (
+                  <div className={styles.noClients}>
+                    <p>No clients found.</p>
+                    <Button variant="primary" size="sm" onClick={handleNewClientClick}>
+                      <Plus size={16} /> New Client
+                    </Button>
+                  </div>
+                ) : (
+                  <div className={styles.searchWrapper}>
+                    <div className={styles.searchInputWrapper}>
+                      <Input
+                        type="text"
+                        placeholder="Search for a client..."
+                        value={clientSearchQuery}
+                        onChange={(e) => handleClientSearchChange(e.target.value)}
+                        onFocus={() => setShowClientDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                        className={styles.searchInput}
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleNewClientClick}
+                        className={styles.newClientBtn}
                       >
-                        <span className={styles.clientName}>{client.name}</span>
-                        <span className={styles.clientDocs}>
-                          {(client.documents || []).length} doc(s)
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* â”€â”€ Proposal name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <FormField label="Proposal Name" labelStyle={{ marginBottom: 0, fontWeight: 400 }}>
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                type="text"
-                placeholder="e.g. Rewritten Proposal for Acme Corp"
-                value={proposalName}
-                onChange={(e) => setProposalName(e.target.value)}
-              />
-            )}
-          </FormField>
-
-          {/* â”€â”€ Project brief â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <FormField label="Project Brief (Optional)" labelStyle={{ marginBottom: 0, fontWeight: 400 }}>
-            {(fieldProps) => (
-              <Textarea
-                {...fieldProps}
-                placeholder="Describe the new project context that will replace the original document content..."
-                value={proposalDescription}
-                onChange={(e) => setProposalDescription(e.target.value)}
-                rows={3}
-              />
-            )}
-          </FormField>
-
-          {/* â”€â”€ SECTION 1: Exact Document â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
-                Exact Document <span style={{ color: "var(--color-error)" }}>*</span>
-              </label>
-            </div>
-
-            {!exactDocument ? (
-              <label
-                className={`${styles.uploadArea} ${exactDragOver ? styles.dragOver : ""}`}
-                onDragOver={(e) => { e.preventDefault(); setExactDragOver(true); }}
-                onDragLeave={() => setExactDragOver(false)}
-                onDrop={handleExactDrop}
-              >
-                <input
-                  ref={exactInputRef}
-                  type="file"
-                  accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
-                  style={{ display: "none" }}
-                  onChange={handleExactInputChange}
-                />
-                <Upload size={24} className={styles.uploadIcon} />
-                <span className={styles.uploadText} style={{ fontWeight: 400 }}>
-                  Drop document here or <strong>browse</strong>
-                </span>
-              </label>
-            ) : (
-              <div className={styles.uploadedFilesList}>
-                <div className={styles.uploadedFileItem}>
-                  <div className={styles.fileIcon}>
-                    {exactDocument.status === "parsing" ? (
-                      <Loader2 size={16} className={styles.spinIcon} />
-                    ) : exactDocument.status === "parsed" ? (
-                      <CheckCircle size={16} className={styles.successIcon} />
-                    ) : (
-                      <AlertCircle size={16} className={styles.errorIcon} />
-                    )}
-                  </div>
-                  <div className={styles.fileInfo}>
-                    <span className={styles.fileName}>{exactDocument.file.name}</span>
-                    <span className={styles.fileSize}>
-                      {exactDocument.status === "parsing" && "Extracting sections..."}
-                      {exactDocument.status === "parsed" &&
-                        `${exactDocument.sections?.length ?? 0} sections extracted Â· ${formatFileSize(exactDocument.file.size)}`}
-                      {exactDocument.status === "error" && (exactDocument.error ?? "Parse error")}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    {exactDocument.status === "error" && (
-                      <button
-                        className={styles.retryBtn}
-                        onClick={() => handleExactFileSelected(exactDocument.file)}
-                        title="Retry parsing"
-                      >
-                        <RefreshCw size={14} />
-                      </button>
-                    )}
-                    <button
-                      className={styles.removeFileBtn}
-                      onClick={handleRemoveExactDocument}
-                      title="Remove"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Extracted sections preview */}
-                {exactDocument.status === "parsed" && exactDocument.sections && (
-                  <div className={styles.sectionsPreview}>
-                    <p className={styles.sectionsPreviewLabel}>
-                      Extracted Sections ({exactDocument.sections.length})
-                    </p>
-                    <div className={styles.sectionsList}>
-                      {exactDocument.sections.map((s, i) => {
-                        const level = s.level || 1;
-                        const indentPx = (level - 1) * 20;
-                        return (
-                          <div
-                            key={s.id}
-                            className={styles.sectionPreviewItem}
-                            style={{ paddingLeft: `${indentPx}px` }}
+                        <Plus size={16} /> New Client
+                      </Button>
+                    </div>
+                    {showClientDropdown && filteredClients.length > 0 && (
+                      <div className={styles.clientDropdown}>
+                        {filteredClients.map((client) => (
+                          <button
+                            key={client.id}
+                            className={`${styles.clientOption} ${
+                              selectedClientId === client.id ? styles.selectedClient : ""
+                            }`}
+                            onClick={() => handleClientSelect(client.id, client.name)}
                           >
-                            <span className={styles.sectionOrder}>{i + 1}</span>
-                            <span className={styles.sectionTitle} style={{ fontWeight: level === 1 ? 600 : 400 }}>
-                              {s.title}
+                            <span className={styles.clientName}>{client.name}</span>
+                            <span className={styles.clientDocs}>
+                              {(client.documents || []).length} doc(s)
                             </span>
-                            {s.parentId && (
-                              <span className={styles.childIndicator} title="Child section">â†³</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* â”€â”€ SECTION 2: Context Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
-                Context Documents
-              </label>
-            </div>
+              {/* â”€â”€ Proposal name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              <FormField label="Proposal Name" labelStyle={{ marginBottom: 0, fontWeight: 400 }}>
+                {(fieldProps) => (
+                  <Input
+                    {...fieldProps}
+                    type="text"
+                    placeholder="e.g. Rewritten Proposal for Acme Corp"
+                    value={proposalName}
+                    onChange={(e) => setProposalName(e.target.value)}
+                  />
+                )}
+              </FormField>
 
-            {/* Existing KB docs */}
-            {selectedClient && (selectedClient.documents || []).length > 0 && (
-              <div className={styles.documentsSection}>
-                <div className={styles.documentsHeader}>
-                  <span className={styles.documentsTitle}>Knowledge Base</span>
-                  <button className={styles.toggleAllBtn} onClick={toggleAllDocuments}>
-                    {selectedDocuments.size ===
-                    (selectedClient.documents || []).filter((d) => d.status === "parsed").length
-                      ? "Deselect All"
-                      : "Select All"}
-                  </button>
+              {/* â”€â”€ Project brief â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              <FormField
+                label="Project Brief (Optional)"
+                labelStyle={{ marginBottom: 0, fontWeight: 400 }}
+              >
+                {(fieldProps) => (
+                  <Textarea
+                    {...fieldProps}
+                    placeholder="Describe the new project context that will replace the original document content..."
+                    value={proposalDescription}
+                    onChange={(e) => setProposalDescription(e.target.value)}
+                    rows={3}
+                  />
+                )}
+              </FormField>
+
+              {/* â”€â”€ SECTION 1: Exact Document â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              <div className={styles.section}>
+                <div className={styles.sectionHeader}>
+                  <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
+                    Exact Document <span style={{ color: "var(--color-error)" }}>*</span>
+                  </label>
                 </div>
-                <div className={styles.documentsList}>
-                  {(selectedClient.documents || [])
-                    .filter((d) => d.status === "parsed")
-                    .map((doc) => (
-                      <button
-                        key={doc.id}
-                        className={`${styles.documentItem} ${
-                          selectedDocuments.has(doc.id) ? styles.selectedDocument : ""
-                        }`}
-                        onClick={() => toggleDocument(doc.id)}
-                      >
-                        <span className={styles.docCheckbox}>
-                          {selectedDocuments.has(doc.id) ? (
-                            <CheckSquare size={16} className={styles.checkIcon} />
-                          ) : (
-                            <Square size={16} />
-                          )}
-                        </span>
-                        <FileText size={14} className={styles.docFileIcon} />
-                        <span className={styles.docName}>{doc.name}</span>
-                        <span className={styles.docSize}>
-                          {formatFileSize(doc.sizeBytes || 0)}
-                        </span>
-                      </button>
-                    ))}
-                </div>
-              </div>
-            )}
 
-            {/* Upload additional context files */}
-            <label
-              className={`${styles.uploadArea} ${contextDragOver ? styles.dragOver : ""} ${styles.uploadAreaCompact}`}
-              onDragOver={(e) => { e.preventDefault(); setContextDragOver(true); }}
-              onDragLeave={() => setContextDragOver(false)}
-              onDrop={handleContextDrop}
-            >
-              <input
-                ref={contextInputRef}
-                type="file"
-                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
-                multiple
-                style={{ display: "none" }}
-                onChange={handleContextInputChange}
-              />
-              <Upload size={20} className={styles.uploadIcon} />
-              <span className={styles.uploadText}>
-                Add more context files
-              </span>
-            </label>
+                {!exactDocument ? (
+                  <label
+                    className={`${styles.uploadArea} ${exactDragOver ? styles.dragOver : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setExactDragOver(true);
+                    }}
+                    onDragLeave={() => setExactDragOver(false)}
+                    onDrop={handleExactDrop}
+                  >
+                    <input
+                      ref={exactInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                      style={{ display: "none" }}
+                      onChange={handleExactInputChange}
+                    />
+                    <Upload size={24} className={styles.uploadIcon} />
+                    <span className={styles.uploadText} style={{ fontWeight: 400 }}>
+                      Drop document here or <strong>browse</strong>
+                    </span>
+                  </label>
+                ) : (
+                  <div className={styles.uploadedFilesList}>
+                    <div className={styles.uploadedFileItem}>
+                      <div className={styles.fileIcon}>
+                        {exactDocument.status === "parsing" ? (
+                          <Loader2 size={16} className={styles.spinIcon} />
+                        ) : exactDocument.status === "parsed" ? (
+                          <CheckCircle size={16} className={styles.successIcon} />
+                        ) : (
+                          <AlertCircle size={16} className={styles.errorIcon} />
+                        )}
+                      </div>
+                      <div className={styles.fileInfo}>
+                        <span className={styles.fileName}>{exactDocument.file.name}</span>
+                        <span className={styles.fileSize}>
+                          {exactDocument.status === "parsing" && "Extracting sections..."}
+                          {exactDocument.status === "parsed" &&
+                            `${exactDocument.sections?.length ?? 0} sections extracted Â· ${formatFileSize(exactDocument.file.size)}`}
+                          {exactDocument.status === "error" &&
+                            (exactDocument.error ?? "Parse error")}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        {exactDocument.status === "error" && (
+                          <button
+                            className={styles.retryBtn}
+                            onClick={() => handleExactFileSelected(exactDocument.file)}
+                            title="Retry parsing"
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                        )}
+                        <button
+                          className={styles.removeFileBtn}
+                          onClick={handleRemoveExactDocument}
+                          title="Remove"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
 
-            {/* Context uploads in progress */}
-            {contextUploads.length > 0 && (
-              <div className={styles.uploadedFilesList}>
-                {contextUploads.map((entry) => (
-                  <div key={entry.id} className={styles.uploadedFileItem}>
-                    <div className={styles.fileIcon}>
-                      {entry.status === "parsing" ? (
-                        <Loader2 size={16} className={styles.spinIcon} />
-                      ) : entry.status === "parsed" ? (
-                        <CheckCircle size={16} className={styles.successIcon} />
-                      ) : (
-                        <AlertCircle size={16} className={styles.errorIcon} />
-                      )}
-                    </div>
-                    <div className={styles.fileInfo}>
-                      <span className={styles.fileName}>{entry.file.name}</span>
-                      <span className={styles.fileSize}>
-                        {entry.status === "parsing" && "Parsing..."}
-                        {entry.status === "parsed" && "Parsing Complete"}
-                        {entry.status === "error" && (entry.error ?? "Error")}
-                      </span>
-                    </div>
-                    <button
-                      className={styles.removeFileBtn}
-                      onClick={() =>
-                        setContextUploads((prev) => prev.filter((f) => f.id !== entry.id))
-                      }
-                    >
-                      <X size={14} />
-                    </button>
+                    {/* Extracted sections preview */}
+                    {exactDocument.status === "parsed" && exactDocument.sections && (
+                      <div className={styles.sectionsPreview}>
+                        <p className={styles.sectionsPreviewLabel}>
+                          Extracted Sections ({exactDocument.sections.length})
+                        </p>
+                        <div className={styles.sectionsList}>
+                          {exactDocument.sections.map((s, i) => {
+                            const level = s.level || 1;
+                            const indentPx = (level - 1) * 20;
+                            return (
+                              <div
+                                key={s.id}
+                                className={styles.sectionPreviewItem}
+                                style={{ paddingLeft: `${indentPx}px` }}
+                              >
+                                <span className={styles.sectionOrder}>{i + 1}</span>
+                                <span
+                                  className={styles.sectionTitle}
+                                  style={{ fontWeight: level === 1 ? 600 : 400 }}
+                                >
+                                  {s.title}
+                                </span>
+                                {s.parentId && (
+                                  <span className={styles.childIndicator} title="Child section">
+                                    â†³
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
+
+              {/* â”€â”€ SECTION 2: Context Documents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+              <div className={styles.section}>
+                <div className={styles.sectionHeader}>
+                  <label className={styles.label} style={{ marginBottom: 0, fontWeight: 400 }}>
+                    Context Documents
+                  </label>
+                </div>
+
+                {/* Existing KB docs */}
+                {selectedClient && (selectedClient.documents || []).length > 0 && (
+                  <div className={styles.documentsSection}>
+                    <div className={styles.documentsHeader}>
+                      <span className={styles.documentsTitle}>Knowledge Base</span>
+                      <button className={styles.toggleAllBtn} onClick={toggleAllDocuments}>
+                        {selectedDocuments.size ===
+                        (selectedClient.documents || []).filter((d) => d.status === "parsed").length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                    </div>
+                    <div className={styles.documentsList}>
+                      {(selectedClient.documents || [])
+                        .filter((d) => d.status === "parsed")
+                        .map((doc) => (
+                          <button
+                            key={doc.id}
+                            className={`${styles.documentItem} ${
+                              selectedDocuments.has(doc.id) ? styles.selectedDocument : ""
+                            }`}
+                            onClick={() => toggleDocument(doc.id)}
+                          >
+                            <span className={styles.docCheckbox}>
+                              {selectedDocuments.has(doc.id) ? (
+                                <CheckSquare size={16} className={styles.checkIcon} />
+                              ) : (
+                                <Square size={16} />
+                              )}
+                            </span>
+                            <FileText size={14} className={styles.docFileIcon} />
+                            <span className={styles.docName}>{doc.name}</span>
+                            <span className={styles.docSize}>
+                              {formatFileSize(doc.sizeBytes || 0)}
+                            </span>
+                            {doc.s3FileUrl && (
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewDocument(selectedClientId!, doc);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.stopPropagation();
+                                    handleViewDocument(selectedClientId!, doc);
+                                  }
+                                }}
+                                title="View file"
+                                style={{
+                                  marginLeft: "auto",
+                                  opacity: viewingDocId === doc.id ? 0.4 : 0.6,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <ExternalLink size={13} />
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload additional context files */}
+                <label
+                  className={`${styles.uploadArea} ${contextDragOver ? styles.dragOver : ""} ${styles.uploadAreaCompact}`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setContextDragOver(true);
+                  }}
+                  onDragLeave={() => setContextDragOver(false)}
+                  onDrop={handleContextDrop}
+                >
+                  <input
+                    ref={contextInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={handleContextInputChange}
+                  />
+                  <Upload size={20} className={styles.uploadIcon} />
+                  <span className={styles.uploadText}>Add more context files</span>
+                </label>
+
+                {/* Context uploads in progress */}
+                {contextUploads.length > 0 && (
+                  <div className={styles.uploadedFilesList}>
+                    {contextUploads.map((entry) => (
+                      <div key={entry.id} className={styles.uploadedFileItem}>
+                        <div className={styles.fileIcon}>
+                          {entry.status === "parsing" ? (
+                            <Loader2 size={16} className={styles.spinIcon} />
+                          ) : entry.status === "parsed" ? (
+                            <CheckCircle size={16} className={styles.successIcon} />
+                          ) : (
+                            <AlertCircle size={16} className={styles.errorIcon} />
+                          )}
+                        </div>
+                        <div className={styles.fileInfo}>
+                          <span className={styles.fileName}>{entry.file.name}</span>
+                          <span className={styles.fileSize}>
+                            {entry.status === "parsing" && "Parsing..."}
+                            {entry.status === "parsed" && "Parsing Complete"}
+                            {entry.status === "error" && (entry.error ?? "Error")}
+                          </span>
+                        </div>
+                        <button
+                          className={styles.removeFileBtn}
+                          onClick={() =>
+                            setContextUploads((prev) => prev.filter((f) => f.id !== entry.id))
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

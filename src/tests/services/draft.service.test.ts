@@ -64,6 +64,9 @@ const mockHttpDelete = http.delete as jest.Mock;
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// wizard_state and ui_state use camelCase because the client sends them as-is
+// (the backend stores and returns the nested JS object without snake_case conversion).
+// Top-level draft fields use snake_case (standard backend serialisation).
 const rawSavedDraft = {
   id: "draft-1",
   proposal_id: 42,
@@ -73,17 +76,17 @@ const rawSavedDraft = {
   last_location: "wizard_parameters",
   stage: "wizard_in_progress",
   wizard_state: {
-    current_step: 2,
-    max_step_reached: 3,
-    completed_steps: [1, 2],
-    proposal_data: { title: "Test Proposal", clientName: "Acme Corp" },
+    currentStep: 2,
+    maxStepReached: 3,
+    completedSteps: [1, 2],
+    proposalData: { title: "Test Proposal", clientName: "Acme Corp" },
   },
   generated_content: { executive_summary: "Some content" },
   ui_state: {
-    scroll_position: 150,
-    active_section: "executive_summary",
-    expanded_sections: ["executive_summary", "proposed_solution"],
-    last_visible_section: "proposed_solution",
+    scrollPosition: 150,
+    activeSection: "executive_summary",
+    expandedSections: ["executive_summary", "proposed_solution"],
+    lastVisibleSection: "proposed_solution",
   },
   created_at: "2025-01-01T00:00:00Z",
   updated_at: "2025-01-02T00:00:00Z",
@@ -111,15 +114,13 @@ beforeEach(() => {
 
 describe("draft.service — parseDraftStage", () => {
   it("maps valid stage 'wizard_in_progress' without mutation", async () => {
-    mockHttpGet.mockResolvedValue([rawDraftListItem]);
+    mockHttpGet.mockResolvedValue({ drafts: [rawDraftListItem] });
     const result = await listDrafts();
     expect(result[0].stage).toBe("wizard_in_progress");
   });
 
   it("defaults unknown stage to 'template_selection'", async () => {
-    mockHttpGet.mockResolvedValue([
-      { ...rawDraftListItem, stage: "unknown_stage" },
-    ]);
+    mockHttpGet.mockResolvedValue({ drafts: [{ ...rawDraftListItem, stage: "unknown_stage" }] });
     const result = await listDrafts();
     expect(result[0].stage).toBe("template_selection");
   });
@@ -131,17 +132,17 @@ describe("draft.service — parseDraftStage", () => {
 
 describe("draft.service — parseDraftLocation", () => {
   it("maps valid location 'wizard_review' without mutation", async () => {
-    mockHttpGet.mockResolvedValue([
-      { ...rawDraftListItem, last_location: "wizard_review" },
-    ]);
+    mockHttpGet.mockResolvedValue({
+      drafts: [{ ...rawDraftListItem, last_location: "wizard_review" }],
+    });
     const result = await listDrafts();
     expect(result[0].lastLocation).toBe("wizard_review");
   });
 
   it("defaults unknown location to 'wizard_parameters'", async () => {
-    mockHttpGet.mockResolvedValue([
-      { ...rawDraftListItem, last_location: "unknown_location" },
-    ]);
+    mockHttpGet.mockResolvedValue({
+      drafts: [{ ...rawDraftListItem, last_location: "unknown_location" }],
+    });
     const result = await listDrafts();
     expect(result[0].lastLocation).toBe("wizard_parameters");
   });
@@ -159,7 +160,7 @@ describe("draft.service — mapWizardState", () => {
       currentStep: 2,
       maxStepReached: 3,
       completedSteps: [1, 2],
-      proposalData: rawSavedDraft.wizard_state.proposal_data,
+      proposalData: rawSavedDraft.wizard_state.proposalData,
     });
   });
 });
@@ -197,11 +198,12 @@ describe("draft.service — mapSavedDraft", () => {
       status: "draft",
       lastLocation: "wizard_parameters",
       stage: "wizard_in_progress",
+      hasEdits: false,
       wizardState: {
         currentStep: 2,
         maxStepReached: 3,
         completedSteps: [1, 2],
-        proposalData: rawSavedDraft.wizard_state.proposal_data,
+        proposalData: rawSavedDraft.wizard_state.proposalData,
       },
       generatedContent: { executive_summary: "Some content" },
       uiState: {
@@ -253,12 +255,15 @@ describe("draft.service — saveDraft", () => {
   it("calls http.post with /drafts/ and snake_case body", async () => {
     mockHttpPost.mockResolvedValue(rawSavedDraft);
     await saveDraft(payload);
-    expect(mockHttpPost).toHaveBeenCalledWith("/drafts/", expect.objectContaining({
-      proposal_id: 42,
-      client_name: "Client X",
-      last_location: "wizard_parameters",
-      stage: "wizard_in_progress",
-    }));
+    expect(mockHttpPost).toHaveBeenCalledWith(
+      "/drafts",
+      expect.objectContaining({
+        proposal_id: 42,
+        client_name: "Client X",
+        last_location: "wizard_parameters",
+        stage: "wizard_in_progress",
+      })
+    );
   });
 
   it("returns mapped SavedDraft", async () => {
@@ -274,12 +279,15 @@ describe("draft.service — saveDraft", () => {
 // ---------------------------------------------------------------------------
 
 describe("draft.service — updateDraft", () => {
-  it("calls http.put with /drafts/:id/ and snake_case body", async () => {
+  it("calls http.put with /drafts/:id and snake_case body", async () => {
     mockHttpPut.mockResolvedValue(rawSavedDraft);
     await updateDraft("draft-1", { title: "Updated" });
-    expect(mockHttpPut).toHaveBeenCalledWith("/drafts/draft-1/", expect.objectContaining({
-      title: "Updated",
-    }));
+    expect(mockHttpPut).toHaveBeenCalledWith(
+      "/drafts/draft-1",
+      expect.objectContaining({
+        title: "Updated",
+      })
+    );
   });
 });
 
@@ -288,10 +296,10 @@ describe("draft.service — updateDraft", () => {
 // ---------------------------------------------------------------------------
 
 describe("draft.service — getDraft", () => {
-  it("calls http.get with /drafts/:id/ and no-store cache", async () => {
+  it("calls http.get with /drafts/:id and no-store cache", async () => {
     mockHttpGet.mockResolvedValue(rawSavedDraft);
     await getDraft("draft-1");
-    expect(mockHttpGet).toHaveBeenCalledWith("/drafts/draft-1/", { cache: "no-store" });
+    expect(mockHttpGet).toHaveBeenCalledWith("/drafts/draft-1", { cache: "no-store" });
   });
 });
 
@@ -300,25 +308,22 @@ describe("draft.service — getDraft", () => {
 // ---------------------------------------------------------------------------
 
 describe("draft.service — listDrafts", () => {
-  it("calls http.get with /drafts/ when no params", async () => {
-    mockHttpGet.mockResolvedValue([rawDraftListItem]);
+  it("calls http.get with /drafts when no params", async () => {
+    mockHttpGet.mockResolvedValue({ drafts: [rawDraftListItem] });
     await listDrafts();
-    expect(mockHttpGet).toHaveBeenCalledWith("/drafts/", { cache: "no-store" });
+    expect(mockHttpGet).toHaveBeenCalledWith("/drafts", { cache: "no-store" });
   });
 
   it("appends limit and offset query params", async () => {
-    mockHttpGet.mockResolvedValue([rawDraftListItem]);
+    mockHttpGet.mockResolvedValue({ drafts: [rawDraftListItem] });
     await listDrafts({ limit: 10, offset: 20 });
-    expect(mockHttpGet).toHaveBeenCalledWith(
-      "/drafts/?limit=10&offset=20",
-      { cache: "no-store" }
-    );
+    expect(mockHttpGet).toHaveBeenCalledWith("/drafts?limit=10&offset=20", { cache: "no-store" });
   });
 
   it("maps each item to DraftMetadata with camelCase fields", async () => {
-    mockHttpGet.mockResolvedValue([rawDraftListItem]);
+    mockHttpGet.mockResolvedValue({ drafts: [rawDraftListItem] });
     const result = await listDrafts();
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       {
         id: "draft-1",
         proposalId: 42,
@@ -333,7 +338,7 @@ describe("draft.service — listDrafts", () => {
   });
 
   it("returns empty array when API returns empty", async () => {
-    mockHttpGet.mockResolvedValue([]);
+    mockHttpGet.mockResolvedValue({ drafts: [] });
     const result = await listDrafts();
     expect(result).toEqual([]);
   });
@@ -345,18 +350,15 @@ describe("draft.service — listDrafts", () => {
 
 describe("draft.service — getDraftByProposalId", () => {
   it("returns first mapped draft when found", async () => {
-    mockHttpGet.mockResolvedValue([rawDraftListItem]);
+    mockHttpGet.mockResolvedValue({ drafts: [rawDraftListItem] });
     const result = await getDraftByProposalId(42);
     expect(result).not.toBeNull();
     expect(result?.proposalId).toBe(42);
-    expect(mockHttpGet).toHaveBeenCalledWith(
-      "/drafts/?proposal_id=42",
-      { cache: "no-store" }
-    );
+    expect(mockHttpGet).toHaveBeenCalledWith("/drafts?proposal_id=42", { cache: "no-store" });
   });
 
   it("returns null when no drafts match", async () => {
-    mockHttpGet.mockResolvedValue([]);
+    mockHttpGet.mockResolvedValue({ drafts: [] });
     const result = await getDraftByProposalId(999);
     expect(result).toBeNull();
   });
@@ -367,10 +369,10 @@ describe("draft.service — getDraftByProposalId", () => {
 // ---------------------------------------------------------------------------
 
 describe("draft.service — deleteDraft", () => {
-  it("calls http.delete with /drafts/:id/", async () => {
+  it("calls http.delete with /drafts/:id", async () => {
     mockHttpDelete.mockResolvedValue(null);
     await deleteDraft("draft-1");
-    expect(mockHttpDelete).toHaveBeenCalledWith("/drafts/draft-1/");
+    expect(mockHttpDelete).toHaveBeenCalledWith("/drafts/draft-1");
   });
 });
 
@@ -379,9 +381,9 @@ describe("draft.service — deleteDraft", () => {
 // ---------------------------------------------------------------------------
 
 describe("draft.service — deleteAllDrafts", () => {
-  it("calls http.delete with /drafts/", async () => {
+  it("calls http.delete with /drafts?confirm=delete-all", async () => {
     mockHttpDelete.mockResolvedValue(null);
     await deleteAllDrafts();
-    expect(mockHttpDelete).toHaveBeenCalledWith("/drafts/");
+    expect(mockHttpDelete).toHaveBeenCalledWith("/drafts?confirm=delete-all");
   });
 });

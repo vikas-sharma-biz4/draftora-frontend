@@ -20,9 +20,14 @@ export {
   getDownloadUrl,
   cancelProposal,
   updateApprovalStatus,
+  estimateProposalHours,
 } from "./proposal/proposalCrud.service";
 
-export type { ProposalStatus, ListProposalsParams, PaginatedProposalResponse } from "./proposal/proposalCrud.service";
+export type {
+  ProposalStatus,
+  ListProposalsParams,
+  PaginatedProposalResponse,
+} from "./proposal/proposalCrud.service";
 
 export {
   updateSection,

@@ -21,6 +21,7 @@ export {
   getDownloadUrl,
   cancelProposal,
   updateApprovalStatus,
+  estimateProposalHours,
 } from "./proposalCrud.service";
 
 export type { ProposalStatus, ListProposalsParams } from "./proposalCrud.service";
@@ -34,10 +35,7 @@ export {
   reorderProposalSections,
 } from "./proposalSections.service";
 
-export type {
-  AddSectionPayload,
-  ReorderSectionsPayload,
-} from "./proposalSections.service";
+export type { AddSectionPayload, ReorderSectionsPayload } from "./proposalSections.service";
 
 // Template parsing & AI recommendations
 export {
@@ -64,7 +62,4 @@ export type {
 } from "./templateParser.service";
 
 // Wizard step navigation
-export {
-  markProposalStepVisited,
-  validateProposalStepAccess,
-} from "./proposalWizard.service";
+export { markProposalStepVisited, validateProposalStepAccess } from "./proposalWizard.service";

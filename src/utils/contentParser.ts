@@ -33,17 +33,34 @@ export function isGeneratedImageContent(content: string): boolean {
   return content.startsWith(IMAGE_SECTION_URL_PREFIX);
 }
 
+/** Separator used by the backend to embed the architecture description after the image URL. */
+export const ARCH_DESCRIPTION_SEPARATOR = "\n\n[ARCH_DESCRIPTION]\n";
+
 /**
  * Parse a GENERATED_IMAGE:: content string into an ordered list of URLs.
  * Supports pipe-separated multi-image user-flow chunks.
+ * Strips the [ARCH_DESCRIPTION] block that architecture diagrams append after the URL.
  */
 export function parseGeneratedImageUrls(content: string): string[] {
   if (!isGeneratedImageContent(content)) return [];
-  return content
-    .slice(IMAGE_SECTION_URL_PREFIX.length)
+  let raw = content.slice(IMAGE_SECTION_URL_PREFIX.length);
+  // Strip architecture description block so it never corrupts the img src attribute.
+  const archIdx = raw.indexOf(ARCH_DESCRIPTION_SEPARATOR);
+  if (archIdx !== -1) raw = raw.slice(0, archIdx);
+  return raw
     .split("|")
     .map((u) => u.trim())
     .filter(Boolean);
+}
+
+/**
+ * Extract the architecture description text embedded after [ARCH_DESCRIPTION] in
+ * a GENERATED_IMAGE:: content string. Returns null if no description is present.
+ */
+export function parseArchitectureDescription(content: string): string | null {
+  const idx = content.indexOf(ARCH_DESCRIPTION_SEPARATOR);
+  if (idx === -1) return null;
+  return content.slice(idx + ARCH_DESCRIPTION_SEPARATOR.length).trim() || null;
 }
 
 export type SectionContentType = "table" | "bullets" | "diagram" | "paragraph";
@@ -51,10 +68,7 @@ export type SectionContentType = "table" | "bullets" | "diagram" | "paragraph";
 /**
  * Detect the rendering type for a proposal section based on its key and content.
  */
-export function detectContentType(
-  sectionKey: string,
-  content: string
-): SectionContentType {
+export function detectContentType(sectionKey: string, content: string): SectionContentType {
   if (DIAGRAM_SECTION_KEYS.includes(sectionKey)) return "diagram";
   if (/^\|.+\|$/m.test(content)) return "table";
   if (/^[-*]\s+/m.test(content) || /^\d+\.\s+/m.test(content)) return "bullets";
@@ -226,11 +240,11 @@ function convertInlineMarkdownToHtml(text: string): string {
   let result = text;
 
   // 0. Remove escaped backslashes (\\text\\ → text)
-  result = result.replace(/\\\\([^\\]+)\\\\/g, '$1');
-  result = result.replace(/\\\\/g, '');
+  result = result.replace(/\\\\([^\\]+)\\\\/g, "$1");
+  result = result.replace(/\\\\/g, "");
 
   // 1. Code blocks first (highest priority - don't process markdown inside code)
-  result = result.replace(/`([^`]+)`/g, '<code>$1</code>');
+  result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
 
   // 2. Images (before links - images use ![alt](url) syntax)
   // Only match complete image markdown syntax
@@ -246,13 +260,13 @@ function convertInlineMarkdownToHtml(text: string): string {
   result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 
   // 4. Bold (before italic to handle *** correctly)
-  result = result.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  result = result.replace(/\*\*([^*]+?)\*\*/g, "<strong>$1</strong>");
 
   // 5. Italic (after bold)
-  result = result.replace(/\*([^*]+?)\*/g, '<em>$1</em>');
+  result = result.replace(/\*([^*]+?)\*/g, "<em>$1</em>");
 
   // 6. Strikethrough
-  result = result.replace(/~~([^~]+?)~~/g, '<s>$1</s>');
+  result = result.replace(/~~([^~]+?)~~/g, "<s>$1</s>");
 
   return result;
 }
@@ -268,9 +282,12 @@ export function plainTextToHtml(content: string): string {
   // Handle GENERATED_IMAGE:: prefix (architecture diagrams)
   if (isGeneratedImageContent(content)) {
     const urls = parseGeneratedImageUrls(content);
-    const images = urls.map(url =>
-      `<img src="${url}" alt="Generated diagram" style="max-width: 600px; height: auto; display: block; margin: 1rem 0; cursor: pointer;" />`
-    ).join('');
+    const images = urls
+      .map(
+        (url) =>
+          `<img src="${url}" alt="Generated diagram" style="max-width: 600px; height: auto; display: block; margin: 1rem 0; cursor: pointer;" />`
+      )
+      .join("");
     return images || "<p>Image not available</p>";
   }
 
@@ -296,11 +313,12 @@ export function plainTextToHtml(content: string): string {
       // Convert Markdown syntax in table headers and cells
       const ths = parsed.headers.map((h) => `<th>${convertInlineMarkdownToHtml(h)}</th>`).join("");
       const trs = parsed.rows
-        .map((row) => `<tr>${row.map((c) => `<td>${convertInlineMarkdownToHtml(c)}</td>`).join("")}</tr>`)
+        .map(
+          (row) =>
+            `<tr>${row.map((c) => `<td>${convertInlineMarkdownToHtml(c)}</td>`).join("")}</tr>`
+        )
         .join("");
-      parts.push(
-        `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`
-      );
+      parts.push(`<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`);
     }
     tableLines = [];
     inTable = false;

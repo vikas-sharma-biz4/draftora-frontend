@@ -5,9 +5,11 @@ import { useEffect, useState } from "react";
 import {
   isGeneratedImageContent,
   isHtmlContent,
+  parseArchitectureDescription,
   parseContentBlocks,
   parseGeneratedImageUrls,
 } from "@/utils/contentParser";
+import AIMarkdownRenderer from "@/components/proposal/AIMarkdownRenderer";
 import { sanitizeHtml } from "@/utils/sanitizeHtml";
 
 interface DiagramRendererProps {
@@ -32,6 +34,7 @@ export default function DiagramRenderer({
 }: DiagramRendererProps): JSX.Element {
   const hasGeneratedImage = isGeneratedImageContent(content);
   const imageUrls = hasGeneratedImage ? parseGeneratedImageUrls(content) : [];
+  const archDescription = hasGeneratedImage ? parseArchitectureDescription(content) : null;
   const [expandedUrl, setExpandedUrl] = useState<string | null>(null);
 
   // Close modal on Escape key
@@ -63,6 +66,9 @@ export default function DiagramRenderer({
                   background: "#fafafa",
                   padding: "12px 8px 8px",
                   boxSizing: "border-box",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-start",
                 }}
               >
                 <img
@@ -111,6 +117,13 @@ export default function DiagramRenderer({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Architecture description — rendered below the diagram when present */}
+      {archDescription && (
+        <div style={{ marginTop: 20 }}>
+          <AIMarkdownRenderer content={archDescription} />
         </div>
       )}
 
@@ -174,34 +187,35 @@ export default function DiagramRenderer({
       )}
 
       {/* Text content — skip rendering when content IS the image URL string */}
-      {!hasGeneratedImage && (() => {
-        const htmlContent = isHtmlContent(content);
-        const blocks = htmlContent ? null : parseContentBlocks(content);
-        return htmlContent ? (
-          <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }} />
-        ) : (
-          blocks?.map((block, i) => {
-            if (block.kind === "heading") {
-              return (
-                <h3 key={i} className="content-subheading">
-                  {block.text}
-                </h3>
-              );
-            }
-            if (block.kind === "bullets") {
-              const Tag = block.ordered ? "ol" : "ul";
-              return (
-                <Tag key={i}>
-                  {block.items.map((item, j) => (
-                    <li key={j}>{item}</li>
-                  ))}
-                </Tag>
-              );
-            }
-            return <p key={i}>{block.text}</p>;
-          })
-        );
-      })()}
+      {!hasGeneratedImage &&
+        (() => {
+          const htmlContent = isHtmlContent(content);
+          const blocks = htmlContent ? null : parseContentBlocks(content);
+          return htmlContent ? (
+            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }} />
+          ) : (
+            blocks?.map((block, i) => {
+              if (block.kind === "heading") {
+                return (
+                  <h3 key={i} className="content-subheading">
+                    {block.text}
+                  </h3>
+                );
+              }
+              if (block.kind === "bullets") {
+                const Tag = block.ordered ? "ol" : "ul";
+                return (
+                  <Tag key={i}>
+                    {block.items.map((item, j) => (
+                      <li key={j}>{item}</li>
+                    ))}
+                  </Tag>
+                );
+              }
+              return <p key={i}>{block.text}</p>;
+            })
+          );
+        })()}
     </div>
   );
 }

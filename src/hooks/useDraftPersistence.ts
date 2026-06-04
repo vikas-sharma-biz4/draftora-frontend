@@ -3,9 +3,20 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
-import { getDraftByProposalId, getDraft, updateDraft as updateDraftApi } from "@/services/draft.service";
-import type { DraftLocation, DraftUIState, SaveDraftPayload } from "@/interfaces/draftInterfaces";
-import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import {
+  getDraftByProposalId,
+  getDraft,
+  updateDraft as updateDraftApi,
+} from "@/services/draft.service";
+import { HttpError } from "@/config/httpClient";
+import type {
+  DraftLocation,
+  DraftStage,
+  DraftUIState,
+  SaveDraftPayload,
+} from "@/interfaces/draftInterfaces";
+import type { ProposalData, ProposalWizardData, WizardStep } from "@/interfaces/proposalInterfaces";
+import { buildDraftPayload } from "@/utils/draftUtils";
 import { logger } from "@/utils/logger";
 
 interface UseDraftPersistenceOptions {
@@ -45,25 +56,25 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
 
   const hasMountSavedRef = useRef(false);
 
-  const currentDraftId = useDraftSessionStore(state => state.currentDraftId);
-  const setCurrentDraftId = useDraftSessionStore(state => state.setCurrentDraftId);
-  const updateDraftInStore = useDraftStore(state => state.updateDraftApi);
-  const saveDraftToStore = useDraftStore(state => state.saveDraft);
+  const currentDraftId = useDraftSessionStore((state) => state.currentDraftId);
+  const setCurrentDraftId = useDraftSessionStore((state) => state.setCurrentDraftId);
+  const updateDraftInStore = useDraftStore((state) => state.updateDraftApi);
+  const saveDraftToStore = useDraftStore((state) => state.saveDraft);
 
   const saveDraft = useCallback(async (): Promise<void> => {
     if (!enabled || !proposal) {
-      logger.debug('[useDraftPersistence] Save disabled or no proposal data');
+      logger.debug("[useDraftPersistence] Save disabled or no proposal data");
       return;
     }
 
     if (!proposalId) {
-      logger.debug('[useDraftPersistence] No proposalId, skipping save');
+      logger.debug("[useDraftPersistence] No proposalId, skipping save");
       return;
     }
 
     // Skip auto-save for approved or rejected proposals (in History)
     if (approvalStatus === "approved" || approvalStatus === "rejected") {
-      logger.debug('[useDraftPersistence] Skipping save for history proposal', { approvalStatus });
+      logger.debug("[useDraftPersistence] Skipping save for history proposal", { approvalStatus });
       return;
     }
 
@@ -87,36 +98,34 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
           if (existingDraft) {
             const fullDraft = await getDraft(existingDraft.id);
             generatedContent = fullDraft.generatedContent || {};
-            logger.debug('[useDraftPersistence] Preserved existing generated content', {
-              sectionCount: Object.keys(generatedContent).length
+            logger.debug("[useDraftPersistence] Preserved existing generated content", {
+              sectionCount: Object.keys(generatedContent).length,
             });
           }
         } catch (error) {
-          logger.warn('[useDraftPersistence] Failed to fetch existing draft for content preservation', error);
+          logger.warn(
+            "[useDraftPersistence] Failed to fetch existing draft for content preservation",
+            error
+          );
         }
       }
 
-      // Construct wizard state
-      const wizardState = {
-        proposalData: proposal,
-        currentStep: wizardStep as any,
-        maxStepReached: wizardStep as any,
-        completedSteps: [],
-      };
-
-      const draftPayload: SaveDraftPayload = {
+      const draftPayload: SaveDraftPayload = buildDraftPayload({
         proposalId,
-        title: proposal.title || "Untitled Proposal",
-        clientName: proposal.clientName || "",
-        status: (proposal.status as any) || "draft",
+        title: proposal.title,
+        clientName: proposal.clientName,
+        status: (proposal.status || "draft") as SaveDraftPayload["status"],
         lastLocation,
-        stage: stage as any,
-        wizardState,
+        stage: stage as DraftStage,
+        proposalData: proposal as unknown as ProposalWizardData,
+        currentStep: wizardStep as WizardStep,
+        maxStepReached: wizardStep as WizardStep,
+        completedSteps: [],
         generatedContent,
         uiState,
-      };
+      });
 
-      logger.info('[useDraftPersistence] Saving draft', {
+      logger.info("[useDraftPersistence] Saving draft", {
         proposalId,
         hasGeneratedContent: Object.keys(draftPayload.generatedContent).length > 0,
         sectionCount: Object.keys(draftPayload.generatedContent).length,
@@ -127,28 +136,30 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
       if (currentDraftId) {
         try {
           await updateDraftInStore(currentDraftId, draftPayload);
-          logger.info('[useDraftPersistence] Draft updated', { draftId: currentDraftId });
+          logger.info("[useDraftPersistence] Draft updated", { draftId: currentDraftId });
         } catch (updateError) {
-          const is404 = updateError instanceof Error && (updateError as any).statusCode === 404;
+          const is404 = updateError instanceof HttpError && updateError.statusCode === 404;
           if (is404) {
             // Draft was deleted from backend — clear stale ID and create fresh
-            logger.warn('[useDraftPersistence] Draft not found (404), creating new draft', { currentDraftId });
+            logger.warn("[useDraftPersistence] Draft not found (404), creating new draft", {
+              currentDraftId,
+            });
             setCurrentDraftId(null);
             const saved = await saveDraftToStore(draftPayload);
             setCurrentDraftId(saved.id);
-            logger.info('[useDraftPersistence] Replacement draft created', { draftId: saved.id });
+            logger.info("[useDraftPersistence] Replacement draft created", { draftId: saved.id });
           } else {
-            logger.error('[useDraftPersistence] Draft update failed', updateError);
+            logger.error("[useDraftPersistence] Draft update failed", updateError);
           }
         }
       } else {
         // Create new draft and store ID
         const saved = await saveDraftToStore(draftPayload);
         setCurrentDraftId(saved.id);
-        logger.info('[useDraftPersistence] Draft created', { draftId: saved.id });
+        logger.info("[useDraftPersistence] Draft created", { draftId: saved.id });
       }
     } catch (error) {
-      logger.error('[useDraftPersistence] Save failed', error);
+      logger.error("[useDraftPersistence] Save failed", error);
     }
   }, [
     enabled,
@@ -184,8 +195,8 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [enabled, proposal, saveDraft]);
 
   // Save on visibility change (tab switch)
@@ -194,12 +205,12 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
 
     const handleVisibilityChange = (): void => {
       if (document.hidden && proposal) {
-        logger.info('[useDraftPersistence] Tab hidden, saving draft');
+        logger.info("[useDraftPersistence] Tab hidden, saving draft");
         void saveDraft();
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [enabled, proposal, saveDraft]);
 }
