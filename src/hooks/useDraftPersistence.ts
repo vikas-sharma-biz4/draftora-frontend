@@ -72,9 +72,11 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
       return;
     }
 
-    // Skip auto-save for approved or rejected proposals (in History)
-    if (approvalStatus === "approved" || approvalStatus === "rejected") {
-      logger.debug("[useDraftPersistence] Skipping save for history proposal", { approvalStatus });
+    const effectiveStatus = approvalStatus ?? proposal.approvalStatus;
+    if (skipIfApproved && (effectiveStatus === "approved" || effectiveStatus === "rejected")) {
+      logger.debug("[useDraftPersistence] Skipping save for history proposal", {
+        approvalStatus: effectiveStatus,
+      });
       return;
     }
 
@@ -184,20 +186,52 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
     void saveDraft();
   }, [saveOnMount, enabled, proposal, saveDraft]);
 
-  // Save on beforeunload (browser close/refresh)
+  // Save on beforeunload/pagehide (browser close/refresh)
   useEffect(() => {
     if (!enabled) return;
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent): void => {
-      if (proposal) {
-        // Try async save (may not complete before unload)
-        void saveDraft();
+    const handleBeforeUnload = (): void => {
+      if (!proposal || !proposalId) return;
+
+      const effectiveStatus = approvalStatus ?? proposal.approvalStatus;
+      if (skipIfApproved && (effectiveStatus === "approved" || effectiveStatus === "rejected")) {
+        return;
       }
+
+      // Synchronous localStorage fallback — async save may not complete before unload
+      try {
+        const FALLBACK_KEY = "drafts_autosave_fallback";
+        const existing: Array<{ id: string; title: string; clientName: string; savedAt: string }> =
+          JSON.parse(localStorage.getItem(FALLBACK_KEY) ?? "[]");
+        const id = proposalId.toString();
+        const entry = {
+          id,
+          title: proposal.title,
+          clientName: proposal.clientName,
+          savedAt: new Date().toISOString(),
+        };
+        const idx = existing.findIndex((e) => e.id === id);
+        if (idx >= 0) {
+          existing[idx] = entry;
+        } else {
+          existing.push(entry);
+        }
+        localStorage.setItem(FALLBACK_KEY, JSON.stringify(existing));
+      } catch {
+        // localStorage may be unavailable (private browsing, quota exceeded)
+      }
+
+      // Also attempt async save — may not complete before unload
+      void saveDraft();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [enabled, proposal, saveDraft]);
+    window.addEventListener("pagehide", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handleBeforeUnload);
+    };
+  }, [enabled, proposal, proposalId, approvalStatus, skipIfApproved, saveDraft]);
 
   // Save on visibility change (tab switch)
   useEffect(() => {

@@ -136,11 +136,7 @@ export default function ClientWorkspacePage(): JSX.Element {
       </div>
 
       <div className={styles.splitLayout}>
-        <ClientDocumentsPanel
-          documents={client.documents}
-          hasDocumentsWithoutS3={client.documents.some((d) => !d.s3FileUrl)}
-          docs={docs}
-        />
+        <ClientDocumentsPanel documents={client.documents} docs={docs} />
         <ClientProposalsList proposals={proposals} onNewProposal={handleNewProposal} />
       </div>
 
