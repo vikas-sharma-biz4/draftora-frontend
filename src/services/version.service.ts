@@ -35,16 +35,14 @@ function mapVersion(v: RawVersionApiResponse): ProposalVersion {
   };
 }
 
-export async function getVersionHistory(
-  proposalId: number
-): Promise<VersionHistory> {
+export async function getVersionHistory(proposalId: number): Promise<VersionHistory> {
   const data = await http.get<{
     proposal_id: number;
     current_version: number;
     versions: RawVersionApiResponse[];
     accepted_versions: number[];
     rejected_versions: number[];
-  }>(`/proposals/${proposalId}/versions/`, { cache: "no-store" });
+  }>(`/proposals/${proposalId}/versions`, { cache: "no-store" });
 
   return {
     proposalId: data.proposal_id,
@@ -56,14 +54,14 @@ export async function getVersionHistory(
 }
 
 export async function getVersion(versionId: string): Promise<ProposalVersion> {
-  const data = await http.get<RawVersionApiResponse>(`/versions/${versionId}/`, { cache: "no-store" });
+  const data = await http.get<RawVersionApiResponse>(`/versions/${versionId}`, {
+    cache: "no-store",
+  });
   return mapVersion(data);
 }
 
-export async function createVersion(
-  payload: CreateVersionPayload
-): Promise<ProposalVersion> {
-  const data = await http.post<RawVersionApiResponse>("/versions/", {
+export async function createVersion(payload: CreateVersionPayload): Promise<ProposalVersion> {
+  const data = await http.post<RawVersionApiResponse>("/versions", {
     proposal_id: payload.proposalId,
     source: payload.source,
     snapshot: payload.snapshot,
@@ -76,10 +74,9 @@ export async function createVersion(
 export async function updateVersionDecision(
   payload: UpdateVersionDecisionPayload
 ): Promise<ProposalVersion> {
-  const data = await http.patch<RawVersionApiResponse>(
-    `/versions/${payload.versionId}/decision/`,
-    { decision: payload.decision }
-  );
+  const data = await http.patch<RawVersionApiResponse>(`/versions/${payload.versionId}/decision`, {
+    decision: payload.decision,
+  });
   return mapVersion(data);
 }
 
@@ -89,7 +86,7 @@ export async function regenerateFromVersion(
   const data = await http.post<{
     proposal_id: number;
     version_id: string;
-  }>(`/versions/${payload.versionId}/regenerate/`, {
+  }>(`/versions/${payload.versionId}/regenerate`, {
     modifications: payload.modifications,
   });
 
@@ -103,7 +100,7 @@ export async function saveEditedVersion(
   versionId: string,
   editedContent: Record<string, string>
 ): Promise<ProposalVersion> {
-  const data = await http.post<RawVersionApiResponse>(`/versions/${versionId}/edit/`, {
+  const data = await http.post<RawVersionApiResponse>(`/versions/${versionId}/edit`, {
     edited_content: editedContent,
   });
   return mapVersion(data);

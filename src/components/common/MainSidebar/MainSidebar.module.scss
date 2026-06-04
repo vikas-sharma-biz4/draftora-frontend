@@ -1,0 +1,290 @@
+// ─── Base ─────────────────────────────────────────────────────────────────────
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--color-sidebar-bg);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: var(--z-sidebar);
+  transition:
+    width 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  // ── Collapsed state (driven by data-collapsed attribute) ────────────────
+  &[data-collapsed="true"] {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+
+    .sidebarHeader {
+      display: none;
+    }
+    .sidebarToggleNav {
+      display: flex;
+    }
+
+    .sidebarStepLabel {
+      opacity: 0;
+      max-width: 0;
+      pointer-events: none;
+    }
+  }
+}
+
+// ─── Mobile variant (semantic placeholder — breakpoints via media queries) ────
+.sidebarMobile {
+}
+
+// ─── Backdrop (mobile overlay) ────────────────────────────────────────────────
+.sidebarBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: calc(var(--z-sidebar) - 1);
+  animation: fadeIn 0.2s ease;
+}
+
+// ─── Header: logo (left) + toggle (right) ────────────────────────────────────
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 60px;
+  padding: 0 10px 0 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+// ─── Logo ─────────────────────────────────────────────────────────────────────
+.sidebarLogoLink {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-decoration: none;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+.sidebarLogoFull {
+  height: 28px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+// ─── Toggle button (header) ───────────────────────────────────────────────────
+.sidebarToggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.08);
+    color: var(--color-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
+  }
+}
+
+// ─── Nav toggle (collapsed mode only) ─────────────────────────────────────────
+.sidebarToggleNav {
+  display: none;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  margin-bottom: 4px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.06);
+    color: var(--color-text);
+  }
+}
+
+// ─── Nav container ────────────────────────────────────────────────────────────
+.sidebarNav {
+  flex: 1;
+  padding: 12px 8px;
+  overflow: hidden;
+}
+
+// ─── Steps list ───────────────────────────────────────────────────────────────
+.sidebarSteps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+// ─── Nav item ─────────────────────────────────────────────────────────────────
+.sidebarStepItem {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+
+  &.active .sidebarNavLink {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  &.active .sidebarStepLabel {
+    font-weight: 600;
+  }
+}
+
+// ─── Nav link ─────────────────────────────────────────────────────────────────
+.sidebarNavLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  width: 100%;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.06);
+    color: var(--color-text);
+  }
+}
+
+// ─── Nav icon ─────────────────────────────────────────────────────────────────
+.sidebarNavIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+// ─── Nav label ────────────────────────────────────────────────────────────────
+.sidebarStepLabel {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+  max-width: 200px;
+  transition:
+    opacity 0.15s ease,
+    max-width 0.2s ease;
+}
+
+// ─── Active class ─────────────────────────────────────────────────────────────
+.active {
+}
+
+// ─── Responsive — tablet (≤ 1024px): auto-collapse ────────────────────────────
+@media (max-width: 1024px) {
+  .sidebar {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
+
+    .sidebarHeader {
+      display: none;
+    }
+    .sidebarToggleNav {
+      display: flex;
+    }
+
+    .sidebarStepLabel {
+      opacity: 0;
+      max-width: 0;
+      pointer-events: none;
+    }
+  }
+}
+
+// ─── Responsive — mobile (≤ 768px): overlay drawer ────────────────────────────
+@media (max-width: 768px) {
+  .sidebar {
+    transition:
+      transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+      width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+
+    // Collapsed on mobile: slide off-screen left
+    &[data-collapsed="true"] {
+      width: var(--sidebar-width) !important;
+      min-width: var(--sidebar-width) !important;
+      transform: translateX(-100%);
+    }
+
+    // Expanded on mobile: slide in and restore label visibility
+    &:not([data-collapsed="true"]) {
+      transform: translateX(0);
+      width: var(--sidebar-width) !important;
+      min-width: var(--sidebar-width) !important;
+
+      .sidebarHeader {
+        display: flex;
+      }
+      .sidebarToggleNav {
+        display: none;
+      }
+
+      .sidebarLogoLink {
+        opacity: 1;
+        pointer-events: auto;
+        flex: 1;
+        max-width: none;
+        overflow: hidden;
+      }
+
+      .sidebarStepLabel {
+        opacity: 1;
+        max-width: 200px;
+        pointer-events: auto;
+      }
+    }
+  }
+}

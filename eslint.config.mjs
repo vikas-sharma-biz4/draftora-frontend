@@ -1,32 +1,42 @@
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
-import nextTypescript from "eslint-config-next/typescript";
+import { FlatCompat } from "@eslint/eslintrc";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const compat = new FlatCompat({ baseDirectory: __dirname });
 
 const eslintConfig = [
-  ...nextCoreWebVitals,
-  ...nextTypescript,
+  ...compat.extends("next/core-web-vitals"),
   {
+    plugins: { "@typescript-eslint": tsPlugin },
     rules: {
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/explicit-function-return-type": "off",
       "react/display-name": "off",
-      "no-console": ["warn", { allow: ["warn", "error"] }],
-      // React Compiler rules (new in eslint-plugin-react-hooks v5 / Next.js 15+).
-      // Downgraded to warn to avoid blocking commits on pre-existing patterns.
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
+      "no-console": ["error", { allow: ["warn", "error"] }],
+      // warn now; upgrade to "error" once remaining pre-existing long files are refactored
+      "max-lines": ["warn", { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
   {
-    ignores: [
-      ".next/**",
-      "node_modules/**",
-      "dist/**",
-      "build/**",
-      "coverage/**",
+    // Test files: allow `any` for mocking patterns; keep other rules active
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/__tests__/**/*.ts",
+      "**/__tests__/**/*.tsx",
+      "**/e2e/**/*.ts",
     ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+  {
+    ignores: [".next/**", "node_modules/**", "dist/**", "build/**", "coverage/**"],
   },
 ];
 

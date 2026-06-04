@@ -1,3 +1,12 @@
-﻿"use client";
+"use client";
 
-export { default } from "@/views/dashboard/DashboardPage";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
+import DashboardPage from "@/views/dashboard/DashboardPage";
+
+export default function Page(): JSX.Element {
+  return (
+    <ErrorBoundary>
+      <DashboardPage />
+    </ErrorBoundary>
+  );
+}

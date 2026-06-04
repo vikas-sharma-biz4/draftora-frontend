@@ -1,6 +1,24 @@
+// Fail fast at build time if required env vars are missing.
+// Prevents a silent runtime failure where every API call goes to "undefined".
+const REQUIRED_ENV_VARS = ["NEXT_PUBLIC_API_URL"];
+
+for (const key of REQUIRED_ENV_VARS) {
+  if (!process.env[key]) {
+    throw new Error(
+      `[FATAL] Missing required environment variable: ${key}. ` +
+        "Add it to your .env file before building."
+    );
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  eslint: {
+    // ESLint runs in pre-commit hooks; skip the duplicate pass during next build
+    ignoreDuringBuilds: true,
+  },
 
   async headers() {
     return [
@@ -20,7 +38,7 @@ const nextConfig = {
     if (dev && !isServer) {
       config.watchOptions = {
         ...config.watchOptions,
-        ignored: ['**/node_modules', '**/.git', '**/.next'],
+        ignored: ["**/node_modules", "**/.git", "**/.next"],
       };
     }
 

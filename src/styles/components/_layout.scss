@@ -18,16 +18,18 @@
   width: calc(100% - var(--sidebar-width));
   height: 100vh;
   position: relative;
-  transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .main-content.no-top-padding {
   padding-top: 0;
 }
 
-// When sidebar is collapsed, shrink the offset
-.sidebar.collapsed + .main-content {
+// When sidebar is collapsed, shrink the offset.
+// Targets the <aside> element directly via the data-collapsed attribute set by MainSidebar.tsx.
+aside[data-collapsed="true"] + .main-content {
   margin-left: var(--sidebar-collapsed-width);
   width: calc(100% - var(--sidebar-collapsed-width));
 }
@@ -54,10 +56,24 @@
   gap: 12px;
 }
 
+// ─── Sidebar skeleton (loading placeholder for MainSidebar dynamic import) ────
+// Keeps the layout stable while the sidebar JS bundle loads.
+// Used by AppLayout.tsx: loading: () => <div className="sidebar-skeleton" />
+.sidebar-skeleton {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100vh;
+  background: var(--color-sidebar-bg);
+  border-right: 1px solid var(--color-border);
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-sidebar);
+}
+
 // ─── Responsive — tablet (≤ 1024px): sidebar auto-collapses ──────────────────
 @media (max-width: 1024px) {
-  .main-content,
-  .sidebar.collapsed + .main-content {
+  .main-content {
     margin-left: var(--sidebar-collapsed-width);
     width: calc(100% - var(--sidebar-collapsed-width));
     padding: 24px 32px;
@@ -66,8 +82,7 @@
 
 // ─── Responsive — mobile (≤ 768px): sidebar is overlay, content is full-width ─
 @media (max-width: 768px) {
-  .main-content,
-  .sidebar.collapsed + .main-content {
+  .main-content {
     margin-left: 0 !important;
     width: 100% !important;
     padding: 20px;

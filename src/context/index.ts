@@ -1,2 +1,1 @@
-// ProposalWizardProvider retained for localStorage hydration
-export { ProposalWizardProvider } from "./ProposalWizardContext";
+// ProposalWizardContext removed — persistence now handled by Zustand persist middleware in proposalWizardSlice

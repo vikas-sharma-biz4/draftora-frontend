@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import Button from "@/components/common/Button";
 import { getProposal } from "@/services/proposal.service";
 
+import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import {
   useTemplateType,
   useTemplateId,
@@ -20,6 +21,8 @@ import {
   useAiModel,
   useExactDocumentName,
   useOriginalSections,
+  useContextualInstructions,
+  useFilesMeta,
   useCurrentStep,
   useIsGenerating,
   useCurrentProposalId,
@@ -37,6 +40,7 @@ import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { SECTION_DISPLAY_NAMES, TEMPLATE_TOCS } from "@/constants";
+import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 
 import SectionManager from "./SectionManager";
 import ToneSelector from "./ToneSelector";
@@ -104,14 +108,25 @@ export default function ParametersPage(): JSX.Element {
   const aiModel = useAiModel();
   const exactDocumentName = useExactDocumentName();
   const originalSections = useOriginalSections();
+  const contextualInstructions = useContextualInstructions();
+  const filesMeta = useFilesMeta();
   const currentStep = useCurrentStep();
   const isGenerating = useIsGenerating();
   const currentProposalId = useCurrentProposalId();
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
   const approvalStatus = useApprovalStatus();
-  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setEditMode, setMaxStepReached, setCurrentProposalId } = useWizardActions();
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
+  const {
+    updateProposalData,
+    setCurrentStep,
+    setIsGenerating,
+    setGeneratedProposalId,
+    setEditMode,
+    setMaxStepReached,
+    setCurrentProposalId,
+  } = useWizardActions();
+  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } =
+    usePipelineSteps();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
@@ -140,13 +155,15 @@ export default function ParametersPage(): JSX.Element {
     if (urlProposalId || currentProposalId) {
       const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
       if (proposalIdToFetch) {
-        getProposal(proposalIdToFetch).then((data: any) => {
-          if (data?.approvalStatus) {
-            updateProposalData({ approvalStatus: data.approvalStatus });
-          }
-        }).catch((error: unknown) => {
-          logger.warn('[ParametersPage] Failed to fetch proposal for approvalStatus', error);
-        });
+        getProposal(proposalIdToFetch)
+          .then((data: ProposalData) => {
+            if (data?.approvalStatus) {
+              updateProposalData({ approvalStatus: data.approvalStatus });
+            }
+          })
+          .catch((error: unknown) => {
+            logger.warn("[ParametersPage] Failed to fetch proposal for approvalStatus", error);
+          });
       }
     }
   }, [searchParams, currentProposalId, updateProposalData]);
@@ -193,7 +210,16 @@ export default function ParametersPage(): JSX.Element {
         markStepVisitedOnBackend(proposalIdToSync, 3);
       }
     }
-  }, [searchParams, currentProposalId, visitedPipelineSteps, markStepVisitedOnBackend, usePipelineStore, setDraftStage, setCompletedSteps, setMaxStepReached]);
+  }, [
+    searchParams,
+    currentProposalId,
+    visitedPipelineSteps,
+    markStepVisitedOnBackend,
+    usePipelineStore,
+    setDraftStage,
+    setCompletedSteps,
+    setMaxStepReached,
+  ]);
 
   // Compute sections from templateType - DERIVED STATE (not stored)
   const computedSections = useMemo(() => {
@@ -201,19 +227,18 @@ export default function ParametersPage(): JSX.Element {
     if (templateType && ["mvp", "design", "poc"].includes(templateType)) {
       const templateSections = getTemplateSections(templateType);
       if (templateSections.length > 0) {
-        logger.info('[ParametersPage] computedSections: using template sections', { templateType, count: templateSections.length });
+        logger.info("[ParametersPage] computedSections: using template sections", {
+          templateType,
+          count: templateSections.length,
+        });
         return templateSections;
       }
     }
     // Otherwise, use the existing sections from proposalData or recreate mode
-    const built = buildSectionItems(
-      selectedSections,
-      sectionDisplayNames,
-      originalSections
-    );
-    logger.info('[ParametersPage] computedSections: built from store', {
+    const built = buildSectionItems(selectedSections, sectionDisplayNames, originalSections);
+    logger.info("[ParametersPage] computedSections: built from store", {
       selectedSectionsCount: selectedSections.length,
-      builtCount: built.length
+      builtCount: built.length,
     });
     return built;
   }, [templateType, selectedSections, sectionDisplayNames, originalSections]);
@@ -237,12 +262,17 @@ export default function ParametersPage(): JSX.Element {
       if (templateSections.length > 0) {
         // Only sync if sections is empty (initial load) or if templateType just changed
         // AND the user hasn't made manual modifications
-        if (sections.length === 0 || (!hasModifiedSections && JSON.stringify(sections.map(s => s.key)) !== JSON.stringify(templateSections.map(s => s.key)))) {
-          logger.info('[ParametersPage] Syncing from template sections', {
+        if (
+          sections.length === 0 ||
+          (!hasModifiedSections &&
+            JSON.stringify(sections.map((s) => s.key)) !==
+              JSON.stringify(templateSections.map((s) => s.key)))
+        ) {
+          logger.info("[ParametersPage] Syncing from template sections", {
             templateType,
             templateCount: templateSections.length,
             currentCount: sections.length,
-            hasModifiedSections
+            hasModifiedSections,
           });
           setSections(templateSections);
           setHasModifiedSections(false);
@@ -262,14 +292,15 @@ export default function ParametersPage(): JSX.Element {
     }
     // Only update if different from store
     const keysChanged = JSON.stringify(keys) !== JSON.stringify(selectedSections);
-    const displayNamesChanged = JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
+    const displayNamesChanged =
+      JSON.stringify(displayNames) !== JSON.stringify(sectionDisplayNames);
     if (keysChanged || displayNamesChanged) {
-      logger.info('[ParametersPage] Syncing local sections to store', {
+      logger.info("[ParametersPage] Syncing local sections to store", {
         keysCount: keys.length,
         displayNamesCount: Object.keys(displayNames).length,
         keysChanged,
         displayNamesChanged,
-        hasModifiedSections
+        hasModifiedSections,
       });
       updateProposalData({
         selectedSections: keys,
@@ -278,7 +309,6 @@ export default function ParametersPage(): JSX.Element {
       });
     }
   }, [sections, selectedSections, sectionDisplayNames, updateProposalData]);
-
 
   // Sync computed sections to store when they change (only for non-template modes)
   // DISABLED: This causes race conditions with manual section additions
@@ -330,7 +360,7 @@ export default function ParametersPage(): JSX.Element {
   // Restore scroll position from draft UI state
   useEffect(() => {
     try {
-      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      const uiStateStr = sessionStorage.getItem(DRAFT_UI_STATE_STORAGE_KEY);
       if (uiStateStr) {
         const uiState = JSON.parse(uiStateStr);
         if (uiState.scrollPosition > 0) {
@@ -341,7 +371,7 @@ export default function ParametersPage(): JSX.Element {
             });
           }, 300);
         }
-        sessionStorage.removeItem("draft_ui_state");
+        sessionStorage.removeItem(DRAFT_UI_STATE_STORAGE_KEY);
       }
     } catch {
       // Ignore errors restoring UI state
@@ -349,7 +379,9 @@ export default function ParametersPage(): JSX.Element {
   }, []);
 
   const handleSaveDraftWithSync = useCallback(async (): Promise<void> => {
-    // Sync local sections state to store before saving
+    // Sync local sections state to store before saving.
+    // Zustand's set is synchronous, and useSaveDraft reads via getState() at call-time,
+    // so the updated values are available immediately — no delay required.
     const keys = sections.map((s) => s.key);
     const displayNames: Record<string, string> = {};
     for (const s of sections) {
@@ -362,10 +394,6 @@ export default function ParametersPage(): JSX.Element {
       customSections: [],
     });
 
-    // Wait longer for state update to complete
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Then call the save draft function
     await handleSaveDraft();
   }, [sections, updateProposalData, handleSaveDraft]);
 
@@ -404,83 +432,97 @@ export default function ParametersPage(): JSX.Element {
     if (isRegenerating) {
       toast.info("Parameters updated. Review and regenerate to apply changes");
     }
-  }, [sections, updateProposalData, currentProposalId, markStepVisitedOnBackend, markStepCompleted, setDraftStage, setCurrentStep, maxStepReached, setMaxStepReached, router, isRegenerating]);
+  }, [
+    sections,
+    updateProposalData,
+    currentProposalId,
+    markStepVisitedOnBackend,
+    markStepCompleted,
+    setDraftStage,
+    setCurrentStep,
+    maxStepReached,
+    setMaxStepReached,
+    router,
+    isRegenerating,
+  ]);
 
-
-  const handleSectionsChange = useCallback((newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
-    // Mark that user has made manual modifications
-    setHasModifiedSections(true);
-    setSections(newSections);
-  }, []);
+  const handleSectionsChange = useCallback(
+    (newSections: SectionItem[] | ((prev: SectionItem[]) => SectionItem[])): void => {
+      // Mark that user has made manual modifications
+      setHasModifiedSections(true);
+      setSections(newSections);
+    },
+    []
+  );
 
   return (
     <PageLayout noPadding>
-        <DynamicPipeline
-          currentStage={draftStage}
-          completedSteps={completedSteps}
-          visitedSteps={visitedPipelineSteps}
-          visible={true}
-          proposalId={currentProposalId}
-          maxStepReached={maxStepReached}
-        />
-        <div className="page-badge">Phase 01</div>
-        <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
-        <p className="page-subtitle">
-          {isRecreateMode
-            ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
-            : "Review and refine the proposal structure. Reorder, rename, or remove sections — and set the tone for the generated content."}
-        </p>
+      <DynamicPipeline
+        currentStage={draftStage}
+        completedSteps={completedSteps}
+        visitedSteps={visitedPipelineSteps}
+        visible={true}
+        proposalId={currentProposalId}
+        maxStepReached={maxStepReached}
+      />
+      <div className="page-badge">Phase 01</div>
+      <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
+      <p className="page-subtitle">
+        {isRecreateMode
+          ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
+          : "Review and refine the proposal structure. Reorder, rename, or remove sections — and set the tone for the generated content."}
+      </p>
 
-        {isRecreateMode && (
-          <div className="recreate-banner">
-            <div>
-              <strong>Recreate Mode</strong>
-              {exactDocumentName && (
-                <span className="recreate-banner-file"> · {exactDocumentName}</span>
-              )}
-              <div className="recreate-banner-hint">
-                {originalSections?.length ?? 0} sections will be rewritten using new context.
-              </div>
+      {isRecreateMode && (
+        <div className="recreate-banner">
+          <div>
+            <strong>Recreate Mode</strong>
+            {exactDocumentName && (
+              <span className="recreate-banner-file"> · {exactDocumentName}</span>
+            )}
+            <div className="recreate-banner-hint">
+              {originalSections?.length ?? 0} sections will be rewritten using new context.
             </div>
           </div>
-        )}
-
-        <SectionManager
-          sections={memoizedSections}
-          onSectionsChange={handleSectionsChange}
-          proposalData={{
-            originalSections,
-            // Include other fields SectionManager might need
-          } as any}
-          onUpdateProposalData={updateProposalData}
-          isRecreateMode={isRecreateMode}
-          proposalId={currentProposalId}
-        />
-
-        <ToneSelector
-          value={tone}
-          onChange={(value) => updateProposalData({ tone: value })}
-        />
-
-        <LengthLanguageSelector
-          lengthPreference={lengthPreference}
-          language={language}
-          aiModel={aiModel ?? "gpt-4o"}
-          onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
-          onLanguageChange={(value) => updateProposalData({ language: value })}
-          onAiModelChange={(value) => updateProposalData({ aiModel: value })}
-        />
-
-        <div className="page-footer">
-          <Button variant="secondary" onClick={handleSaveDraftWithSync}>
-            Save Draft
-          </Button>
-          <div className="ml-auto">
-            <Button variant="primary" onClick={handleNext}>
-              Next
-            </Button>
-          </div>
         </div>
+      )}
+
+      <SectionManager
+        sections={memoizedSections}
+        onSectionsChange={handleSectionsChange}
+        proposalData={{
+          templateId,
+          sectionDisplayNames,
+          contextualInstructions,
+          exactDocumentName,
+          filesMeta,
+        }}
+        onUpdateProposalData={updateProposalData}
+        isRecreateMode={isRecreateMode}
+        proposalId={currentProposalId}
+      />
+
+      <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
+
+      <LengthLanguageSelector
+        lengthPreference={lengthPreference}
+        language={language}
+        aiModel={aiModel ?? "gpt-4o"}
+        onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
+        onLanguageChange={(value) => updateProposalData({ language: value })}
+        onAiModelChange={(value) => updateProposalData({ aiModel: value })}
+      />
+
+      <div className="page-footer">
+        <Button variant="secondary" onClick={handleSaveDraftWithSync}>
+          Save Draft
+        </Button>
+        <div className="ml-auto">
+          <Button variant="primary" onClick={handleNext}>
+            Next
+          </Button>
+        </div>
+      </div>
     </PageLayout>
   );
 }

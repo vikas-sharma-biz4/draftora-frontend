@@ -12,6 +12,7 @@ import styles from "./ReviewPage.module.scss";
 
 import { generateProposal, getProposal } from "@/services/proposal.service";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
+import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import {
   useProposalTitle,
   useClientName,
@@ -40,7 +41,12 @@ import {
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
-import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
+import type {
+  ToneOption,
+  LengthOption,
+  ProposalWizardData,
+  ProposalData,
+} from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useClients } from "@/hooks/useClients";
@@ -58,9 +64,12 @@ const ScopeEditorModal = dynamic(() => import("@/components/modals/ScopeEditorMo
   ssr: false,
 });
 
-const KnowledgeBaseSelectorModal = dynamic(() => import("@/components/modals/KnowledgeBaseSelectorModal"), {
-  ssr: false,
-});
+const KnowledgeBaseSelectorModal = dynamic(
+  () => import("@/components/modals/KnowledgeBaseSelectorModal"),
+  {
+    ssr: false,
+  }
+);
 
 const StyleVoiceEditorModal = dynamic(() => import("@/components/modals/StyleVoiceEditorModal"), {
   ssr: false,
@@ -97,32 +106,61 @@ export default function ReviewPage(): JSX.Element {
   const currentProposalId = useCurrentProposalId();
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
-  const { updateProposalData, setCurrentStep, setIsGenerating, setGeneratedProposalId, setCurrentProposalId, setEditMode, setMaxStepReached } = useWizardActions();
+  const {
+    updateProposalData,
+    setCurrentStep,
+    setIsGenerating,
+    setGeneratedProposalId,
+    setCurrentProposalId,
+    setEditMode,
+    setMaxStepReached,
+  } = useWizardActions();
 
   // Reconstruct proposalData object for backward compatibility with existing code
   // This is a temporary measure - the component should eventually use granular selectors directly
-  const proposalData = useMemo(() => ({
-    title,
-    clientName,
-    clientId,
-    description,
-    selectedSections,
-    sectionDisplayNames,
-    tone,
-    lengthPreference,
-    language,
-    aiModel,
-    templateId,
-    templateType,
-    files: [],
-    filesMeta,
-    selectedDocumentIds,
-    customSections: [],
-    contextualInstructions: "",
-    webReferences,
-  } as any), [title, clientName, clientId, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType, filesMeta, selectedDocumentIds, webReferences]);
+  const proposalData = useMemo(
+    () =>
+      ({
+        title,
+        clientName,
+        clientId,
+        description,
+        selectedSections,
+        sectionDisplayNames,
+        tone,
+        lengthPreference,
+        language,
+        aiModel,
+        templateId,
+        templateType,
+        files: [],
+        filesMeta,
+        selectedDocumentIds,
+        customSections: [],
+        contextualInstructions: "",
+        webReferences,
+      }) as ProposalWizardData,
+    [
+      title,
+      clientName,
+      clientId,
+      description,
+      selectedSections,
+      sectionDisplayNames,
+      tone,
+      lengthPreference,
+      language,
+      aiModel,
+      templateId,
+      templateType,
+      filesMeta,
+      selectedDocumentIds,
+      webReferences,
+    ]
+  );
 
-  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } = usePipelineSteps();
+  const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } =
+    usePipelineSteps();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
@@ -133,7 +171,11 @@ export default function ReviewPage(): JSX.Element {
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
   const approvalStatus = useApprovalStatus();
-  const { clients, isLoading: isLoadingClients, refetch: refetchClients } = useClients({ autoFetch: true });
+  const {
+    clients,
+    isLoading: isLoadingClients,
+    refetch: refetchClients,
+  } = useClients({ autoFetch: true });
 
   // Enable auto-save when user is in pipeline stage (but NOT during generation)
   useWizardAutoSave({ enabled: !isGenerating, debounceMs: 2000, approvalStatus });
@@ -152,13 +194,15 @@ export default function ReviewPage(): JSX.Element {
     if (urlProposalId || currentProposalId) {
       const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
       if (proposalIdToFetch) {
-        getProposal(proposalIdToFetch).then((data: any) => {
-          if (data?.approvalStatus) {
-            updateProposalData({ approvalStatus: data.approvalStatus });
-          }
-        }).catch((error: unknown) => {
-          logger.warn('[ReviewPage] Failed to fetch proposal for approvalStatus', error);
-        });
+        getProposal(proposalIdToFetch)
+          .then((data: ProposalData) => {
+            if (data?.approvalStatus) {
+              updateProposalData({ approvalStatus: data.approvalStatus });
+            }
+          })
+          .catch((error: unknown) => {
+            logger.warn("[ReviewPage] Failed to fetch proposal for approvalStatus", error);
+          });
       }
     }
   }, [searchParams, currentProposalId, updateProposalData]);
@@ -204,12 +248,19 @@ export default function ReviewPage(): JSX.Element {
         markStepVisitedOnBackend(proposalIdToSync, 3);
       }
     }
-  }, [searchParams, currentProposalId, visitedPipelineSteps, markStepVisitedOnBackend, usePipelineStore, setDraftStage, setCompletedSteps]);
+  }, [
+    searchParams,
+    currentProposalId,
+    visitedPipelineSteps,
+    markStepVisitedOnBackend,
+    usePipelineStore,
+    setDraftStage,
+    setCompletedSteps,
+  ]);
 
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
-  const [isOpeningKBModal, setIsOpeningKBModal] = useState<boolean>(false);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -218,19 +269,19 @@ export default function ReviewPage(): JSX.Element {
   // Reset isGenerating when landing on review page
   useEffect(() => {
     setIsGenerating(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Mark step 2 as visited when this page loads
   useEffect(() => {
     markStepCompleted(2);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Restore scroll position from draft UI state
   useEffect(() => {
     try {
-      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      const uiStateStr = sessionStorage.getItem(DRAFT_UI_STATE_STORAGE_KEY);
       if (uiStateStr) {
         const uiState = JSON.parse(uiStateStr);
         if (uiState.scrollPosition > 0) {
@@ -241,7 +292,7 @@ export default function ReviewPage(): JSX.Element {
             });
           }, 300);
         }
-        sessionStorage.removeItem("draft_ui_state");
+        sessionStorage.removeItem(DRAFT_UI_STATE_STORAGE_KEY);
       }
     } catch {
       // Ignore errors restoring UI state
@@ -263,7 +314,12 @@ export default function ReviewPage(): JSX.Element {
   useEffect(() => {
     if (proposalData.clientId && clients.length > 0) {
       const currentClient = clients.find((c) => c.id === proposalData.clientId);
-      if (currentClient && proposalData.filesMeta.length === 0 && proposalData.selectedDocumentIds && proposalData.selectedDocumentIds.length > 0) {
+      if (
+        currentClient &&
+        proposalData.filesMeta.length === 0 &&
+        proposalData.selectedDocumentIds &&
+        proposalData.selectedDocumentIds.length > 0
+      ) {
         const rebuiltMeta = currentClient.documents
           .filter((doc) => proposalData.selectedDocumentIds!.includes(Number(doc.id)))
           .map((doc) => ({
@@ -276,10 +332,20 @@ export default function ReviewPage(): JSX.Element {
         }
       }
     }
-  }, [proposalData.clientId, proposalData.selectedDocumentIds, proposalData.filesMeta.length, clients]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    proposalData.clientId,
+    proposalData.selectedDocumentIds,
+    proposalData.filesMeta.length,
+    clients,
+  ]);
 
-  function handleSaveScope(data: { title: string; clientName: string; clientId: number | null; description: string }): void {
-    logger.info('[ReviewPage] handleSaveScope called', data);
+  function handleSaveScope(data: {
+    title: string;
+    clientName: string;
+    clientId: number | null;
+    description: string;
+  }): void {
+    logger.info("[ReviewPage] handleSaveScope called", data);
     updateProposalData({
       title: data.title,
       clientName: data.clientName,
@@ -294,20 +360,16 @@ export default function ReviewPage(): JSX.Element {
     }, 0);
   }
 
-  async function handleOpenKnowledgeBase(): Promise<void> {
-    setIsOpeningKBModal(true);
-    try {
-      // Force-refresh from API so the modal has accurate data:
-      // - client existence is confirmed (not stale localStorage cache)
-      // - document list reflects current backend state
-      await refetchClients();
-    } finally {
-      setIsOpeningKBModal(false);
-    }
+  function handleOpenKnowledgeBase(): void {
     setShowKnowledgeBaseModal(true);
+    // Refresh client data in the background so the modal has up-to-date info
+    refetchClients();
   }
 
-  async function handleSaveKnowledgeBase(selectedIds: string[], hasNewUploads: boolean): Promise<void> {
+  async function handleSaveKnowledgeBase(
+    selectedIds: string[],
+    hasNewUploads: boolean
+  ): Promise<void> {
     if (hasNewUploads) {
       await refetchClients();
     }
@@ -333,12 +395,19 @@ export default function ReviewPage(): JSX.Element {
     setShowKnowledgeBaseModal(false);
   }
 
-  function handleSaveStyleVoice(data: { tone: ToneOption; lengthPreference: LengthOption; language: string }): void {
+  function handleSaveStyleVoice(data: {
+    tone: ToneOption;
+    lengthPreference: LengthOption;
+    language: string;
+  }): void {
     updateProposalData(data);
     setShowStyleVoiceModal(false);
   }
 
-  function handleSaveSections(sections: string[], newCustomSections?: Array<{ key: string; label: string; description: string }>): void {
+  function handleSaveSections(
+    sections: string[],
+    newCustomSections?: Array<{ key: string; label: string; description: string }>
+  ): void {
     const existingCustomSections: Array<{ key: string; label: string; description: string }> = [];
     updateProposalData({
       selectedSections: sections,
@@ -371,16 +440,28 @@ export default function ReviewPage(): JSX.Element {
 
   const currentClient = clients.find((c) => c.id === proposalData.clientId);
   // Map API ClientDocument to the shape expected by KnowledgeBaseSelectorModal
-  const clientDocuments = useMemo(() => (currentClient?.documents || []).map((doc) => ({
-    id: String(doc.id),
-    name: doc.name,
-    size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
-    date: doc.createdAt ? formatDate(doc.createdAt) : "",
-    status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
-    fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as "pdf" | "docx" | "xlsx" | "pptx",
-  })), [currentClient]);
+  const clientDocuments = useMemo(
+    () =>
+      (currentClient?.documents || []).map((doc) => ({
+        id: String(doc.id),
+        name: doc.name,
+        size: String(doc.sizeBytes > 0 ? doc.sizeBytes : 0),
+        date: doc.createdAt ? formatDate(doc.createdAt) : "",
+        status: (doc.status === "error" ? "processing" : doc.status) as "parsed" | "processing",
+        fileType: (doc.fileType?.split("/").pop()?.split(".").pop() || "pdf") as
+          | "pdf"
+          | "docx"
+          | "xlsx"
+          | "pptx",
+        s3FileUrl: doc.s3FileUrl,
+      })),
+    [currentClient]
+  );
 
-  const selectedDocumentIdsMemoized = useMemo(() => (proposalData.selectedDocumentIds || []).map(String), [proposalData.selectedDocumentIds]);
+  const selectedDocumentIdsMemoized = useMemo(
+    () => (proposalData.selectedDocumentIds || []).map(String),
+    [proposalData.selectedDocumentIds]
+  );
 
   async function handleGenerate(): Promise<void> {
     // Check if sections are selected
@@ -430,7 +511,11 @@ export default function ReviewPage(): JSX.Element {
       });
 
       if (generateDuration > 2000) {
-        logger.warn("[ReviewPage] WARNING: API call took", generateDuration, "ms - Backend is likely doing synchronous generation instead of returning immediately");
+        logger.warn(
+          "[ReviewPage] WARNING: API call took",
+          generateDuration,
+          "ms - Backend is likely doing synchronous generation instead of returning immediately"
+        );
       }
 
       // Mark Step 2 as visited when starting generation
@@ -448,11 +533,15 @@ export default function ReviewPage(): JSX.Element {
       }
 
       // Navigate to Generating screen to show real-time progress
-      logger.info("[ReviewPage] Navigating to generating page at", new Date().toISOString(), "with proposalId:", response.id);
+      logger.info(
+        "[ReviewPage] Navigating to generating page at",
+        new Date().toISOString(),
+        "with proposalId:",
+        response.id
+      );
       router.push(`/generating/${response.id}`);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to generate proposal.";
+      const message = err instanceof Error ? err.message : "Failed to generate proposal.";
       setErrorMessage(message);
       setIsGenerating(false);
       toast.error(message);
@@ -460,8 +549,7 @@ export default function ReviewPage(): JSX.Element {
   }
 
   const descriptionSnippet = proposalData.description
-    ? proposalData.description.slice(0, 120) +
-      (proposalData.description.length > 120 ? "..." : "")
+    ? proposalData.description.slice(0, 120) + (proposalData.description.length > 120 ? "..." : "")
     : "No description provided.";
 
   const selectedSectionLabels = proposalData.selectedSections.map(
@@ -474,260 +562,239 @@ export default function ReviewPage(): JSX.Element {
   const estimatedPages = `${proposalData.selectedSections.length * 2}–${proposalData.selectedSections.length * 3} Pages`;
 
   // Get current template name for display
-  const currentTemplate = PROPOSAL_TEMPLATES.find((t: { id: string }) => t.id === proposalData.templateId);
-  const currentTemplateName = currentTemplate?.name || (proposalData.templateType === "scratch" ? "Start From Scratch" : proposalData.templateType === "recreate" ? "Recreate Template" : "Custom Template");
+  const currentTemplate = PROPOSAL_TEMPLATES.find(
+    (t: { id: string }) => t.id === proposalData.templateId
+  );
+  const currentTemplateName =
+    currentTemplate?.name ||
+    (proposalData.templateType === "scratch"
+      ? "Start From Scratch"
+      : proposalData.templateType === "recreate"
+        ? "Recreate Template"
+        : "Custom Template");
 
   return (
     <PageLayout noPadding>
-        <DynamicPipeline
-          currentStage={draftStage}
-          completedSteps={completedSteps}
-          visitedSteps={visitedPipelineSteps}
-          visible={true}
-          proposalId={currentProposalId ?? generatedProposalId}
-          maxStepReached={maxStepReached}
-        />
-        <div className="page-badge">Phase 05</div>
-        <h1 className="page-title">Final Review</h1>
-        <p className={`page-subtitle ${styles.reviewPageSubtitle}`}>
-          Verify your proposal configuration before the AI architect constructs
-          your final document. Everything looks right? Hit Generate.
-        </p>
+      <DynamicPipeline
+        currentStage={draftStage}
+        completedSteps={completedSteps}
+        visitedSteps={visitedPipelineSteps}
+        visible={true}
+        proposalId={currentProposalId ?? generatedProposalId}
+        maxStepReached={maxStepReached}
+      />
+      <div className="page-badge">Phase 05</div>
+      <h1 className="page-title">Final Review</h1>
+      <p className={`page-subtitle ${styles.reviewPageSubtitle}`}>
+        Verify your proposal configuration before the AI architect constructs your final document.
+        Everything looks right? Hit Generate.
+      </p>
 
-        {errorMessage && (
-          <div className={styles.errorAlert}>
-            {errorMessage}
+      {errorMessage && <div className={styles.errorAlert}>{errorMessage}</div>}
+
+      {/* Sticky Download Documents Button */}
+      {proposalData.filesMeta && proposalData.filesMeta.length > 0 && (
+        <div className={`${styles.stickyDownloadBar} ${showStickyDownload ? styles.visible : ""}`}>
+          <div className={styles.downloadBarContent}>
+            <span className={styles.downloadBarText}>
+              {proposalData.filesMeta.length} document{proposalData.filesMeta.length > 1 ? "s" : ""}
+            </span>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => toast.info("Download functionality coming soon")}
+            >
+              Download All Docs
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Sticky Download Documents Button */}
-        {proposalData.filesMeta && proposalData.filesMeta.length > 0 && (
-          <div className={`${styles.stickyDownloadBar} ${showStickyDownload ? styles.visible : ""}`}>
-            <div className={styles.downloadBarContent}>
-              <span className={styles.downloadBarText}>
-                {proposalData.filesMeta.length} document{proposalData.filesMeta.length > 1 ? "s" : ""}
-              </span>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => toast.info("Download functionality coming soon")}
-              >
-                Download All Docs
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="review-layout">
-          {/* Left — Summary Cards */}
-          <div className="review-layout-left">
-            {/* Client + Style & Voice side by side */}
-            <div className="grid-2">
-              <div className="review-card">
-                <div className="review-card-header">
-                  <span className="review-card-title">CLIENT</span>
-                  <button
-                    className="link-plain"
-                    onClick={() => setShowScopeModal(true)}
-                  >
-                    Edit
-                  </button>
-                </div>
-                <div className="review-field">
-                  <span className="review-field-label">Proposal Title</span>
-                  <span className="review-field-value dark-bold">
-                    {proposalData.title || "—"}
-                  </span>
-                </div>
-                <div className="review-field">
-                  <span className="review-field-label">Client Name</span>
-                  <span className="review-field-value dark-bold">
-                    {proposalData.clientName || "—"}
-                  </span>
-                </div>
-                <div className="review-field">
-                  <span className="review-field-label">Strategic Prompt Snippet</span>
-                  <span className="review-field-value dark-bold">
-                    &ldquo;{descriptionSnippet}&rdquo;
-                  </span>
-                </div>
-              </div>
-
-              <div className="review-card">
-                <div className="review-card-header">
-                  <span className="review-card-title">STYLE & VOICE</span>
-                  <button
-                    className="link-plain"
-                    onClick={() => setShowStyleVoiceModal(true)}
-                  >
-                    Edit
-                  </button>
-                </div>
-                <div className={`flex-row ${styles.badgeRow}`}>
-                  <span className="badge badge-primary">{proposalData.tone}</span>
-                  <span className="badge badge-muted">
-                    {proposalData.lengthPreference}
-                  </span>
-                  <span className="badge badge-muted">{proposalData.language}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Knowledge Base */}
+      <div className="review-layout">
+        {/* Left — Summary Cards */}
+        <div className="review-layout-left">
+          {/* Client + Style & Voice side by side */}
+          <div className="grid-2">
             <div className="review-card">
               <div className="review-card-header">
-                <span className="review-card-title">KNOWLEDGE BASE</span>
-                <button
-                  className="link-plain"
-                  onClick={handleOpenKnowledgeBase}
-                  disabled={isOpeningKBModal}
-                >
-                  {isOpeningKBModal ? "Loading…" : "Edit"}
-                </button>
-              </div>
-              {proposalData.filesMeta.length > 0 ? (
-                <ul className={styles.fileList}>
-                  {proposalData.filesMeta.map((f: { name: string; size: number }, i: number) => (
-                    <li key={i} className={styles.fileItem}>
-                      <span className={styles.fileItemName}>{f.name}</span>
-                      <span className={styles.fileItemSize}>
-                        {formatBytes(f.size)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : isLoadingClients ? (
-                <span className="text-muted text-small">Loading documents…</span>
-              ) : (proposalData.selectedDocumentIds?.length ?? 0) > 0 ? (
-                <span className="text-muted text-small">
-                  Previously selected documents unavailable — click Edit to reselect
-                </span>
-              ) : (
-                <span className="text-muted text-small">
-                  No files uploaded
-                </span>
-              )}
-              {proposalData.webReferences.length > 0 && (
-                <div className={styles.webRefsSection}>
-                  <span className={`review-field-label ${styles.webRefsLabel}`}>
-                    Web References
-                  </span>
-                  {proposalData.webReferences.map((r: string) => (
-                    <div key={r} className={styles.webRefUrl}>{r}</div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Sections */}
-            <div className="review-card">
-              <div className="review-card-header">
-                <span className="review-card-title">
-                  INCLUDED SECTIONS
-                </span>
-                <button
-                  className="link-plain"
-                  onClick={() => setShowSectionsModal(true)}
-                >
+                <span className="review-card-title">CLIENT</span>
+                <button className="link-plain" onClick={() => setShowScopeModal(true)}>
                   Edit
                 </button>
               </div>
-              <div className={`flex-row ${styles.sectionsBadgeRow}`}>
-                {selectedSectionLabels.map((label: string) => (
-                  <span key={label} className="badge badge-primary">
-                    {label}
-                  </span>
-                ))}
-                {selectedSectionLabels.length === 0 && (
-                  <span className="text-muted text-small">
-                    No sections selected
-                  </span>
-                )}
+              <div className="review-field">
+                <span className="review-field-label">Proposal Title</span>
+                <span className="review-field-value dark-bold">{proposalData.title || "—"}</span>
+              </div>
+              <div className="review-field">
+                <span className="review-field-label">Client Name</span>
+                <span className="review-field-value dark-bold">
+                  {proposalData.clientName || "—"}
+                </span>
+              </div>
+              <div className="review-field">
+                <span className="review-field-label">Strategic Prompt Snippet</span>
+                <span className="review-field-value dark-bold">
+                  &ldquo;{descriptionSnippet}&rdquo;
+                </span>
+              </div>
+            </div>
+
+            <div className="review-card">
+              <div className="review-card-header">
+                <span className="review-card-title">STYLE & VOICE</span>
+                <button className="link-plain" onClick={() => setShowStyleVoiceModal(true)}>
+                  Edit
+                </button>
+              </div>
+              <div className={`flex-row ${styles.badgeRow}`}>
+                <span className="badge badge-primary">{proposalData.tone}</span>
+                <span className="badge badge-muted">{proposalData.lengthPreference}</span>
+                <span className="badge badge-muted">{proposalData.language}</span>
               </div>
             </div>
           </div>
-          {/* Right — Launch Panel */}
-          <div className="review-layout-right">
-            <div className="launch-panel">
-              <h2 className="launch-panel-title">Ready to launch?</h2>
-              <p className="launch-panel-desc">
-                Your proposal configuration is complete. The AI will now generate
-                each section based on your inputs. This may take 30–60 seconds.
-              </p>
 
-              <Button
-                variant="primary"
-                onClick={handleGenerate}
-                disabled={proposalData.selectedSections.length === 0}
-                loading={isGenerating}
-                className="launch-btn"
-              >
-                {isGenerating ? "Generating Proposal..." : "Generate Proposal"}
-              </Button>
+          {/* Knowledge Base */}
+          <div className="review-card">
+            <div className="review-card-header">
+              <span className="review-card-title">KNOWLEDGE BASE</span>
+              <button className="link-plain" onClick={handleOpenKnowledgeBase}>
+                Edit
+              </button>
+            </div>
+            {proposalData.filesMeta.length > 0 ? (
+              <ul className={styles.fileList}>
+                {proposalData.filesMeta.map((f: { name: string; size: number }, i: number) => (
+                  <li key={i} className={styles.fileItem}>
+                    <span className={styles.fileItemName}>{f.name}</span>
+                    <span className={styles.fileItemSize}>{formatBytes(f.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : isLoadingClients ? (
+              <span className="text-muted text-small">Loading documents…</span>
+            ) : (proposalData.selectedDocumentIds?.length ?? 0) > 0 ? (
+              <span className="text-muted text-small">
+                Previously selected documents unavailable — click Edit to reselect
+              </span>
+            ) : (
+              <span className="text-muted text-small">No files uploaded</span>
+            )}
+            {proposalData.webReferences.length > 0 && (
+              <div className={styles.webRefsSection}>
+                <span className={`review-field-label ${styles.webRefsLabel}`}>Web References</span>
+                {proposalData.webReferences.map((r: string) => (
+                  <div key={r} className={styles.webRefUrl}>
+                    {r}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-              <Button
-                variant="secondary"
-                onClick={handleSaveDraft}
-                disabled={isGenerating}
-                className="launch-btn-secondary"
-              >
-                Save Draft
-              </Button>
+          {/* Sections */}
+          <div className="review-card">
+            <div className="review-card-header">
+              <span className="review-card-title">INCLUDED SECTIONS</span>
+              <button className="link-plain" onClick={() => setShowSectionsModal(true)}>
+                Edit
+              </button>
+            </div>
+            <div className={`flex-row ${styles.sectionsBadgeRow}`}>
+              {selectedSectionLabels.map((label: string) => (
+                <span key={label} className="badge badge-primary">
+                  {label}
+                </span>
+              ))}
+              {selectedSectionLabels.length === 0 && (
+                <span className="text-muted text-small">No sections selected</span>
+              )}
             </div>
           </div>
         </div>
+        {/* Right — Launch Panel */}
+        <div className="review-layout-right">
+          <div className="launch-panel">
+            <h2 className="launch-panel-title">Ready to launch?</h2>
+            <p className="launch-panel-desc">
+              Your proposal configuration is complete. The AI will now generate each section based
+              on your inputs. This may take 30–60 seconds.
+            </p>
 
-        {/* Modals */}
-        {showScopeModal && (
-          <ScopeEditorModal
-            proposalTitle={proposalData.title}
-            clientName={proposalData.clientName}
-            clientId={proposalData.clientId}
-            description={proposalData.description}
-            onClose={() => setShowScopeModal(false)}
-            onSave={handleSaveScope}
-          />
-        )}
+            <Button
+              variant="primary"
+              onClick={handleGenerate}
+              disabled={proposalData.selectedSections.length === 0}
+              loading={isGenerating}
+              className="launch-btn"
+            >
+              {isGenerating ? "Generating Proposal..." : "Generate Proposal"}
+            </Button>
 
-        {showKnowledgeBaseModal && (
-          <KnowledgeBaseSelectorModal
-            availableDocuments={clientDocuments}
-            selectedDocumentIds={selectedDocumentIdsMemoized}
-            onClose={() => setShowKnowledgeBaseModal(false)}
-            onSave={handleSaveKnowledgeBase}
-            clientId={proposalData.clientId}
-            onRefreshDocuments={async () => {
-              await refetchClients();
-            }}
-          />
-        )}
+            <Button
+              variant="secondary"
+              onClick={handleSaveDraft}
+              disabled={isGenerating}
+              className="launch-btn-secondary"
+            >
+              Save Draft
+            </Button>
+          </div>
+        </div>
+      </div>
 
-        {showStyleVoiceModal && (
-          <StyleVoiceEditorModal
-            tone={proposalData.tone}
-            lengthPreference={proposalData.lengthPreference}
-            language={proposalData.language}
-            onClose={() => setShowStyleVoiceModal(false)}
-            onSave={handleSaveStyleVoice}
-          />
-        )}
+      {/* Modals */}
+      {showScopeModal && (
+        <ScopeEditorModal
+          proposalTitle={proposalData.title}
+          clientName={proposalData.clientName}
+          clientId={proposalData.clientId ?? null}
+          description={proposalData.description}
+          onClose={() => setShowScopeModal(false)}
+          onSave={handleSaveScope}
+        />
+      )}
 
-        {showSectionsModal && (
-          <SectionsSelectorModal
-            selectedSections={proposalData.selectedSections}
-            sectionDisplayNames={proposalData.sectionDisplayNames}
-            onClose={() => setShowSectionsModal(false)}
-            onSave={handleSaveSections}
-          />
-        )}
+      {showKnowledgeBaseModal && (
+        <KnowledgeBaseSelectorModal
+          availableDocuments={clientDocuments}
+          selectedDocumentIds={selectedDocumentIdsMemoized}
+          onClose={() => setShowKnowledgeBaseModal(false)}
+          onSave={handleSaveKnowledgeBase}
+          clientId={proposalData.clientId}
+          onRefreshDocuments={async () => {
+            await refetchClients();
+          }}
+        />
+      )}
 
-        {showTemplateModal && (
-          <TemplateSelectorModal
-            currentTemplateId={proposalData.templateId}
-            currentTemplateType={proposalData.templateType}
-            onClose={() => setShowTemplateModal(false)}
-            onSave={handleSaveTemplate}
-          />
-        )}
+      {showStyleVoiceModal && (
+        <StyleVoiceEditorModal
+          tone={proposalData.tone}
+          lengthPreference={proposalData.lengthPreference}
+          language={proposalData.language}
+          onClose={() => setShowStyleVoiceModal(false)}
+          onSave={handleSaveStyleVoice}
+        />
+      )}
+
+      {showSectionsModal && (
+        <SectionsSelectorModal
+          selectedSections={proposalData.selectedSections}
+          sectionDisplayNames={proposalData.sectionDisplayNames}
+          onClose={() => setShowSectionsModal(false)}
+          onSave={handleSaveSections}
+        />
+      )}
+
+      {showTemplateModal && (
+        <TemplateSelectorModal
+          currentTemplateId={proposalData.templateId}
+          currentTemplateType={proposalData.templateType}
+          onClose={() => setShowTemplateModal(false)}
+          onSave={handleSaveTemplate}
+        />
+      )}
     </PageLayout>
   );
 }

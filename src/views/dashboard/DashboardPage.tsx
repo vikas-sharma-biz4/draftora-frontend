@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
 
 import { useProposals } from "@/hooks/useProposals";
 import { useErrorToast } from "@/hooks/useErrorToast";
@@ -26,10 +27,14 @@ const SkeletonCard = dynamic(
 const SkeletonGrid = dynamic(() => import("@/components/common/SkeletonGrid"), { ssr: false });
 
 export default function DashboardPage(): JSX.Element {
-  const { proposals, isLoading, isInitialized, error } = useProposals();
+  const { proposals, isLoading, isLoadingMore, isInitialized, error, hasMore, fetchMore } =
+    useProposals();
   const [search, setSearch] = useState<string>("");
   const debouncedSearch = useDebounce(search, 200);
   const [mounted, setMounted] = useState<boolean>(false);
+
+  const loadingRef = useRef(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -51,24 +56,55 @@ export default function DashboardPage(): JSX.Element {
     [proposals, debouncedSearch]
   );
 
+  // Infinite scroll sentinel callback — fires when the bottom of the list enters the viewport
+  const sentinelRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isLoading || isLoadingMore) return;
+
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+            loadingRef.current = true;
+            fetchMore().finally(() => {
+              loadingRef.current = false;
+            });
+          }
+        },
+        { rootMargin: "200px" }
+      );
+
+      if (node) {
+        observerRef.current.observe(node);
+      }
+    },
+    [isLoading, isLoadingMore, hasMore, fetchMore]
+  );
+
+  // Disconnect observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  const hasActiveSearch = debouncedSearch.length > 0;
+
   return (
     <AppLayout>
       <PageHeader
         title="Your Proposals"
         subtitle="Manage and track all your AI-generated proposals."
-        action={
-          <ProposalSearch
-            value={search}
-            onChange={handleSearchChange}
-          />
-        }
+        action={<ProposalSearch value={search} onChange={handleSearchChange} />}
       />
 
       {!mounted || (isLoading && !isInitialized) ? (
-        <SkeletonGrid
-          className="proposals-grid"
-          renderItem={() => <SkeletonCard />}
-        />
+        <SkeletonGrid className="proposals-grid" renderItem={() => <SkeletonCard />} />
       ) : filtered.length === 0 ? (
         <div className="empty-state-wrapper">
           {proposals.length === 0 ? (
@@ -88,11 +124,25 @@ export default function DashboardPage(): JSX.Element {
           )}
         </div>
       ) : (
-        <div className="proposals-grid">
-          {filtered.map((proposal) => (
-            <ProposalCard key={proposal.id} proposal={proposal} />
-          ))}
-        </div>
+        <>
+          <div className="proposals-grid">
+            {filtered.map((proposal) => (
+              <ProposalCard key={proposal.id} proposal={proposal} />
+            ))}
+          </div>
+
+          {/* Infinite scroll trigger — only when not filtering */}
+          {!hasActiveSearch && hasMore && (
+            <div ref={sentinelRef} style={{ height: 1 }}>
+              {isLoadingMore && (
+                <div className="flex-center gap-8" style={{ padding: "24px 0" }}>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-muted">Loading more proposals…</span>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </AppLayout>
   );
