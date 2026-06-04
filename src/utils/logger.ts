@@ -6,6 +6,8 @@
  * and reduce performance overhead.
  */
 
+/* eslint-disable no-console */
+
 const isDevelopment = process.env.NODE_ENV === "development";
 
 export const logger = {

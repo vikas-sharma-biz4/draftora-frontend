@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Users, Plus, Building2, Calendar, Trash2 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
@@ -13,6 +13,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import styles from "./ClientsPage.module.scss";
 
 import { useClients } from "@/hooks/useClients";
+import { useErrorToast } from "@/hooks/useErrorToast";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { formatDate } from "@/utils/dateUtils";
 import PageLayout from "@/layouts/AppLayout";
@@ -21,9 +22,12 @@ import EmptyState from "@/components/common/EmptyState";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
 import ClientCardSkeleton from "@/components/common/skeletons/ClientCardSkeleton";
 
-const TemplateSelectionModal = dynamic(() => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"), {
-  ssr: false,
-});
+const TemplateSelectionModal = dynamic(
+  () => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"),
+  {
+    ssr: false,
+  }
+);
 
 const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClientModal"), {
   ssr: false,
@@ -31,17 +35,10 @@ const DeleteClientModal = dynamic(() => import("@/components/modals/DeleteClient
 
 export default function ClientsPage(): JSX.Element {
   const router = useRouter();
-  const { clients, isLoading: loading, refetch } = useClients();
-  const deleteClientFromStore = useClientStore(state => state.deleteClient);
+  const { clients, isLoading: loading, error, refetch } = useClients();
+  const deleteClientFromStore = useClientStore((state) => state.deleteClient);
 
-  // Refresh when tab becomes visible only if cache is stale
-  useEffect(() => {
-    const handleVisibilityChange = (): void => {
-      if (!document.hidden) void refetch();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refetch]);
+  useErrorToast(error, "Failed to load clients");
 
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteModalData, setDeleteModalData] = useState<{ id: number; name: string } | null>(null);
@@ -52,9 +49,7 @@ export default function ClientsPage(): JSX.Element {
     if (!debouncedSearch) return clients;
     const q = debouncedSearch.toLowerCase();
     return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.industry.toLowerCase().includes(q)
+      (c) => c.name.toLowerCase().includes(q) || c.industry.toLowerCase().includes(q)
     );
   }, [clients, debouncedSearch]);
 
@@ -92,7 +87,7 @@ export default function ClientsPage(): JSX.Element {
     <PageLayout>
       <PageHeader
         title="Clients"
-        subtitle={`Manage your client relationships and view all proposals associated with each client.${clients.length > 0 ? ` (${clients.length} total)` : ''}`}
+        subtitle={`Manage your client relationships and view all proposals associated with each client.${clients.length > 0 ? ` (${clients.length} total)` : ""}`}
         action={
           <Button variant="primary" onClick={handleNewClient}>
             <Plus size={18} />
@@ -102,10 +97,7 @@ export default function ClientsPage(): JSX.Element {
       />
 
       {loading ? (
-        <SkeletonGrid
-          className={styles.clientsGrid}
-          renderItem={() => <ClientCardSkeleton />}
-        />
+        <SkeletonGrid className={styles.clientsGrid} renderItem={() => <ClientCardSkeleton />} />
       ) : clients.length === 0 ? (
         <EmptyState
           icon={<Users size={48} />}
@@ -132,78 +124,80 @@ export default function ClientsPage(): JSX.Element {
               subtitle="Try adjusting your search."
             />
           ) : (
-        <div className={styles.clientsGrid}>
-          {filteredClients.map((client) => (
-            <article
-              key={client.id}
-              className={styles.clientCard}
-              onClick={() => handleClientClick(client.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleClientClick(client.id);
-              }}
-            >
-              <div className={styles.clientCardHeader}>
-                <div className={styles.clientCardIcon}>
-                  <Building2 size={24} />
-                </div>
-                <div className={styles.clientCardActions}>
-                  <span className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}>
-                    {client.status}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    iconOnly
-                    onClick={(e) => handleDeleteClient(client.id, client.name, e)}
-                    title="Delete client"
-                    aria-label="Delete client"
-                    className={styles.deleteClientBtn}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </div>
-
-              <div className={styles.clientCardBody}>
-                <h3 className={styles.clientCardName}>{client.name}</h3>
-                <p className={styles.clientCardIndustry}>{client.industry}</p>
-
-                <div className={styles.clientCardMeta}>
-                  <div className={styles.clientCardMetaItem}>
-                    <Calendar size={14} />
-                    <span>Created {formatDate(client.createdAt)}</span>
+            <div className={styles.clientsGrid}>
+              {filteredClients.map((client) => (
+                <article
+                  key={client.id}
+                  className={styles.clientCard}
+                  onClick={() => handleClientClick(client.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleClientClick(client.id);
+                  }}
+                >
+                  <div className={styles.clientCardHeader}>
+                    <div className={styles.clientCardIcon}>
+                      <Building2 size={24} />
+                    </div>
+                    <div className={styles.clientCardActions}>
+                      <span
+                        className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}
+                      >
+                        {client.status}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        iconOnly
+                        onClick={(e) => handleDeleteClient(client.id, client.name, e)}
+                        title="Delete client"
+                        aria-label="Delete client"
+                        className={styles.deleteClientBtn}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className={styles.clientCardFooter}>
-                <span className={styles.clientCardTier}>Active Client</span>
-              </div>
-            </article>
-          ))}
-        </div>
+                  <div className={styles.clientCardBody}>
+                    <h3 className={styles.clientCardName}>{client.name}</h3>
+                    <p className={styles.clientCardIndustry}>{client.industry}</p>
+
+                    <div className={styles.clientCardMeta}>
+                      <div className={styles.clientCardMetaItem}>
+                        <Calendar size={14} />
+                        <span>Created {formatDate(client.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.clientCardFooter}>
+                    <span className={styles.clientCardTier}>Active Client</span>
+                  </div>
+                </article>
+              ))}
+            </div>
           )}
         </>
       )}
 
-        {showTemplateModal && (
-          <TemplateSelectionModal
-            templateId={null}
-            templateName=""
-            onClose={handleCloseTemplateModal}
-            initialClients={clients}
-            initialView="new_client"
-          />
-        )}
+      {showTemplateModal && (
+        <TemplateSelectionModal
+          templateId={null}
+          templateName=""
+          onClose={handleCloseTemplateModal}
+          initialClients={clients}
+          initialView="new_client"
+        />
+      )}
 
-        {deleteModalData && (
-          <DeleteClientModal
-            clientName={deleteModalData.name}
-            onClose={() => setDeleteModalData(null)}
-            onConfirm={confirmDeleteClient}
-          />
-        )}
+      {deleteModalData && (
+        <DeleteClientModal
+          clientName={deleteModalData.name}
+          onClose={() => setDeleteModalData(null)}
+          onConfirm={confirmDeleteClient}
+        />
+      )}
     </PageLayout>
   );
 }

@@ -6,7 +6,15 @@
 
 import { DEFAULT_AI_MODEL } from "@/config/config";
 import { http, buildUrl, HttpError } from "@/config/httpClient";
-import type { ProposalData, ProposalListItem, ToneOption, LengthOption, TemplateType } from "@/interfaces/proposalInterfaces";
+import type {
+  ProposalData,
+  ProposalWizardData,
+  ProposalListItem,
+  ToneOption,
+  LengthOption,
+  TemplateType,
+  EstimatedHoursData,
+} from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 
 const ALLOWED_UPLOAD_EXTENSIONS = ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt"];
@@ -27,8 +35,22 @@ function parseLengthOption(raw: string): LengthOption {
 }
 
 function parseTemplateType(raw: string | null): TemplateType {
-  const valid: TemplateType[] = ["predefined", "custom", "scratch", "recreate"];
+  const valid: TemplateType[] = [
+    "predefined",
+    "custom",
+    "scratch",
+    "recreate",
+    "mvp",
+    "poc",
+    "design",
+    "brd",
+    "frd",
+    "srs",
+    "architecture",
+    "sow",
+  ];
   if (raw && (valid as string[]).includes(raw)) return raw as TemplateType;
+  logger.warn(`[proposalCrud] Unknown TemplateType "${raw}" — defaulting to "scratch"`);
   return "scratch";
 }
 
@@ -38,10 +60,11 @@ interface CreateProposalResponse {
   jobId?: string | null;
 }
 
-export async function generateProposal(
-  data: ProposalData
-): Promise<CreateProposalResponse> {
-  logger.info("[generateProposal] Starting proposal generation request at", new Date().toISOString());
+export async function generateProposal(data: ProposalWizardData): Promise<CreateProposalResponse> {
+  logger.info(
+    "[generateProposal] Starting proposal generation request at",
+    new Date().toISOString()
+  );
   const startTime = Date.now();
 
   const formData = new FormData();
@@ -57,10 +80,7 @@ export async function generateProposal(
     contextual += `${separator}[Additional custom sections to include in the proposal]:\n${customBlock}`;
   }
 
-  const allSections = [
-    ...data.selectedSections,
-    ...data.customSections.map((s) => s.key),
-  ];
+  const allSections = [...data.selectedSections, ...data.customSections.map((s) => s.key)];
 
   // Merge section display names: custom sections + any from template parsing
   const sectionDisplayNames: Record<string, string> = {
@@ -100,9 +120,7 @@ export async function generateProposal(
       );
     }
     if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
-      throw new Error(
-        `File too large: "${file.name}". Maximum size is ${MAX_UPLOAD_SIZE_MB}MB.`
-      );
+      throw new Error(`File too large: "${file.name}". Maximum size is ${MAX_UPLOAD_SIZE_MB}MB.`);
     }
     formData.append("files", file);
   }
@@ -122,7 +140,11 @@ export async function generateProposal(
   });
 
   if (requestDuration > 1000) {
-    logger.warn("[generateProposal] API call took longer than 1 second:", requestDuration, "ms - Backend may be doing synchronous generation");
+    logger.warn(
+      "[generateProposal] API call took longer than 1 second:",
+      requestDuration,
+      "ms - Backend may be doing synchronous generation"
+    );
   }
 
   return response;
@@ -167,7 +189,12 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
   let progressPercent = d.progress_percent ?? d.progress ?? 0;
   if (progressPercent === 0 && totalSections > 0 && completed.length > 0) {
     progressPercent = Math.round((completed.length / totalSections) * 100);
-  } else if (progressPercent === 0 && totalSections > 0 && completed.length === 0 && d.status === "generating") {
+  } else if (
+    progressPercent === 0 &&
+    totalSections > 0 &&
+    completed.length === 0 &&
+    d.status === "generating"
+  ) {
     // If generating but no sections completed yet, show a small initial progress
     progressPercent = 1;
   }
@@ -186,6 +213,13 @@ export async function getProposalStatus(id: number): Promise<ProposalStatus> {
   };
 
   return status;
+}
+
+interface RawEstimatedHoursData {
+  total_estimated_hours: { hours: number; description: string };
+  team_breakdown: Array<{ role: string; hours: number; description: string }>;
+  feature_list_used: string;
+  custom_prompt_used?: string | null;
 }
 
 /** Raw backend response shape for GET /proposals/:id/ (snake_case) */
@@ -210,6 +244,7 @@ interface RawProposalApiResponse {
   sections: Record<string, string> | null;
   section_types: Record<string, string> | null;
   generating_section: string | null;
+  estimated_hours_data?: RawEstimatedHoursData | null;
   created_at: string;
   updated_at: string;
 }
@@ -232,7 +267,6 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
     contextualInstructions: d.contextual_instructions ?? "",
     webReferences: d.web_references ?? [],
     selectedDocumentIds: d.selected_document_ids ?? [],
-    files: [],
     filesMeta: [],
     templateId: null,
     templateType: parseTemplateType(d.template_type),
@@ -241,8 +275,43 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
     sections: d.sections ?? {},
     sectionTypes: d.section_types ?? {},
     generatingSection: d.generating_section ?? null,
+    estimatedHoursData: d.estimated_hours_data
+      ? {
+          totalEstimatedHours: d.estimated_hours_data.total_estimated_hours,
+          teamBreakdown: d.estimated_hours_data.team_breakdown,
+          featureListUsed: d.estimated_hours_data.feature_list_used,
+          customPromptUsed: d.estimated_hours_data.custom_prompt_used ?? undefined,
+        }
+      : undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
+  };
+}
+
+interface EstimateHoursPayload {
+  custom_feature_list?: string;
+  custom_prompt?: string;
+}
+
+interface RawEstimateHoursResponse {
+  proposal_id: number;
+  estimated_hours_data: RawEstimatedHoursData;
+}
+
+export async function estimateProposalHours(
+  proposalId: number,
+  body: EstimateHoursPayload = {}
+): Promise<EstimatedHoursData> {
+  const raw = await http.post<RawEstimateHoursResponse>(
+    `/proposals/${proposalId}/estimate-hours`,
+    body
+  );
+  const d = raw.estimated_hours_data;
+  return {
+    totalEstimatedHours: d.total_estimated_hours,
+    teamBreakdown: d.team_breakdown,
+    featureListUsed: d.feature_list_used,
+    customPromptUsed: d.custom_prompt_used ?? undefined,
   };
 }
 
@@ -271,6 +340,7 @@ interface ProposalListApiItem {
 export interface ListProposalsParams {
   limit?: number;
   offset?: number;
+  page?: number;
 }
 
 function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
@@ -291,24 +361,24 @@ function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
 }
 
 export async function listProposals(params?: ListProposalsParams): Promise<ProposalListItem[]> {
-  // If explicit limit/offset params are passed, use them directly (legacy behaviour)
-  if (params?.limit !== undefined || params?.offset !== undefined) {
+  // Legacy: offset-based pagination path (kept for backward compatibility)
+  if (params?.offset !== undefined) {
     const queryParams = new URLSearchParams();
     if (params.limit) queryParams.set("per_page", String(params.limit));
-    if (params.offset) queryParams.set("page", String(Math.floor((params.offset ?? 0) / (params.limit ?? 10)) + 1));
-    const url = `/proposals?${queryParams.toString()}`;
-    const raw = await http.get<ProposalListApiItem[]>(url, { cache: "no-store" });
+    queryParams.set("page", String(Math.floor((params.offset ?? 0) / (params.limit ?? 10)) + 1));
+    const raw = await http.get<ProposalListApiItem[]>(`/proposals?${queryParams.toString()}`, {
+      cache: "no-store",
+    });
     return raw.map(mapProposalListItem);
   }
 
-  // Fetch only the first page (100 items max) to avoid multiple sequential API calls.
-  // This is optimized for performance - if you need all proposals, use pagination params.
-  const PER_PAGE = 100;
+  // Page-based pagination: page + limit params (used by proposalSlice for infinite scroll)
+  const page = params?.page ?? 1;
+  const perPage = params?.limit ?? 100;
   const items = await http.get<ProposalListApiItem[]>(
-    `/proposals?page=1&per_page=${PER_PAGE}`,
-    { cache: "no-store" },
+    `/proposals?page=${page}&per_page=${perPage}`,
+    { cache: "no-store" }
   );
-
   return items.map(mapProposalListItem);
 }
 
@@ -341,13 +411,13 @@ export async function listProposalHistory(
 
   // Defensive check: ensure response has expected structure
   if (!response || !response.data || !Array.isArray(response.data)) {
-    logger.error('[listProposalHistory] Invalid API response structure', { response });
-    throw new Error('Invalid response from proposal history API');
+    logger.error("[listProposalHistory] Invalid API response structure", { response });
+    throw new Error("Invalid response from proposal history API");
   }
 
   if (!response.meta) {
-    logger.error('[listProposalHistory] Missing meta in API response', { response });
-    throw new Error('Missing pagination metadata in API response');
+    logger.error("[listProposalHistory] Missing meta in API response", { response });
+    throw new Error("Missing pagination metadata in API response");
   }
 
   return {
@@ -380,9 +450,8 @@ export async function updateApprovalStatus(
   proposalId: number,
   status: "pending" | "approved" | "rejected"
 ): Promise<ProposalData> {
-  const raw = await http.patch<RawProposalApiResponse>(
-    `/proposals/${proposalId}/approval-status`,
-    { approval_status: status }
-  );
+  const raw = await http.patch<RawProposalApiResponse>(`/proposals/${proposalId}/approval-status`, {
+    approval_status: status,
+  });
   return mapProposal(raw);
 }

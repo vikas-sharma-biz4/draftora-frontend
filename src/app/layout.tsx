@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "@/styles/styles.scss";
-import { ProposalWizardProvider } from "@/context/ProposalWizardContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,20 +31,12 @@ export const metadata: Metadata = {
   description: "Generate professional proposals powered by AI in minutes.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
-        <ProposalWizardProvider>
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
-          <ToastProvider />
-        </ProposalWizardProvider>
+        <ErrorBoundary>{children}</ErrorBoundary>
+        <ToastProvider />
       </body>
     </html>
   );

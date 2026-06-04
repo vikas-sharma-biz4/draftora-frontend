@@ -2,11 +2,7 @@
  * Data formatting utilities — currency, numbers, dates, strings
  */
 
-export function formatCurrency(
-  amount: number,
-  currency = "USD",
-  locale = "en-US"
-): string {
+export function formatCurrency(amount: number, currency = "USD", locale = "en-US"): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
@@ -46,7 +42,7 @@ export function formatRelativeTime(date: Date | string): string {
   if (diffMin < 60) return `${diffMin}m ago`;
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function formatInitials(name: string): string {

@@ -12,16 +12,18 @@
  */
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 
 import { DEFAULT_AI_MODEL } from "@/config/config";
 import { DEFAULT_SELECTED_SECTIONS, PROPOSAL_WIZARD_STORAGE_KEY } from "@/constants";
-import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { ProposalWizardData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
 import { getSectionRecommendations } from "@/services/proposal.service";
+import type { SectionRecommendation } from "@/services/proposal/templateParser.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 
-export const DEFAULT_PROPOSAL_DATA: ProposalData = {
+export const DEFAULT_PROPOSAL_DATA: ProposalWizardData = {
   title: "",
   clientName: "",
   clientId: undefined,
@@ -52,13 +54,13 @@ export const INITIAL_WIZARD_STATE = {
   editMode: false,
   maxStepReached: 1 as WizardStep,
   shouldStartBackgroundFetch: false,
-  prefetchedRecommendations: null as any[] | null,
-  recommendationsFetchStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+  prefetchedRecommendations: null as SectionRecommendation[] | null,
+  recommendationsFetchStatus: "idle" as "idle" | "loading" | "success" | "error",
   recommendationsError: null as string | null,
 };
 
 interface ProposalWizardState {
-  proposalData: ProposalData;
+  proposalData: ProposalWizardData;
   currentStep: WizardStep;
   isGenerating: boolean;
   generatedProposalId: number | null;
@@ -67,11 +69,11 @@ interface ProposalWizardState {
   editMode: boolean;
   maxStepReached: WizardStep;
   shouldStartBackgroundFetch: boolean;
-  prefetchedRecommendations: any[] | null;
-  recommendationsFetchStatus: 'idle' | 'loading' | 'success' | 'error';
+  prefetchedRecommendations: SectionRecommendation[] | null;
+  recommendationsFetchStatus: "idle" | "loading" | "success" | "error";
   recommendationsError: string | null;
 
-  updateProposalData: (updates: Partial<ProposalData>) => void;
+  updateProposalData: (updates: Partial<ProposalWizardData>) => void;
   setCurrentStep: (step: WizardStep) => void;
   setIsGenerating: (val: boolean) => void;
   setGeneratedProposalId: (id: number | null) => void;
@@ -88,120 +90,166 @@ interface ProposalWizardState {
   clearRecommendationsError: () => void;
 }
 
-export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
-  ...INITIAL_WIZARD_STATE,
+type PersistedWizardState = Pick<
+  ProposalWizardState,
+  "proposalData" | "currentStep" | "currentProposalId" | "generatedProposalId" | "maxStepReached"
+>;
 
-  updateProposalData: (updates: Partial<ProposalData>): void => {
-    set((state) => {
-      const newProposalData = { ...state.proposalData, ...updates };
-      logger.debug('[proposalWizardSlice] updateProposalData', { updates, newProposalData });
-      return { proposalData: newProposalData };
-    });
-  },
+export const useProposalWizardStore = create<ProposalWizardState>()(
+  persist(
+    (set) => ({
+      ...INITIAL_WIZARD_STATE,
 
-  setCurrentStep: (step: WizardStep): void => {
-    set({ currentStep: step });
-  },
+      updateProposalData: (updates: Partial<ProposalWizardData>): void => {
+        set((state) => {
+          const newProposalData = { ...state.proposalData, ...updates };
+          logger.debug("[proposalWizardSlice] updateProposalData", { updates, newProposalData });
+          return { proposalData: newProposalData };
+        });
+      },
 
-  setIsGenerating: (val: boolean): void => {
-    set({ isGenerating: val });
-  },
+      setCurrentStep: (step: WizardStep): void => {
+        set({ currentStep: step });
+      },
 
-  setGeneratedProposalId: (id: number | null): void => {
-    set({ generatedProposalId: id });
-  },
+      setIsGenerating: (val: boolean): void => {
+        set({ isGenerating: val });
+      },
 
-  setCurrentProposalId: (id: number | null): void => {
-    set({ currentProposalId: id });
-  },
+      setGeneratedProposalId: (id: number | null): void => {
+        set({ generatedProposalId: id });
+      },
 
-  setHydrated: (val: boolean): void => {
-    set({ hydrated: val });
-  },
+      setCurrentProposalId: (id: number | null): void => {
+        set({ currentProposalId: id });
+      },
 
-  setEditMode: (val: boolean): void => {
-    set({ editMode: val });
-  },
+      setHydrated: (val: boolean): void => {
+        set({ hydrated: val });
+      },
 
-  setMaxStepReached: (step: WizardStep): void => {
-    set({ maxStepReached: step });
-  },
+      setEditMode: (val: boolean): void => {
+        set({ editMode: val });
+      },
 
-  setShouldStartBackgroundFetch: (val: boolean): void => {
-    set({ shouldStartBackgroundFetch: val });
-  },
+      setMaxStepReached: (step: WizardStep): void => {
+        set({ maxStepReached: step });
+      },
 
-  resetProposal: (): void => {
-    set(INITIAL_WIZARD_STATE);
-    try {
-      localStorage.removeItem(PROPOSAL_WIZARD_STORAGE_KEY);
-    } catch (e) {
-      logger.warn("[proposalWizardSlice] Failed to clear wizard storage", e);
+      setShouldStartBackgroundFetch: (val: boolean): void => {
+        set({ shouldStartBackgroundFetch: val });
+      },
+
+      // After reset, keep hydrated: true since the component is already mounted
+      resetProposal: (): void => {
+        set({ ...INITIAL_WIZARD_STATE, hydrated: true });
+      },
+
+      reset: (): void => {
+        set(INITIAL_WIZARD_STATE);
+      },
+
+      prefetchRecommendations: async (): Promise<void> => {
+        const state = useProposalWizardStore.getState();
+        const { proposalData } = state;
+
+        // Allow prefetch even without description/documents - the backend can handle empty context
+        logger.debug(
+          "[proposalWizardSlice] Prefetching recommendations | has_description=%s | has_documents=%s",
+          !!proposalData.description,
+          !!proposalData.selectedDocumentIds?.length
+        );
+
+        set({ recommendationsFetchStatus: "loading" });
+
+        try {
+          const existingSectionsWithRules = proposalData.selectedSections.map((key) => ({
+            sectionKey: key,
+            sectionName:
+              SECTION_DISPLAY_NAMES[key] ||
+              key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+            include: "",
+            exclude: "",
+            purpose: "",
+          }));
+
+          const recs = await getSectionRecommendations({
+            templateId: proposalData.templateId,
+            existingSections: proposalData.selectedSections,
+            existingSectionsWithRules,
+            context: proposalData.description || "",
+            userPrompt: null,
+          });
+
+          set({
+            prefetchedRecommendations: recs,
+            recommendationsFetchStatus: "success",
+          });
+          logger.info("[proposalWizardSlice] Recommendations prefetched successfully", {
+            count: recs.length,
+          });
+        } catch (error) {
+          logger.error("[proposalWizardSlice] Failed to prefetch recommendations", error);
+          set({
+            recommendationsFetchStatus: "error",
+            recommendationsError:
+              error instanceof Error ? error.message : "Failed to fetch recommendations",
+          });
+        }
+      },
+
+      cancelRecommendationsFetch: (): void => {
+        // Implementation for canceling recommendations fetch
+        set({ recommendationsFetchStatus: "idle" });
+      },
+
+      invalidateRecommendationsCache: (): void => {
+        // Implementation for invalidating recommendations cache
+        set({ prefetchedRecommendations: null, recommendationsFetchStatus: "idle" });
+      },
+
+      clearRecommendationsError: (): void => {
+        // Implementation for clearing recommendations error
+        set({ recommendationsError: null });
+      },
+    }),
+    {
+      name: PROPOSAL_WIZARD_STORAGE_KEY,
+      storage: createJSONStorage(() => localStorage),
+      // Only persist wizard form data + navigation state; never ephemeral flags
+      partialize: (state): PersistedWizardState => ({
+        proposalData: {
+          ...state.proposalData,
+          files: [], // File objects cannot be serialized to JSON
+        },
+        currentStep: state.currentStep,
+        currentProposalId: state.currentProposalId,
+        generatedProposalId: state.generatedProposalId,
+        maxStepReached: state.maxStepReached,
+      }),
+      // Deep-merge persisted proposalData with defaults so new required fields
+      // introduced in future versions are always present after hydration.
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<PersistedWizardState>;
+        return {
+          ...currentState,
+          ...persisted,
+          proposalData: {
+            ...DEFAULT_PROPOSAL_DATA,
+            ...(persisted.proposalData ?? {}),
+            files: [],
+          },
+          hydrated: false, // set to true by onRehydrateStorage below
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.hydrated = true;
+        }
+      },
     }
-  },
-
-  reset: (): void => {
-    set(INITIAL_WIZARD_STATE);
-  },
-
-  prefetchRecommendations: async (): Promise<void> => {
-    const state = useProposalWizardStore.getState();
-    const { proposalData } = state;
-
-    // Allow prefetch even without description/documents - the backend can handle empty context
-    logger.debug('[proposalWizardSlice] Prefetching recommendations | has_description=%s | has_documents=%s', 
-      !!proposalData.description, 
-      !!proposalData.selectedDocumentIds?.length
-    );
-
-    set({ recommendationsFetchStatus: 'loading' });
-
-    try {
-      const existingSectionsWithRules = proposalData.selectedSections.map((key) => ({
-        sectionKey: key,
-        sectionName: SECTION_DISPLAY_NAMES[key] || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        include: "",
-        exclude: "",
-        purpose: "",
-      }));
-
-      const recs = await getSectionRecommendations({
-        templateId: proposalData.templateId,
-        existingSections: proposalData.selectedSections,
-        existingSectionsWithRules,
-        context: proposalData.description || "",
-        userPrompt: null,
-      });
-
-      set({ 
-        prefetchedRecommendations: recs, 
-        recommendationsFetchStatus: 'success' 
-      });
-      logger.info('[proposalWizardSlice] Recommendations prefetched successfully', { count: recs.length });
-    } catch (error) {
-      logger.error('[proposalWizardSlice] Failed to prefetch recommendations', error);
-      set({ 
-        recommendationsFetchStatus: 'error',
-        recommendationsError: error instanceof Error ? error.message : 'Failed to fetch recommendations'
-      });
-    }
-  },
-
-  cancelRecommendationsFetch: (): void => {
-    // Implementation for canceling recommendations fetch
-    set({ recommendationsFetchStatus: 'idle' });
-  },
-
-  invalidateRecommendationsCache: (): void => {
-    // Implementation for invalidating recommendations cache
-    set({ prefetchedRecommendations: null, recommendationsFetchStatus: 'idle' });
-  },
-
-  clearRecommendationsError: (): void => {
-    // Implementation for clearing recommendations error
-    set({ recommendationsError: null });
-  },
-}));
+  )
+);
 
 // ─── Granular Selector Hooks ─────────────────────────────────────────────────────
 
@@ -213,30 +261,19 @@ export const useProposalWizardStore = create<ProposalWizardState>((set) => ({
  */
 
 /**
- * Selects the entire proposalData object.
- * DEPRECATED: Use granular selectors instead to avoid unnecessary re-renders.
- * This selector causes re-renders on ANY proposalData change.
- */
-export const useProposalData = () =>
-  useProposalWizardStore((state) => state.proposalData);
-
-/**
  * Selects the proposal title.
  */
-export const useProposalTitle = () =>
-  useProposalWizardStore((state) => state.proposalData.title);
+export const useProposalTitle = () => useProposalWizardStore((state) => state.proposalData.title);
 
 /**
  * Selects the client name.
  */
-export const useClientName = () =>
-  useProposalWizardStore((state) => state.proposalData.clientName);
+export const useClientName = () => useProposalWizardStore((state) => state.proposalData.clientName);
 
 /**
  * Selects the client ID.
  */
-export const useClientId = () =>
-  useProposalWizardStore((state) => state.proposalData.clientId);
+export const useClientId = () => useProposalWizardStore((state) => state.proposalData.clientId);
 
 /**
  * Selects the template type.
@@ -247,14 +284,19 @@ export const useTemplateType = () =>
 /**
  * Selects the template ID.
  */
-export const useTemplateId = () =>
-  useProposalWizardStore((state) => state.proposalData.templateId);
+export const useTemplateId = () => useProposalWizardStore((state) => state.proposalData.templateId);
 
 /**
  * Selects the proposal description.
  */
 export const useProposalDescription = () =>
   useProposalWizardStore((state) => state.proposalData.description);
+
+/**
+ * Selects the contextual instructions.
+ */
+export const useContextualInstructions = () =>
+  useProposalWizardStore((state) => state.proposalData.contextualInstructions);
 
 /**
  * Selects the selected sections array.
@@ -271,8 +313,7 @@ export const useSectionDisplayNames = () =>
 /**
  * Selects the tone preference.
  */
-export const useTone = () =>
-  useProposalWizardStore((state) => state.proposalData.tone);
+export const useTone = () => useProposalWizardStore((state) => state.proposalData.tone);
 
 /**
  * Selects the length preference.
@@ -283,14 +324,12 @@ export const useLengthPreference = () =>
 /**
  * Selects the language preference.
  */
-export const useLanguage = () =>
-  useProposalWizardStore((state) => state.proposalData.language);
+export const useLanguage = () => useProposalWizardStore((state) => state.proposalData.language);
 
 /**
  * Selects the AI model preference.
  */
-export const useAiModel = () =>
-  useProposalWizardStore((state) => state.proposalData.aiModel);
+export const useAiModel = () => useProposalWizardStore((state) => state.proposalData.aiModel);
 
 /**
  * Selects the exact document name (for recreate mode).
@@ -313,8 +352,7 @@ export const useOriginalSections = () =>
 /**
  * Selects the files metadata (for knowledge base).
  */
-export const useFilesMeta = () =>
-  useProposalWizardStore((state) => state.proposalData.filesMeta);
+export const useFilesMeta = () => useProposalWizardStore((state) => state.proposalData.filesMeta);
 
 /**
  * Selects the web references (for knowledge base).
@@ -331,20 +369,17 @@ export const useSelectedDocumentIds = () =>
 /**
  * Selects the current wizard step.
  */
-export const useCurrentStep = () =>
-  useProposalWizardStore((state) => state.currentStep);
+export const useCurrentStep = () => useProposalWizardStore((state) => state.currentStep);
 
 /**
  * Selects the maximum step reached.
  */
-export const useMaxStepReached = () =>
-  useProposalWizardStore((state) => state.maxStepReached);
+export const useMaxStepReached = () => useProposalWizardStore((state) => state.maxStepReached);
 
 /**
  * Selects the generation status.
  */
-export const useIsGenerating = () =>
-  useProposalWizardStore((state) => state.isGenerating);
+export const useIsGenerating = () => useProposalWizardStore((state) => state.isGenerating);
 
 /**
  * Selects the generated proposal ID.
@@ -361,14 +396,12 @@ export const useCurrentProposalId = () =>
 /**
  * Selects the edit mode flag.
  */
-export const useEditMode = () =>
-  useProposalWizardStore((state) => state.editMode);
+export const useEditMode = () => useProposalWizardStore((state) => state.editMode);
 
 /**
  * Selects the hydration status.
  */
-export const useHydrated = () =>
-  useProposalWizardStore((state) => state.hydrated);
+export const useHydrated = () => useProposalWizardStore((state) => state.hydrated);
 
 /**
  * Selects the background fetch flag.
@@ -399,20 +432,22 @@ export const useRecommendationsError = () =>
  * Use this when you need multiple actions without subscribing to state changes.
  */
 export const useWizardActions = () =>
-  useProposalWizardStore(useShallow((state) => ({
-    updateProposalData: state.updateProposalData,
-    setCurrentStep: state.setCurrentStep,
-    setIsGenerating: state.setIsGenerating,
-    setGeneratedProposalId: state.setGeneratedProposalId,
-    setCurrentProposalId: state.setCurrentProposalId,
-    setHydrated: state.setHydrated,
-    setEditMode: state.setEditMode,
-    setMaxStepReached: state.setMaxStepReached,
-    setShouldStartBackgroundFetch: state.setShouldStartBackgroundFetch,
-    resetProposal: state.resetProposal,
-    reset: state.reset,
-    prefetchRecommendations: state.prefetchRecommendations,
-    cancelRecommendationsFetch: state.cancelRecommendationsFetch,
-    invalidateRecommendationsCache: state.invalidateRecommendationsCache,
-    clearRecommendationsError: state.clearRecommendationsError,
-  })));
+  useProposalWizardStore(
+    useShallow((state) => ({
+      updateProposalData: state.updateProposalData,
+      setCurrentStep: state.setCurrentStep,
+      setIsGenerating: state.setIsGenerating,
+      setGeneratedProposalId: state.setGeneratedProposalId,
+      setCurrentProposalId: state.setCurrentProposalId,
+      setHydrated: state.setHydrated,
+      setEditMode: state.setEditMode,
+      setMaxStepReached: state.setMaxStepReached,
+      setShouldStartBackgroundFetch: state.setShouldStartBackgroundFetch,
+      resetProposal: state.resetProposal,
+      reset: state.reset,
+      prefetchRecommendations: state.prefetchRecommendations,
+      cancelRecommendationsFetch: state.cancelRecommendationsFetch,
+      invalidateRecommendationsCache: state.invalidateRecommendationsCache,
+      clearRecommendationsError: state.clearRecommendationsError,
+    }))
+  );

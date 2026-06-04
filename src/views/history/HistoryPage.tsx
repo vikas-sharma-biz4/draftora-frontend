@@ -45,17 +45,6 @@ export default function HistoryPage(): JSX.Element {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Refresh when tab becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = (): void => {
-      if (!document.hidden) {
-        void refetch();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [refetch]);
-
   useEffect(() => {
     if (!isLoading && historyItems.length > 0) {
       logger.info(`[HistoryPage] Data loaded - ${historyItems.length} history items found`, {
@@ -134,10 +123,7 @@ export default function HistoryPage(): JSX.Element {
       )}
 
       {isLoading ? (
-        <SkeletonGrid
-          className={styles.historyGrid}
-          renderItem={() => <HistoryCardSkeleton />}
-        />
+        <SkeletonGrid className={styles.historyGrid} renderItem={() => <HistoryCardSkeleton />} />
       ) : historyItems.length === 0 ? (
         <EmptyState
           icon={<History size={48} />}
@@ -164,9 +150,7 @@ export default function HistoryPage(): JSX.Element {
                   <div className={styles.cardHeader}>
                     <div className={styles.cardTitle}>{item.title}</div>
                     <div className={styles.cardHeaderRight}>
-                      {versionLabel && (
-                        <span className={styles.versionBadge}>{versionLabel}</span>
-                      )}
+                      {versionLabel && <span className={styles.versionBadge}>{versionLabel}</span>}
                       <StatusBadge status={item.approvalStatus} />
                     </div>
                   </div>

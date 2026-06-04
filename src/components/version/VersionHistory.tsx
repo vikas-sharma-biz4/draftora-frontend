@@ -1,6 +1,7 @@
 import React from "react";
 import { Check, X, GitCommit, Edit, RefreshCw, Sparkles } from "lucide-react";
 import type { ProposalVersion } from "@/interfaces/versionInterfaces";
+import { formatRelativeTime } from "@/utils/formatters";
 import styles from "./VersionHistory.module.scss";
 
 interface VersionHistoryProps {
@@ -44,29 +45,6 @@ export function VersionHistory({
     }
   };
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) {
-      return "Just now";
-    }
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    }
-    if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    }
-    if (diffDays < 7) {
-      return `${diffDays}d ago`;
-    }
-    return date.toLocaleDateString();
-  };
-
   const sortedVersions = [...versions].sort((a, b) => b.version - a.version);
 
   return (
@@ -88,9 +66,7 @@ export function VersionHistory({
           return (
             <div
               key={version.id}
-              className={`${styles.timelineItem} ${
-                isSelected ? styles.timelineItemSelected : ""
-              }`}
+              className={`${styles.timelineItem} ${isSelected ? styles.timelineItemSelected : ""}`}
               onClick={() => onSelectVersion(version.version)}
             >
               <div className={styles.timelineMarker}>
@@ -99,8 +75,8 @@ export function VersionHistory({
                     isAccepted
                       ? styles.dotAccepted
                       : isRejected
-                      ? styles.dotRejected
-                      : styles.dotDefault
+                        ? styles.dotRejected
+                        : styles.dotDefault
                   }`}
                 >
                   {isAccepted ? (
@@ -116,33 +92,21 @@ export function VersionHistory({
 
               <div className={styles.content}>
                 <div className={styles.contentHeader}>
-                  <span className={styles.versionNumber}>
-                    Version {version.version}
-                  </span>
-                  {isAccepted && (
-                    <span className={styles.statusAccepted}>Accepted</span>
-                  )}
-                  {isRejected && (
-                    <span className={styles.statusRejected}>Rejected</span>
-                  )}
+                  <span className={styles.versionNumber}>Version {version.version}</span>
+                  {isAccepted && <span className={styles.statusAccepted}>Accepted</span>}
+                  {isRejected && <span className={styles.statusRejected}>Rejected</span>}
                 </div>
 
                 <p className={styles.sourceLabel}>
                   {getSourceLabel(version.source)}
-                  {version.parentVersion && (
-                    <> Based on v{version.parentVersion}</>
-                  )}
+                  {version.parentVersion && <> Based on v{version.parentVersion}</>}
                 </p>
 
                 {version.changeDescription && (
-                  <p className={styles.description}>
-                    {version.changeDescription}
-                  </p>
+                  <p className={styles.description}>{version.changeDescription}</p>
                 )}
 
-                <span className={styles.timestamp}>
-                  {formatDate(version.createdAt)}
-                </span>
+                <span className={styles.timestamp}>{formatRelativeTime(version.createdAt)}</span>
               </div>
             </div>
           );

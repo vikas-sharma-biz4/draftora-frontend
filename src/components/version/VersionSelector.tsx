@@ -1,6 +1,7 @@
 import React from "react";
 import { Check, X, ChevronDown, GitBranch } from "lucide-react";
 import type { ProposalVersion } from "@/interfaces/versionInterfaces";
+import { formatDateWithTime } from "@/utils/dateUtils";
 import styles from "./VersionSelector.module.scss";
 
 interface VersionSelectorProps {
@@ -71,11 +72,7 @@ export function VersionSelector({
       </div>
 
       <div className={styles.selectorWrapper}>
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={styles.trigger}
-          disabled={disabled}
-        >
+        <button onClick={() => setIsOpen(!isOpen)} className={styles.trigger} disabled={disabled}>
           <div className={styles.triggerContent}>
             <span className={styles.versionNumber}>v{selectedVersion}</span>
             {selectedVersionData && (
@@ -122,27 +119,19 @@ export function VersionSelector({
                     >
                       <div className={styles.versionInfo}>
                         <div className={styles.versionHeader}>
-                          <span className={styles.versionNum}>
-                            v{version.version}
-                          </span>
-                          {isCurrent && (
-                            <span className={styles.currentBadge}>Latest</span>
-                          )}
+                          <span className={styles.versionNum}>v{version.version}</span>
+                          {isCurrent && <span className={styles.currentBadge}>Latest</span>}
                           {getVersionBadge(version.version)}
                         </div>
                         <span className={styles.versionMeta}>
                           {getSourceLabel(version.source)}
-                          {version.parentVersion && (
-                            <> Based on v{version.parentVersion}</>
-                          )}
+                          {version.parentVersion && <> Based on v{version.parentVersion}</>}
                         </span>
                         {version.changeDescription && (
-                          <p className={styles.changeDesc}>
-                            {version.changeDescription}
-                          </p>
+                          <p className={styles.changeDesc}>{version.changeDescription}</p>
                         )}
                         <span className={styles.versionDate}>
-                          {new Date(version.createdAt).toLocaleString()}
+                          {formatDateWithTime(version.createdAt)}
                         </span>
                       </div>
 
@@ -174,9 +163,7 @@ export function VersionSelector({
         )}
       </div>
 
-      {isOpen && (
-        <div className={styles.overlay} onClick={() => setIsOpen(false)} />
-      )}
+      {isOpen && <div className={styles.overlay} onClick={() => setIsOpen(false)} />}
     </div>
   );
 }

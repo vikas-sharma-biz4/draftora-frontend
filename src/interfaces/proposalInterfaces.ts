@@ -1,3 +1,21 @@
+export interface TeamRoleEstimate {
+  role: string;
+  hours: number;
+  description: string;
+}
+
+export interface TotalEstimate {
+  hours: number;
+  description: string;
+}
+
+export interface EstimatedHoursData {
+  totalEstimatedHours: TotalEstimate;
+  teamBreakdown: TeamRoleEstimate[];
+  featureListUsed: string;
+  customPromptUsed?: string | null;
+}
+
 export interface ProposalSection {
   key: string;
   displayName: string;
@@ -10,7 +28,19 @@ export interface CustomSection {
   description: string;
 }
 
-export type TemplateType = "predefined" | "custom" | "scratch" | "recreate" | "mvp" | "poc" | "design" | "brd" | "frd" | "srs" | "architecture" | "sow";
+export type TemplateType =
+  | "predefined"
+  | "custom"
+  | "scratch"
+  | "recreate"
+  | "mvp"
+  | "poc"
+  | "design"
+  | "brd"
+  | "frd"
+  | "srs"
+  | "architecture"
+  | "sow";
 
 export interface OriginalSection {
   id: string;
@@ -28,8 +58,12 @@ export interface FileMeta {
   type: string;
 }
 
-export interface ProposalData {
-  id?: number;
+/**
+ * Fields shared between the wizard form input (ProposalWizardData) and the
+ * backend API response (ProposalData).  Browser-specific types such as
+ * `File` must NOT appear here — they belong only on ProposalWizardData.
+ */
+export interface ProposalBaseFields {
   title: string;
   clientName: string;
   clientId?: number;
@@ -43,10 +77,8 @@ export interface ProposalData {
   customSections: CustomSection[];
   contextualInstructions: string;
   webReferences: string[];
-  files: File[];
   filesMeta: FileMeta[];
   selectedDocumentIds?: number[];
-  // Template selection (set in wizard step 3)
   templateId: string | null;
   templateType: TemplateType;
   // Recreate mode: sections extracted from the exact document
@@ -55,13 +87,32 @@ export interface ProposalData {
   originalSectionContents?: Record<string, string>;
   // Recreate mode: filename of the uploaded exact document
   exactDocumentName?: string;
-  // Response fields from backend
-  status?: string;
+  // Cross-cutting wizard fields
   approvalStatus?: "pending" | "approved" | "rejected";
   sections?: Record<string, string>;
+}
+
+/**
+ * Core wizard form data — extends ProposalBaseFields with browser File
+ * objects that are only available during the wizard upload phase and are
+ * never present on API responses.
+ */
+export interface ProposalWizardData extends ProposalBaseFields {
+  files: File[];
+}
+
+/**
+ * Full proposal shape as returned by the backend API.
+ * Extends ProposalBaseFields directly — does NOT include `files: File[]`
+ * because browser File objects are never returned by the server.
+ */
+export interface ProposalData extends ProposalBaseFields {
+  id?: number;
+  status?: string;
   /** Maps section_key → content type: "table" | "bullets" | "diagram" | "paragraph" */
   sectionTypes?: Record<string, string>;
   generatingSection?: string | null;
+  estimatedHoursData?: EstimatedHoursData | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -14,14 +14,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { logger } from "@/utils/logger";
-import { useCurrentStep, useMaxStepReached, useCurrentProposalId, useEditMode, useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import {
+  useCurrentStep,
+  useMaxStepReached,
+  useCurrentProposalId,
+  useEditMode,
+  useWizardActions,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
-import {
-  getProposal,
-} from "@/services/proposal.service";
+import { getProposal } from "@/services/proposal.service";
+
+// Statuses that indicate the proposal is actively being generated on the backend.
+// Only these statuses should trigger a redirect to the generating page.
+// Unexpected, null, or terminal non-completed statuses (e.g. "cancelled") must
+// NOT redirect — they would create a false "generating" impression.
+const ACTIVE_GENERATION_STATUSES = new Set([
+  "queued",
+  "initializing",
+  "parsing",
+  "validating",
+  "planning",
+  "generating",
+  "refining",
+  "finalizing",
+]);
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
+import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import type { DraftUIState } from "@/interfaces/draftInterfaces";
 
@@ -43,11 +63,11 @@ export function useProposalPageData(
   const router = useRouter();
   const { setCurrentProposalId, updateProposalData } = useWizardActions();
   const { syncVisitedStepsFromBackend } = usePipelineSteps();
-  const setDraftStage = useDraftSessionStore(state => state.setDraftStage);
-  const setCompletedSteps = useDraftSessionStore(state => state.setCompletedSteps);
-  const markStepCompleted = useDraftSessionStore(state => state.markStepCompleted);
-  const setFromHistoryInStore = useDraftSessionStore(state => state.setFromHistory);
-  const updateProposalInStore = useProposalStore(state => state.updateProposal);
+  const setDraftStage = useDraftSessionStore((state) => state.setDraftStage);
+  const setCompletedSteps = useDraftSessionStore((state) => state.setCompletedSteps);
+  const markStepCompleted = useDraftSessionStore((state) => state.markStepCompleted);
+  const setFromHistoryInStore = useDraftSessionStore((state) => state.setFromHistory);
+  const updateProposalInStore = useProposalStore((state) => state.updateProposal);
 
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -148,15 +168,34 @@ export function useProposalPageData(
       }
 
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-      logger.info(`[useProposalPageData] Proposal status is ${data.status}, redirecting to generating page`);
-      router.replace(`/generating/${proposalId}`);
+      if (ACTIVE_GENERATION_STATUSES.has(data.status ?? "")) {
+        logger.info(
+          `[useProposalPageData] Proposal is actively generating (${data.status}), redirecting`
+        );
+        router.replace(`/generating/${proposalId}`);
+      } else {
+        // Unexpected status (null, cancelled, unknown) — do NOT redirect to generating page.
+        // Redirecting would show a false "generating" screen for a non-generating proposal.
+        logger.warn(
+          `[useProposalPageData] Unexpected proposal status (${data.status}), showing error`
+        );
+        setIsLoading(false);
+        setErrorMessage("Unable to load the proposal. Please refresh or go back and try again.");
+      }
     } catch (err: unknown) {
       logger.error(`[useProposalPageData] Error fetching proposal ${proposalId}:`, err);
       const message = err instanceof Error ? err.message : "Failed to load proposal.";
       setErrorMessage(message);
       setIsLoading(false);
     }
-  }, [proposalId, router, setCurrentProposalId, updateProposalData, setDraftStage, setCompletedSteps]);
+  }, [
+    proposalId,
+    router,
+    setCurrentProposalId,
+    updateProposalData,
+    setDraftStage,
+    setCompletedSteps,
+  ]);
 
   useEffect(() => {
     fetchProposal();
@@ -168,7 +207,7 @@ export function useProposalPageData(
   // Restore scroll position and active section from draft UI state
   useEffect(() => {
     try {
-      const uiStateStr = sessionStorage.getItem("draft_ui_state");
+      const uiStateStr = sessionStorage.getItem(DRAFT_UI_STATE_STORAGE_KEY);
       if (uiStateStr) {
         const uiState = JSON.parse(uiStateStr) as DraftUIState;
 
@@ -187,7 +226,7 @@ export function useProposalPageData(
           }, 300);
         }
 
-        sessionStorage.removeItem("draft_ui_state");
+        sessionStorage.removeItem(DRAFT_UI_STATE_STORAGE_KEY);
       }
     } catch {
       // Ignore errors restoring UI state
@@ -196,10 +235,11 @@ export function useProposalPageData(
 
   // Auto-save to drafts when navigating away without approval/rejection
   useDraftPersistence({
-    enabled: proposal?.status === "completed" &&
-             proposal?.approvalStatus !== "approved" &&
-             proposal?.approvalStatus !== "rejected" &&
-             !fromHistory,
+    enabled:
+      proposal?.status === "completed" &&
+      proposal?.approvalStatus !== "approved" &&
+      proposal?.approvalStatus !== "rejected" &&
+      !fromHistory,
     proposalId,
     proposal,
     activeSection,

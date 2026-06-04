@@ -19,11 +19,16 @@ import type { ProposalData } from "@/interfaces/proposalInterfaces";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Mock a fetch response using the standard API envelope:
+ *   { success: true/false, data?: T, error?: { message } }
+ * handleResponse() in httpClient reads res.text(), not res.json().
+ */
 function mockFetch(body: unknown, ok = true, status = 200): void {
   global.fetch = jest.fn().mockResolvedValue({
     ok,
     status,
-    json: jest.fn().mockResolvedValue(body),
+    text: async () => JSON.stringify(body),
   } as unknown as Response);
 }
 
@@ -58,20 +63,16 @@ describe("handleResponse — error path", () => {
 
   it("throws when success flag is false even with HTTP 200", async () => {
     mockFetch(
-      { ok: true, success: false, error: { message: "Logic error" } },
+      { success: false, error: { code: "VALIDATION_ERROR", message: "Logic error" } },
       true,
       200
     );
-    await expect(updateSection(1, "intro", "content")).rejects.toThrow(
-      "Logic error"
-    );
+    await expect(updateSection(1, "intro", "content")).rejects.toThrow("Logic error");
   });
 
   it("falls back to generic message when no error.message provided", async () => {
     mockFetch({ success: false }, false, 500);
-    await expect(updateSection(1, "intro", "x")).rejects.toThrow(
-      "Request failed with status 500"
-    );
+    await expect(updateSection(1, "intro", "x")).rejects.toThrow("Request failed with status 500");
   });
 });
 
@@ -85,7 +86,7 @@ describe("generateProposal", () => {
     const result = await generateProposal(minimalProposalData);
     expect(result).toEqual({ id: 42, status: "draft" });
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/proposals/"),
+      expect.stringContaining("/proposals"),
       expect.objectContaining({ method: "POST" })
     );
   });
@@ -94,17 +95,13 @@ describe("generateProposal", () => {
     mockFetch({ success: true, data: { id: 1, status: "draft" } });
     const dataWithCustom: ProposalData = {
       ...minimalProposalData,
-      customSections: [
-        { key: "custom_1", label: "Custom Section", description: "Details" },
-      ],
+      customSections: [{ key: "custom_1", label: "Custom Section", description: "Details" }],
     };
     await generateProposal(dataWithCustom);
     const call = (global.fetch as jest.Mock).mock.calls[0];
     const formData: FormData = call[1].body;
     const payload = JSON.parse(formData.get("proposal_data") as string);
-    expect(payload.contextual_instructions).toContain(
-      "[Additional custom sections"
-    );
+    expect(payload.contextual_instructions).toContain("[Additional custom sections");
     expect(payload.selected_sections).toContain("custom_1");
   });
 
@@ -113,9 +110,7 @@ describe("generateProposal", () => {
     const dataWithDisplay: ProposalData = {
       ...minimalProposalData,
       sectionDisplayNames: { executive_summary: "Exec Summary" },
-      customSections: [
-        { key: "my_section", label: "My Section", description: "Desc" },
-      ],
+      customSections: [{ key: "my_section", label: "My Section", description: "Desc" }],
     };
     await generateProposal(dataWithDisplay);
     const call = (global.fetch as jest.Mock).mock.calls[0];
@@ -128,14 +123,8 @@ describe("generateProposal", () => {
   });
 
   it("throws on API error", async () => {
-    mockFetch(
-      { success: false, error: { message: "Validation failed" } },
-      false,
-      422
-    );
-    await expect(generateProposal(minimalProposalData)).rejects.toThrow(
-      "Validation failed"
-    );
+    mockFetch({ success: false, error: { message: "Validation failed" } }, false, 422);
+    await expect(generateProposal(minimalProposalData)).rejects.toThrow("Validation failed");
   });
 });
 
@@ -166,7 +155,8 @@ describe("getProposal", () => {
   it("maps backend snake_case fields to camelCase ProposalData", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({ success: true, data: backendProposal }),
+      status: 200,
+      text: async () => JSON.stringify({ success: true, data: backendProposal }),
     } as unknown as Response);
 
     const result = await getProposal(5);
@@ -176,26 +166,27 @@ describe("getProposal", () => {
     expect(result.sectionDisplayNames).toEqual({ executive_summary: "Exec" });
     expect(result.contextualInstructions).toBe("Some instructions");
     expect(result.webReferences).toEqual(["https://example.com"]);
-    expect(result.files).toEqual([]);
     expect(result.customSections).toEqual([]);
   });
 
   it("provides safe defaults for nullable backend fields", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({
-        success: true,
-        data: {
-          ...backendProposal,
-          description: null,
-          selected_sections: null,
-          section_display_names: null,
-          contextual_instructions: null,
-          web_references: null,
-          sections: null,
-          generating_section: null,
-        },
-      }),
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          data: {
+            ...backendProposal,
+            description: null,
+            selected_sections: null,
+            section_display_names: null,
+            contextual_instructions: null,
+            web_references: null,
+            sections: null,
+            generating_section: null,
+          },
+        }),
     } as unknown as Response);
 
     const result = await getProposal(5);
@@ -211,9 +202,8 @@ describe("getProposal", () => {
   it("throws when success is false", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
-      json: jest
-        .fn()
-        .mockResolvedValue({ success: false, error: { message: "Not found" } }),
+      status: 404,
+      text: async () => JSON.stringify({ success: false, error: { message: "Not found" } }),
     } as unknown as Response);
     await expect(getProposal(999)).rejects.toThrow("Not found");
   });
@@ -282,21 +272,23 @@ describe("listProposals", () => {
   it("maps backend array to ProposalListItem list", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({
-        success: true,
-        data: [
-          {
-            id: 1,
-            title: "P1",
-            client_name: "Client A",
-            status: "completed",
-            tone: "professional",
-            length_preference: "balanced",
-            created_at: "2024-01-01T00:00:00Z",
-            updated_at: "2024-01-02T00:00:00Z",
-          },
-        ],
-      }),
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          data: [
+            {
+              id: 1,
+              title: "P1",
+              client_name: "Client A",
+              status: "completed",
+              tone: "professional",
+              length_preference: "balanced",
+              created_at: "2024-01-01T00:00:00Z",
+              updated_at: "2024-01-02T00:00:00Z",
+            },
+          ],
+        }),
     } as unknown as Response);
 
     const items = await listProposals();
@@ -308,9 +300,10 @@ describe("listProposals", () => {
   it("throws on error response", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
-      json: jest.fn().mockResolvedValue({ success: false }),
+      status: 500,
+      text: async () => JSON.stringify({ success: false }),
     } as unknown as Response);
-    await expect(listProposals()).rejects.toThrow("Request failed with status undefined");
+    await expect(listProposals()).rejects.toThrow("Request failed with status 500");
   });
 });
 
@@ -322,7 +315,7 @@ describe("getDownloadUrl", () => {
   it("returns a URL containing the proposal id", () => {
     const url = getDownloadUrl(7);
     expect(url).toContain("7");
-    expect(url).toContain("/download/");
+    expect(url).toContain("/download");
   });
 });
 
@@ -332,7 +325,10 @@ describe("getDownloadUrl", () => {
 
 describe("addProposalSection", () => {
   it("sends POST to correct endpoint", async () => {
-    mockFetch({ success: true, data: null });
+    mockFetch({
+      success: true,
+      data: { key: "new_section", label: "New Section", content: "" },
+    });
     await addProposalSection(1, {
       key: "new_section",
       label: "New Section",
@@ -397,9 +393,7 @@ describe("parseCustomTemplate", () => {
     mockFetch({
       success: true,
       data: {
-        sections: [
-          { key: "scope", label: "Scope", description: "Project scope" },
-        ],
+        sections: [{ key: "scope", label: "Scope", description: "Project scope" }],
         source_type: "docx",
         total_sections: 1,
       },
@@ -422,24 +416,28 @@ describe("parseFiles", () => {
   it("maps snake_case backend response to camelCase", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({
-        success: true,
-        message: "Parsed 1 file",
-        files_received: 1,
-        files_parsed: 1,
-        results: [
-          {
-            filename: "doc.pdf",
-            extension: ".pdf",
-            size_bytes: 1024,
-            char_count: 500,
-            word_count: 80,
-            preview: "Preview text...",
-            text: "Full text here",
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          data: {
+            message: "Parsed 1 file",
+            files_received: 1,
+            files_parsed: 1,
+            results: [
+              {
+                filename: "doc.pdf",
+                extension: ".pdf",
+                size_bytes: 1024,
+                char_count: 500,
+                word_count: 80,
+                preview: "Preview text...",
+                text: "Full text here",
+              },
+            ],
+            errors: [],
           },
-        ],
-        errors: [],
-      }),
+        }),
     } as unknown as Response);
 
     const file = new File(["pdf content"], "doc.pdf", {
@@ -458,7 +456,11 @@ describe("parseFiles", () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       status: 422,
-      json: jest.fn().mockResolvedValue({ detail: "Unprocessable entity" }),
+      text: async () =>
+        JSON.stringify({
+          success: false,
+          error: { code: "PARSE_ERROR", message: "Unprocessable entity" },
+        }),
     } as unknown as Response);
     const file = new File(["x"], "bad.exe");
     await expect(parseFiles([file])).rejects.toThrow("Unprocessable entity");
@@ -473,9 +475,12 @@ describe("getSupportedParseFormats", () => {
   it("returns extensions array from response", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest
-        .fn()
-        .mockResolvedValue({ data: { extensions: [".pdf", ".docx", ".txt"] } }),
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          success: true,
+          data: { extensions: [".pdf", ".docx", ".txt"] },
+        }),
     } as unknown as Response);
 
     const result = await getSupportedParseFormats();
@@ -485,7 +490,8 @@ describe("getSupportedParseFormats", () => {
   it("returns empty array when extensions missing from response", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue({}),
+      status: 200,
+      text: async () => JSON.stringify({ success: true, data: {} }),
     } as unknown as Response);
 
     const result = await getSupportedParseFormats();
