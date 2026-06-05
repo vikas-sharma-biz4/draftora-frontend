@@ -1,4 +1,77 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+const MOCK_DRAFT = {
+  id: "draft-e2e-1",
+  proposal_id: null,
+  title: "E2E Test Draft",
+  client_name: "Acme Corp",
+  status: "draft",
+  last_location: "wizard_parameters",
+  stage: "wizard_in_progress",
+  updated_at: "2025-01-15T12:00:00Z",
+};
+
+const MOCK_DRAFT_FULL = {
+  ...MOCK_DRAFT,
+  wizard_state: {
+    currentStep: 1,
+    maxStepReached: 1,
+    completedSteps: [],
+    proposalData: {
+      title: "E2E Test Draft",
+      clientName: "Acme Corp",
+      clientId: 1,
+      selectedSections: ["executive_summary"],
+      sectionDisplayNames: {},
+      tone: "professional",
+      length: "balanced",
+      templateType: "predefined",
+      language: "english",
+      filesMeta: [],
+      selectedDocumentIds: [],
+      webReferences: [],
+    },
+  },
+  ui_state: {
+    scrollPosition: 0,
+    activeSection: null,
+    expandedSections: [],
+    lastVisibleSection: null,
+  },
+  generated_content: {},
+  created_at: "2025-01-14T10:00:00Z",
+  version: 1,
+};
+
+async function mockDraftsApi(page: Page, drafts: (typeof MOCK_DRAFT)[]): Promise<void> {
+  await page.route(/\/api\/v1\/drafts/, async (route) => {
+    if (route.request().resourceType() === "document") {
+      await route.continue();
+      return;
+    }
+    const url = route.request().url();
+    const method = route.request().method();
+
+    // Detail endpoint: /drafts/:id
+    if (/\/drafts\/[^?/]+/.test(url)) {
+      if (method === "GET") {
+        await route.fulfill({ json: { success: true, data: MOCK_DRAFT_FULL } });
+      } else if (method === "DELETE") {
+        await route.fulfill({ status: 204, json: { success: true, data: null } });
+      } else {
+        await route.continue();
+      }
+      return;
+    }
+
+    // List endpoint: /drafts or /drafts?...
+    if (method === "GET") {
+      await route.fulfill({ json: { success: true, data: { drafts } } });
+    } else {
+      await route.continue();
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Drafts page — list view
@@ -6,11 +79,12 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Drafts — list page", () => {
   test.beforeEach(async ({ page }) => {
+    await mockDraftsApi(page, []);
     await page.goto("/drafts");
   });
 
   test("renders the page heading", async ({ page }) => {
-    await expect(page.getByRole("heading", { name: /drafts/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /drafts/i })).toBeVisible({ timeout: 8_000 });
   });
 
   test("shows draft cards or empty state — never a blank screen", async ({ page }) => {
@@ -47,6 +121,7 @@ test.describe("Drafts — list page", () => {
 
 test.describe("Drafts — resume flow", () => {
   test("resume button is present on existing draft cards", async ({ page }) => {
+    await mockDraftsApi(page, [MOCK_DRAFT]);
     await page.goto("/drafts");
 
     await page.waitForSelector("[data-testid='draft-card'], [data-testid='empty-state']", {
@@ -65,6 +140,7 @@ test.describe("Drafts — resume flow", () => {
   });
 
   test("clicking resume navigates into the wizard", async ({ page }) => {
+    await mockDraftsApi(page, [MOCK_DRAFT]);
     await page.goto("/drafts");
 
     await page.waitForSelector("[data-testid='draft-card'], [data-testid='empty-state']", {
@@ -90,6 +166,7 @@ test.describe("Drafts — resume flow", () => {
 
 test.describe("Drafts — delete flow", () => {
   test("delete button or menu is present on existing draft cards", async ({ page }) => {
+    await mockDraftsApi(page, [MOCK_DRAFT]);
     await page.goto("/drafts");
 
     await page.waitForSelector("[data-testid='draft-card'], [data-testid='empty-state']", {

@@ -27,15 +27,25 @@ function getStatusLabel(status: string): string {
 
 function getLocationLabel(location: string): string {
   switch (location) {
-    case "wizard_parameters": return "Parameters";
-    case "wizard_review": return "Review";
-    case "web_view": return "Generated";
-    case "ai_sections": return "AI Generation";
-    default: return "Unknown";
+    case "wizard_parameters":
+      return "Parameters";
+    case "wizard_review":
+      return "Review";
+    case "web_view":
+      return "Generated";
+    case "ai_sections":
+      return "AI Generation";
+    default:
+      return "Unknown";
   }
 }
 
-export default function DraftCard({ draft, loadingDraftId, onLoad, onDelete }: DraftCardProps): JSX.Element {
+export default function DraftCard({
+  draft,
+  loadingDraftId,
+  onLoad,
+  onDelete,
+}: DraftCardProps): JSX.Element {
   const templateMeta = getDraftTemplateMeta(draft.id);
   const templateId = templateMeta?.templateId ?? draft.templateId;
   const templateType = templateMeta?.templateType ?? draft.templateType;
@@ -55,10 +65,15 @@ export default function DraftCard({ draft, loadingDraftId, onLoad, onDelete }: D
   return (
     <article
       className={styles.card}
-      onClick={() => { if (!loadingDraftId) onLoad(draft.id); }}
+      data-testid="draft-card"
+      onClick={() => {
+        if (!loadingDraftId) onLoad(draft.id);
+      }}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" && !loadingDraftId) onLoad(draft.id); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !loadingDraftId) onLoad(draft.id);
+      }}
     >
       <div className={styles.header}>
         <div className={styles.headerLeft}>
@@ -101,9 +116,7 @@ export default function DraftCard({ draft, loadingDraftId, onLoad, onDelete }: D
         </div>
         {templateName && <div className={styles.template}>{templateName}</div>}
         <div className={styles.location}>Step: {getLocationLabel(draft.lastLocation)}</div>
-        {isGenerated && (
-          <div className={styles.generated}>Generated Proposal Available</div>
-        )}
+        {isGenerated && <div className={styles.generated}>Generated Proposal Available</div>}
       </div>
 
       <Card.Footer className={styles.footer}>
@@ -112,7 +125,10 @@ export default function DraftCard({ draft, loadingDraftId, onLoad, onDelete }: D
           size="sm"
           fullWidth
           disabled={loadingDraftId === draft.id}
-          onClick={(e) => { e.stopPropagation(); onLoad(draft.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onLoad(draft.id);
+          }}
           className={styles.resumeBtn}
         >
           Resume Editing

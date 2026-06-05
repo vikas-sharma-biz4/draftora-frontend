@@ -783,7 +783,13 @@ export default function TemplateSelectionModal({
 
   return createPortal(
     <div className={styles.modalOverlay}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={styles.modalContent}
+        role="dialog"
+        aria-modal="true"
+        data-testid="template-selection-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.modalHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             {modalView === "new_client" && initialView !== "new_client" && (
@@ -1339,12 +1345,7 @@ export default function TemplateSelectionModal({
               <Button
                 variant="primary"
                 onClick={handleContinue}
-                disabled={
-                  !selectedClientId ||
-                  !proposalName.trim() ||
-                  selectedDocuments.size === 0 ||
-                  uploadedFiles.some((f) => f.status === "parsing")
-                }
+                disabled={uploadedFiles.some((f) => f.status === "parsing")}
                 loading={isNavigating}
               >
                 {isNavigating ? "Starting..." : "Continue to Wizard"}

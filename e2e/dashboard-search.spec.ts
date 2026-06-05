@@ -4,100 +4,89 @@ import { test, expect, type Page } from "@playwright/test";
 // API fixtures
 // ---------------------------------------------------------------------------
 
-// Two pages of proposals so the infinite scroll sentinel has something to trigger.
-// The shape matches what handlePaginatedResponse expects from the backend.
-const PAGE_1_RESPONSE = {
-  data: [
-    {
-      id: 1,
-      title: "Infrastructure Migration Proposal",
-      client_name: "Acme Corp",
-      client_id: 1,
-      status: "pending",
-      approval_status: "pending",
-      template_type: "predefined",
-      version: 1,
-      estimated_hours: null,
-      created_at: "2025-01-10T10:00:00Z",
-      updated_at: "2025-01-11T10:00:00Z",
-    },
-    {
-      id: 2,
-      title: "Cloud Architecture Review",
-      client_name: "Biz Tech",
-      client_id: 2,
-      status: "approved",
-      approval_status: "approved",
-      template_type: "predefined",
-      version: 2,
-      estimated_hours: null,
-      created_at: "2025-01-09T10:00:00Z",
-      updated_at: "2025-01-10T10:00:00Z",
-    },
-    {
-      id: 3,
-      title: "Security Hardening Plan",
-      client_name: "Acme Corp",
-      client_id: 1,
-      status: "pending",
-      approval_status: "pending",
-      template_type: "custom",
-      version: 1,
-      estimated_hours: null,
-      created_at: "2025-01-08T10:00:00Z",
-      updated_at: "2025-01-09T10:00:00Z",
-    },
-  ],
-  meta: {
-    total: 5,
-    page: 1,
-    page_size: 3,
-    total_pages: 2,
+// Responses use the API envelope: { success: true, data: [...] }
+// This matches what handleResponse() in httpClient.ts expects.
+const PROPOSAL_ITEMS_PAGE_1 = [
+  {
+    id: 1,
+    title: "Infrastructure Migration Proposal",
+    client_name: "Acme Corp",
+    client_id: 1,
+    status: "pending",
+    approval_status: "pending",
+    template_type: "predefined",
+    tone: "professional",
+    length_preference: "balanced",
+    version: 1,
+    created_at: "2025-01-10T10:00:00Z",
+    updated_at: "2025-01-11T10:00:00Z",
   },
-};
+  {
+    id: 2,
+    title: "Cloud Architecture Review",
+    client_name: "Biz Tech",
+    client_id: 2,
+    status: "approved",
+    approval_status: "approved",
+    template_type: "predefined",
+    tone: "professional",
+    length_preference: "balanced",
+    version: 2,
+    created_at: "2025-01-09T10:00:00Z",
+    updated_at: "2025-01-10T10:00:00Z",
+  },
+  {
+    id: 3,
+    title: "Security Hardening Plan",
+    client_name: "Acme Corp",
+    client_id: 1,
+    status: "pending",
+    approval_status: "pending",
+    template_type: "predefined",
+    tone: "professional",
+    length_preference: "balanced",
+    version: 1,
+    created_at: "2025-01-08T10:00:00Z",
+    updated_at: "2025-01-09T10:00:00Z",
+  },
+];
 
-const PAGE_2_RESPONSE = {
-  data: [
-    {
-      id: 4,
-      title: "Data Platform Strategy",
-      client_name: "Greenfield Ltd",
-      client_id: 3,
-      status: "pending",
-      approval_status: "pending",
-      template_type: "brd",
-      version: 1,
-      estimated_hours: null,
-      created_at: "2025-01-07T10:00:00Z",
-      updated_at: "2025-01-08T10:00:00Z",
-    },
-    {
-      id: 5,
-      title: "Mobile App MVP",
-      client_name: "StartupX",
-      client_id: 4,
-      status: "pending",
-      approval_status: "pending",
-      template_type: "mvp",
-      version: 1,
-      estimated_hours: null,
-      created_at: "2025-01-06T10:00:00Z",
-      updated_at: "2025-01-07T10:00:00Z",
-    },
-  ],
-  meta: {
-    total: 5,
-    page: 2,
-    page_size: 3,
-    total_pages: 2,
+const PROPOSAL_ITEMS_PAGE_2 = [
+  {
+    id: 4,
+    title: "Data Platform Strategy",
+    client_name: "Greenfield Ltd",
+    client_id: 3,
+    status: "pending",
+    approval_status: "pending",
+    template_type: "predefined",
+    tone: "professional",
+    length_preference: "balanced",
+    version: 1,
+    created_at: "2025-01-07T10:00:00Z",
+    updated_at: "2025-01-08T10:00:00Z",
   },
-};
+  {
+    id: 5,
+    title: "Mobile App MVP",
+    client_name: "StartupX",
+    client_id: 4,
+    status: "pending",
+    approval_status: "pending",
+    template_type: "predefined",
+    tone: "professional",
+    length_preference: "balanced",
+    version: 1,
+    created_at: "2025-01-06T10:00:00Z",
+    updated_at: "2025-01-07T10:00:00Z",
+  },
+];
 
 // ---------------------------------------------------------------------------
-// Mock helper
+// Mock helper — wraps items in { success: true, data: [...] } envelope
 // ---------------------------------------------------------------------------
 
-async function mockProposalApis(page: Page, firstPage = PAGE_1_RESPONSE): Promise<void> {
+async function mockProposalApis(page: Page, firstPageItems = PROPOSAL_ITEMS_PAGE_1): Promise<void> {
   await page.route(/\/proposals(\?.*)?$/, async (route) => {
     if (route.request().method() !== "GET") {
       await route.continue();
@@ -106,9 +95,10 @@ async function mockProposalApis(page: Page, firstPage = PAGE_1_RESPONSE): Promis
 
     const url = new URL(route.request().url());
     const pageParam = url.searchParams.get("page") ?? "1";
+    const items = pageParam === "2" ? PROPOSAL_ITEMS_PAGE_2 : firstPageItems;
 
     await route.fulfill({
-      json: pageParam === "2" ? PAGE_2_RESPONSE : firstPage,
+      json: { success: true, data: items },
     });
   });
 }
