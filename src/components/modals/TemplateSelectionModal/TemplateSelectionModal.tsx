@@ -888,8 +888,7 @@ export default function TemplateSelectionModal({
 
               <div className={styles.section}>
                 <h3 className={styles.sectionTitle}>
-                  Initial Context & Notes
-                  <span className={styles.optional}>Optional</span>
+                  Initial Context & Notes <span className={styles.optional}>Optional</span>
                 </h3>
 
                 <FormField label="">

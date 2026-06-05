@@ -19,13 +19,21 @@ import type { ParsedFileResult } from "@/services/upload.service";
 
 interface NewClientModalProps {
   onClose: () => void;
-  onClientCreated: (client: { id: number; name: string }, notes: string, uploadedFiles: File[]) => void;
+  onClientCreated: (
+    client: { id: number; name: string },
+    notes: string,
+    uploadedFiles: File[]
+  ) => void;
   existingClients?: { id: number; name: string }[];
 }
 
-export default function NewClientModal({ onClose, onClientCreated, existingClients = [] }: NewClientModalProps): JSX.Element | null {
-  const createClientInStore = useClientStore(state => state.createClient);
-  const uploadDocumentToStore = useClientStore(state => state.uploadDocument);
+export default function NewClientModal({
+  onClose,
+  onClientCreated,
+  existingClients = [],
+}: NewClientModalProps): JSX.Element | null {
+  const createClientInStore = useClientStore((state) => state.createClient);
+  const uploadDocumentToStore = useClientStore((state) => state.uploadDocument);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [mounted, setMounted] = useState<boolean>(false);
@@ -40,7 +48,13 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
   const [otherIndustry, setOtherIndustry] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<
-    { file: File; id: string; status: "pending" | "parsing" | "parsed" | "error"; error?: string; parsedData?: ParsedFileResult }[]
+    {
+      file: File;
+      id: string;
+      status: "pending" | "parsing" | "parsed" | "error";
+      error?: string;
+      parsedData?: ParsedFileResult;
+    }[]
   >([]);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
@@ -53,7 +67,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = originalOverflow;
     };
@@ -238,7 +252,8 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
     try {
       // Create client via Zustand store
-      const resolvedIndustry = formData.industry === "Other" ? otherIndustry.trim() : formData.industry;
+      const resolvedIndustry =
+        formData.industry === "Other" ? otherIndustry.trim() : formData.industry;
 
       const newClient = await createClientInStore({
         name: formData.clientName,
@@ -259,7 +274,11 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
       }
 
       toast.success(`Client "${formData.clientName}" created`);
-      onClientCreated(newClient, formData.notes || "", uploadedFiles.map((f) => f.file));
+      onClientCreated(
+        newClient,
+        formData.notes || "",
+        uploadedFiles.map((f) => f.file)
+      );
     } catch (error) {
       logger.error("Failed to create client:", error);
       toast.error("Failed to create client");
@@ -275,7 +294,9 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
         <div className={styles.modalHeader}>
           <div>
             <h2 className={styles.modalTitle}>Add New Client</h2>
-            <p className={styles.modalSubtitle}>Enter details to provision a new client workspace.</p>
+            <p className={styles.modalSubtitle}>
+              Enter details to provision a new client workspace.
+            </p>
           </div>
           <Button
             variant="ghost"
@@ -313,7 +334,9 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
                       if (e.target.value !== "Other") setOtherIndustry("");
                     }}
                   >
-                    <option value="" disabled hidden>Select industry...</option>
+                    <option value="" disabled hidden>
+                      Select industry...
+                    </option>
                     {INDUSTRIES.map((industry) => (
                       <option key={industry} value={industry}>
                         {industry}
@@ -336,8 +359,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
 
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>
-              Initial Context & Notes
-              <span className={styles.optional}>Optional</span>
+              Initial Context & Notes <span className={styles.optional}>Optional</span>
             </h3>
 
             <FormField label="">
@@ -365,9 +387,7 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
               onDrop={handleDrop}
             >
               <Upload size={24} className={styles.uploadIcon} aria-hidden="true" />
-              <div className={styles.uploadText}>
-                Click to upload or drag and drop
-              </div>
+              <div className={styles.uploadText}>Click to upload or drag and drop</div>
               <div className={styles.uploadHint}>
                 PDF, DOCX, TXT, PNG, JPG, JPEG, XLSX, PPTX (max 10MB each)
               </div>
@@ -391,7 +411,10 @@ export default function NewClientModal({ onClose, onClientCreated, existingClien
                     ) : status === "error" ? (
                       <AlertCircle size={16} className={`${styles.fileIcon} ${styles.errorIcon}`} />
                     ) : status === "parsed" ? (
-                      <CheckCircle size={16} className={`${styles.fileIcon} ${styles.successIcon}`} />
+                      <CheckCircle
+                        size={16}
+                        className={`${styles.fileIcon} ${styles.successIcon}`}
+                      />
                     ) : (
                       <FileText size={16} className={styles.fileIcon} />
                     )}
