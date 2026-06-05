@@ -20,7 +20,7 @@ export default function ProposalCard({ proposal }: ProposalCardProps): JSX.Eleme
   }
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} data-testid="proposal-card">
       <div className={styles.iconWrap}>
         <FileText size={22} color="var(--color-primary)" />
       </div>
@@ -38,7 +38,11 @@ export default function ProposalCard({ proposal }: ProposalCardProps): JSX.Eleme
             View
           </Link>
           {proposal.status === "completed" && (
-            <button className="btn btn-secondary btn-sm icon-only" onClick={handleDownload} title="Download DOCX">
+            <button
+              className="btn btn-secondary btn-sm icon-only"
+              onClick={handleDownload}
+              title="Download DOCX"
+            >
               <Download size={13} />
             </button>
           )}

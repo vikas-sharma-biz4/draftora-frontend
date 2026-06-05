@@ -265,8 +265,8 @@ export default function DraftsPage(): JSX.Element {
       ) : drafts.length === 0 ? (
         <EmptyState
           icon={<FileText size={48} />}
-          title="No drafts yet"
-          subtitle="Drafts are automatically saved as you work on proposals. Start a new proposal to create your first draft."
+          title="Nothing to resume yet"
+          subtitle="Proposals in progress are automatically saved here. Start a new proposal to create your first draft."
           ctaLabel="Create New Proposal"
           onCtaClick={handleNewProposalClick}
         />

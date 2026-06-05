@@ -12,7 +12,6 @@ import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import {
   useTemplateType,
   useTemplateId,
-  useProposalDescription,
   useSelectedSections,
   useSectionDisplayNames,
   useTone,
@@ -30,6 +29,8 @@ import {
   useMaxStepReached,
   useWizardActions,
   useApprovalStatus,
+  useProposalTitle,
+  useClientName,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/hooks";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
@@ -99,7 +100,8 @@ function getTemplateSections(templateType: string): SectionItem[] {
 export default function ParametersPage(): JSX.Element {
   const templateType = useTemplateType();
   const templateId = useTemplateId();
-  const description = useProposalDescription();
+  const proposalTitle = useProposalTitle();
+  const clientName = useClientName();
   const selectedSections = useSelectedSections();
   const sectionDisplayNames = useSectionDisplayNames();
   const tone = useTone();
@@ -467,6 +469,7 @@ export default function ParametersPage(): JSX.Element {
       />
       <div className="page-badge">Phase 01</div>
       <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
+
       <p className="page-subtitle">
         {isRecreateMode
           ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."

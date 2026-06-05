@@ -426,7 +426,7 @@ export const TEMPLATE_TOCS = {
     { key: "scope_of_prototype", label: "Scope of Prototype" },
     { key: "deliverables", label: "Deliverables" },
     { key: "value_proposition", label: "Value Proposition" },
-    { key: "prototypes_developed", label: "Prototypes Developed" },
+    { key: "prototypes_developed", label: "Similar Prototypes Developed by Biz4Group Experts" },
     { key: "our_approach_methodology", label: "Our Approach & Methodology" },
   ],
   poc: [

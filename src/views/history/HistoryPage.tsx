@@ -146,7 +146,7 @@ export default function HistoryPage(): JSX.Element {
             {filteredItems.map((item) => {
               const versionLabel = item.version != null ? `v${item.version}` : null;
               return (
-                <div key={item.id} className={styles.historyCard}>
+                <div key={item.id} className={styles.historyCard} data-testid="proposal-card">
                   <div className={styles.cardHeader}>
                     <div className={styles.cardTitle}>{item.title}</div>
                     <div className={styles.cardHeaderRight}>
