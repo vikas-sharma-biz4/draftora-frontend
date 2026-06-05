@@ -301,7 +301,7 @@ describe("useClientDocuments — confirmDeleteAllDocuments", () => {
 // ---------------------------------------------------------------------------
 
 describe("useClientDocuments — handleViewDocument", () => {
-  it("opens a new tab for a valid https:// URL", async () => {
+  it("opens the in-app modal viewer for a valid https:// URL", async () => {
     mockGetDocumentViewUrl.mockResolvedValue("https://s3.example.com/file.pdf");
     const client = makeClient([makeDocument(5, "file.pdf")]);
     const { result } = renderHook(() => useClientDocuments(client));
@@ -310,11 +310,13 @@ describe("useClientDocuments — handleViewDocument", () => {
       await result.current.handleViewDocument(client.documents[0]);
     });
 
-    expect(mockWindowOpen).toHaveBeenCalledWith(
-      "https://s3.example.com/file.pdf",
-      "_blank",
-      "noopener,noreferrer"
+    expect(result.current.viewingDocModal).toEqual(
+      expect.objectContaining({
+        url: "https://s3.example.com/file.pdf",
+        fileName: "file.pdf",
+      })
     );
+    expect(mockWindowOpen).not.toHaveBeenCalled();
     expect(mockToastError).not.toHaveBeenCalled();
   });
 

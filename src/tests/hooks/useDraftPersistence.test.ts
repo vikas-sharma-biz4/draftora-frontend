@@ -17,6 +17,8 @@
 import { renderHook } from "@testing-library/react";
 import { useDraftPersistence } from "@/hooks/useDraftPersistence";
 import * as draftApi from "@/services/draft.service";
+import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,14 @@ beforeEach(() => {
   mockGetDraftByProposalId.mockResolvedValue(null);
   mockSaveDraft.mockResolvedValue({ id: "new-draft-1" });
   mockUpdateDraft.mockResolvedValue({ id: "existing-draft-1" });
+  // Reset stores so state doesn't bleed between tests
+  useDraftStore.getState().reset();
+  useDraftSessionStore.setState({
+    currentDraftId: null,
+    autoSaveEnabled: true,
+    draftStage: "template_selection",
+    completedSteps: [],
+  });
   // Reset localStorage
   localStorage.clear();
 });
@@ -131,11 +141,13 @@ describe("useDraftPersistence — skipIfApproved", () => {
 
   it("skips save when proposal is approved and skipIfApproved=true", async () => {
     const approvedProposal = { ...baseProposal, approvalStatus: "approved" as const };
-    renderHook(() => useDraftPersistence({
-      ...defaultOptions,
-      proposal: approvedProposal,
-      skipIfApproved: true,
-    }));
+    renderHook(() =>
+      useDraftPersistence({
+        ...defaultOptions,
+        proposal: approvedProposal,
+        skipIfApproved: true,
+      })
+    );
 
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -149,11 +161,13 @@ describe("useDraftPersistence — skipIfApproved", () => {
 
   it("skips save when proposal is rejected and skipIfApproved=true", async () => {
     const rejectedProposal = { ...baseProposal, approvalStatus: "rejected" as const };
-    renderHook(() => useDraftPersistence({
-      ...defaultOptions,
-      proposal: rejectedProposal,
-      skipIfApproved: true,
-    }));
+    renderHook(() =>
+      useDraftPersistence({
+        ...defaultOptions,
+        proposal: rejectedProposal,
+        skipIfApproved: true,
+      })
+    );
 
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -165,11 +179,13 @@ describe("useDraftPersistence — skipIfApproved", () => {
 
   it("saves when proposal is approved but skipIfApproved=false", async () => {
     const approvedProposal = { ...baseProposal, approvalStatus: "approved" as const };
-    renderHook(() => useDraftPersistence({
-      ...defaultOptions,
-      proposal: approvedProposal,
-      skipIfApproved: false,
-    }));
+    renderHook(() =>
+      useDraftPersistence({
+        ...defaultOptions,
+        proposal: approvedProposal,
+        skipIfApproved: false,
+      })
+    );
 
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -199,11 +215,13 @@ describe("useDraftPersistence — beforeunload fallback", () => {
 
   it("does not write to localStorage when proposal is approved and skipIfApproved=true", () => {
     const approvedProposal = { ...baseProposal, approvalStatus: "approved" as const };
-    renderHook(() => useDraftPersistence({
-      ...defaultOptions,
-      proposal: approvedProposal,
-      skipIfApproved: true,
-    }));
+    renderHook(() =>
+      useDraftPersistence({
+        ...defaultOptions,
+        proposal: approvedProposal,
+        skipIfApproved: true,
+      })
+    );
 
     window.dispatchEvent(new Event("beforeunload"));
 
@@ -236,6 +254,13 @@ describe("useDraftPersistence — visibilitychange async save", () => {
     mockGetDraftByProposalId.mockResolvedValue(null);
     mockSaveDraft.mockResolvedValue({ id: "new-draft-1" });
     mockUpdateDraft.mockResolvedValue({ id: "existing-draft-1" });
+    useDraftStore.getState().reset();
+    useDraftSessionStore.setState({
+      currentDraftId: null,
+      autoSaveEnabled: true,
+      draftStage: "template_selection",
+      completedSteps: [],
+    });
   });
 
   afterEach(() => {
@@ -252,14 +277,18 @@ describe("useDraftPersistence — visibilitychange async save", () => {
     await jest.runAllTimersAsync();
 
     expect(mockGetDraftByProposalId).toHaveBeenCalledWith(42);
-    expect(mockSaveDraft).toHaveBeenCalledWith(expect.objectContaining({
-      proposalId: 42,
-      title: "Test Proposal",
-    }));
+    expect(mockSaveDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        proposalId: 42,
+        title: "Test Proposal",
+      })
+    );
   });
 
   it("calls updateDraftApi when existing draft found", async () => {
     mockGetDraftByProposalId.mockResolvedValue({ id: "existing-draft-1" });
+    // Hook uses currentDraftId from session store (not getDraftByProposalId) to pick update vs create
+    useDraftSessionStore.setState({ currentDraftId: "existing-draft-1" });
     renderHook(() => useDraftPersistence(defaultOptions));
 
     Object.defineProperty(document, "hidden", { value: true, configurable: true });
@@ -267,9 +296,12 @@ describe("useDraftPersistence — visibilitychange async save", () => {
 
     await jest.runAllTimersAsync();
 
-    expect(mockUpdateDraft).toHaveBeenCalledWith("existing-draft-1", expect.objectContaining({
-      proposalId: 42,
-    }));
+    expect(mockUpdateDraft).toHaveBeenCalledWith(
+      "existing-draft-1",
+      expect.objectContaining({
+        proposalId: 42,
+      })
+    );
   });
 });
 
