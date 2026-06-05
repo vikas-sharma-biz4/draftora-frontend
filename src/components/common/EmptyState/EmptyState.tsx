@@ -35,23 +35,20 @@ export default function EmptyState({
   const showCta = ctaLabel && (ctaHref || onCtaClick);
 
   return (
-    <div className={styles.emptyState}>
+    <div className={styles.emptyState} data-testid="empty-state">
       <div className={styles.icon}>{icon ?? defaultIcon}</div>
       <h3 className={styles.title}>{title}</h3>
       <p className={styles.subtitle}>{subtitle}</p>
-      {showCta && (
-        onCtaClick ? (
+      {showCta &&
+        (onCtaClick ? (
           <Button variant="primary" onClick={onCtaClick}>
             {ctaLabel}
           </Button>
         ) : (
           <Link href={ctaHref!}>
-            <Button variant="primary">
-              {ctaLabel}
-            </Button>
+            <Button variant="primary">{ctaLabel}</Button>
           </Link>
-        )
-      )}
+        ))}
     </div>
   );
 }

@@ -87,6 +87,9 @@ const MD_COMPONENTS: Components = {
           boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
           display: "block",
         }}
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
       />
     </div>
   ),
