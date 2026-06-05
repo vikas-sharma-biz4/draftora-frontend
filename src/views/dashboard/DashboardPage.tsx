@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -15,9 +16,7 @@ const ProposalCard = dynamic(() => import("@/components/proposal/ProposalCard"),
   ssr: false,
 });
 
-const EmptyState = dynamic(() => import("@/components/common/EmptyState"), {
-  ssr: false,
-});
+import EmptyState from "@/components/common/EmptyState";
 
 const SkeletonCard = dynamic(
   () => import("@/components/common/Skeleton").then((mod) => ({ default: mod.SkeletonCard })),
@@ -100,7 +99,14 @@ export default function DashboardPage(): JSX.Element {
       <PageHeader
         title="Your Proposals"
         subtitle="Manage and track all your AI-generated proposals."
-        action={<ProposalSearch value={search} onChange={handleSearchChange} />}
+        action={
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <ProposalSearch value={search} onChange={handleSearchChange} />
+            <Link href="/" className="btn btn-primary btn-sm">
+              New Proposal
+            </Link>
+          </div>
+        }
       />
 
       {!mounted || (isLoading && !isInitialized) ? (

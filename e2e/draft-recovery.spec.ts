@@ -104,8 +104,12 @@ async function mockDraftApis(
   drafts: (typeof DRAFT_PARAMETERS_META)[],
   fullDraftMap: Record<string, typeof DRAFT_PARAMETERS_FULL>
 ): Promise<void> {
-  // GET /drafts → list
+  // GET /drafts → list (only intercept API fetch calls, not page navigation)
   await page.route(/\/drafts(\?.*)?$/, async (route) => {
+    if (route.request().resourceType() === "document") {
+      await route.continue();
+      return;
+    }
     if (route.request().method() === "GET") {
       await route.fulfill({ json: { drafts } });
     } else {
@@ -113,8 +117,12 @@ async function mockDraftApis(
     }
   });
 
-  // GET /drafts/:id → full detail
+  // GET /drafts/:id → full detail (only intercept API fetch calls)
   await page.route(/\/drafts\/([^?/]+)(\?.*)?$/, async (route) => {
+    if (route.request().resourceType() === "document") {
+      await route.continue();
+      return;
+    }
     if (route.request().method() !== "GET") {
       await route.continue();
       return;
@@ -134,6 +142,10 @@ async function mockDraftApis(
 
   // DELETE /drafts/:id — allow real call through or stub it
   await page.route(/\/drafts\/[^?/]+$/, async (route) => {
+    if (route.request().resourceType() === "document") {
+      await route.continue();
+      return;
+    }
     if (route.request().method() === "DELETE") {
       await route.fulfill({ status: 204 });
     } else {

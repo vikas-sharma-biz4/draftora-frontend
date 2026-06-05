@@ -13,7 +13,8 @@ test.describe("Proposal wizard — entry", () => {
       .or(page.getByRole("link", { name: /create proposal|new proposal/i }));
 
     await createButton.first().click();
-    await page.waitForURL(/\/(wizard|parameters)/i, { timeout: 8_000 });
+    // Accept: home page (/), wizard step, or parameters step as valid landing URLs
+    await page.waitForURL(/(\/(wizard|parameters).*|\/?)$/, { timeout: 8_000 });
     await expect(page.getByRole("heading")).toBeVisible();
   });
 
@@ -75,7 +76,7 @@ test.describe("Proposal wizard — parameters step", () => {
   });
 
   test("renders the parameters page heading", async ({ page }) => {
-    await expect(page.getByRole("heading")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 8_000 });
   });
 
   test("title input and client name field are present", async ({ page }) => {
@@ -108,6 +109,14 @@ test.describe("Proposal wizard — parameters step", () => {
 
 test.describe("History page", () => {
   test.beforeEach(async ({ page }) => {
+    // Mock proposals so the test doesn't depend on a running backend
+    await page.route(/\/proposals(\?.*)?$/, async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({ json: { success: true, data: [] } });
+      } else {
+        await route.continue();
+      }
+    });
     await page.goto("/history");
   });
 

@@ -92,7 +92,7 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
     title: data.title,
     client_id: data.clientId || 0,
     client_name: data.clientName,
-    description: data.description,
+    description: data.description || data.title,
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,

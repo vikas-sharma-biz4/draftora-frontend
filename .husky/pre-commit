@@ -1,6 +1,9 @@
 echo "▶ Running pre-commit checks..."
 
-npx lint-staged
+# Add node_modules/.bin to PATH so lint-staged can spawn eslint/prettier on Windows
+export PATH="$PWD/node_modules/.bin:$PATH"
+
+./node_modules/.bin/lint-staged
 if [ $? -ne 0 ]; then
   echo "✖ lint-staged failed. Commit aborted."
   exit 1

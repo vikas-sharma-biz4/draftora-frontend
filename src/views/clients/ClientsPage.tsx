@@ -129,6 +129,7 @@ export default function ClientsPage(): JSX.Element {
                 <article
                   key={client.id}
                   className={styles.clientCard}
+                  data-testid="client-card"
                   onClick={() => handleClientClick(client.id)}
                   role="button"
                   tabIndex={0}
