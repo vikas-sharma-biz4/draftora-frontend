@@ -11,13 +11,11 @@ type DocumentsHook = ReturnType<typeof useClientDocuments>;
 
 interface ClientDocumentsPanelProps {
   documents: ClientDocument[];
-  hasDocumentsWithoutS3: boolean;
   docs: DocumentsHook;
 }
 
 export default function ClientDocumentsPanel({
   documents,
-  hasDocumentsWithoutS3,
   docs,
 }: ClientDocumentsPanelProps): JSX.Element {
   const {
@@ -28,7 +26,6 @@ export default function ClientDocumentsPanel({
     viewingDocModal,
     closeDocViewer,
     restoringDocId,
-    isMigratingToS3,
     filteredDocuments,
     fileInputRef,
     restoreFileInputRef,
@@ -37,7 +34,6 @@ export default function ClientDocumentsPanel({
     handleViewDocument,
     handleDeleteDocument,
     handleRestoreToS3Click,
-    handleMigrateAllToS3,
     handleDeleteAllDocuments,
   } = docs;
 
@@ -49,17 +45,6 @@ export default function ClientDocumentsPanel({
           <p className={styles.panelSubtitle}>Source documents for context generation</p>
         </div>
         <div className={styles.headerActions}>
-          {hasDocumentsWithoutS3 && (
-            <button
-              className={styles.migrateS3Btn}
-              onClick={handleMigrateAllToS3}
-              disabled={isMigratingToS3}
-              title="Auto-migrate all documents without S3 URLs using their extracted text"
-            >
-              <CloudUpload size={16} />
-              <span>{isMigratingToS3 ? "Migrating…" : "Migrate to S3"}</span>
-            </button>
-          )}
           {filteredDocuments.length > 0 && (
             <button
               className={styles.deleteAllBtn}

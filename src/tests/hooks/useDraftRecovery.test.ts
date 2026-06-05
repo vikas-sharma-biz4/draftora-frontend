@@ -16,6 +16,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useDraftRecovery } from "@/hooks/useDraftRecovery";
 import * as draftApi from "@/services/draft.service";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { useDraftStore } from "@/store/features/drafts/draftSlice";
 import type { SavedDraft, DraftMetadata } from "@/interfaces/draftInterfaces";
 
 // ---------------------------------------------------------------------------
@@ -122,7 +123,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockListDrafts.mockResolvedValue([draftMetadata]);
   mockGetDraft.mockResolvedValue(savedDraft);
-  // Reset draft session store
+  // Reset draft stores so Zustand cache doesn't bleed between tests
+  useDraftStore.getState().reset();
   useDraftSessionStore.setState({
     currentDraftId: null,
     autoSaveEnabled: true,
@@ -182,9 +184,10 @@ describe("useDraftRecovery — recoverDraft state restoration", () => {
       await result.current.recoverDraft("draft-1");
     });
 
-    expect(mockUpdateProposalData).toHaveBeenCalledWith(
-      savedDraft.wizardState.proposalData
-    );
+    expect(mockUpdateProposalData).toHaveBeenCalledWith({
+      ...savedDraft.wizardState.proposalData,
+      sections: savedDraft.generatedContent ?? {},
+    });
   });
 
   it("calls setCurrentStep with draft currentStep", async () => {
@@ -397,10 +400,12 @@ describe("useDraftRecovery — autoRecover", () => {
 
     const onRecoveryComplete = jest.fn();
 
-    renderHook(() => useDraftRecovery({
-      autoRecover: true,
-      onRecoveryComplete,
-    }));
+    renderHook(() =>
+      useDraftRecovery({
+        autoRecover: true,
+        onRecoveryComplete,
+      })
+    );
 
     // Wait for listDrafts + auto-recover
     await act(async () => {

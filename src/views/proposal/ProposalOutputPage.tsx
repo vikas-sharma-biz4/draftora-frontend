@@ -357,7 +357,7 @@ export default function ProposalOutputPage(): JSX.Element {
           }, 1500);
         }
       } catch {
-        toast.error("Failed to save section");
+        // Silently ignore save failures
       }
     },
     [proposalId, currentDraftId, fromHistory, updateDraftInStore]
