@@ -60,6 +60,7 @@ export function useClientDocuments(
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const restoreFileInputRef = useRef<HTMLInputElement>(null);
+  const viewInFlightRef = useRef<boolean>(false);
 
   const filteredDocuments = (client?.documents ?? []).filter((doc) =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -133,7 +134,8 @@ export function useClientDocuments(
 
   const handleViewDocument = useCallback(
     async (doc: ClientDocument): Promise<void> => {
-      if (!client) return;
+      if (!client || viewInFlightRef.current) return;
+      viewInFlightRef.current = true;
       try {
         setViewingDocId(doc.id);
         const viewUrl = await clientApi.getDocumentViewUrl(client.id, doc.id);
@@ -152,6 +154,7 @@ export function useClientDocuments(
           toast.error("Could not open document. Please try again.");
         }
       } finally {
+        viewInFlightRef.current = false;
         setViewingDocId(null);
       }
     },
