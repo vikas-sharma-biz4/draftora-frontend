@@ -55,6 +55,10 @@ export default function DraftCard({
       return PROPOSAL_TEMPLATES.find((t) => t.id === templateId)?.name ?? "Template";
     }
     if (templateType === "scratch" || (!templateId && !templateType)) return "From Scratch";
+    // Generated proposals often only have templateType (not templateId) — look up by type
+    if (templateType) {
+      return PROPOSAL_TEMPLATES.find((t) => t.templateType === templateType)?.name ?? null;
+    }
     return null;
   })();
 
