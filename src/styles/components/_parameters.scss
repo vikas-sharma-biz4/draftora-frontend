@@ -13,15 +13,8 @@
 }
 
 .parameters-right-col {
-  // Scroll naturally with the page — both columns move together
-  // Cancel the mt-24 on ToneSelector so TONE aligns with the TOC card header
   > *:first-child {
     margin-top: 0;
-  }
-
-  // Stack Length + Language/AI cards vertically so inner grids have full width
-  > .grid-2 {
-    grid-template-columns: 1fr;
   }
 }
 

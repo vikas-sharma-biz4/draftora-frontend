@@ -1,28 +1,19 @@
 // ─── Tone grid ────────────────────────────────────────────────────────────────
 .tone-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 
-  @media (min-width: 1400px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  @media (max-width: 900px) {
+  @media (max-width: 700px) {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  @media (max-width: 500px) {
-    grid-template-columns: 1fr;
   }
 }
 
 // ─── Tone card ────────────────────────────────────────────────────────────────
 .tone-card {
   border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.15s;
   background: var(--color-white);
@@ -40,8 +31,8 @@
 }
 
 .tone-card-icon {
-  font-size: 18px;
-  margin-bottom: 10px;
+  font-size: 14px;
+  margin-bottom: 4px;
   color: var(--color-text-muted);
   line-height: 1;
 }
@@ -51,10 +42,10 @@
 }
 
 .tone-card-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -81,7 +72,7 @@
 }
 
 .length-option {
-  padding: 12px 14px;
+  padding: 8px 10px;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -100,15 +91,15 @@
 }
 
 .length-option-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .length-option-desc {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-text-muted);
-  margin-top: 2px;
+  margin-top: 1px;
   display: block;
   line-height: 1.4;
 }

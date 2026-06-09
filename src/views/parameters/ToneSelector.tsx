@@ -24,12 +24,10 @@ interface ToneSelectorProps {
 
 export default function ToneSelector({ value, onChange }: ToneSelectorProps): JSX.Element {
   return (
-    <div className="mt-24 mb-16">
-      <div className="form-label mb-24">
-        Tone
-      </div>
+    <div className="card mb-16">
+      <div className="form-label mb-12">Tone</div>
       <div className="tone-grid">
-        {TONE_OPTIONS.map(({ value: optionValue, label, description }) => {
+        {TONE_OPTIONS.map(({ value: optionValue, label }) => {
           const Icon = TONE_ICONS[optionValue as keyof typeof TONE_ICONS];
           const isSelected = value === optionValue;
           return (
@@ -44,12 +42,9 @@ export default function ToneSelector({ value, onChange }: ToneSelectorProps): JS
               }}
             >
               <div className="tone-card-icon">
-                <Icon size={18} />
+                <Icon size={14} />
               </div>
-              <div className="tone-card-label">
-                {label}
-              </div>
-              <div className="tone-card-desc">{description}</div>
+              <div className="tone-card-label">{label}</div>
             </div>
           );
         })}
