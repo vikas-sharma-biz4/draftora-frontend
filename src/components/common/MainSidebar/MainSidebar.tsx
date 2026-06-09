@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Home, Users, FileText, History, PanelLeft } from "lucide-react";
 
 import styles from "./MainSidebar.module.scss";
-import { MAIN_NAV_ITEMS } from "@/constants";
+import { MAIN_NAV_ITEMS, SIDEBAR_LOGO_SRC } from "@/constants";
 import { useUIStore } from "@/store/features/ui/uiSlice";
 import { MOBILE_BREAKPOINT } from "@/constants/breakpoints";
 
@@ -68,11 +68,7 @@ export default function MainSidebar(): JSX.Element {
             aria-label="Draftora home"
             prefetch={false}
           >
-            <img
-              src="/images/draftora-logo.png"
-              alt="Draftora"
-              className={styles.sidebarLogoFull}
-            />
+            <img src={SIDEBAR_LOGO_SRC} alt="Draftora" className={styles.sidebarLogoFull} />
           </Link>
 
           <button

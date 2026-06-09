@@ -142,11 +142,6 @@ export default function ClientsPage(): JSX.Element {
                       <Building2 size={24} />
                     </div>
                     <div className={styles.clientCardActions}>
-                      <span
-                        className={`${styles.clientCardStatus} ${client.status === "active" ? styles.statusActive : styles.statusInactive}`}
-                      >
-                        {client.status}
-                      </span>
                       <Button
                         variant="ghost"
                         iconOnly

@@ -275,8 +275,8 @@ export default function SectionManager({
   );
 
   return (
-    <div className="parameters-layout mb-14">
-      {/* Left Column: Section Structure */}
+    <div className="mb-14">
+      {/* Section Structure */}
       <div className="card">
         <div className="flex-between mb-14">
           <div className="flex-center gap-10">
@@ -326,22 +326,24 @@ export default function SectionManager({
         </div>
       </div>
 
-      {/* Right Column: AI Recommendations */}
-      <SectionRecommendations
-        ref={sectionRecommendationsRef}
-        templateId={proposalData.templateId}
-        existingSections={sections.map((s) => s.key)}
-        context={proposalData.contextualInstructions || ""}
-        documentContext={
-          (isRecreateMode
-            ? proposalData.exactDocumentName
-              ? proposalData.exactDocumentName + ", "
-              : ""
-            : "") + (proposalData.filesMeta?.map((f) => f.name).join(", ") ?? "")
-        }
-        onAddSection={addSectionToProposal}
-        proposalId={proposalId}
-      />
+      {/* AI Recommendations — below the TOC list */}
+      <div className="section-recommendations-wrapper">
+        <SectionRecommendations
+          ref={sectionRecommendationsRef}
+          templateId={proposalData.templateId}
+          existingSections={sections.map((s) => s.key)}
+          context={proposalData.contextualInstructions || ""}
+          documentContext={
+            (isRecreateMode
+              ? proposalData.exactDocumentName
+                ? proposalData.exactDocumentName + ", "
+                : ""
+              : "") + (proposalData.filesMeta?.map((f) => f.name).join(", ") ?? "")
+          }
+          onAddSection={addSectionToProposal}
+          proposalId={proposalId}
+        />
+      </div>
 
       {/* Add Section Modal */}
       <AddSectionModal

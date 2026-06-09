@@ -792,18 +792,6 @@ export default function TemplateSelectionModal({
       >
         <div className={styles.modalHeader}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {modalView === "new_client" && initialView !== "new_client" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBackToTemplateSelection}
-                aria-label="Back to template selection"
-                className={styles.backBtn}
-              >
-                <ArrowLeft size={16} />
-                Back
-              </Button>
-            )}
             <div>
               <h2 className={styles.modalTitle}>
                 {modalView === "new_client"
@@ -1320,9 +1308,6 @@ export default function TemplateSelectionModal({
         <div className={styles.modalFooter}>
           {modalView === "new_client" ? (
             <>
-              <Button variant="secondary" onClick={handleBackToTemplateSelection}>
-                Back
-              </Button>
               <Button
                 variant="primary"
                 onClick={handleCreateClient}
@@ -1332,6 +1317,7 @@ export default function TemplateSelectionModal({
                   (newClientFormData.industry === "Other" && !newClientOtherIndustry.trim())
                 }
                 loading={isCreatingClient}
+                style={{ marginLeft: "auto" }}
               >
                 Create Client
               </Button>
