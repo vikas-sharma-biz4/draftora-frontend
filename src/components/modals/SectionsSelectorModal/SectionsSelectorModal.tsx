@@ -34,6 +34,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     label: "Technical",
     sections: [
       "high_level_scope",
+      "scope_of_work",
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",
@@ -45,6 +46,8 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     label: "Planning & Timeline",
     sections: [
       "milestone_timeline",
+      "estimated_timeline",
+      "deliverables",
       "implementation_plan",
       "timeline",
       "client_dependencies",
@@ -57,7 +60,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
   },
   company: {
     label: "Company Info",
-    sections: ["similar_projects", "our_approach_methodology"],
+    sections: ["similar_projects", "our_approach_methodology", "our_proven_approach"],
   },
   static: {
     label: "Static Sections",
