@@ -490,31 +490,37 @@ export default function ParametersPage(): JSX.Element {
         </div>
       )}
 
-      <SectionManager
-        sections={memoizedSections}
-        onSectionsChange={handleSectionsChange}
-        proposalData={{
-          templateId,
-          sectionDisplayNames,
-          contextualInstructions,
-          exactDocumentName,
-          filesMeta,
-        }}
-        onUpdateProposalData={updateProposalData}
-        isRecreateMode={isRecreateMode}
-        proposalId={currentProposalId}
-      />
+      <div className="parameters-outer-layout">
+        <div>
+          <SectionManager
+            sections={memoizedSections}
+            onSectionsChange={handleSectionsChange}
+            proposalData={{
+              templateId,
+              sectionDisplayNames,
+              contextualInstructions,
+              exactDocumentName,
+              filesMeta,
+            }}
+            onUpdateProposalData={updateProposalData}
+            isRecreateMode={isRecreateMode}
+            proposalId={currentProposalId}
+          />
+        </div>
 
-      <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
+        <div className="parameters-right-col">
+          <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
 
-      <LengthLanguageSelector
-        lengthPreference={lengthPreference}
-        language={language}
-        aiModel={aiModel ?? "gpt-4o"}
-        onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
-        onLanguageChange={(value) => updateProposalData({ language: value })}
-        onAiModelChange={(value) => updateProposalData({ aiModel: value })}
-      />
+          <LengthLanguageSelector
+            lengthPreference={lengthPreference}
+            language={language}
+            aiModel={aiModel ?? "gpt-4o"}
+            onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
+            onLanguageChange={(value) => updateProposalData({ language: value })}
+            onAiModelChange={(value) => updateProposalData({ aiModel: value })}
+          />
+        </div>
+      </div>
 
       <div className="page-footer">
         <Button variant="secondary" onClick={handleSaveDraftWithSync}>

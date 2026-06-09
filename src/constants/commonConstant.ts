@@ -1,5 +1,7 @@
 import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
+export const SIDEBAR_LOGO_SRC = "/images/draftora-logo%20(1)%20D.png";
+
 export const AI_MODEL_OPTIONS = [
   {
     value: "gpt-5.4",
@@ -141,6 +143,9 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   client_dependencies: "Client Dependencies",
   communication_client_cadence: "Communication & Client Cadence",
   our_approach_methodology: "Our Approach & Methodology",
+  poc_feature_list: "Feature List",
+  poc_milestone_timeline: "Milestone and Timeline Estimation",
+  future_vision: "Future Vision",
 };
 
 export const PROPOSAL_TEMPLATES = [

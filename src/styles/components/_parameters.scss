@@ -1,18 +1,33 @@
-// ─── Parameters page two-column layout ───────────────────────────────────────
-.parameters-layout {
+// ─── Parameters page outer two-column layout ─────────────────────────────────
+// Left: TOC + AI Recommendations stacked | Right: Tone + Length/AI Model
+.parameters-outer-layout {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: minmax(0, 1fr) 460px;
   gap: 1.5rem;
   align-items: flex-start;
+  margin-bottom: 1.5rem;
 
   @media (max-width: 1200px) {
     grid-template-columns: 1fr;
-
-    > :last-child {
-      order: 2;
-      max-height: 500px;
-    }
   }
+}
+
+.parameters-right-col {
+  // Scroll naturally with the page — both columns move together
+  // Cancel the mt-24 on ToneSelector so TONE aligns with the TOC card header
+  > *:first-child {
+    margin-top: 0;
+  }
+
+  // Stack Length + Language/AI cards vertically so inner grids have full width
+  > .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ─── AI Recommendations below the TOC card ────────────────────────────────────
+.section-recommendations-wrapper {
+  margin-top: 1.5rem;
 }
 
 // ─── Section drop zone ────────────────────────────────────────────────────────
