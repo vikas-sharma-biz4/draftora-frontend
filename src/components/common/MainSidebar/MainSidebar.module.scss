@@ -245,46 +245,31 @@
   }
 }
 
-// ─── Responsive — mobile (≤ 768px): overlay drawer ────────────────────────────
+// ─── Responsive — mobile (≤ 768px): always-visible icon-only strip ────────────
 @media (max-width: 768px) {
   .sidebar {
-    transition:
-      transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-      width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    width: var(--sidebar-collapsed-width) !important;
+    min-width: var(--sidebar-collapsed-width) !important;
+    transform: none !important;
 
-    // Collapsed on mobile: slide off-screen left
-    &[data-collapsed="true"] {
-      width: var(--sidebar-width) !important;
-      min-width: var(--sidebar-width) !important;
-      transform: translateX(-100%);
+    .sidebarHeader {
+      display: none;
     }
 
-    // Expanded on mobile: slide in and restore label visibility
-    &:not([data-collapsed="true"]) {
-      transform: translateX(0);
-      width: var(--sidebar-width) !important;
-      min-width: var(--sidebar-width) !important;
-
-      .sidebarHeader {
-        display: flex;
-      }
-      .sidebarToggleNav {
-        display: none;
-      }
-
-      .sidebarLogoLink {
-        opacity: 1;
-        pointer-events: auto;
-        flex: 1;
-        max-width: none;
-        overflow: hidden;
-      }
-
-      .sidebarStepLabel {
-        opacity: 1;
-        max-width: 200px;
-        pointer-events: auto;
-      }
+    // Hide expand toggle — sidebar stays icon-only on mobile
+    .sidebarToggleNav {
+      display: none;
     }
+
+    .sidebarStepLabel {
+      opacity: 0;
+      max-width: 0;
+      pointer-events: none;
+    }
+  }
+
+  // Backdrop never needed — sidebar is not an overlay on mobile
+  .sidebarBackdrop {
+    display: none;
   }
 }

@@ -1,9 +1,3 @@
-/**
- * ToneSelector component
- *
- * Renders the tone-of-voice card grid for proposal parameter selection.
- */
-
 "use client";
 
 import { Briefcase, Target, Code, Palette } from "lucide-react";

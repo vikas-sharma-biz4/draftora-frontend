@@ -206,7 +206,9 @@
   line-height: 1.5;
   min-height: 100px;
   resize: vertical;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   outline: none;
 }
 
@@ -659,6 +661,7 @@
   background: var(--color-bg);
   margin-top: 12px;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (hover: hover) {
@@ -668,10 +671,12 @@
   }
 }
 
-.uploadZone:focus-within {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
+@media (hover: hover) {
+  .uploadZone:focus-within {
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+    box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.15);
+  }
 }
 
 .dragOver {
@@ -919,7 +924,9 @@
   font-family: var(--font-sans);
   line-height: 1.5;
   resize: vertical;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   outline: none;
   box-sizing: border-box;
 }
@@ -972,8 +979,12 @@
 }
 
 @keyframes spinNew {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .fileInfo {

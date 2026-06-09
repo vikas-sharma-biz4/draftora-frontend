@@ -224,17 +224,26 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
+  padding: 11px 14px;
   background: var(--color-white);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
-  transition: all 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
   user-select: none;
 }
 
 .section-structure-item:hover {
   border-color: var(--color-primary-medium);
   box-shadow: var(--shadow-sm);
+
+  // Reveal drag handle on row hover
+  .section-drag-handle {
+    opacity: 1;
+    color: var(--color-text-muted);
+  }
 }
 
 .section-structure-item.dragging {
@@ -251,10 +260,14 @@
 .section-drag-handle {
   cursor: grab;
   color: var(--color-text-light);
+  opacity: 0.35;
   display: flex;
   align-items: center;
   flex-shrink: 0;
   padding: 2px;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
 }
 
 .section-drag-handle:active {
@@ -380,11 +393,11 @@
 
 // ─── Static sections panel ────────────────────────────────────────────────────
 // Displays read-only, auto-appended sections (e.g. appendix, cover page).
-// Used by SectionManager.tsx. Moved from _sidebar.scss.
+// Used by SectionManager.tsx.
 .static-sections-panel {
   margin-top: 16px;
-  border-top: 1px dashed var(--color-border);
-  padding-top: 12px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-border-dark);
 }
 
 .static-sections-header {
@@ -426,11 +439,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  background: var(--color-surface-2, #f8f8fa);
+  padding: 7px 10px;
+  background: var(--color-bg);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  opacity: 0.7;
+  border: 1px dashed var(--color-border);
+  opacity: 0.65;
 }
 
 .static-sections-num {
