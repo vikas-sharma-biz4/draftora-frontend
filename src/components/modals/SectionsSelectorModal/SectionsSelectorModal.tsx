@@ -35,6 +35,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     sections: [
       "high_level_scope",
       "scope_of_work",
+      "poc_features_list",
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",

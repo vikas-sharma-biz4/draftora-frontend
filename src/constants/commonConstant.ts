@@ -147,9 +147,10 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   poc_milestone_timeline: "Milestone and Timeline Estimation",
   future_vision: "Future Vision",
   scope_of_work: "Scope of Work",
+  poc_features_list: "POC Features List",
   estimated_timeline: "Estimated Timeline",
   deliverables: "Deliverables",
-  our_proven_approach: "Our Proven Approach for Your AI-Powered Legal Platform",
+  our_proven_approach: "Our Proven Approach for Your Project",
 };
 
 export const PROPOSAL_TEMPLATES = [
@@ -216,6 +217,7 @@ export const PROPOSAL_TEMPLATES = [
       "introduction",
       "purpose",
       "scope_of_work",
+      "poc_features_list",
       "estimated_timeline",
       "deliverables",
       "our_proven_approach",
@@ -466,9 +468,10 @@ export const TEMPLATE_TOCS = {
     { key: "introduction", label: "Introduction" },
     { key: "purpose", label: "Purpose" },
     { key: "scope_of_work", label: "Scope of Work" },
+    { key: "poc_features_list", label: "POC Features List" },
     { key: "estimated_timeline", label: "Estimated Timeline" },
     { key: "deliverables", label: "Deliverables" },
-    { key: "our_proven_approach", label: "Our Proven Approach for Your AI-Powered Legal Platform" },
+    { key: "our_proven_approach", label: "Our Proven Approach for Your Project" },
     { key: "similar_projects", label: "Similar Projects Developed by Biz4Group Experts" },
   ],
   full: [
