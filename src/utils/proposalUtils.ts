@@ -26,8 +26,6 @@ export function getTemplateTypeLabel(
       return "Custom";
     case "scratch":
       return "From Scratch";
-    case "recreate":
-      return "Recreated";
     default:
       return proposal.templateType || "Template";
   }

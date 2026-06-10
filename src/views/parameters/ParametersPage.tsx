@@ -18,8 +18,6 @@ import {
   useLengthPreference,
   useLanguage,
   useAiModel,
-  useExactDocumentName,
-  useOriginalSections,
   useContextualInstructions,
   useFilesMeta,
   useCurrentStep,
@@ -40,7 +38,7 @@ import { useShallow } from "zustand/react/shallow";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
-import { SECTION_DISPLAY_NAMES, TEMPLATE_TOCS } from "@/constants";
+import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TEMPLATE_TOCS } from "@/constants";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 
 import SectionRecommendations, {
@@ -112,8 +110,6 @@ export default function ParametersPage(): JSX.Element {
   const lengthPreference = useLengthPreference();
   const language = useLanguage();
   const aiModel = useAiModel();
-  const exactDocumentName = useExactDocumentName();
-  const originalSections = useOriginalSections();
   const contextualInstructions = useContextualInstructions();
   const filesMeta = useFilesMeta();
   const currentStep = useCurrentStep();
@@ -142,7 +138,6 @@ export default function ParametersPage(): JSX.Element {
   const searchParams = useSearchParams();
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
-  const isRecreateMode = templateType === "recreate";
 
   // Enable auto-save when user is in pipeline stage
   useWizardAutoSave({ enabled: true, debounceMs: 2000, approvalStatus });
@@ -240,14 +235,14 @@ export default function ParametersPage(): JSX.Element {
         return templateSections;
       }
     }
-    // Otherwise, use the existing sections from proposalData or recreate mode
-    const built = buildSectionItems(selectedSections, sectionDisplayNames, originalSections);
+    // Otherwise, use existing sections from proposalData
+    const built = buildSectionItems(selectedSections, sectionDisplayNames);
     logger.info("[ParametersPage] computedSections: built from store", {
       selectedSectionsCount: selectedSections.length,
       builtCount: built.length,
     });
     return built;
-  }, [templateType, selectedSections, sectionDisplayNames, originalSections]);
+  }, [templateType, selectedSections, sectionDisplayNames]);
 
   const [sections, setSections] = useState<SectionItem[]>(computedSections);
   const [hasModifiedSections, setHasModifiedSections] = useState<boolean>(false);
@@ -482,7 +477,13 @@ export default function ParametersPage(): JSX.Element {
         return;
       }
       const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
-      const updatedSections = [...sections, newSection];
+      const firstStaticIdx = sections.findIndex((s) =>
+        (STATIC_SECTION_KEYS as readonly string[]).includes(s.key)
+      );
+      const updatedSections =
+        firstStaticIdx === -1
+          ? [...sections, newSection]
+          : [...sections.slice(0, firstStaticIdx), newSection, ...sections.slice(firstStaticIdx)];
       if (recommendation && originalIndex !== undefined) {
         setAiRecommendedSectionsMap((prev) =>
           new Map(prev).set(sectionKey, { recommendation, originalIndex })
@@ -539,24 +540,9 @@ export default function ParametersPage(): JSX.Element {
       <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
 
       <p className="page-subtitle">
-        {isRecreateMode
-          ? "Sections extracted from your document are shown below. Reorder, rename, or add sections — each will be rewritten with the new context."
-          : "Review and refine the proposal structure. Reorder, rename, or remove sections — and set the tone for the generated content."}
+        Review and refine the proposal structure. Reorder, rename, or remove sections — and set the
+        tone for the generated content.
       </p>
-
-      {isRecreateMode && (
-        <div className="recreate-banner">
-          <div>
-            <strong>Recreate Mode</strong>
-            {exactDocumentName && (
-              <span className="recreate-banner-file"> · {exactDocumentName}</span>
-            )}
-            <div className="recreate-banner-hint">
-              {originalSections?.length ?? 0} sections will be rewritten using new context.
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="parameters-outer-layout">
         <div>
@@ -567,11 +553,9 @@ export default function ParametersPage(): JSX.Element {
               templateId,
               sectionDisplayNames,
               contextualInstructions,
-              exactDocumentName,
               filesMeta,
             }}
             onUpdateProposalData={updateProposalData}
-            isRecreateMode={isRecreateMode}
             proposalId={currentProposalId}
             onAddSection={addSectionToProposal}
             onRemoveFromRecommendations={handleRemoveFromRecommendations}
@@ -597,10 +581,7 @@ export default function ParametersPage(): JSX.Element {
               templateId={templateId}
               existingSections={sections.map((s) => s.key)}
               context={contextualInstructions || ""}
-              documentContext={
-                (isRecreateMode ? (exactDocumentName ? exactDocumentName + ", " : "") : "") +
-                (filesMeta?.map((f) => f.name).join(", ") ?? "")
-              }
+              documentContext={filesMeta?.map((f) => f.name).join(", ") ?? ""}
               onAddSection={addSectionToProposal}
               proposalId={currentProposalId}
             />

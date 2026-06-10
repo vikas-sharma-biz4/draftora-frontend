@@ -880,27 +880,6 @@
   }
 }
 
-/* ── RecreateTemplateModal extras ─────────────────────────────────────────── */
-
-.sectionBadge {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  background: var(--color-primary-light);
-  padding: 2px 8px;
-  border-radius: 100px;
-  white-space: nowrap;
-  margin-left: 8px;
-}
-
-.sectionHint {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  margin-bottom: 12px;
-  margin-top: -4px;
-  line-height: 1.5;
-}
-
 .optionalBadge {
   font-size: 0.6875rem;
   font-weight: 500;

@@ -32,7 +32,6 @@ export type TemplateType =
   | "predefined"
   | "custom"
   | "scratch"
-  | "recreate"
   | "mvp"
   | "poc"
   | "design"
@@ -81,12 +80,6 @@ export interface ProposalBaseFields {
   selectedDocumentIds?: number[];
   templateId: string | null;
   templateType: TemplateType;
-  // Recreate mode: sections extracted from the exact document
-  originalSections?: OriginalSection[];
-  // Recreate mode: maps section_key -> original content for rewrite prompts
-  originalSectionContents?: Record<string, string>;
-  // Recreate mode: filename of the uploaded exact document
-  exactDocumentName?: string;
   // Cross-cutting wizard fields
   approvalStatus?: "pending" | "approved" | "rejected";
   sections?: Record<string, string>;

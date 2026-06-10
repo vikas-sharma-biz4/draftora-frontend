@@ -1,6 +1,6 @@
 import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
-export const SIDEBAR_LOGO_SRC = "/images/draftora-logo%20(1)%20D.png";
+export const SIDEBAR_LOGO_SRC = "/images/new%20logo%203.png";
 
 export const AI_MODEL_OPTIONS = [
   {
@@ -402,13 +402,6 @@ export const SPECIAL_CARDS = {
     description:
       "Upload your own DOCX or PDF template and let AI extract the structure automatically.",
     icon: "⇪",
-  },
-  RECREATE_TEMPLATE: {
-    id: "recreate-template",
-    name: "Recreate Template",
-    description:
-      "Upload an existing document and rewrite it with new context while preserving the original structure.",
-    icon: "↺",
   },
 } as const;
 

@@ -5,6 +5,7 @@ import { History, Download, Eye, Loader2 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 
 import styles from "./HistoryPage.module.scss";
+import { PROPOSAL_TEMPLATES } from "@/constants";
 import { useInfiniteProposalHistory } from "@/hooks/useInfiniteProposalHistory";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useErrorToast } from "@/hooks/useErrorToast";
@@ -145,6 +146,20 @@ export default function HistoryPage(): JSX.Element {
           <div className={styles.historyGrid}>
             {filteredItems.map((item) => {
               const versionLabel = item.version != null ? `v${item.version}` : null;
+              const { templateId, templateType } = item;
+              const templateName = (() => {
+                if (templateId) {
+                  return PROPOSAL_TEMPLATES.find((t) => t.id === templateId)?.name ?? "Template";
+                }
+                if (templateType === "scratch" || (!templateId && !templateType))
+                  return "From Scratch";
+                if (templateType) {
+                  return (
+                    PROPOSAL_TEMPLATES.find((t) => t.templateType === templateType)?.name ?? null
+                  );
+                }
+                return null;
+              })();
               return (
                 <div key={item.id} className={styles.historyCard} data-testid="proposal-card">
                   <div className={styles.cardHeader}>
@@ -159,6 +174,7 @@ export default function HistoryPage(): JSX.Element {
                     <span className={styles.clientName}>{item.clientName}</span>
                   </div>
                   <div className={styles.cardDate}>{formatDate(item.createdAt)}</div>
+                  {templateName && <div className={styles.cardTemplate}>{templateName}</div>}
                   <div className={styles.cardActions}>
                     <Button
                       variant="secondary"
