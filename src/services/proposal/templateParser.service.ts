@@ -21,9 +21,7 @@ export interface ParseTemplateResult {
   totalSections: number;
 }
 
-export async function parseCustomTemplate(
-  file: File
-): Promise<ParseTemplateResult> {
+export async function parseCustomTemplate(file: File): Promise<ParseTemplateResult> {
   const formData = new FormData();
   formData.append("file", file);
 
@@ -114,21 +112,21 @@ export interface ParseFilesResponse {
  * Typed raw response from the backend parse endpoint (snake_case fields inside data envelope).
  */
 interface RawParsedFileResult {
-  filename:  string;
+  filename: string;
   extension: string;
   size_bytes: number;
   char_count: number;
   word_count: number;
-  preview:   string;
-  text:      string;
+  preview: string;
+  text: string;
 }
 
 interface RawParseFilesData {
-  message:        string;
+  message: string;
   files_received: number;
-  files_parsed:   number;
-  results:        RawParsedFileResult[];
-  errors:         Array<{ filename: string; error: string }>;
+  files_parsed: number;
+  results: RawParsedFileResult[];
+  errors: Array<{ filename: string; error: string }>;
 }
 
 /**
@@ -149,13 +147,13 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
     filesReceived: data.files_received,
     filesParsed: data.files_parsed,
     results: data.results.map((r) => ({
-      filename:  r.filename,
+      filename: r.filename,
       extension: r.extension,
       sizeBytes: r.size_bytes,
       charCount: r.char_count,
       wordCount: r.word_count,
-      preview:   r.preview,
-      text:      r.text,
+      preview: r.preview,
+      text: r.text,
     })),
     errors: data.errors ?? [],
   };
@@ -165,7 +163,9 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
  * Fetch the list of file extensions supported by the backend parser.
  */
 export async function getSupportedParseFormats(): Promise<string[]> {
-  const data = await http.get<{ extensions: string[] }>("/parse/supported-formats/", { cache: "no-store" });
+  const data = await http.get<{ extensions: string[] }>("/parse/supported-formats/", {
+    cache: "no-store",
+  });
   return data.extensions ?? [];
 }
 
@@ -240,20 +240,24 @@ export async function getSectionRecommendations(
       exclude: string;
       purpose: string;
     }>;
-  }>("/proposals/recommend-sections", {
-    template_id: request.templateId,
-    existing_sections: request.existingSections,
-    existing_sections_with_rules: request.existingSectionsWithRules.map(s => ({
-      section_key: s.sectionKey,
-      section_name: s.sectionName,
-      include: s.include,
-      exclude: s.exclude,
-      purpose: s.purpose,
-    })),
-    context: request.context,
-    user_prompt: request.userPrompt,
-  });
-  return response.recommendations.map(r => ({
+  }>(
+    "/proposals/recommend-sections",
+    {
+      template_id: request.templateId,
+      existing_sections: request.existingSections,
+      existing_sections_with_rules: request.existingSectionsWithRules.map((s) => ({
+        section_key: s.sectionKey,
+        section_name: s.sectionName,
+        include: s.include,
+        exclude: s.exclude,
+        purpose: s.purpose,
+      })),
+      context: request.context,
+      user_prompt: request.userPrompt,
+    },
+    { requestTimeout: 120_000 }
+  );
+  return response.recommendations.map((r) => ({
     sectionTitle: r.section_title,
     description: r.description,
     reasoning: r.reasoning,

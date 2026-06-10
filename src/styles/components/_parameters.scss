@@ -1,34 +1,52 @@
-// ─── Parameters page two-column layout ───────────────────────────────────────
-.parameters-layout {
+// ─── Parameters page outer two-column layout ─────────────────────────────────
+// Left: TOC + AI Recommendations stacked | Right: Tone + Length/AI Model
+.parameters-outer-layout {
   display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 36%, 460px);
+  gap: 1.75rem;
   align-items: flex-start;
+  margin-bottom: 1.5rem;
 
-  @media (max-width: 1200px) {
+  // Stack to single column when viewport is too narrow to fit both comfortably.
+  // At ≤900px the sidebar has already collapsed, so content area is narrower.
+  @media (max-width: 900px) {
     grid-template-columns: 1fr;
-
-    > :last-child {
-      order: 2;
-      max-height: 500px;
-    }
+    gap: 1.25rem;
   }
+}
+
+.parameters-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+
+  > *:first-child {
+    margin-top: 0;
+  }
+}
+
+// ─── AI Recommendations below the TOC card ────────────────────────────────────
+.section-recommendations-wrapper {
+  margin-top: 1.25rem;
 }
 
 // ─── Section drop zone ────────────────────────────────────────────────────────
 .section-drop-zone {
   min-height: 100px;
   border-radius: 8px;
-  transition: all 0.2s ease;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
   &:empty {
     border: 2px dashed var(--color-border);
-    background: var(--color-background);
+    background: var(--color-bg);
   }
 }
 
 .section-drop-zone[data-drag-over="true"] {
-  background: rgba(102, 126, 234, 0.05);
+  background: rgba(55, 48, 163, 0.04);
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.08);
 }

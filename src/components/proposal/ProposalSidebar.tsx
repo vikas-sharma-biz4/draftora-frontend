@@ -33,7 +33,7 @@ import { Check, GripVertical, Pencil, Plus, X, Lock } from "lucide-react";
 
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
-import { STATIC_SECTION_KEYS } from "@/constants";
+import { PROPOSAL_TEMPLATES, SPECIAL_CARDS, STATIC_SECTION_KEYS } from "@/constants";
 import {
   addProposalSection,
   removeProposalSection,
@@ -245,6 +245,17 @@ function SortableProposalSection({
   );
 }
 
+// ─── Template name resolver ───────────────────────────────────────────────────
+
+function resolveTemplateName(templateType: string | undefined): string {
+  if (!templateType) return "";
+  if (templateType === "scratch") return SPECIAL_CARDS.START_FROM_SCRATCH.name;
+  if (templateType === "custom") return SPECIAL_CARDS.CUSTOM_TEMPLATE.name;
+  if (templateType === "recreate") return SPECIAL_CARDS.RECREATE_TEMPLATE.name;
+  const found = PROPOSAL_TEMPLATES.find((t) => t.templateType === templateType);
+  return found?.name ?? "";
+}
+
 // ─── ProposalSidebar ───────────────────────────────────────────────────────────
 
 export default function ProposalSidebar({
@@ -425,11 +436,14 @@ export default function ProposalSidebar({
     ? (orderedSections.find((s) => s.key === insertAfterKey)?.label ?? undefined)
     : undefined;
 
+  const templateName = resolveTemplateName(templateType);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
       <nav className="proposal-sidebar" aria-label="Proposal sections">
+        {templateName && <div className="proposal-sidebar-template-name">{templateName}</div>}
         <div className="proposal-sidebar-title">Sections</div>
 
         <DndContext

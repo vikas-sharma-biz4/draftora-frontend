@@ -11,15 +11,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Check, X, Plus, Lock } from "lucide-react";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
 import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { SectionItem } from "@/components/common/SortableSectionList";
-import SectionRecommendations, {
-  type SectionRecommendationsRef,
-} from "@/components/proposal/SectionRecommendations";
 import type { ProposalWizardData } from "@/interfaces/proposalInterfaces";
 import type { SectionRecommendation } from "@/services/proposal.service";
 import { logger } from "@/utils/logger";
@@ -46,6 +43,14 @@ interface SectionManagerProps {
   onUpdateProposalData: (updates: Partial<ProposalWizardData>) => void;
   isRecreateMode: boolean;
   proposalId: number | null;
+  onAddSection: (
+    key: string,
+    title: string,
+    recommendation?: SectionRecommendation,
+    originalIndex?: number
+  ) => void;
+  onRemoveFromRecommendations: (key: string) => void;
+  onRemoveSectionEffect: (key: string) => void;
 }
 
 export default function SectionManager({
@@ -55,15 +60,12 @@ export default function SectionManager({
   onUpdateProposalData,
   isRecreateMode,
   proposalId,
+  onAddSection,
+  onRemoveFromRecommendations,
+  onRemoveSectionEffect,
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
-  const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
-
-  // Track sections that were added from AI recommendations with their original indices
-  const [aiRecommendedSectionsMap, setAiRecommendedSectionsMap] = useState<
-    Map<string, { recommendation: SectionRecommendation; originalIndex: number }>
-  >(new Map());
 
   // Add section modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -101,101 +103,20 @@ export default function SectionManager({
           toast.error("At least one section is required");
           return prev;
         }
-
-        // Check if this section was from AI recommendations
-        const recommendationData = aiRecommendedSectionsMap.get(key);
-        if (recommendationData && sectionRecommendationsRef.current) {
-          // Restore the recommendation to the AI recommendations list at its original position
-          sectionRecommendationsRef.current.restoreRecommendation(
-            key,
-            recommendationData.recommendation,
-            recommendationData.originalIndex
-          );
-          logger.info("[SectionManager] Restored section to AI recommendations", {
-            sectionKey: key,
-            originalIndex: recommendationData.originalIndex,
-          });
-
-          // Remove from the tracking map
-          setAiRecommendedSectionsMap((prev) => {
-            const newMap = new Map(prev);
-            newMap.delete(key);
-            return newMap;
-          });
-        }
-
         return prev.filter((s) => s.key !== key);
       });
+      onRemoveSectionEffect(key);
     },
-    [onSectionsChange, aiRecommendedSectionsMap]
-  );
-
-  const addSectionToProposal = useCallback(
-    (
-      sectionKey: string,
-      sectionTitle: string,
-      recommendation?: SectionRecommendation,
-      originalIndex?: number
-    ): void => {
-      logger.info("[SectionManager] Adding section to proposal", {
-        sectionKey,
-        sectionTitle,
-        currentSections: sections.map((s) => s.key),
-      });
-
-      // Check if section already exists before attempting to add
-      if (sections.some((s) => s.key === sectionKey)) {
-        toast.error(`"${sectionTitle}" is already in the structure`);
-        logger.warn("[SectionManager] Section already exists, skipping add", { sectionKey });
-        return;
-      }
-
-      const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
-      const updatedSections = [...sections, newSection];
-
-      logger.info("[SectionManager] Updating local sections state", {
-        before: sections.map((s) => s.key),
-        after: updatedSections.map((s) => s.key),
-      });
-
-      // Store recommendation data with original index if provided (section came from AI recommendations)
-      if (recommendation && originalIndex !== undefined) {
-        setAiRecommendedSectionsMap((prev) =>
-          new Map(prev).set(sectionKey, { recommendation, originalIndex })
-        );
-        logger.info("[SectionManager] Stored AI recommendation data for section", {
-          sectionKey,
-          originalIndex,
-        });
-      }
-
-      // Update local state first
-      onSectionsChange(updatedSections);
-
-      // Then update store
-      onUpdateProposalData({
-        selectedSections: updatedSections.map((s) => s.key),
-        sectionDisplayNames: {
-          ...proposalData.sectionDisplayNames,
-          [sectionKey]: sectionTitle,
-        },
-      });
-
-      logger.info("[SectionManager] Section added successfully", {
-        sectionKey,
-        totalSections: updatedSections.length,
-      });
-    },
-    [sections, onUpdateProposalData, proposalData.sectionDisplayNames, onSectionsChange]
+    [onSectionsChange, onRemoveSectionEffect]
   );
 
   const handleDropFromRecommendations = useCallback(
     (sectionKey: string, sectionTitle: string): void => {
-      addSectionToProposal(sectionKey, sectionTitle);
+      onAddSection(sectionKey, sectionTitle);
       toast.success(`Added "${sectionTitle}" to section structure`);
-      sectionRecommendationsRef.current?.removeRecommendation(sectionKey);
+      onRemoveFromRecommendations(sectionKey);
     },
-    [addSectionToProposal]
+    [onAddSection, onRemoveFromRecommendations]
   );
 
   const handleDrop = useCallback(
@@ -275,8 +196,8 @@ export default function SectionManager({
   );
 
   return (
-    <div className="parameters-layout mb-14">
-      {/* Left Column: Section Structure */}
+    <div className="mb-14">
+      {/* Section Structure */}
       <div className="card">
         <div className="flex-between mb-14">
           <div className="flex-center gap-10">
@@ -325,23 +246,6 @@ export default function SectionManager({
           </ul>
         </div>
       </div>
-
-      {/* Right Column: AI Recommendations */}
-      <SectionRecommendations
-        ref={sectionRecommendationsRef}
-        templateId={proposalData.templateId}
-        existingSections={sections.map((s) => s.key)}
-        context={proposalData.contextualInstructions || ""}
-        documentContext={
-          (isRecreateMode
-            ? proposalData.exactDocumentName
-              ? proposalData.exactDocumentName + ", "
-              : ""
-            : "") + (proposalData.filesMeta?.map((f) => f.name).join(", ") ?? "")
-        }
-        onAddSection={addSectionToProposal}
-        proposalId={proposalId}
-      />
 
       {/* Add Section Modal */}
       <AddSectionModal

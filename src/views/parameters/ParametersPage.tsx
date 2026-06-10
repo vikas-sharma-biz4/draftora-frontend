@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import dynamic from "next/dynamic";
@@ -43,6 +43,10 @@ import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { SECTION_DISPLAY_NAMES, TEMPLATE_TOCS } from "@/constants";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 
+import SectionRecommendations, {
+  type SectionRecommendationsRef,
+} from "@/components/proposal/SectionRecommendations";
+import type { SectionRecommendation } from "@/services/proposal.service";
 import SectionManager from "./SectionManager";
 import ToneSelector from "./ToneSelector";
 import LengthLanguageSelector from "./LengthLanguageSelector";
@@ -457,6 +461,70 @@ export default function ParametersPage(): JSX.Element {
     []
   );
 
+  // ── AI Recommendations state (lifted from SectionManager so the panel can
+  //    render in the right column while callbacks remain wired to the TOC) ──────
+  const sectionRecommendationsRef = useRef<SectionRecommendationsRef>(null);
+
+  const [aiRecommendedSectionsMap, setAiRecommendedSectionsMap] = useState<
+    Map<string, { recommendation: SectionRecommendation; originalIndex: number }>
+  >(new Map());
+
+  const addSectionToProposal = useCallback(
+    (
+      sectionKey: string,
+      sectionTitle: string,
+      recommendation?: SectionRecommendation,
+      originalIndex?: number
+    ): void => {
+      if (sections.some((s) => s.key === sectionKey)) {
+        toast.error(`"${sectionTitle}" is already in the structure`);
+        logger.warn("[ParametersPage] Section already exists, skipping add", { sectionKey });
+        return;
+      }
+      const newSection: SectionItem = { key: sectionKey, label: sectionTitle };
+      const updatedSections = [...sections, newSection];
+      if (recommendation && originalIndex !== undefined) {
+        setAiRecommendedSectionsMap((prev) =>
+          new Map(prev).set(sectionKey, { recommendation, originalIndex })
+        );
+      }
+      setHasModifiedSections(true);
+      setSections(updatedSections);
+      updateProposalData({
+        selectedSections: updatedSections.map((s) => s.key),
+        sectionDisplayNames: { ...sectionDisplayNames, [sectionKey]: sectionTitle },
+      });
+    },
+    [sections, sectionDisplayNames, updateProposalData]
+  );
+
+  const handleRemoveSectionEffect = useCallback(
+    (key: string): void => {
+      const data = aiRecommendedSectionsMap.get(key);
+      if (data) {
+        sectionRecommendationsRef.current?.restoreRecommendation(
+          key,
+          data.recommendation,
+          data.originalIndex
+        );
+        logger.info("[ParametersPage] Restored section to AI recommendations", {
+          sectionKey: key,
+          originalIndex: data.originalIndex,
+        });
+        setAiRecommendedSectionsMap((prev) => {
+          const m = new Map(prev);
+          m.delete(key);
+          return m;
+        });
+      }
+    },
+    [aiRecommendedSectionsMap]
+  );
+
+  const handleRemoveFromRecommendations = useCallback((key: string): void => {
+    sectionRecommendationsRef.current?.removeRecommendation(key);
+  }, []);
+
   return (
     <PageLayout noPadding>
       <DynamicPipeline
@@ -490,31 +558,55 @@ export default function ParametersPage(): JSX.Element {
         </div>
       )}
 
-      <SectionManager
-        sections={memoizedSections}
-        onSectionsChange={handleSectionsChange}
-        proposalData={{
-          templateId,
-          sectionDisplayNames,
-          contextualInstructions,
-          exactDocumentName,
-          filesMeta,
-        }}
-        onUpdateProposalData={updateProposalData}
-        isRecreateMode={isRecreateMode}
-        proposalId={currentProposalId}
-      />
+      <div className="parameters-outer-layout">
+        <div>
+          <SectionManager
+            sections={memoizedSections}
+            onSectionsChange={handleSectionsChange}
+            proposalData={{
+              templateId,
+              sectionDisplayNames,
+              contextualInstructions,
+              exactDocumentName,
+              filesMeta,
+            }}
+            onUpdateProposalData={updateProposalData}
+            isRecreateMode={isRecreateMode}
+            proposalId={currentProposalId}
+            onAddSection={addSectionToProposal}
+            onRemoveFromRecommendations={handleRemoveFromRecommendations}
+            onRemoveSectionEffect={handleRemoveSectionEffect}
+          />
+        </div>
 
-      <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
+        <div className="parameters-right-col">
+          <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
 
-      <LengthLanguageSelector
-        lengthPreference={lengthPreference}
-        language={language}
-        aiModel={aiModel ?? "gpt-4o"}
-        onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
-        onLanguageChange={(value) => updateProposalData({ language: value })}
-        onAiModelChange={(value) => updateProposalData({ aiModel: value })}
-      />
+          <LengthLanguageSelector
+            lengthPreference={lengthPreference}
+            language={language}
+            aiModel={aiModel ?? "gpt-4o"}
+            onLengthChange={(value) => updateProposalData({ lengthPreference: value })}
+            onLanguageChange={(value) => updateProposalData({ language: value })}
+            onAiModelChange={(value) => updateProposalData({ aiModel: value })}
+          />
+
+          <div className="section-recommendations-wrapper">
+            <SectionRecommendations
+              ref={sectionRecommendationsRef}
+              templateId={templateId}
+              existingSections={sections.map((s) => s.key)}
+              context={contextualInstructions || ""}
+              documentContext={
+                (isRecreateMode ? (exactDocumentName ? exactDocumentName + ", " : "") : "") +
+                (filesMeta?.map((f) => f.name).join(", ") ?? "")
+              }
+              onAddSection={addSectionToProposal}
+              proposalId={currentProposalId}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="page-footer">
         <Button variant="secondary" onClick={handleSaveDraftWithSync}>

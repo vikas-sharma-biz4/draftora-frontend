@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { X, Search, AlertCircle, Plus } from "lucide-react";
+import { X, Search, Plus } from "lucide-react";
 import { toast } from "@/utils/toast";
 
 import styles from "../EditModal.module.scss";
@@ -34,6 +34,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     label: "Technical",
     sections: [
       "high_level_scope",
+      "scope_of_work",
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",
@@ -45,6 +46,8 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     label: "Planning & Timeline",
     sections: [
       "milestone_timeline",
+      "estimated_timeline",
+      "deliverables",
       "implementation_plan",
       "timeline",
       "client_dependencies",
@@ -57,7 +60,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
   },
   company: {
     label: "Company Info",
-    sections: ["similar_projects", "our_approach_methodology"],
+    sections: ["similar_projects", "our_approach_methodology", "our_proven_approach"],
   },
   static: {
     label: "Static Sections",
@@ -101,23 +104,36 @@ export default function SectionsSelectorModal({
   onClose,
   onSave,
 }: SectionsSelectorModalProps): JSX.Element | null {
-  const [selected, setSelected] = useState<Set<string>>(new Set(selectedSections));
+  // Static sections are always included — initialize with them pre-selected
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set([...selectedSections, ...STATIC_SECTIONS_GROUP])
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
   // key → displayName for custom sections added in this session
   const [customSectionNames, setCustomSectionNames] = useState<Record<string, string>>({});
   // key → AI instructions for custom sections added in this session
-  const [customSectionInstructions, setCustomSectionInstructions] = useState<Record<string, string>>({});
+  const [customSectionInstructions, setCustomSectionInstructions] = useState<
+    Record<string, string>
+  >({});
   const [showAddSectionModal, setShowAddSectionModal] = useState<boolean>(false);
   const [isAddingSection, setIsAddingSection] = useState<boolean>(false);
 
   const allDisplayNames = useMemo(
-    () => ({ ...SECTION_DISPLAY_NAMES, ...STATIC_SECTION_DISPLAY_NAMES, ...sectionDisplayNames, ...customSectionNames }),
+    () => ({
+      ...SECTION_DISPLAY_NAMES,
+      ...STATIC_SECTION_DISPLAY_NAMES,
+      ...sectionDisplayNames,
+      ...customSectionNames,
+    }),
     [sectionDisplayNames, customSectionNames]
   );
 
   const uncategorizedSections = useMemo(() => {
     const allCustomKeys = Object.keys(customSectionNames);
-    const allUncategorized = [...selectedSections.filter((s) => !ALL_CATEGORIZED_SECTIONS.has(s)), ...allCustomKeys];
+    const allUncategorized = [
+      ...selectedSections.filter((s) => !ALL_CATEGORIZED_SECTIONS.has(s)),
+      ...allCustomKeys,
+    ];
     return Array.from(new Set(allUncategorized));
   }, [selectedSections, customSectionNames]);
 
@@ -138,6 +154,7 @@ export default function SectionsSelectorModal({
   }
 
   function toggleSection(sectionKey: string): void {
+    if (STATIC_SECTIONS_GROUP.includes(sectionKey)) return;
     setSelected((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(sectionKey)) {
@@ -165,22 +182,6 @@ export default function SectionsSelectorModal({
     });
   }
 
-  function selectAllStatic(): void {
-    setSelected((prev) => {
-      const newSet = new Set(prev);
-      STATIC_SECTIONS_GROUP.forEach((s) => newSet.add(s));
-      return newSet;
-    });
-  }
-
-  function deselectAllStatic(): void {
-    setSelected((prev) => {
-      const newSet = new Set(prev);
-      STATIC_SECTIONS_GROUP.forEach((s) => newSet.delete(s));
-      return newSet;
-    });
-  }
-
   async function handleAddSectionSubmit(name: string, instructions: string): Promise<void> {
     setIsAddingSection(true);
     try {
@@ -196,7 +197,10 @@ export default function SectionsSelectorModal({
   }
 
   function handleSave(): void {
-    if (selected.size < 3) {
+    // Always include static sections in the final selection
+    const finalSelected = new Set([...selected, ...STATIC_SECTIONS_GROUP]);
+
+    if (finalSelected.size < 3) {
       toast.error("Please select at least 3 sections");
       return;
     }
@@ -209,8 +213,8 @@ export default function SectionsSelectorModal({
       })
     );
 
-    onSave(Array.from(selected), newCustomSections.length > 0 ? newCustomSections : undefined);
-    toast.success(`${selected.size} section(s) selected`);
+    onSave(Array.from(finalSelected), newCustomSections.length > 0 ? newCustomSections : undefined);
+    toast.success(`${finalSelected.size} section(s) selected`);
   }
 
   const filteredSectionsGroup = allSectionsGroup.filter((s) =>
@@ -222,7 +226,6 @@ export default function SectionsSelectorModal({
   );
 
   const sectionsSelectedCount = allSectionsGroup.filter((s) => selected.has(s)).length;
-  const staticSelectedCount = STATIC_SECTIONS_GROUP.filter((s) => selected.has(s)).length;
 
   const allExistingKeys = [...allSectionsGroup, ...STATIC_SECTIONS_GROUP];
 
@@ -231,7 +234,9 @@ export default function SectionsSelectorModal({
       <BaseModal isOpen={true} onClose={onClose} size="md" labelId="sections-modal-title">
         <div className={styles.modalHeader}>
           <div>
-            <h2 id="sections-modal-title" className={styles.modalTitle}>Select Proposal Sections</h2>
+            <h2 id="sections-modal-title" className={styles.modalTitle}>
+              Select Proposal Sections
+            </h2>
             <p className={styles.modalSubtitle}>
               {selected.size} of {totalSections} sections selected
             </p>
@@ -261,22 +266,11 @@ export default function SectionsSelectorModal({
 
           <div className={styles.actionBar}>
             <div />
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setShowAddSectionModal(true)}
-            >
+            <Button variant="primary" size="sm" onClick={() => setShowAddSectionModal(true)}>
               <Plus size={14} />
               Add Custom Section
             </Button>
           </div>
-
-          {selected.size < 3 && (
-            <div className={styles.warningBox}>
-              <AlertCircle size={16} />
-              <span>Please select at least 3 sections for your proposal</span>
-            </div>
-          )}
 
           <div className={styles.categoriesList}>
             {/* Sections group */}
@@ -332,55 +326,23 @@ export default function SectionsSelectorModal({
               </div>
             )}
 
-            {/* Static Sections group */}
+            {/* Static Sections group — always included, not selectable */}
             {(!searchQuery || filteredStaticGroup.length > 0) && (
               <div className={styles.category}>
                 <div className={styles.categoryHeader} style={{ cursor: "default" }}>
                   <span className={styles.categoryLabel}>Static Sections</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span className={styles.categoryCount}>
-                      {staticSelectedCount}/{STATIC_SECTIONS_GROUP.length}
-                    </span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={selectAllStatic}
-                      className={styles.toggleAllButton}
-                    >
-                      Select All
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={deselectAllStatic}
-                      className={styles.toggleAllButton}
-                    >
-                      Deselect All
-                    </Button>
-                  </div>
+                  <span className={styles.alwaysIncludedBadge}>Always Included</span>
                 </div>
                 <div className={styles.sectionsList}>
-                  {filteredStaticGroup.map((sectionKey) => {
-                    const isSelected = selected.has(sectionKey);
-                    return (
-                      <div
-                        key={sectionKey}
-                        className={`${styles.sectionItem} ${isSelected ? styles.selected : ""}`}
-                        onClick={() => toggleSection(sectionKey)}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSection(sectionKey)}
-                          className={styles.checkbox}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span className={styles.sectionName}>{getDisplayName(sectionKey)}</span>
-                      </div>
-                    );
-                  })}
+                  {filteredStaticGroup.map((sectionKey) => (
+                    <div
+                      key={sectionKey}
+                      className={`${styles.sectionItem} ${styles.sectionItemStatic}`}
+                    >
+                      <span className={styles.staticCheckmark}>✓</span>
+                      <span className={styles.sectionName}>{getDisplayName(sectionKey)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

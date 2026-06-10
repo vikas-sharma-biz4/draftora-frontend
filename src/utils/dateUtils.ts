@@ -20,7 +20,7 @@ export function formatDate(iso: string): string {
   try {
     const date = new Date(iso);
     const day = date.getDate();
-    const month = date.toLocaleDateString("en-US", { month: "short" });
+    const month = date.toLocaleDateString("en-US", { month: "long" });
     const year = date.getFullYear();
     return `${month} ${day}${getOrdinalSuffix(day)}, ${year}`;
   } catch {
@@ -30,13 +30,13 @@ export function formatDate(iso: string): string {
 
 /**
  * Format a UTC ISO date string into a date with time, always in en-US locale
- * (e.g. "Jan 5th, 2025, 02:30 PM").
+ * (e.g. "January 5th, 2025, 02:30 PM").
  */
 export function formatDateWithTime(iso: string): string {
   try {
     const date = new Date(iso);
     const day = date.getDate();
-    const month = date.toLocaleDateString("en-US", { month: "short" });
+    const month = date.toLocaleDateString("en-US", { month: "long" });
     const year = date.getFullYear();
     const time = date.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit" });
     return `${month} ${day}${getOrdinalSuffix(day)}, ${year}, ${time}`;

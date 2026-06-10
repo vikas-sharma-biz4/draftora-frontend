@@ -80,12 +80,17 @@ aside[data-collapsed="true"] + .main-content {
   }
 }
 
-// ─── Responsive — mobile (≤ 768px): sidebar is overlay, content is full-width ─
+// ─── Responsive — mobile (≤ 768px): sidebar stays as icon strip ──────────────
 @media (max-width: 768px) {
   .main-content {
-    margin-left: 0 !important;
-    width: 100% !important;
-    padding: 20px;
+    margin-left: var(--sidebar-collapsed-width) !important;
+    width: calc(100% - var(--sidebar-collapsed-width)) !important;
+    padding: 16px;
+  }
+
+  .sidebar-skeleton {
+    width: var(--sidebar-collapsed-width);
+    min-width: var(--sidebar-collapsed-width);
   }
 }
 
