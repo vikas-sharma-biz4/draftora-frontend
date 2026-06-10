@@ -44,7 +44,7 @@ export default function ImageSectionHeader({
   // Sync version history when content prop changes from outside.
   // If content is already tracked (e.g. from our own regeneration), keep history intact.
   useEffect(() => {
-    setVersionHistory(prev => {
+    setVersionHistory((prev) => {
       if (prev.includes(content)) return prev;
       return [content];
     });
@@ -58,24 +58,29 @@ export default function ImageSectionHeader({
   const displayedContent = versionHistory[safeCurrentIndex] ?? content;
   const totalVersions = versionHistory.length;
 
-  const doRegenerate = useCallback(async (combinedInstructions?: string): Promise<void> => {
-    setIsRegenerating(true);
-    try {
-      const newContent = await regenerateSection(proposalId, sectionKey, combinedInstructions);
-      // Use functional update so we don't need versionHistory in the dep array
-      setVersionHistory(prev => {
-        const newHistory = [...prev, newContent];
-        setCurrentIndex(newHistory.length - 1);
-        return newHistory;
-      });
-      onContentChange(sectionKey, newContent);
-      await onSave(sectionKey, newContent);
-    } catch {
-      toast.error("Failed to regenerate diagram");
-    } finally {
-      setIsRegenerating(false);
-    }
-  }, [proposalId, sectionKey, onContentChange, onSave]);
+  const doRegenerate = useCallback(
+    async (combinedInstructions?: string): Promise<void> => {
+      setIsRegenerating(true);
+      try {
+        const newContent = await regenerateSection(proposalId, sectionKey, combinedInstructions);
+        // Use functional update so we don't need versionHistory in the dep array
+        setVersionHistory((prev) => {
+          const newHistory = [...prev, newContent];
+          setCurrentIndex(newHistory.length - 1);
+          return newHistory;
+        });
+        onContentChange(sectionKey, newContent);
+        // Re-enable the button as soon as the new diagram is visible; save is a
+        // background concern and should not keep the button blocked.
+        setIsRegenerating(false);
+        await onSave(sectionKey, newContent);
+      } catch {
+        setIsRegenerating(false);
+        toast.error("Failed to regenerate diagram");
+      }
+    },
+    [proposalId, sectionKey, onContentChange, onSave]
+  );
 
   function handleRegenerate(): void {
     const instr = instructions.trim();
@@ -102,7 +107,7 @@ export default function ImageSectionHeader({
           {totalVersions > 1 && (
             <div className="diagram-version-nav">
               <button
-                onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
+                onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
                 disabled={safeCurrentIndex === 0}
                 aria-label="Previous version"
               >
@@ -112,7 +117,7 @@ export default function ImageSectionHeader({
                 {safeCurrentIndex + 1} / {totalVersions}
               </span>
               <button
-                onClick={() => setCurrentIndex(i => Math.min(versionHistory.length - 1, i + 1))}
+                onClick={() => setCurrentIndex((i) => Math.min(versionHistory.length - 1, i + 1))}
                 disabled={safeCurrentIndex === totalVersions - 1}
                 aria-label="Next version"
               >
@@ -126,7 +131,7 @@ export default function ImageSectionHeader({
             size="sm"
             className="diagram-regen-btn"
             loading={isRegenerating}
-            onClick={() => (isMultiImage ? setShowModal(true) : setShowInput(v => !v))}
+            onClick={() => (isMultiImage ? setShowModal(true) : setShowInput((v) => !v))}
             disabled={isRegenerating}
           >
             {!isRegenerating && <RefreshCw size={13} />}
@@ -141,8 +146,8 @@ export default function ImageSectionHeader({
             className="diagram-regen-input"
             placeholder="Describe changes (e.g. Add Redis cache, Remove old service)"
             value={instructions}
-            onChange={e => setInstructions(e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => setInstructions(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === "Enter") handleRegenerate();
               if (e.key === "Escape") {
                 setShowInput(false);
