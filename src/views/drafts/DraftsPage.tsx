@@ -253,9 +253,9 @@ export default function DraftsPage(): JSX.Element {
         subtitle="Resume work on proposals that are in progress or pending completion."
         action={
           !isLoading && drafts.length > 0 ? (
-            <Button variant="danger" size="sm" onClick={() => setShowDeleteAllModal(true)}>
+            <button className={styles.deleteAllBtn} onClick={() => setShowDeleteAllModal(true)}>
               Delete All
-            </Button>
+            </button>
           ) : undefined
         }
       />

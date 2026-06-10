@@ -83,10 +83,11 @@
 }
 
 .sidebarLogoFull {
-  height: 28px;
+  height: 44px;
   width: auto;
-  max-width: 140px;
+  max-width: 160px;
   object-fit: contain;
+  object-position: left center;
   display: block;
   flex-shrink: 0;
 }

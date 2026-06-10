@@ -22,8 +22,12 @@ interface EditClientModalProps {
   onClientUpdated: (client: Client) => void;
 }
 
-export default function EditClientModal({ client, onClose, onClientUpdated }: EditClientModalProps): JSX.Element | null {
-  const updateClientInStore = useClientStore(state => state.updateClientApi);
+export default function EditClientModal({
+  client,
+  onClose,
+  onClientUpdated,
+}: EditClientModalProps): JSX.Element | null {
+  const updateClientInStore = useClientStore((state) => state.updateClientApi);
   const [mounted, setMounted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -39,7 +43,7 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
   }, []);
 
   // Enable browser back button to close modal
-  useModalHistory({ isOpen: true, onClose, modalId: 'edit-client-modal' });
+  useModalHistory({ isOpen: true, onClose, modalId: "edit-client-modal" });
 
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -156,9 +160,6 @@ export default function EditClientModal({ client, onClose, onClientUpdated }: Ed
         </div>
 
         <div className={styles.modalFooter}>
-          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
-            Cancel
-          </Button>
           <Button
             variant="primary"
             onClick={handleSave}

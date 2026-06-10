@@ -40,7 +40,6 @@ export type { AddSectionPayload, ReorderSectionsPayload } from "./proposalSectio
 // Template parsing & AI recommendations
 export {
   parseCustomTemplate,
-  parseRecreateDocument,
   parseFiles,
   getSupportedParseFormats,
   suggestSections,
@@ -50,8 +49,6 @@ export {
 export type {
   ExtractedTemplateSection,
   ParseTemplateResult,
-  RecreateExtractedSection,
-  ParseRecreateResult,
   ParsedFileResult,
   ParseFilesResponse,
   SuggestSectionsPayload,

@@ -29,11 +29,7 @@ const SortableSectionList = dynamic(() => import("@/components/common/SortableSe
 
 type SectionManagerProposalData = Pick<
   ProposalWizardData,
-  | "templateId"
-  | "sectionDisplayNames"
-  | "contextualInstructions"
-  | "exactDocumentName"
-  | "filesMeta"
+  "templateId" | "sectionDisplayNames" | "contextualInstructions" | "filesMeta"
 >;
 
 interface SectionManagerProps {
@@ -41,7 +37,6 @@ interface SectionManagerProps {
   onSectionsChange: React.Dispatch<React.SetStateAction<SectionItem[]>>;
   proposalData: SectionManagerProposalData;
   onUpdateProposalData: (updates: Partial<ProposalWizardData>) => void;
-  isRecreateMode: boolean;
   proposalId: number | null;
   onAddSection: (
     key: string,
@@ -58,7 +53,6 @@ export default function SectionManager({
   onSectionsChange,
   proposalData,
   onUpdateProposalData,
-  isRecreateMode,
   proposalId,
   onAddSection,
   onRemoveFromRecommendations,
