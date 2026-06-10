@@ -1,14 +1,15 @@
-/**
- * LengthLanguageSelector component
- *
- * Renders the proposal length and language/locale selection cards.
- */
-
 "use client";
 
-import { Select } from "@/components/common/Input";
-import { LANGUAGE_OPTIONS, LENGTH_OPTIONS, AI_MODEL_OPTIONS } from "@/constants";
+import { LENGTH_OPTIONS } from "@/constants";
 import type { LengthOption } from "@/interfaces/proposalInterfaces";
+
+const LENGTH_DEPTH: Record<string, number> = {
+  concise: 1,
+  balanced: 2,
+  comprehensive: 3,
+};
+
+const MAX_DEPTH = 3;
 
 interface LengthLanguageSelectorProps {
   lengthPreference: LengthOption;
@@ -21,21 +22,16 @@ interface LengthLanguageSelectorProps {
 
 export default function LengthLanguageSelector({
   lengthPreference,
-  language,
-  aiModel,
   onLengthChange,
-  onLanguageChange,
-  onAiModelChange,
 }: LengthLanguageSelectorProps): JSX.Element {
   return (
-    <div className="grid-2 mb-14">
+    <div className="mb-16">
       <div className="card">
-        <div className="form-label mb-16">
-          Proposal Length
-        </div>
+        <div className="form-label mb-16">Proposal Length</div>
         <div className="flex-col gap-8">
           {LENGTH_OPTIONS.map(({ value, label, description }) => {
             const isSelected = lengthPreference === value;
+            const depth = LENGTH_DEPTH[value] ?? 1;
             return (
               <div
                 key={value}
@@ -47,50 +43,16 @@ export default function LengthLanguageSelector({
                   if (e.key === "Enter") onLengthChange(value);
                 }}
               >
-                <div className="flex-between">
-                  <span className="length-option-label">{label}</span>
+                <div className="length-option-body">
+                  <div className="length-option-label">{label}</div>
+                  <span className="length-option-desc">{description}</span>
                 </div>
-                <span className="length-option-desc">{description}</span>
+                <div className="length-depth-indicator">
+                  {Array.from({ length: MAX_DEPTH }, (_, i) => (
+                    <div key={i} className={`length-depth-bar${i < depth ? " active" : ""}`} />
+                  ))}
+                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="form-label mb-16">
-          Language &amp; Locale
-        </div>
-        <Select
-          className="form-select mb-24"
-          value={language}
-          onChange={(e) => onLanguageChange(e.target.value)}
-        >
-          {LANGUAGE_OPTIONS.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </Select>
-        <div className="form-label mb-16">
-          AI Model
-        </div>
-        <div className="grid-2">
-          {AI_MODEL_OPTIONS.map(({ value: optionValue, label, provider, description }) => {
-            const isSelected = (aiModel ?? "gpt-4o") === optionValue;
-            return (
-              <button
-                key={optionValue}
-                type="button"
-                className={`tone-card${isSelected ? " selected" : ""}`}
-                onClick={() => onAiModelChange(optionValue)}
-              >
-                <div className="tone-card-label">
-                  {label}
-                  <span className="font-11 text-muted ml-6">({provider})</span>
-                </div>
-                <div className="tone-card-desc">{description}</div>
-              </button>
             );
           })}
         </div>

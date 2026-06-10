@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, FileText, Eye, X, CloudUpload } from "lucide-react";
+import { Upload, FileText, Eye, X } from "lucide-react";
 import { formatDate } from "@/utils/dateUtils";
 import type { ClientDocument } from "@/interfaces/clientInterfaces";
 import type { useClientDocuments } from "@/hooks/useClientDocuments";
@@ -25,15 +25,11 @@ export default function ClientDocumentsPanel({
     viewingDocId,
     viewingDocModal,
     closeDocViewer,
-    restoringDocId,
     filteredDocuments,
     fileInputRef,
-    restoreFileInputRef,
     handleFileInputChange,
-    handleRestoreFileInputChange,
     handleViewDocument,
     handleDeleteDocument,
-    handleRestoreToS3Click,
     handleDeleteAllDocuments,
   } = docs;
 
@@ -70,13 +66,6 @@ export default function ClientDocumentsPanel({
           accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
           multiple
           onChange={handleFileInputChange}
-          style={{ display: "none" }}
-        />
-        <input
-          ref={restoreFileInputRef}
-          type="file"
-          accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.xlsx,.pptx"
-          onChange={handleRestoreFileInputChange}
           style={{ display: "none" }}
         />
       </div>
@@ -151,17 +140,6 @@ export default function ClientDocumentsPanel({
                     </span>
                   )}
                 </div>
-                {!doc.s3FileUrl && (
-                  <button
-                    className={styles.restoreS3Btn}
-                    onClick={(e) => handleRestoreToS3Click(doc.id, e)}
-                    disabled={restoringDocId === doc.id}
-                    title="Upload original file to enable viewing"
-                    aria-label="Upload to S3"
-                  >
-                    <CloudUpload size={14} />
-                  </button>
-                )}
                 <button
                   className={styles.deleteDocBtn}
                   onClick={(e) => {

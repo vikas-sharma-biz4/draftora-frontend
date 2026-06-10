@@ -191,6 +191,14 @@ export default function RichEditor({
     editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   }, [editor]);
 
+  const closeAllPanels = useCallback((): void => {
+    setShowHeadingMenu(false);
+    setShowLinkInput(false);
+    setShowImageInput(false);
+    setShowTextColorPicker(false);
+    setShowHighlightPicker(false);
+  }, []);
+
   const setLink = useCallback((): void => {
     if (!editor || !linkUrl) return;
     editor.chain().focus().setLink({ href: linkUrl }).run();
@@ -285,6 +293,12 @@ export default function RichEditor({
         const contentToInsert = plainTextToHtml(regeneratedText);
         editor.chain().focus().setTextSelection({ from, to }).insertContent(contentToInsert).run();
         logger.debug("[RichEditor] Content regenerated with format:", format);
+
+        // After successful AI generation, hide the entire floating toolbar so the
+        // user can immediately see the inserted content without the toolbar in the way.
+        keepToolbarVisibleRef.current = false;
+        setHasSelection(false);
+        if (bubbleElRef.current) bubbleElRef.current.style.display = "none";
       }
     } catch (error) {
       console.error("[RichEditor] Regeneration failed:", error);
@@ -606,7 +620,11 @@ export default function RichEditor({
             type="button"
             className="rte-btn-dropdown"
             title="Text style"
-            onClick={() => setShowHeadingMenu(!showHeadingMenu)}
+            onClick={() => {
+              const next = !showHeadingMenu;
+              closeAllPanels();
+              setShowHeadingMenu(next);
+            }}
           >
             <svg
               width="16"
@@ -785,7 +803,11 @@ export default function RichEditor({
             type="button"
             className={`rte-btn-icon${editor.isActive("link") ? " active" : ""}`}
             title={editor.isActive("link") ? "Edit link" : "Add link"}
-            onClick={() => setShowLinkInput(!showLinkInput)}
+            onClick={() => {
+              const next = !showLinkInput;
+              closeAllPanels();
+              setShowLinkInput(next);
+            }}
           >
             <svg
               width="16"
@@ -840,7 +862,11 @@ export default function RichEditor({
             type="button"
             className="rte-btn-icon"
             title="Insert image"
-            onClick={() => setShowImageInput(!showImageInput)}
+            onClick={() => {
+              const next = !showImageInput;
+              closeAllPanels();
+              setShowImageInput(next);
+            }}
           >
             <svg
               width="16"
@@ -924,8 +950,9 @@ export default function RichEditor({
             className="rte-btn-text-color"
             title="Text color"
             onClick={() => {
-              setShowTextColorPicker(!showTextColorPicker);
-              setShowHighlightPicker(false);
+              const next = !showTextColorPicker;
+              closeAllPanels();
+              setShowTextColorPicker(next);
             }}
           >
             <span className="rte-btn-color-letter" style={{ color: activeTextColor }}>
@@ -982,8 +1009,9 @@ export default function RichEditor({
             className="rte-btn-highlight-color"
             title="Highlight color"
             onClick={() => {
-              setShowHighlightPicker(!showHighlightPicker);
-              setShowTextColorPicker(false);
+              const next = !showHighlightPicker;
+              closeAllPanels();
+              setShowHighlightPicker(next);
             }}
           >
             <span className="rte-btn-color-letter" style={{ background: activeHighlightColor }}>

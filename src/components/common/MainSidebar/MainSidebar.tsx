@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, FileText, History, PanelLeft } from "lucide-react";
 
 import styles from "./MainSidebar.module.scss";
-import { MAIN_NAV_ITEMS } from "@/constants";
+import { MAIN_NAV_ITEMS, SIDEBAR_LOGO_SRC } from "@/constants";
 import { useUIStore } from "@/store/features/ui/uiSlice";
-import { MOBILE_BREAKPOINT } from "@/constants/breakpoints";
 
 /** Maps nav item id → lucide icon */
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -22,20 +20,6 @@ export default function MainSidebar(): JSX.Element {
   const pathname = usePathname();
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
-
-  // Detect mobile — initialised synchronously so there's no flash on first render
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth <= MOBILE_BREAKPOINT;
-  });
-
-  // Keep isMobile in sync on resize
-  useEffect(() => {
-    const handler = (): void => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
 
   const collapsed = !sidebarOpen;
 
@@ -46,20 +30,7 @@ export default function MainSidebar(): JSX.Element {
 
   return (
     <>
-      {/* Mobile backdrop — click outside to close */}
-      {isMobile && !collapsed && (
-        <div
-          className={styles.sidebarBackdrop}
-          aria-hidden="true"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <aside
-        className={`${styles.sidebar}${isMobile ? ` ${styles.sidebarMobile}` : ""}`}
-        data-collapsed={collapsed}
-        aria-label="Main navigation"
-      >
+      <aside className={styles.sidebar} data-collapsed={collapsed} aria-label="Main navigation">
         {/* ── Header: Logo (left) + Toggle (right) — hidden when collapsed ── */}
         <div className={styles.sidebarHeader}>
           <Link
@@ -68,11 +39,7 @@ export default function MainSidebar(): JSX.Element {
             aria-label="Draftora home"
             prefetch={false}
           >
-            <img
-              src="/images/draftora-logo.png"
-              alt="Draftora"
-              className={styles.sidebarLogoFull}
-            />
+            <img src={SIDEBAR_LOGO_SRC} alt="Draftora" className={styles.sidebarLogoFull} />
           </Link>
 
           <button
@@ -116,7 +83,6 @@ export default function MainSidebar(): JSX.Element {
                     aria-current={active ? "page" : undefined}
                     prefetch={false}
                     title={collapsed ? item.label : undefined}
-                    onClick={() => isMobile && setSidebarOpen(false)}
                   >
                     <span className={styles.sidebarNavIcon}>{NAV_ICONS[item.id] ?? item.icon}</span>
                     <span className={styles.sidebarStepLabel}>{item.label}</span>

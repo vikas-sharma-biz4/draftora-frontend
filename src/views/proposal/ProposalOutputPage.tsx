@@ -168,11 +168,13 @@ export default function ProposalOutputPage(): JSX.Element {
   }, [router]);
 
   /**
-   * Scroll spy: Automatically highlight the active section in sidebar based on scroll position.
+   * Scroll spy: highlight the sidebar item for the section currently being read.
    *
-   * Uses IntersectionObserver with `.main-content` as root because the page's
-   * scroll container is `.main-content` (overflow-y: auto), not the window.
-   * A window scroll listener would never fire in this layout.
+   * Strategy: on every scroll event, find the section whose top edge has most
+   * recently crossed the container's top edge (largest negative offset ≤ TRIGGER_OFFSET).
+   * This correctly handles tall sections (images, tables) that remain partially
+   * visible long after the reader has moved past them — unlike an IntersectionObserver
+   * "smallest top" approach which keeps the old section active far too long.
    */
   useEffect(() => {
     if (!proposal || !mounted) return;
@@ -180,42 +182,63 @@ export default function ProposalOutputPage(): JSX.Element {
     const sectionKeys = proposal.selectedSections ?? [];
     if (sectionKeys.length === 0) return;
 
-    // The scrollable ancestor is .main-content, not the window
     const scrollRoot = document.querySelector<HTMLElement>(".main-content");
+    if (!scrollRoot) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // Ignore observer callbacks triggered by a click-to-scroll action
-        if (isProgrammaticScrollRef.current) return;
+    // px below the container's top edge that triggers a section switch.
+    // A small positive offset accounts for section headers having some padding.
+    const TRIGGER_OFFSET = 80;
 
-        // Among all newly-intersecting entries pick the one nearest the top
-        const visible = entries.filter((e) => e.isIntersecting);
-        if (visible.length === 0) return;
+    function updateActiveSection(): void {
+      if (isProgrammaticScrollRef.current) return;
 
-        const topEntry = visible.reduce((best, entry) =>
-          entry.boundingClientRect.top < best.boundingClientRect.top ? entry : best
-        );
+      const containerTop = scrollRoot!.getBoundingClientRect().top;
 
-        const sectionKey = topEntry.target.id.replace("section-", "");
-        if (sectionKey && sectionKey !== currentActiveSectionRef.current) {
-          currentActiveSectionRef.current = sectionKey;
-          setActiveSection(sectionKey);
+      let bestKey: string | null = null;
+      let bestRelTop = -Infinity;
+
+      // Pick the section whose top is the largest value still ≤ TRIGGER_OFFSET
+      // (i.e., the section that most recently scrolled past the container's top edge).
+      sectionKeys.forEach((key) => {
+        const el = document.getElementById(`section-${key}`);
+        if (!el) return;
+        const relTop = el.getBoundingClientRect().top - containerTop;
+        if (relTop <= TRIGGER_OFFSET && relTop > bestRelTop) {
+          bestRelTop = relTop;
+          bestKey = key;
         }
-      },
-      {
-        root: scrollRoot ?? null,
-        // Section is "active" when its top is within the upper 45% of the container
-        rootMargin: "0px 0px -55% 0px",
-        threshold: 0,
+      });
+
+      // Fallback: nothing has reached the trigger yet — pick first visible section.
+      if (!bestKey) {
+        let firstRelTop = Infinity;
+        sectionKeys.forEach((key) => {
+          const el = document.getElementById(`section-${key}`);
+          if (!el) return;
+          const relTop = el.getBoundingClientRect().top - containerTop;
+          if (relTop < firstRelTop) {
+            firstRelTop = relTop;
+            bestKey = key;
+          }
+        });
       }
-    );
 
-    sectionKeys.forEach((key) => {
-      const el = document.getElementById(`section-${key}`);
-      if (el) observer.observe(el);
-    });
+      if (bestKey && bestKey !== currentActiveSectionRef.current) {
+        currentActiveSectionRef.current = bestKey;
+        setActiveSection(bestKey);
+      }
+    }
 
-    return () => observer.disconnect();
+    scrollRoot.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection, { passive: true });
+
+    // Set the correct active section immediately on mount / proposal load.
+    updateActiveSection();
+
+    return () => {
+      scrollRoot.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
   }, [proposal, mounted, setActiveSection]);
 
   // Approval workflow state
