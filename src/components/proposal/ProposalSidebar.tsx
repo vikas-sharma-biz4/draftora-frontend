@@ -251,7 +251,6 @@ function resolveTemplateName(templateType: string | undefined): string {
   if (!templateType) return "";
   if (templateType === "scratch") return SPECIAL_CARDS.START_FROM_SCRATCH.name;
   if (templateType === "custom") return SPECIAL_CARDS.CUSTOM_TEMPLATE.name;
-  if (templateType === "recreate") return SPECIAL_CARDS.RECREATE_TEMPLATE.name;
   const found = PROPOSAL_TEMPLATES.find((t) => t.templateType === templateType);
   return found?.name ?? "";
 }

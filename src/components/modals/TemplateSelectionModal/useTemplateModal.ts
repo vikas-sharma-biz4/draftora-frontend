@@ -84,14 +84,12 @@ export interface UseTemplateModalReturn {
   // New-client form
   newClientFormData: NewClientFormData;
   isCreatingClient: boolean;
-  newClientOtherIndustry: string;
 
   // Field setters (passed straight to input onChange)
   setProposalName: (name: string) => void;
   setProposalDescription: (desc: string) => void;
   setInitialContextNotes: (notes: string) => void;
   setSelectedTemplateIdState: (id: string | null) => void;
-  setNewClientOtherIndustry: (value: string) => void;
 
   // File handlers
   processFileList: (files: FileList | null) => void;
@@ -174,14 +172,12 @@ export function useTemplateModal({
   // ── New-client form ───────────────────────────────────────────────────────
   const [newClientFormData, setNewClientFormData] = useState<NewClientFormData>({
     clientName: "",
-    industry: "",
     pipelineStage: "Discovery",
     primaryContactName: "",
     primaryContactEmail: "",
     notes: "",
   });
   const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const [newClientOtherIndustry, setNewClientOtherIndustry] = useState("");
 
   // ── Document auto-select ref ──────────────────────────────────────────────
   const initialDocIdsRef = useRef<Set<number>>(new Set());
@@ -553,14 +549,6 @@ export function useTemplateModal({
       toast.error("Client name is required");
       return;
     }
-    if (!newClientFormData.industry) {
-      toast.error("Please select an industry");
-      return;
-    }
-    if (newClientFormData.industry === "Other" && !newClientOtherIndustry.trim()) {
-      toast.error("Please specify your industry");
-      return;
-    }
     if (
       clients.some(
         (c) => c.name.toLowerCase().trim() === newClientFormData.clientName.toLowerCase().trim()
@@ -576,14 +564,8 @@ export function useTemplateModal({
 
     setIsCreatingClient(true);
     try {
-      const resolvedIndustry =
-        newClientFormData.industry === "Other"
-          ? newClientOtherIndustry.trim()
-          : newClientFormData.industry;
-
       const newClient = await createClient({
         name: newClientFormData.clientName,
-        industry: resolvedIndustry,
         notes: newClientFormData.notes || undefined,
       });
 
@@ -609,10 +591,8 @@ export function useTemplateModal({
       }
 
       setModalView("template_selection");
-      setNewClientOtherIndustry("");
       setNewClientFormData({
         clientName: "",
-        industry: "",
         pipelineStage: "Discovery",
         primaryContactName: "",
         primaryContactEmail: "",
@@ -648,12 +628,10 @@ export function useTemplateModal({
     isPending,
     newClientFormData,
     isCreatingClient,
-    newClientOtherIndustry,
     setProposalName,
     setProposalDescription,
     setInitialContextNotes,
     setSelectedTemplateIdState,
-    setNewClientOtherIndustry,
     processFileList,
     handleRemoveFile,
     handleRemoveAllFiles,

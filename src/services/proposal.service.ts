@@ -45,7 +45,6 @@ export type {
 
 export {
   parseCustomTemplate,
-  parseRecreateDocument,
   parseFiles,
   getSupportedParseFormats,
   suggestSections,
@@ -55,8 +54,6 @@ export {
 export type {
   ExtractedTemplateSection,
   ParseTemplateResult,
-  RecreateExtractedSection,
-  ParseRecreateResult,
   ParsedFileResult,
   ParseFilesResponse,
   SuggestSectionsPayload,

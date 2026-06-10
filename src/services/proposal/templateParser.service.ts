@@ -1,8 +1,7 @@
 /**
  * Template and document parsing services
  *
- * Custom template parsing, recreate document parsing,
- * file parsing (Docling + OCR), and section suggestions.
+ * Custom template parsing, file parsing (Docling + OCR), and section suggestions.
  */
 
 import { http } from "@/config/httpClient";
@@ -34,56 +33,6 @@ export async function parseCustomTemplate(file: File): Promise<ParseTemplateResu
     sections: data.sections,
     sourceType: data.source_type,
     totalSections: data.total_sections,
-  };
-}
-
-// ── Recreate template document parsing ──────────────────────────────────────
-
-export interface RecreateExtractedSection {
-  id: string;
-  title: string;
-  content: string;
-  order: number;
-  type: string;
-  level?: number;
-  parentId?: string;
-}
-
-export interface ParseRecreateResult {
-  sections: RecreateExtractedSection[];
-  sourceType: string;
-  totalSections: number;
-  fullText: string;
-}
-
-/**
- * Parse a document fully for recreate mode, returning sections with their content.
- */
-export async function parseRecreateDocument(
-  file: File,
-  signal?: AbortSignal
-): Promise<ParseRecreateResult> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const d = await http.post<{
-    sections: Array<{
-      id: string;
-      title: string;
-      content: string;
-      order: number;
-      type: string;
-    }>;
-    source_type: string;
-    total_sections: number;
-    full_text: string;
-  }>("/templates/parse-recreate/", formData, { signal });
-
-  return {
-    sections: d.sections,
-    sourceType: d.source_type,
-    totalSections: d.total_sections,
-    fullText: d.full_text,
   };
 }
 

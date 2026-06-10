@@ -6,11 +6,17 @@ import { logger } from "@/utils/logger";
 export { API_BASE_URL } from "./httpClient";
 
 export const POLLING_INTERVAL_MS = 3000;
+
+// Regenerating architecture diagram sections involves multiple LLM calls,
+// the Eraser.io API, and an S3 upload — allow up to 90 s before timing out.
+export const REGENERATE_SECTION_TIMEOUT_MS = 90_000;
 export const MAX_POLL_ATTEMPTS = 120;
 
 const _defaultAiModel = process.env.NEXT_PUBLIC_DEFAULT_AI_MODEL;
 if (!_defaultAiModel) {
-  logger.warn("[config] NEXT_PUBLIC_DEFAULT_AI_MODEL is not set — defaulting to 'gpt-4o'. This may incur higher API costs.");
+  logger.warn(
+    "[config] NEXT_PUBLIC_DEFAULT_AI_MODEL is not set — defaulting to 'gpt-4o'. This may incur higher API costs."
+  );
 }
 export const DEFAULT_AI_MODEL = _defaultAiModel ?? "gpt-4o";
 

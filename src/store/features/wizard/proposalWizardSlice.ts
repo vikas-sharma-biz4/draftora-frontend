@@ -332,22 +332,10 @@ export const useLanguage = () => useProposalWizardStore((state) => state.proposa
 export const useAiModel = () => useProposalWizardStore((state) => state.proposalData.aiModel);
 
 /**
- * Selects the exact document name (for recreate mode).
- */
-export const useExactDocumentName = () =>
-  useProposalWizardStore((state) => state.proposalData.exactDocumentName);
-
-/**
  * Selects the approval status.
  */
 export const useApprovalStatus = () =>
   useProposalWizardStore((state) => state.proposalData.approvalStatus);
-
-/**
- * Selects the original sections (for recreate mode).
- */
-export const useOriginalSections = () =>
-  useProposalWizardStore((state) => state.proposalData.originalSections);
 
 /**
  * Selects the files metadata (for knowledge base).
