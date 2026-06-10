@@ -8,12 +8,11 @@ import { logger } from "@/utils/logger";
 
 import styles from "../NewClientModal.module.scss";
 import Button from "@/components/common/Button";
-import { Input, Select, Textarea } from "@/components/common/Input";
+import { Input, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";
 
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import type { NewClientFormData } from "@/interfaces/clientInterfaces";
-import { INDUSTRIES, PIPELINE_STAGES } from "@/constants";
 import { parseFiles } from "@/services/upload.service";
 import type { ParsedFileResult } from "@/services/upload.service";
 
@@ -39,14 +38,11 @@ export default function NewClientModal({
   const [mounted, setMounted] = useState<boolean>(false);
   const [formData, setFormData] = useState<NewClientFormData>({
     clientName: "",
-    industry: "",
     pipelineStage: "Discovery",
     primaryContactName: "",
     primaryContactEmail: "",
     notes: "",
   });
-
-  const [otherIndustry, setOtherIndustry] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<
     {
       file: File;
@@ -222,16 +218,6 @@ export default function NewClientModal({
       return;
     }
 
-    if (!formData.industry) {
-      toast.error("Please select an industry");
-      return;
-    }
-
-    if (formData.industry === "Other" && !otherIndustry.trim()) {
-      toast.error("Please specify your industry");
-      return;
-    }
-
     // Check for duplicate client name
     const isDuplicate = existingClients.some(
       (client) => client.name.toLowerCase().trim() === formData.clientName.toLowerCase().trim()
@@ -251,13 +237,8 @@ export default function NewClientModal({
     setIsCreating(true);
 
     try {
-      // Create client via Zustand store
-      const resolvedIndustry =
-        formData.industry === "Other" ? otherIndustry.trim() : formData.industry;
-
       const newClient = await createClientInStore({
         name: formData.clientName,
-        industry: resolvedIndustry,
         notes: formData.notes || undefined,
       });
 
@@ -320,39 +301,6 @@ export default function NewClientModal({
                   value={formData.clientName}
                   onChange={(e) => handleInputChange("clientName", e.target.value)}
                 />
-              )}
-            </FormField>
-
-            <FormField label="Industry">
-              {(fieldProps) => (
-                <>
-                  <Select
-                    {...fieldProps}
-                    value={formData.industry}
-                    onChange={(e) => {
-                      handleInputChange("industry", e.target.value);
-                      if (e.target.value !== "Other") setOtherIndustry("");
-                    }}
-                  >
-                    <option value="" disabled hidden>
-                      Select industry...
-                    </option>
-                    {INDUSTRIES.map((industry) => (
-                      <option key={industry} value={industry}>
-                        {industry}
-                      </option>
-                    ))}
-                  </Select>
-                  {formData.industry === "Other" && (
-                    <Input
-                      type="text"
-                      placeholder="Please specify your industry"
-                      value={otherIndustry}
-                      onChange={(e) => setOtherIndustry(e.target.value)}
-                      style={{ marginTop: "8px" }}
-                    />
-                  )}
-                </>
               )}
             </FormField>
           </div>
@@ -456,11 +404,7 @@ export default function NewClientModal({
           <Button
             variant="primary"
             onClick={handleCreate}
-            disabled={
-              !formData.clientName.trim() ||
-              !formData.industry ||
-              (formData.industry === "Other" && !otherIndustry.trim())
-            }
+            disabled={!formData.clientName.trim()}
             loading={isCreating}
           >
             Create Client

@@ -50,12 +50,10 @@ export default function TemplateSelectionModal(
     isPending,
     newClientFormData,
     isCreatingClient,
-    newClientOtherIndustry,
     setProposalName,
     setProposalDescription,
     setInitialContextNotes,
     setSelectedTemplateIdState,
-    setNewClientOtherIndustry,
     processFileList,
     handleRemoveFile,
     handleRemoveAllFiles,
@@ -134,10 +132,8 @@ export default function TemplateSelectionModal(
           {modalView === "new_client" ? (
             <NewClientForm
               formData={newClientFormData}
-              otherIndustry={newClientOtherIndustry}
               uploadedFiles={uploadedFiles}
               onInputChange={handleNewClientInputChange}
-              onOtherIndustryChange={setNewClientOtherIndustry}
               onProcessFiles={processFileList}
               onRemoveFile={handleRemoveFile}
             />
@@ -229,30 +225,22 @@ export default function TemplateSelectionModal(
             <Button
               variant="primary"
               onClick={handleCreateClient}
-              disabled={
-                !newClientFormData.clientName.trim() ||
-                !newClientFormData.industry ||
-                (newClientFormData.industry === "Other" && !newClientOtherIndustry.trim())
-              }
+              disabled={!newClientFormData.clientName.trim()}
               loading={isCreatingClient}
               style={{ marginLeft: "auto" }}
             >
               Create Client
             </Button>
           ) : (
-            <>
-              <Button variant="secondary" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleContinue}
-                disabled={uploadedFiles.some((f) => f.status === "parsing")}
-                loading={isPending}
-              >
-                {isPending ? "Starting..." : "Continue to Wizard"}
-              </Button>
-            </>
+            <Button
+              variant="primary"
+              onClick={handleContinue}
+              disabled={uploadedFiles.some((f) => f.status === "parsing")}
+              loading={isPending}
+              style={{ marginLeft: "auto" }}
+            >
+              {isPending ? "Starting..." : "Continue to Wizard"}
+            </Button>
           )}
         </div>
       </div>

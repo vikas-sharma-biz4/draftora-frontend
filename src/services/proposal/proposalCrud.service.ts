@@ -39,7 +39,6 @@ function parseTemplateType(raw: string | null): TemplateType {
     "predefined",
     "custom",
     "scratch",
-    "recreate",
     "mvp",
     "poc",
     "design",
@@ -104,11 +103,6 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
     web_references: data.webReferences,
     selected_document_ids: data.selectedDocumentIds || [],
   };
-
-  // Recreate mode: pass original section contents for per-section rewrite prompts
-  if (data.templateType === "recreate" && data.originalSectionContents) {
-    proposalPayload["original_section_contents"] = data.originalSectionContents;
-  }
 
   formData.append("proposal_data", JSON.stringify(proposalPayload));
 

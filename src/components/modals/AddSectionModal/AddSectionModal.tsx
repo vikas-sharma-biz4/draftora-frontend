@@ -169,25 +169,13 @@ export default function AddSectionModal({
 
       <div className={styles.modalFooter}>
         <Button
-          variant="secondary"
-          onClick={handleClose}
-          disabled={isGenerating}
-          className={styles.cancelButton}
-        >
-          Cancel
-        </Button>
-        <Button
           variant="primary"
           onClick={() => void handleSubmit()}
           loading={isGenerating}
           disabled={!sectionName.trim()}
           className={styles.saveButton}
         >
-          {isGenerating ? (
-            "Adding\u2026"
-          ) : (
-            "Add Section"
-          )}
+          {isGenerating ? "Adding\u2026" : "Add Section"}
         </Button>
       </div>
     </BaseModal>
