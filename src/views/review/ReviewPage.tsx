@@ -395,11 +395,7 @@ export default function ReviewPage(): JSX.Element {
     setShowKnowledgeBaseModal(false);
   }
 
-  function handleSaveStyleVoice(data: {
-    tone: ToneOption;
-    lengthPreference: LengthOption;
-    language: string;
-  }): void {
+  function handleSaveStyleVoice(data: { tone: ToneOption; lengthPreference: LengthOption }): void {
     updateProposalData(data);
     setShowStyleVoiceModal(false);
   }
@@ -567,11 +563,7 @@ export default function ReviewPage(): JSX.Element {
   );
   const currentTemplateName =
     currentTemplate?.name ||
-    (proposalData.templateType === "scratch"
-      ? "Start From Scratch"
-      : proposalData.templateType === "recreate"
-        ? "Recreate Template"
-        : "Custom Template");
+    (proposalData.templateType === "scratch" ? "Start From Scratch" : "Custom Template");
 
   return (
     <PageLayout noPadding>
@@ -772,7 +764,6 @@ export default function ReviewPage(): JSX.Element {
         <StyleVoiceEditorModal
           tone={proposalData.tone}
           lengthPreference={proposalData.lengthPreference}
-          language={proposalData.language}
           onClose={() => setShowStyleVoiceModal(false)}
           onSave={handleSaveStyleVoice}
         />

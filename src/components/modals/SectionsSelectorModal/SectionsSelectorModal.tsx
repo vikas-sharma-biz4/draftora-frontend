@@ -35,6 +35,7 @@ const SECTION_CATEGORIES: Record<string, { label: string; sections: string[] }> 
     sections: [
       "high_level_scope",
       "scope_of_work",
+      "poc_features_list",
       "high_level_feature_list",
       "non_functional_requirements",
       "proposed_technology_stack",
@@ -213,7 +214,13 @@ export default function SectionsSelectorModal({
       })
     );
 
-    onSave(Array.from(finalSelected), newCustomSections.length > 0 ? newCustomSections : undefined);
+    const allSelected = Array.from(finalSelected);
+    const nonStaticSelected = allSelected.filter((s) => !STATIC_SECTIONS_GROUP.includes(s));
+    const staticSelected = allSelected.filter((s) => STATIC_SECTIONS_GROUP.includes(s));
+    onSave(
+      [...nonStaticSelected, ...staticSelected],
+      newCustomSections.length > 0 ? newCustomSections : undefined
+    );
     toast.success(`${finalSelected.size} section(s) selected`);
   }
 

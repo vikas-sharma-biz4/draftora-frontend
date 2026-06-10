@@ -32,11 +32,7 @@ const TemplateSelectionModal = dynamic(
   }
 );
 
-const RecreateTemplateModal = dynamic(() => import("@/components/modals/RecreateTemplateModal"), {
-  ssr: false,
-});
-
-type SelectionMode = "template" | "scratch" | "recreate";
+type SelectionMode = "template" | "scratch";
 
 export default function HomePage(): JSX.Element {
   const title = useProposalTitle();
@@ -64,7 +60,6 @@ export default function HomePage(): JSX.Element {
   const [selectionMode, setSelectionMode] = useState<SelectionMode | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
-  const [showRecreateModal, setShowRecreateModal] = useState<boolean>(false);
   const { clients: preloadedClients, refetch: refetchClients } = useClients({ autoFetch: false });
   const hasFetchedClients = useRef(false);
 
@@ -98,7 +93,6 @@ export default function HomePage(): JSX.Element {
   }
 
   const isScratchSelected = selectionMode === "scratch";
-  const isRecreateSelected = selectionMode === "recreate";
 
   return (
     <PageLayout noPadding>
@@ -182,48 +176,7 @@ export default function HomePage(): JSX.Element {
             <div className="tmpl-desc">{SPECIAL_CARDS.START_FROM_SCRATCH.description}</div>
           </div>
         </article>
-
-        <article
-          className={`tmpl-card tmpl-recreate${isRecreateSelected ? " tmpl-selected" : ""}`}
-          onClick={() => {
-            setSelectionMode("recreate");
-            setShowRecreateModal(true);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              setSelectionMode("recreate");
-              setShowRecreateModal(true);
-            }
-          }}
-          aria-label="Recreate an existing document with new context"
-        >
-          <div className="tmpl-preview tmpl-preview-gradient-recreate">
-            <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
-              <div className="tmpl-preview-line" />
-              <div className="tmpl-preview-line" />
-              <div className="tmpl-preview-line" />
-              <div className="tmpl-preview-line" />
-            </div>
-            <span className="tmpl-preview-icon" aria-hidden="true">
-              {SPECIAL_CARDS.RECREATE_TEMPLATE.name}
-            </span>
-          </div>
-          <div className="tmpl-body">
-            <div className="tmpl-desc">{SPECIAL_CARDS.RECREATE_TEMPLATE.description}</div>
-          </div>
-        </article>
       </div>
-
-      {showRecreateModal && (
-        <RecreateTemplateModal
-          onClose={() => {
-            setShowRecreateModal(false);
-            setSelectionMode(null);
-          }}
-        />
-      )}
 
       {showTemplateModal && (selectedTemplateId || selectionMode === "scratch") && (
         <TemplateSelectionModal

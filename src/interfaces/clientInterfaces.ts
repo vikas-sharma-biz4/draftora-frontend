@@ -9,7 +9,6 @@ export interface ProposalHistoryItem {
 
 export interface NewClientFormData {
   clientName: string;
-  industry: string;
   pipelineStage: string;
   primaryContactName: string;
   primaryContactEmail: string;
@@ -46,7 +45,7 @@ export interface ClientWithDocuments extends Client {
 
 export interface CreateClientRequest {
   name: string;
-  industry: string;
+  industry?: string;
   notes?: string;
 }
 

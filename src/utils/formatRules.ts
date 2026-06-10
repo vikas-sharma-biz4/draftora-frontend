@@ -75,11 +75,6 @@ const TEMPLATE_FORMAT_RULES: Partial<Record<TemplateType, string>> = {
 - Determine optimal format based on section purpose
 - Use appropriate structure for the content type
 - Follow general best practices`,
-  recreate: `For Recreate Mode:
-- Match the format of the original document
-- Preserve structure and formatting
-- Use tables, bullets, or paragraphs as in the original
-- Maintain consistency with source material`,
 };
 
 /**
@@ -87,24 +82,27 @@ const TEMPLATE_FORMAT_RULES: Partial<Record<TemplateType, string>> = {
  * These provide additional guidance for specific section types.
  */
 const SECTION_FORMAT_HINTS: Record<string, string> = {
-  "timeline": "Use table format with columns for phase, duration, deliverables, and dependencies.",
-  "milestone": "Use table format with columns for milestone, date, description, and status.",
-  "budget": "Use table format with columns for item, cost, quantity, and total.",
-  "pricing": "Use table format with columns for service/feature, pricing tier, and cost.",
-  "team": "Use table format with columns for role, name, experience, and responsibilities.",
-  "technology": "Use table format comparing technologies with pros, cons, and use cases.",
-  "stack": "Use table format with columns for technology, purpose, and version.",
-  "requirement": "Use table format with columns for ID, requirement, priority, and acceptance criteria.",
-  "deliverable": "Use table format with columns for deliverable, description, timeline, and acceptance criteria.",
-  "feature": "Use bullet points with clear descriptions and priorities.",
-  "benefit": "Use bullet points for clear, concise benefit statements.",
-  "risk": "Use table format with columns for risk, likelihood, impact, and mitigation.",
-  "architecture": "Use structured paragraphs with diagrams (if applicable) and component descriptions.",
-  "workflow": "Use step-by-step numbered list or diagram format.",
-  "process": "Use numbered list or flow diagram format.",
-  "api": "Use table format with columns for endpoint, method, description, and parameters.",
-  "database": "Use table format for schema descriptions and relationships.",
-  "integration": "Use table format with columns for system, integration type, and status.",
+  timeline: "Use table format with columns for phase, duration, deliverables, and dependencies.",
+  milestone: "Use table format with columns for milestone, date, description, and status.",
+  budget: "Use table format with columns for item, cost, quantity, and total.",
+  pricing: "Use table format with columns for service/feature, pricing tier, and cost.",
+  team: "Use table format with columns for role, name, experience, and responsibilities.",
+  technology: "Use table format comparing technologies with pros, cons, and use cases.",
+  stack: "Use table format with columns for technology, purpose, and version.",
+  requirement:
+    "Use table format with columns for ID, requirement, priority, and acceptance criteria.",
+  deliverable:
+    "Use table format with columns for deliverable, description, timeline, and acceptance criteria.",
+  feature: "Use bullet points with clear descriptions and priorities.",
+  benefit: "Use bullet points for clear, concise benefit statements.",
+  risk: "Use table format with columns for risk, likelihood, impact, and mitigation.",
+  architecture:
+    "Use structured paragraphs with diagrams (if applicable) and component descriptions.",
+  workflow: "Use step-by-step numbered list or diagram format.",
+  process: "Use numbered list or flow diagram format.",
+  api: "Use table format with columns for endpoint, method, description, and parameters.",
+  database: "Use table format for schema descriptions and relationships.",
+  integration: "Use table format with columns for system, integration type, and status.",
 };
 
 /**

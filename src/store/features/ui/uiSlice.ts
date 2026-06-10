@@ -67,8 +67,8 @@ export const useUIStore = create<UIState>()(
     {
       name: "draftora-ui",
       storage: createJSONStorage(() => localStorage),
-      // Only persist sidebar state — loading and modal state is always ephemeral
-      partialize: (state) => ({ sidebarOpen: state.sidebarOpen }),
+      // Sidebar state is not persisted — always opens expanded on page load
+      partialize: () => ({}),
     }
   )
 );

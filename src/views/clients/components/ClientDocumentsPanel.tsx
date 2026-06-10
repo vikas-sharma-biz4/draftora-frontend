@@ -42,12 +42,8 @@ export default function ClientDocumentsPanel({
         </div>
         <div className={styles.headerActions}>
           {filteredDocuments.length > 0 && (
-            <button
-              className={styles.deleteAllBtn}
-              onClick={handleDeleteAllDocuments}
-              title="Delete all documents"
-            >
-              <X size={18} />
+            <button className={styles.deleteAllBtn} onClick={handleDeleteAllDocuments}>
+              Delete All
             </button>
           )}
           <button

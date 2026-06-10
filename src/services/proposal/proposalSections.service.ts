@@ -4,6 +4,7 @@
  * Add, remove, reorder, update, and regenerate individual sections.
  */
 
+import { REGENERATE_SECTION_TIMEOUT_MS } from "@/config/config";
 import { http } from "@/config/httpClient";
 
 interface RegenerateResponse {
@@ -24,10 +25,14 @@ export async function regenerateSection(
   sectionKey: string,
   instructions?: string
 ): Promise<string> {
-  const data = await http.post<RegenerateResponse>(`/proposals/${id}/regenerate`, {
-    section_key: sectionKey,
-    additional_instructions: instructions ?? null,
-  });
+  const data = await http.post<RegenerateResponse>(
+    `/proposals/${id}/regenerate`,
+    {
+      section_key: sectionKey,
+      additional_instructions: instructions ?? null,
+    },
+    { requestTimeout: REGENERATE_SECTION_TIMEOUT_MS }
+  );
   return data.content;
 }
 
