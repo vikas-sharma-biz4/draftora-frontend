@@ -125,12 +125,6 @@ export default function HomePage(): JSX.Element {
               }}
               aria-pressed={isSelected}
             >
-              {isSelected && (
-                <div className="tmpl-selected-badge" aria-hidden="true">
-                  ✓
-                </div>
-              )}
-
               <div className={`tmpl-preview ${template.gradientClass}`}>
                 <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
                   <div className="tmpl-preview-line" />
@@ -173,11 +167,6 @@ export default function HomePage(): JSX.Element {
           }}
           aria-pressed={isScratchSelected}
         >
-          {isScratchSelected && (
-            <div className="tmpl-selected-badge" aria-hidden="true">
-              ✓
-            </div>
-          )}
           <div className="tmpl-preview tmpl-preview-gradient-scratch">
             <div className={`tmpl-preview-lines ${styles.previewLines}`} aria-hidden="true">
               <div className="tmpl-preview-line" />

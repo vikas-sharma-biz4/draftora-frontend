@@ -1,32 +1,26 @@
 // ─── Tone grid ────────────────────────────────────────────────────────────────
 .tone-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 
-  @media (min-width: 1400px) {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  @media (max-width: 900px) {
+  @media (max-width: 700px) {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  @media (max-width: 500px) {
-    grid-template-columns: 1fr;
   }
 }
 
 // ─── Tone card ────────────────────────────────────────────────────────────────
 .tone-card {
   border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.15s;
   background: var(--color-white);
   text-align: left;
+  // Ensures all cards in the grid row share identical dimensions
+  align-self: stretch;
+  min-height: 54px;
 }
 
 .tone-card:hover {
@@ -40,8 +34,8 @@
 }
 
 .tone-card-icon {
-  font-size: 18px;
-  margin-bottom: 10px;
+  font-size: 14px;
+  margin-bottom: 4px;
   color: var(--color-text-muted);
   line-height: 1;
 }
@@ -51,10 +45,10 @@
 }
 
 .tone-card-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-text);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -74,6 +68,7 @@
 // ─── Length selector ──────────────────────────────────────────────────────────
 .length-options {
   display: flex;
+  flex-direction: column;
   gap: 0;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -81,36 +76,87 @@
 }
 
 .length-option {
-  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
   cursor: pointer;
   background: var(--color-white);
-  transition: all 0.15s;
+  min-height: 56px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .length-option:hover:not(.selected) {
   border-color: var(--color-primary-medium);
-  background: var(--color-primary-light);
+  background: var(--color-interactive-hover);
 }
 
 .length-option.selected {
   border-color: var(--color-primary);
   background: var(--color-primary-light);
+  box-shadow: 0 0 0 3px rgba(55, 48, 163, 0.08);
+}
+
+.length-option-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .length-option-label {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.length-option.selected .length-option-label {
+  color: var(--color-primary-hover);
 }
 
 .length-option-desc {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--color-text-muted);
   margin-top: 2px;
   display: block;
   line-height: 1.4;
+}
+
+// ─── Length depth indicator — bar segments showing relative depth ─────────────
+.length-depth-indicator {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+  align-items: flex-end;
+}
+
+.length-depth-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--color-border-dark);
+  transition: background 0.15s;
+
+  &:nth-child(1) {
+    height: 10px;
+  }
+  &:nth-child(2) {
+    height: 15px;
+  }
+  &:nth-child(3) {
+    height: 20px;
+  }
+
+  &.active {
+    background: var(--color-primary-medium);
+  }
+}
+
+.length-option.selected .length-depth-bar.active {
+  background: var(--color-primary);
 }
 
 // ─── Length display badge ─────────────────────────────────────────────────────

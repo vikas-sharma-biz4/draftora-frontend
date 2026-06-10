@@ -1,5 +1,7 @@
 import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
+export const SIDEBAR_LOGO_SRC = "/images/draftora-logo%20(1)%20D.png";
+
 export const AI_MODEL_OPTIONS = [
   {
     value: "gpt-5.4",
@@ -141,6 +143,13 @@ export const SECTION_DISPLAY_NAMES: Record<string, string> = {
   client_dependencies: "Client Dependencies",
   communication_client_cadence: "Communication & Client Cadence",
   our_approach_methodology: "Our Approach & Methodology",
+  poc_feature_list: "Feature List",
+  poc_milestone_timeline: "Milestone and Timeline Estimation",
+  future_vision: "Future Vision",
+  scope_of_work: "Scope of Work",
+  estimated_timeline: "Estimated Timeline",
+  deliverables: "Deliverables",
+  our_proven_approach: "Our Proven Approach for Your AI-Powered Legal Platform",
 };
 
 export const PROPOSAL_TEMPLATES = [
@@ -206,13 +215,11 @@ export const PROPOSAL_TEMPLATES = [
     sections: [
       "introduction",
       "purpose",
-      "high_level_scope",
-      "poc_feature_list",
-      "proposed_technology_stack",
-      "poc_milestone_timeline",
-      "client_dependencies",
-      "future_vision",
-      "our_approach_methodology",
+      "scope_of_work",
+      "estimated_timeline",
+      "deliverables",
+      "our_proven_approach",
+      "similar_projects",
     ],
     gradientClass: "tmpl-preview-gradient-2",
     icon: "⊞",
@@ -458,13 +465,11 @@ export const TEMPLATE_TOCS = {
   poc: [
     { key: "introduction", label: "Introduction" },
     { key: "purpose", label: "Purpose" },
-    { key: "high_level_scope", label: "High Level Scope" },
-    { key: "poc_feature_list", label: "Feature List" },
-    { key: "proposed_technology_stack", label: "Proposed Technology Stack" },
-    { key: "poc_milestone_timeline", label: "Milestone Timeline" },
-    { key: "client_dependencies", label: "Client Dependencies" },
-    { key: "future_vision", label: "Future Vision" },
-    { key: "our_approach_methodology", label: "Our Approach & Methodology" },
+    { key: "scope_of_work", label: "Scope of Work" },
+    { key: "estimated_timeline", label: "Estimated Timeline" },
+    { key: "deliverables", label: "Deliverables" },
+    { key: "our_proven_approach", label: "Our Proven Approach for Your AI-Powered Legal Platform" },
+    { key: "similar_projects", label: "Similar Projects Developed by Biz4Group Experts" },
   ],
   full: [
     { key: "introduction", label: "Introduction" },

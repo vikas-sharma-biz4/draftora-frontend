@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, Children, isValidElement, type ReactElement } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
@@ -54,7 +54,58 @@ const MD_COMPONENTS: Components = {
   h1: ({ children }) => <h1 className="ai-md-h1">{children}</h1>,
   h2: ({ children }) => <h2 className="ai-md-h2">{children}</h2>,
   h3: ({ children }) => <h3 className="ai-md-h3">{children}</h3>,
-  p: ({ children }) => <p className="ai-md-p">{children}</p>,
+  p: ({ children }) => {
+    const childArray = Children.toArray(children);
+    const first = childArray[0];
+
+    if (typeof first === "string") {
+      const trimmed = first.trimStart();
+
+      // ==Note:== pattern → full yellow-highlight paragraph
+      if (trimmed.startsWith("==Note:==")) {
+        const text = trimmed.replace(/^==Note:==\s*/, "");
+        return (
+          <p className="ai-md-p ai-note-yellow">
+            <strong className="ai-note-heading">Note:</strong>
+            {text ? ` ${text}` : ""}
+            {childArray.slice(1)}
+          </p>
+        );
+      }
+
+      // ==Additional Costs for APIs:== pattern → inline yellow label
+      if (trimmed.startsWith("==Additional Costs for APIs:==")) {
+        const text = trimmed.replace(/^==Additional Costs for APIs:==\s*/, "");
+        return (
+          <p className="ai-md-p">
+            <mark className="ai-note-label">
+              <strong>Additional Costs for APIs:</strong>
+            </mark>
+            {text ? ` ${text}` : ""}
+            {childArray.slice(1)}
+          </p>
+        );
+      }
+    }
+
+    // Design cost line — bold or plain paragraph with $200/screen
+    const fullText = childArray
+      .map((c) => {
+        if (typeof c === "string") return c;
+        if (isValidElement(c)) {
+          const el = c as ReactElement<{ children?: unknown }>;
+          return typeof el.props.children === "string" ? el.props.children : "";
+        }
+        return "";
+      })
+      .join("");
+
+    if (fullText.includes("$200/screen") || fullText.toLowerCase().includes("cost for design is")) {
+      return <p className="ai-md-p ai-note-dark">{children}</p>;
+    }
+
+    return <p className="ai-md-p">{children}</p>;
+  },
   strong: ({ children }) => <strong className="ai-md-strong">{children}</strong>,
   em: ({ children }) => <em className="ai-md-em">{children}</em>,
   ul: ({ children }) => <ul className="ai-md-ul">{children}</ul>,

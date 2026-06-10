@@ -112,7 +112,11 @@ export function parseContentBlocks(content: string): ContentBlock[] {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
-      flushBullets();
+      // Only flush unordered (bullet) lists on blank lines.
+      // Ordered lists continue across blank lines so AI-generated numbered lists
+      // with blank lines between items are not split into separate <ol> elements
+      // (which would reset the counter and show 1, 1, 1 instead of 1, 2, 3).
+      if (!pendingOrdered) flushBullets();
       continue;
     }
 
@@ -338,7 +342,9 @@ export function plainTextToHtml(content: string): string {
 
     if (!trimmed) {
       flushTable();
-      flushBullets();
+      // Only flush unordered lists on blank lines — ordered lists continue across
+      // blank lines so numbered items separated by blank lines stay in one <ol>.
+      if (!isOrdered) flushBullets();
       continue;
     }
 
