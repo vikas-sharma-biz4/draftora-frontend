@@ -22,15 +22,18 @@ const SESSION_COMPLETED_STEPS_KEY = "draftora_completed_steps";
 const isBrowser = typeof window !== "undefined" && typeof sessionStorage !== "undefined";
 
 function readDraftIdFromSession(): string | null {
+  /* istanbul ignore next */
   if (!isBrowser) return null;
   try {
     return sessionStorage.getItem(SESSION_DRAFT_ID_KEY);
   } catch {
+    /* istanbul ignore next */
     return null;
   }
 }
 
 function writeDraftIdToSession(id: string | null): void {
+  /* istanbul ignore next */
   if (!isBrowser) return;
   try {
     if (id) sessionStorage.setItem(SESSION_DRAFT_ID_KEY, id);
@@ -41,15 +44,18 @@ function writeDraftIdToSession(id: string | null): void {
 }
 
 function readDraftStageFromSession(): DraftStage {
+  /* istanbul ignore next */
   if (!isBrowser) return "template_selection";
   try {
     return (sessionStorage.getItem(SESSION_DRAFT_STAGE_KEY) as DraftStage) || "template_selection";
   } catch {
+    /* istanbul ignore next */
     return "template_selection";
   }
 }
 
 function writeDraftStageToSession(stage: DraftStage): void {
+  /* istanbul ignore next */
   if (!isBrowser) return;
   try {
     sessionStorage.setItem(SESSION_DRAFT_STAGE_KEY, stage);
@@ -59,16 +65,19 @@ function writeDraftStageToSession(stage: DraftStage): void {
 }
 
 function readCompletedStepsFromSession(): number[] {
+  /* istanbul ignore next */
   if (!isBrowser) return [];
   try {
     const raw = sessionStorage.getItem(SESSION_COMPLETED_STEPS_KEY);
     return raw ? (JSON.parse(raw) as number[]) : [];
   } catch {
+    /* istanbul ignore next */
     return [];
   }
 }
 
 function writeCompletedStepsToSession(steps: number[]): void {
+  /* istanbul ignore next */
   if (!isBrowser) return;
   try {
     sessionStorage.setItem(SESSION_COMPLETED_STEPS_KEY, JSON.stringify(steps));

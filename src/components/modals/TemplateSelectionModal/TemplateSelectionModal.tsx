@@ -8,6 +8,7 @@ import Button from "@/components/common/Button";
 import { Input, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";
 import styles from "./TemplateSelectionModal.module.scss";
+import DocumentViewerModal from "@/components/modals/DocumentViewerModal";
 
 import { useTemplateModal } from "./useTemplateModal";
 import TemplateGrid from "./TemplateGrid";
@@ -45,6 +46,8 @@ export default function TemplateSelectionModal(
     initialContextNotes,
     uploadedFiles,
     viewingDocId,
+    viewingDocModal,
+    closeViewingDocModal,
     modalView,
     showTemplateSelector,
     isPending,
@@ -96,7 +99,7 @@ export default function TemplateSelectionModal(
       </>
     );
 
-  return createPortal(
+  const portal = createPortal(
     <div className={styles.modalOverlay}>
       <div
         className={styles.modalContent}
@@ -246,5 +249,19 @@ export default function TemplateSelectionModal(
       </div>
     </div>,
     document.body
+  );
+
+  return (
+    <>
+      {portal}
+      {viewingDocModal && (
+        <DocumentViewerModal
+          url={viewingDocModal.url}
+          fileName={viewingDocModal.fileName}
+          fileType={viewingDocModal.fileType}
+          onClose={closeViewingDocModal}
+        />
+      )}
+    </>
   );
 }

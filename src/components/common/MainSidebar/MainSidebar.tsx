@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { Home, Users, FileText, History, PanelLeft } from "lucide-react";
 
 import styles from "./MainSidebar.module.scss";
 import { MAIN_NAV_ITEMS, SIDEBAR_LOGO_SRC } from "@/constants";
+import { useIsTablet } from "@/hooks/useMediaQuery";
 import { useUIStore } from "@/store/features/ui/uiSlice";
 
 /** Maps nav item id → lucide icon */
@@ -19,9 +21,19 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
 export default function MainSidebar(): JSX.Element {
   const pathname = usePathname();
   const sidebarOpen = useUIStore((state) => state.sidebarOpen);
+  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
 
+  // True when viewport ≤ 1024px — sidebar behaves as an overlay drawer
+  const isOverlayMode = useIsTablet();
+
+  // Collapse when entering overlay mode (resize) or when navigating
+  useEffect(() => {
+    if (isOverlayMode) setSidebarOpen(false);
+  }, [pathname, isOverlayMode, setSidebarOpen]);
+
   const collapsed = !sidebarOpen;
+  const showBackdrop = isOverlayMode && sidebarOpen;
 
   function isActive(path: string): boolean {
     if (path === "/") return pathname === "/";
@@ -30,6 +42,14 @@ export default function MainSidebar(): JSX.Element {
 
   return (
     <>
+      {showBackdrop && (
+        <div
+          className={styles.sidebarBackdrop}
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <aside className={styles.sidebar} data-collapsed={collapsed} aria-label="Main navigation">
         {/* ── Header: Logo (left) + Toggle (right) — hidden when collapsed ── */}
         <div className={styles.sidebarHeader}>
@@ -46,6 +66,7 @@ export default function MainSidebar(): JSX.Element {
             type="button"
             className={styles.sidebarToggle}
             onClick={toggleSidebar}
+            aria-expanded={sidebarOpen}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
@@ -55,12 +76,12 @@ export default function MainSidebar(): JSX.Element {
 
         {/* ── Navigation ─────────────────────────────────────────────────── */}
         <nav className={styles.sidebarNav}>
-          {/* Toggle as first nav item — only visible when collapsed so it
-              sits flush with the other icons, no separate header section */}
+          {/* Expand toggle — only visible when icon-only collapsed */}
           <button
             type="button"
             className={styles.sidebarToggleNav}
             onClick={toggleSidebar}
+            aria-expanded={sidebarOpen}
             aria-label="Expand sidebar"
             title="Expand sidebar"
           >

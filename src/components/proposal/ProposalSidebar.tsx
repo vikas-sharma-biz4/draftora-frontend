@@ -276,8 +276,22 @@ export default function ProposalSidebar({
     const activeItem = listRef.current.querySelector<HTMLElement>(
       ".proposal-sidebar-section-row.active"
     );
-    if (activeItem) {
-      activeItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!activeItem) return;
+
+    // Scroll only within the sidebar container — never scroll the main content area.
+    // Using scrollIntoView() would bubble up to .main-content and jump the page.
+    const sidebar = listRef.current.closest<HTMLElement>(".proposal-sidebar");
+    if (!sidebar) return;
+
+    const itemTop = activeItem.offsetTop;
+    const itemBottom = itemTop + activeItem.offsetHeight;
+    const viewTop = sidebar.scrollTop;
+    const viewBottom = viewTop + sidebar.clientHeight;
+
+    if (itemTop < viewTop) {
+      sidebar.scrollTo({ top: itemTop, behavior: "smooth" });
+    } else if (itemBottom > viewBottom) {
+      sidebar.scrollTo({ top: itemBottom - sidebar.clientHeight, behavior: "smooth" });
     }
   }, [activeSection]);
 

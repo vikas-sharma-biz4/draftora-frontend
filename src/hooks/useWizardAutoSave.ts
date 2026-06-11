@@ -23,6 +23,7 @@ import {
   useFilesMeta,
   useSelectedDocumentIds,
   useWebReferences,
+  useCustomSections,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
@@ -72,6 +73,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
   const filesMeta = useFilesMeta();
   const selectedDocumentIds = useSelectedDocumentIds();
   const webReferences = useWebReferences();
+  const customSections = useCustomSections();
 
   const currentStep = useCurrentStep();
   const maxStepReached = useMaxStepReached();
@@ -252,6 +254,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
           description,
           selectedSections,
           sectionDisplayNames,
+          customSections,
           tone,
           lengthPreference,
           language,
@@ -348,6 +351,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
       description,
       selectedSections,
       sectionDisplayNames,
+      customSections,
       tone,
       lengthPreference,
       language,
@@ -426,6 +430,7 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
               description,
               selectedSections,
               sectionDisplayNames,
+              customSections,
               tone,
               lengthPreference,
               language,
@@ -435,7 +440,6 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
               files: [],
               filesMeta,
               selectedDocumentIds,
-              customSections: [],
               contextualInstructions: "",
               webReferences,
             },

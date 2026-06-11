@@ -8,6 +8,11 @@
 
 import "@testing-library/jest-dom";
 
+// structuredClone polyfill — available in Node 17+ but not exposed by jsdom
+if (typeof globalThis.structuredClone === "undefined") {
+  globalThis.structuredClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
+}
+
 const originalConsoleError = console.error;
 
 beforeAll(() => {

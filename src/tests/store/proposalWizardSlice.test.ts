@@ -19,13 +19,33 @@ import {
   useProposalWizardStore,
   useProposalTitle,
   useClientName,
+  useClientId,
+  useTemplateType,
+  useTemplateId,
+  useProposalDescription,
+  useContextualInstructions,
+  useSelectedSections,
+  useSectionDisplayNames,
+  useTone,
+  useLengthPreference,
+  useLanguage,
+  useAiModel,
+  useApprovalStatus,
+  useFilesMeta,
+  useWebReferences,
+  useSelectedDocumentIds,
   useCurrentStep,
   useMaxStepReached,
   useIsGenerating,
   useGeneratedProposalId,
   useCurrentProposalId,
+  useEditMode,
+  useHydrated,
+  useShouldStartBackgroundFetch,
+  usePrefetchedRecommendations,
   useRecommendationsFetchStatus,
   useRecommendationsError,
+  useWizardActions,
 } from "@/store/features/wizard/proposalWizardSlice";
 
 // ---------------------------------------------------------------------------
@@ -428,5 +448,246 @@ describe("proposalWizardSlice — granular selector hooks", () => {
   it("useRecommendationsError returns null initially", () => {
     const { result } = renderHook(() => useRecommendationsError());
     expect(result.current).toBeNull();
+  });
+
+  it("useClientId returns clientId from proposalData", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ clientId: 42 });
+    });
+    const { result } = renderHook(() => useClientId());
+    expect(result.current).toBe(42);
+  });
+
+  it("useTemplateType returns templateType", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ templateType: "predefined" });
+    });
+    const { result } = renderHook(() => useTemplateType());
+    expect(result.current).toBe("predefined");
+  });
+
+  it("useTemplateId returns templateId", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ templateId: "tmpl-123" });
+    });
+    const { result } = renderHook(() => useTemplateId());
+    expect(result.current).toBe("tmpl-123");
+  });
+
+  it("useProposalDescription returns description", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ description: "A great proposal" });
+    });
+    const { result } = renderHook(() => useProposalDescription());
+    expect(result.current).toBe("A great proposal");
+  });
+
+  it("useContextualInstructions returns contextualInstructions", () => {
+    act(() => {
+      useProposalWizardStore
+        .getState()
+        .updateProposalData({ contextualInstructions: "Focus on ROI" });
+    });
+    const { result } = renderHook(() => useContextualInstructions());
+    expect(result.current).toBe("Focus on ROI");
+  });
+
+  it("useSelectedSections returns the sections array", () => {
+    act(() => {
+      useProposalWizardStore
+        .getState()
+        .updateProposalData({ selectedSections: ["exec", "timeline"] });
+    });
+    const { result } = renderHook(() => useSelectedSections());
+    expect(result.current).toEqual(["exec", "timeline"]);
+  });
+
+  it("useSectionDisplayNames returns the display names map", () => {
+    act(() => {
+      useProposalWizardStore
+        .getState()
+        .updateProposalData({ sectionDisplayNames: { exec: "Executive Summary" } });
+    });
+    const { result } = renderHook(() => useSectionDisplayNames());
+    expect(result.current).toEqual({ exec: "Executive Summary" });
+  });
+
+  it("useTone returns tone", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ tone: "creative" });
+    });
+    const { result } = renderHook(() => useTone());
+    expect(result.current).toBe("creative");
+  });
+
+  it("useLengthPreference returns lengthPreference", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ lengthPreference: "concise" });
+    });
+    const { result } = renderHook(() => useLengthPreference());
+    expect(result.current).toBe("concise");
+  });
+
+  it("useLanguage returns language", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ language: "French" });
+    });
+    const { result } = renderHook(() => useLanguage());
+    expect(result.current).toBe("French");
+  });
+
+  it("useAiModel returns aiModel", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ aiModel: "gpt-4o" });
+    });
+    const { result } = renderHook(() => useAiModel());
+    expect(result.current).toBe("gpt-4o");
+  });
+
+  it("useApprovalStatus returns approvalStatus", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ approvalStatus: "approved" });
+    });
+    const { result } = renderHook(() => useApprovalStatus());
+    expect(result.current).toBe("approved");
+  });
+
+  it("useFilesMeta returns filesMeta array", () => {
+    act(() => {
+      useProposalWizardStore
+        .getState()
+        .updateProposalData({
+          filesMeta: [{ name: "doc.pdf", size: 1024, type: "application/pdf" }],
+        });
+    });
+    const { result } = renderHook(() => useFilesMeta());
+    expect(result.current).toHaveLength(1);
+  });
+
+  it("useWebReferences returns webReferences", () => {
+    act(() => {
+      useProposalWizardStore
+        .getState()
+        .updateProposalData({ webReferences: ["https://example.com"] });
+    });
+    const { result } = renderHook(() => useWebReferences());
+    expect(result.current).toEqual(["https://example.com"]);
+  });
+
+  it("useSelectedDocumentIds returns selectedDocumentIds", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ selectedDocumentIds: [1, 2, 3] });
+    });
+    const { result } = renderHook(() => useSelectedDocumentIds());
+    expect(result.current).toEqual([1, 2, 3]);
+  });
+
+  it("useEditMode returns editMode", () => {
+    act(() => {
+      useProposalWizardStore.getState().setEditMode(true);
+    });
+    const { result } = renderHook(() => useEditMode());
+    expect(result.current).toBe(true);
+  });
+
+  it("useHydrated returns hydrated state", () => {
+    act(() => {
+      useProposalWizardStore.getState().setHydrated(true);
+    });
+    const { result } = renderHook(() => useHydrated());
+    expect(result.current).toBe(true);
+  });
+
+  it("useShouldStartBackgroundFetch returns the flag", () => {
+    act(() => {
+      useProposalWizardStore.getState().setShouldStartBackgroundFetch(true);
+    });
+    const { result } = renderHook(() => useShouldStartBackgroundFetch());
+    expect(result.current).toBe(true);
+  });
+
+  it("usePrefetchedRecommendations returns null initially", () => {
+    const { result } = renderHook(() => usePrefetchedRecommendations());
+    expect(result.current).toBeNull();
+  });
+
+  it("useWizardActions returns all action functions", () => {
+    const { result } = renderHook(() => useWizardActions());
+    expect(typeof result.current.updateProposalData).toBe("function");
+    expect(typeof result.current.setCurrentStep).toBe("function");
+    expect(typeof result.current.resetProposal).toBe("function");
+    expect(typeof result.current.prefetchRecommendations).toBe("function");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setHydrated / setShouldStartBackgroundFetch
+// ---------------------------------------------------------------------------
+
+describe("proposalWizardSlice — additional boolean actions", () => {
+  it("setHydrated sets hydrated to true", () => {
+    act(() => {
+      useProposalWizardStore.getState().setHydrated(true);
+    });
+    expect(useProposalWizardStore.getState().hydrated).toBe(true);
+  });
+
+  it("setHydrated sets hydrated to false", () => {
+    act(() => {
+      useProposalWizardStore.getState().setHydrated(false);
+    });
+    expect(useProposalWizardStore.getState().hydrated).toBe(false);
+  });
+
+  it("setShouldStartBackgroundFetch sets the flag", () => {
+    act(() => {
+      useProposalWizardStore.getState().setShouldStartBackgroundFetch(true);
+    });
+    expect(useProposalWizardStore.getState().shouldStartBackgroundFetch).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prefetchRecommendations — non-Error rejection branch
+// ---------------------------------------------------------------------------
+
+describe("proposalWizardSlice — prefetchRecommendations non-Error rejection", () => {
+  it("stores generic error message when thrown value is not an Error instance", async () => {
+    mockGetSectionRecommendations.mockRejectedValue("plain string error");
+
+    await act(async () => {
+      await useProposalWizardStore.getState().prefetchRecommendations();
+    });
+
+    const { recommendationsFetchStatus, recommendationsError } = useProposalWizardStore.getState();
+    expect(recommendationsFetchStatus).toBe("error");
+    expect(recommendationsError).toBe("Failed to fetch recommendations");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prefetchRecommendations — section key not in SECTION_DISPLAY_NAMES
+// ---------------------------------------------------------------------------
+
+describe("proposalWizardSlice — prefetchRecommendations with unknown section key", () => {
+  it("falls back to auto-generated name for section keys not in SECTION_DISPLAY_NAMES", async () => {
+    mockGetSectionRecommendations.mockResolvedValue([]);
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({
+        selectedSections: ["unknown_section_xyz"],
+      });
+    });
+
+    await act(async () => {
+      await useProposalWizardStore.getState().prefetchRecommendations();
+    });
+
+    expect(mockGetSectionRecommendations).toHaveBeenCalledWith(
+      expect.objectContaining({
+        existingSectionsWithRules: expect.arrayContaining([
+          expect.objectContaining({ sectionKey: "unknown_section_xyz" }),
+        ]),
+      })
+    );
   });
 });

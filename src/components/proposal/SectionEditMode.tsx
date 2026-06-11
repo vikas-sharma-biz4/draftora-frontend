@@ -7,11 +7,7 @@ import { type RegenerateSelectionResult } from "@/services/proposal/proposalSect
 
 const RichEditor = dynamic(() => import("@/components/common/RichEditor"), {
   ssr: false,
-  loading: () => (
-    <div className="rte-content text-light">
-      Loading editor…
-    </div>
-  ),
+  loading: () => <div className="rte-content text-light">Loading editor…</div>,
 });
 
 interface RegenerateSelectionParams {
@@ -26,13 +22,15 @@ interface SectionEditModeProps {
   content: string;
   onContentChange: (key: string, html: string) => void;
   onSave: (key: string, content: string) => Promise<void>;
-  onRegenerateSelection?: (params: RegenerateSelectionParams) => Promise<RegenerateSelectionResult | null>;
+  onRegenerateSelection?: (
+    params: RegenerateSelectionParams
+  ) => Promise<RegenerateSelectionResult | null>;
   placeholder?: string;
 }
 
 /**
  * Always-editable component for proposal section content.
- * 
+ *
  * FEATURES:
  * - Always rendered (no view/edit mode switching)
  * - Auto-saves with debouncing
@@ -84,7 +82,10 @@ const SectionEditMode = memo(function SectionEditMode({
   );
 
   const editorContent = useMemo(() => {
-    if (isHtmlContent(localContent)) {
+    // Markdown tables that contain inline HTML (<br> in cells) must still go through
+    // plainTextToHtml — not be returned as-is. A content string starting with "|" is
+    // a markdown table regardless of whether it contains HTML tags like <br>.
+    if (isHtmlContent(localContent) && !localContent.trimStart().startsWith("|")) {
       return localContent;
     }
     return plainTextToHtml(localContent);

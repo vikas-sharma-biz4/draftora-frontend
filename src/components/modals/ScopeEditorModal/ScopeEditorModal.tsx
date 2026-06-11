@@ -17,7 +17,12 @@ interface ScopeEditorModalProps {
   clientId: number | null;
   description: string;
   onClose: () => void;
-  onSave: (data: { title: string; clientName: string; clientId: number | null; description: string }) => void;
+  onSave: (data: {
+    title: string;
+    clientName: string;
+    clientId: number | null;
+    description: string;
+  }) => void;
 }
 
 export default function ScopeEditorModal({
@@ -39,9 +44,7 @@ export default function ScopeEditorModal({
 
   const filteredClients = useMemo(() => {
     if (!clientSearchQuery.trim()) return clients;
-    return clients.filter((c) =>
-      c.name.toLowerCase().includes(clientSearchQuery.toLowerCase())
-    );
+    return clients.filter((c) => c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()));
   }, [clients, clientSearchQuery]);
 
   function handleClientSelect(id: number, name: string): void {
@@ -117,119 +120,118 @@ export default function ScopeEditorModal({
 
   return (
     <BaseModal isOpen={true} onClose={onClose} size="md" labelId="scope-modal-title">
-        <div className={styles.modalHeader}>
-          <h2 id="scope-modal-title" className={styles.modalTitle}>Edit Client Details</h2>
-          <Button
-            variant="ghost"
-            iconOnly
-            onClick={onClose}
-            aria-label="Close"
-            className={styles.closeButton}
-          >
-            <X size={20} />
-          </Button>
-        </div>
+      <div className={styles.modalHeader}>
+        <h2 id="scope-modal-title" className={styles.modalTitle}>
+          Edit Client Details
+        </h2>
+        <Button
+          variant="ghost"
+          iconOnly
+          onClick={onClose}
+          aria-label="Close"
+          className={styles.closeButton}
+        >
+          <X size={20} />
+        </Button>
+      </div>
 
-        <div className={styles.modalBody}>
-          <FormField label="Proposal Title *">
-            {(fieldProps) => (
+      <div className={styles.modalBody}>
+        <FormField label="Proposal Title *">
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter proposal title"
+              autoFocus
+            />
+          )}
+        </FormField>
+
+        <FormField label="Client Name *">
+          {(fieldProps) =>
+            isLoading ? (
+              <p className={styles.emptyText}>Loading clients...</p>
+            ) : clients.length === 0 ? (
               <Input
                 {...fieldProps}
                 type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter proposal title"
-                autoFocus
+                value={clientSearchQuery}
+                onChange={(e) => setClientSearchQuery(e.target.value)}
+                placeholder="Enter client name"
               />
-            )}
-          </FormField>
-
-          <FormField label="Client Name *">
-            {(fieldProps) => (
-              isLoading ? (
-                <p className={styles.emptyText}>Loading clients...</p>
-              ) : clients.length === 0 ? (
+            ) : (
+              <div className={styles.searchWrapper}>
                 <Input
                   {...fieldProps}
                   type="text"
+                  placeholder="Search for a client..."
                   value={clientSearchQuery}
-                  onChange={(e) => setClientSearchQuery(e.target.value)}
-                  placeholder="Enter client name"
+                  onChange={(e) => handleClientSearchChange(e.target.value)}
+                  onFocus={handleClientSearchFocus}
+                  onBlur={handleClientSearchBlur}
+                  onKeyDown={handleClientKeyDown}
                 />
-              ) : (
-                <div className={styles.searchWrapper}>
-                  <Input
-                    {...fieldProps}
-                    type="text"
-                    placeholder="Search for a client..."
-                    value={clientSearchQuery}
-                    onChange={(e) => handleClientSearchChange(e.target.value)}
-                    onFocus={handleClientSearchFocus}
-                    onBlur={handleClientSearchBlur}
-                    onKeyDown={handleClientKeyDown}
-                  />
 
-                  {showClientDropdown && filteredClients.length > 0 && (
-                    <div className={styles.clientDropdown}>
-                      {filteredClients.map((c, index) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          className={[
-                            styles.clientOption,
-                            selectedClientId === c.id ? styles.selectedOption : "",
-                            index === highlightedIndex ? styles.highlighted : "",
-                          ].join(" ")}
-                          onPointerDown={(e) => {
-                            e.preventDefault();
-                            handleClientSelect(c.id, c.name);
-                          }}
-                        >
-                          <div className={styles.clientOptionMain}>
-                            <span className={styles.clientOptionName}>{c.name}</span>
-                            <span className={styles.clientOptionIndustry}>{c.industry}</span>
-                          </div>
-                          <div className={styles.clientOptionMeta}>
-                            {c.documents?.length || 0} docs
-                          </div>
-                        </button>
-                      ))}
+                {showClientDropdown && filteredClients.length > 0 && (
+                  <div className={styles.clientDropdown}>
+                    {filteredClients.map((c, index) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={[
+                          styles.clientOption,
+                          selectedClientId === c.id ? styles.selectedOption : "",
+                          index === highlightedIndex ? styles.highlighted : "",
+                        ].join(" ")}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          handleClientSelect(c.id, c.name);
+                        }}
+                      >
+                        <div className={styles.clientOptionMain}>
+                          <span className={styles.clientOptionName}>{c.name}</span>
+                          <span className={styles.clientOptionIndustry}>{c.industry}</span>
+                        </div>
+                        <div className={styles.clientOptionMeta}>
+                          {c.documents?.length || 0} docs
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showClientDropdown && filteredClients.length === 0 && clientSearchQuery.trim() && (
+                  <div className={styles.clientDropdown}>
+                    <div className={styles.noResults}>
+                      No clients found matching &ldquo;{clientSearchQuery}&rdquo;
                     </div>
-                  )}
+                  </div>
+                )}
+              </div>
+            )
+          }
+        </FormField>
 
-                  {showClientDropdown && filteredClients.length === 0 && clientSearchQuery.trim() && (
-                    <div className={styles.clientDropdown}>
-                      <div className={styles.noResults}>
-                        No clients found matching &ldquo;{clientSearchQuery}&rdquo;
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-          </FormField>
+        <FormField label="Strategic Prompt Snippet">
+          {(fieldProps) => (
+            <Textarea
+              {...fieldProps}
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+              placeholder="Enter strategic context or instructions for the AI"
+              rows={4}
+            />
+          )}
+        </FormField>
+      </div>
 
-          <FormField label="Strategic Prompt Snippet">
-            {(fieldProps) => (
-              <Textarea
-                {...fieldProps}
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                placeholder="Enter strategic context or instructions for the AI"
-                rows={4}
-              />
-            )}
-          </FormField>
-        </div>
-
-        <div className={styles.modalFooter}>
-          <Button variant="secondary" onClick={onClose} className={styles.cancelButton}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleSave} className={styles.saveButton}>
-            Save Changes
-          </Button>
-        </div>
+      <div className={styles.modalFooter}>
+        <Button variant="primary" onClick={handleSave} className={styles.saveButton}>
+          Save Changes
+        </Button>
+      </div>
     </BaseModal>
   );
 }

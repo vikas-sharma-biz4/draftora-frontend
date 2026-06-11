@@ -10,7 +10,21 @@
  *   - snake_case API response correctly transformed to camelCase domain model
  */
 
-import { listClientsFullData } from "@/services/client.service";
+import {
+  listClientsFullData,
+  createClient,
+  listClients,
+  getClient,
+  updateClient,
+  deleteClient,
+  listClientsWithDocuments,
+  uploadDocument,
+  deleteDocument,
+  getDocumentViewUrl,
+  migrateDocumentsToS3,
+  restoreDocumentToS3,
+  invalidateClientsCache,
+} from "@/services/client.service";
 import { http } from "@/config/httpClient";
 import type { PaginatedApiResponse } from "@/config/httpClient";
 
@@ -37,6 +51,10 @@ jest.mock("@/config/httpClient", () => ({
   },
 }));
 
+const mockGet = http.get as jest.Mock;
+const mockPost = http.post as jest.Mock;
+const mockPatch = http.patch as jest.Mock;
+const mockDelete = http.delete as jest.Mock;
 const mockGetPaginated = http.getPaginated as jest.Mock;
 
 // ---------------------------------------------------------------------------
@@ -251,5 +269,178 @@ describe("listClientsFullData — error handling", () => {
 
     // Promise.all rejects as soon as any promise rejects
     await expect(listClientsFullData()).rejects.toThrow("Page 2 failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createClient
+// ---------------------------------------------------------------------------
+
+describe("createClient", () => {
+  it("posts to /clients and returns id and name", async () => {
+    mockPost.mockResolvedValue({ id: 10, name: "New Client" });
+    const result = await createClient({ name: "New Client", industry: "Tech", notes: null });
+    expect(mockPost).toHaveBeenCalledWith("/clients", {
+      name: "New Client",
+      industry: "Tech",
+      notes: null,
+    });
+    expect(result).toEqual({ id: 10, name: "New Client" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listClients
+// ---------------------------------------------------------------------------
+
+describe("listClients", () => {
+  it("gets /clients and transforms snake_case to camelCase", async () => {
+    mockGet.mockResolvedValue([makeRawClient(1)]);
+    const result = await listClients();
+    expect(mockGet).toHaveBeenCalledWith("/clients");
+    expect(result).toHaveLength(1);
+    expect(result[0].createdAt).toBe("2025-01-01T00:00:00Z");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getClient
+// ---------------------------------------------------------------------------
+
+describe("getClient", () => {
+  it("gets /clients/:id and returns client with documents", async () => {
+    const rawWithDocs = { ...makeRawClient(1), documents: [makeRawDocument(10, 1)] };
+    mockGet.mockResolvedValue(rawWithDocs);
+    const result = await getClient(1);
+    expect(result.id).toBe(1);
+    expect(result.documents).toHaveLength(1);
+    expect(result.documents[0].fileType).toBe("pdf");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateClient
+// ---------------------------------------------------------------------------
+
+describe("updateClient", () => {
+  it("patches /clients/:id and returns updated client", async () => {
+    mockPatch.mockResolvedValue({ ...makeRawClient(1), name: "Updated Name" });
+    const result = await updateClient(1, { name: "Updated Name" });
+    expect(mockPatch).toHaveBeenCalledWith("/clients/1", { name: "Updated Name" });
+    expect(result.name).toBe("Updated Name");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteClient
+// ---------------------------------------------------------------------------
+
+describe("deleteClient", () => {
+  it("sends DELETE request to /clients/:id", async () => {
+    mockDelete.mockResolvedValue(null);
+    await deleteClient(1);
+    expect(mockDelete).toHaveBeenCalledWith("/clients/1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listClientsWithDocuments (deprecated)
+// ---------------------------------------------------------------------------
+
+describe("listClientsWithDocuments", () => {
+  it("delegates to listClientsFullData (single page)", async () => {
+    mockGetPaginated.mockResolvedValueOnce(makePaginatedResponse([makeRawClient(1)], 1));
+    const result = await listClientsWithDocuments();
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// invalidateClientsCache (no-op)
+// ---------------------------------------------------------------------------
+
+describe("invalidateClientsCache", () => {
+  it("is a no-op and does not throw", () => {
+    expect(() => invalidateClientsCache()).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// uploadDocument
+// ---------------------------------------------------------------------------
+
+describe("uploadDocument", () => {
+  it("posts FormData to /clients/:id/documents and returns document", async () => {
+    const rawDoc = makeRawDocument(5, 1);
+    mockPost.mockResolvedValue(rawDoc);
+    const file = new File(["content"], "report.pdf", { type: "application/pdf" });
+    const result = await uploadDocument(1, file);
+    expect(mockPost).toHaveBeenCalledWith("/clients/1/documents", expect.any(FormData));
+    expect(result.id).toBe(5);
+    expect(result.fileType).toBe("pdf");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteDocument
+// ---------------------------------------------------------------------------
+
+describe("deleteDocument", () => {
+  it("sends DELETE to /clients/:id/documents/:docId", async () => {
+    mockDelete.mockResolvedValue(null);
+    await deleteDocument(1, 10);
+    expect(mockDelete).toHaveBeenCalledWith("/clients/1/documents/10");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDocumentViewUrl
+// ---------------------------------------------------------------------------
+
+describe("getDocumentViewUrl", () => {
+  it("gets view URL from the API", async () => {
+    mockGet.mockResolvedValue({
+      view_url: "https://s3.amazonaws.com/signed-url",
+      expires_in: 3600,
+    });
+    const result = await getDocumentViewUrl(1, 10);
+    expect(result).toBe("https://s3.amazonaws.com/signed-url");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// migrateDocumentsToS3
+// ---------------------------------------------------------------------------
+
+describe("migrateDocumentsToS3", () => {
+  it("posts migration and transforms snake_case result", async () => {
+    mockPost.mockResolvedValue({
+      migrated: 2,
+      failed: 0,
+      skipped: 1,
+      results: [
+        { id: 1, name: "doc1.pdf", s3_file_url: "https://s3.example.com/1.pdf" },
+        { id: 2, name: "doc2.pdf", s3_file_url: "https://s3.example.com/2.pdf" },
+      ],
+    });
+    const result = await migrateDocumentsToS3(1);
+    expect(result.migrated).toBe(2);
+    expect(result.failed).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(result.results[0].s3FileUrl).toBe("https://s3.example.com/1.pdf");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// restoreDocumentToS3
+// ---------------------------------------------------------------------------
+
+describe("restoreDocumentToS3", () => {
+  it("posts file and returns id and s3FileUrl", async () => {
+    mockPost.mockResolvedValue({ id: 5, s3_file_url: "https://s3.example.com/restored.pdf" });
+    const file = new File(["pdf content"], "restored.pdf");
+    const result = await restoreDocumentToS3(1, 5, file);
+    expect(result.id).toBe(5);
+    expect(result.s3FileUrl).toBe("https://s3.example.com/restored.pdf");
   });
 });
