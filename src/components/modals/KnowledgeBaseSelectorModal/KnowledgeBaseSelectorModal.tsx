@@ -718,9 +718,6 @@ export default function KnowledgeBaseSelectorModal({
             </div>
 
             <div className={styles.modalFooter}>
-              <button className={styles.cancelButton} onClick={onClose}>
-                Cancel
-              </button>
               <button className={styles.saveButton} onClick={handleSave}>
                 Save Changes
               </button>

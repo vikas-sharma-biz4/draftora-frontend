@@ -15,6 +15,7 @@ import type { CustomSection } from "@/interfaces/proposalInterfaces";
 interface SectionsSelectorModalProps {
   selectedSections: string[];
   sectionDisplayNames: Record<string, string>;
+  customSections?: CustomSection[];
   onClose: () => void;
   onSave: (sections: string[], newCustomSections?: CustomSection[]) => void;
 }
@@ -102,6 +103,7 @@ function buildSectionKey(name: string): string {
 export default function SectionsSelectorModal({
   selectedSections,
   sectionDisplayNames,
+  customSections,
   onClose,
   onSave,
 }: SectionsSelectorModalProps): JSX.Element | null {
@@ -110,12 +112,14 @@ export default function SectionsSelectorModal({
     new Set([...selectedSections, ...STATIC_SECTIONS_GROUP])
   );
   const [searchQuery, setSearchQuery] = useState<string>("");
-  // key → displayName for custom sections added in this session
-  const [customSectionNames, setCustomSectionNames] = useState<Record<string, string>>({});
-  // key → AI instructions for custom sections added in this session
+  // key → displayName; initialized from existing custom sections so they survive re-opens
+  const [customSectionNames, setCustomSectionNames] = useState<Record<string, string>>(() =>
+    Object.fromEntries((customSections ?? []).map((cs) => [cs.key, cs.label]))
+  );
+  // key → AI instructions; initialized from existing custom sections
   const [customSectionInstructions, setCustomSectionInstructions] = useState<
     Record<string, string>
-  >({});
+  >(() => Object.fromEntries((customSections ?? []).map((cs) => [cs.key, cs.description])));
   const [showAddSectionModal, setShowAddSectionModal] = useState<boolean>(false);
   const [isAddingSection, setIsAddingSection] = useState<boolean>(false);
 
@@ -221,7 +225,6 @@ export default function SectionsSelectorModal({
       [...nonStaticSelected, ...staticSelected],
       newCustomSections.length > 0 ? newCustomSections : undefined
     );
-    toast.success(`${finalSelected.size} section(s) selected`);
   }
 
   const filteredSectionsGroup = allSectionsGroup.filter((s) =>
@@ -357,9 +360,6 @@ export default function SectionsSelectorModal({
         </div>
 
         <div className={styles.modalFooter}>
-          <Button variant="secondary" onClick={onClose} className={styles.cancelButton}>
-            Cancel
-          </Button>
           <Button variant="primary" onClick={handleSave} className={styles.saveButton}>
             Save Changes
           </Button>

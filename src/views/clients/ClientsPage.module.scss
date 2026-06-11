@@ -55,7 +55,7 @@
 
 .searchBar {
   flex: 1;
-  min-width: 220px;
+  min-width: 200px;
   max-width: 360px;
 }
 
@@ -201,18 +201,63 @@
   letter-spacing: 0.05em;
 }
 
-@media (max-width: 900px) {
-  .clientsGrid {
-    grid-template-columns: 1fr 1fr;
+// Touch devices: delete button must always be visible (no hover state)
+@media (hover: none) {
+  .deleteClientBtn {
+    opacity: 1;
   }
+}
 
+@media (max-width: 1024px) {
+  .clientsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 900px) {
   .header {
     flex-direction: column;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .searchBar {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+  }
+
   .clientsGrid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .clientCard {
+    border-radius: 10px;
+  }
+
+  .clientCardName {
+    font-size: 16px;
+  }
+
+  .clientCardHeader {
+    padding: 16px 16px 0;
+  }
+
+  .clientCardBody {
+    padding: 12px 16px;
+  }
+
+  .clientCardFooter {
+    padding: 10px 16px;
   }
 }

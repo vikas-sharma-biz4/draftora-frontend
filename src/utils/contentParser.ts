@@ -295,11 +295,13 @@ export function plainTextToHtml(content: string): string {
     return images || "<p>Image not available</p>";
   }
 
-  // If content is already HTML, return it unchanged
-  // CRITICAL: Do NOT process markdown on HTML - it destroys the formatted content
+  // If content is already HTML, return it unchanged.
+  // CRITICAL: Do NOT process markdown on HTML - it destroys the formatted content.
   // The backend normalizes content to Markdown, so HTML here means it was
-  // intentionally formatted (e.g., from TipTap editor or legacy content)
-  if (isHtmlContent(content)) {
+  // intentionally formatted (e.g., from TipTap editor or legacy content).
+  // EXCEPTION: Markdown tables starting with "|" may contain inline HTML tags
+  // like <br> in cells — these must still be processed as markdown tables.
+  if (isHtmlContent(content) && !content.trimStart().startsWith("|")) {
     return content;
   }
 

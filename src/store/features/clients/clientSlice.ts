@@ -130,7 +130,7 @@ export const useClientStore = create<ClientState>()(
 
       addClient: (client: ClientWithDocuments) => {
         set((state) => ({
-          clients: [...state.clients, client],
+          clients: [client, ...state.clients],
           lastFetched: Date.now(),
           total: state.total + 1,
         }));

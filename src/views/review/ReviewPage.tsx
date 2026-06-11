@@ -20,6 +20,7 @@ import {
   useProposalDescription,
   useSelectedSections,
   useSectionDisplayNames,
+  useCustomSections,
   useTone,
   useLengthPreference,
   useLanguage,
@@ -91,6 +92,7 @@ export default function ReviewPage(): JSX.Element {
   const description = useProposalDescription();
   const selectedSections = useSelectedSections();
   const sectionDisplayNames = useSectionDisplayNames();
+  const customSections = useCustomSections();
   const tone = useTone();
   const lengthPreference = useLengthPreference();
   const language = useLanguage();
@@ -136,7 +138,7 @@ export default function ReviewPage(): JSX.Element {
         files: [],
         filesMeta,
         selectedDocumentIds,
-        customSections: [],
+        customSections,
         contextualInstructions: "",
         webReferences,
       }) as ProposalWizardData,
@@ -155,6 +157,7 @@ export default function ReviewPage(): JSX.Element {
       templateType,
       filesMeta,
       selectedDocumentIds,
+      customSections,
       webReferences,
     ]
   );
@@ -404,10 +407,9 @@ export default function ReviewPage(): JSX.Element {
     sections: string[],
     newCustomSections?: Array<{ key: string; label: string; description: string }>
   ): void {
-    const existingCustomSections: Array<{ key: string; label: string; description: string }> = [];
     updateProposalData({
       selectedSections: sections,
-      customSections: [...existingCustomSections, ...(newCustomSections ?? [])],
+      customSections: newCustomSections ?? [],
     });
     setShowSectionsModal(false);
   }
@@ -548,8 +550,14 @@ export default function ReviewPage(): JSX.Element {
     ? proposalData.description.slice(0, 120) + (proposalData.description.length > 120 ? "..." : "")
     : "No description provided.";
 
+  const customSectionLabelMap = useMemo(
+    () => Object.fromEntries((proposalData.customSections ?? []).map((cs) => [cs.key, cs.label])),
+    [proposalData.customSections]
+  );
+
   const selectedSectionLabels = proposalData.selectedSections.map(
     (key: string) =>
+      customSectionLabelMap[key] ??
       (proposalData.sectionDisplayNames ?? {})[key] ??
       SECTION_DISPLAY_NAMES[key] ??
       key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
@@ -575,7 +583,6 @@ export default function ReviewPage(): JSX.Element {
         proposalId={currentProposalId ?? generatedProposalId}
         maxStepReached={maxStepReached}
       />
-      <div className="page-badge">Phase 05</div>
       <h1 className="page-title">Final Review</h1>
       <p className={`page-subtitle ${styles.reviewPageSubtitle}`}>
         Verify your proposal configuration before the AI architect constructs your final document.
@@ -773,6 +780,7 @@ export default function ReviewPage(): JSX.Element {
         <SectionsSelectorModal
           selectedSections={proposalData.selectedSections}
           sectionDisplayNames={proposalData.sectionDisplayNames}
+          customSections={proposalData.customSections}
           onClose={() => setShowSectionsModal(false)}
           onSave={handleSaveSections}
         />

@@ -311,6 +311,12 @@ export const useSectionDisplayNames = () =>
   useProposalWizardStore((state) => state.proposalData.sectionDisplayNames);
 
 /**
+ * Selects the custom sections array.
+ */
+export const useCustomSections = () =>
+  useProposalWizardStore((state) => state.proposalData.customSections);
+
+/**
  * Selects the tone preference.
  */
 export const useTone = () => useProposalWizardStore((state) => state.proposalData.tone);

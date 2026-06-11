@@ -116,7 +116,9 @@
 }
 
 @keyframes rte-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // ─── Inline toolbar container ─────────────────────────────────────────────────
@@ -135,7 +137,9 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.12),
+    0 1px 4px rgba(0, 0, 0, 0.08);
   flex-wrap: nowrap;
   white-space: nowrap;
 }
@@ -270,8 +274,12 @@
   margin-top: 1em;
 }
 
-.rte-content .ProseMirror h1 { font-size: 1.5em; }
-.rte-content .ProseMirror h2 { font-size: 1.25em; }
+.rte-content .ProseMirror h1 {
+  font-size: 1.5em;
+}
+.rte-content .ProseMirror h2 {
+  font-size: 1.25em;
+}
 
 .rte-content .ProseMirror h3 {
   font-size: 1.1em;
@@ -298,9 +306,15 @@
   list-style-type: decimal;
 }
 
-.rte-content .ProseMirror li { margin-bottom: 0.25em; }
-.rte-content .ProseMirror strong { font-weight: 700; }
-.rte-content .ProseMirror em { font-style: italic; }
+.rte-content .ProseMirror li {
+  margin-bottom: 0.25em;
+}
+.rte-content .ProseMirror strong {
+  font-weight: 700;
+}
+.rte-content .ProseMirror em {
+  font-style: italic;
+}
 
 .rte-content .ProseMirror mark {
   padding: 0.1em 0.2em;
@@ -331,11 +345,24 @@
   text-align: left;
 }
 
-.rte-content .ProseMirror td:first-child { font-weight: 700; }
+.rte-content .ProseMirror td:first-child {
+  font-weight: 700;
+}
+
+// Paragraphs inside table cells must not be justified — justified text in
+// narrow columns creates large word gaps that break readability.
+.rte-content .ProseMirror td p,
+.rte-content .ProseMirror th p {
+  text-align: left;
+  margin-bottom: 0;
+}
 
 .rte-content .ProseMirror .selectedCell::after {
   content: "";
-  left: 0; right: 0; top: 0; bottom: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   background: rgba(var(--color-primary-rgb), 0.1);
   position: absolute;
   pointer-events: none;
@@ -377,7 +404,9 @@
   font-weight: 700;
   color: #e0e7ff;
   font-family: var(--font-sans);
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
   white-space: nowrap;
 }
 
@@ -524,7 +553,9 @@
   color: white;
 }
 
-.rte-btn-icon svg { flex-shrink: 0; }
+.rte-btn-icon svg {
+  flex-shrink: 0;
+}
 
 // ─── Dropdown button ──────────────────────────────────────────────────────────
 .rte-btn-dropdown {
@@ -600,7 +631,9 @@
   color: var(--color-primary);
 }
 
-.rte-dropdown-menu button:active { transform: scale(0.98); }
+.rte-dropdown-menu button:active {
+  transform: scale(0.98);
+}
 
 // ─── Link / image input panel ─────────────────────────────────────────────────
 .rte-link-input-panel {
@@ -658,7 +691,9 @@
   transform: scale(1.05);
 }
 
-.rte-link-btn-apply:active { transform: scale(0.95); }
+.rte-link-btn-apply:active {
+  transform: scale(0.95);
+}
 
 .rte-link-btn-remove {
   display: flex;
@@ -681,10 +716,14 @@
   transform: scale(1.05);
 }
 
-.rte-link-btn-remove:active { transform: scale(0.95); }
+.rte-link-btn-remove:active {
+  transform: scale(0.95);
+}
 
 // ─── Color group ──────────────────────────────────────────────────────────────
-.rte-color-group { gap: 4px; }
+.rte-color-group {
+  gap: 4px;
+}
 
 .rte-color-label {
   font-size: 10px;
@@ -716,7 +755,9 @@
   transform: scale(1.1);
 }
 
-.rte-color-swatch-btn:active { transform: scale(0.95); }
+.rte-color-swatch-btn:active {
+  transform: scale(0.95);
+}
 
 .rte-color-swatch {
   width: 20px;
@@ -734,7 +775,7 @@
 }
 
 .rte-color-swatch-empty::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -745,7 +786,14 @@
 }
 
 .rte-color-swatch-custom {
-  background: linear-gradient(135deg, #ff0000 0%, #00ff00 25%, #0000ff 50%, #ffff00 75%, #ff00ff 100%);
+  background: linear-gradient(
+    135deg,
+    #ff0000 0%,
+    #00ff00 25%,
+    #0000ff 50%,
+    #ffff00 75%,
+    #ff00ff 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -815,7 +863,9 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
 }
 
-.rte-btn-ai:active { transform: translateY(0) scale(0.96); }
+.rte-btn-ai:active {
+  transform: translateY(0) scale(0.96);
+}
 
 .rte-btn-ai.active {
   background: linear-gradient(135deg, #4f5fc0 0%, #5e3488 100%);
@@ -850,7 +900,9 @@
     background: rgba(var(--color-primary-rgb), 0.08);
   }
 
-  &:active { transform: scale(0.96); }
+  &:active {
+    transform: scale(0.96);
+  }
 }
 
 .rte-btn-color-letter {
@@ -912,7 +964,9 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   }
 
-  &:active { transform: scale(0.96); }
+  &:active {
+    transform: scale(0.96);
+  }
 }
 
 .rte-color-swatch-clear {
@@ -921,7 +975,7 @@
   position: relative;
 
   &::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -970,7 +1024,9 @@
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
 
-  &:active:not(:disabled) { transform: scale(0.94); }
+  &:active:not(:disabled) {
+    transform: scale(0.94);
+  }
 
   &:disabled {
     opacity: 0.5;
@@ -988,7 +1044,9 @@
   color: var(--color-text);
 }
 
-.ProseMirror:focus { outline: none; }
+.ProseMirror:focus {
+  outline: none;
+}
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -1020,7 +1078,9 @@
   cursor: pointer;
 }
 
-.ProseMirror .editor-link:hover { color: var(--color-primary-hover); }
+.ProseMirror .editor-link:hover {
+  color: var(--color-primary-hover);
+}
 
 .ProseMirror blockquote {
   border-left: 3px solid var(--color-primary);
@@ -1067,7 +1127,9 @@
   color: var(--color-text);
 }
 
-.ProseMirror td { background: white; }
+.ProseMirror td {
+  background: white;
+}
 
 // ─── Responsive — 480px: compact adjustments ──────────────────────────────────
 @media (max-width: 480px) {
@@ -1093,4 +1155,3 @@
     height: 14px;
   }
 }
-
