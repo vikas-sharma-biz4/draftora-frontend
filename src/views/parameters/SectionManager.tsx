@@ -107,7 +107,6 @@ export default function SectionManager({
   const handleDropFromRecommendations = useCallback(
     (sectionKey: string, sectionTitle: string): void => {
       onAddSection(sectionKey, sectionTitle);
-      toast.success(`Added "${sectionTitle}" to section structure`);
       onRemoveFromRecommendations(sectionKey);
     },
     [onAddSection, onRemoveFromRecommendations]
@@ -161,13 +160,21 @@ export default function SectionManager({
       try {
         onSectionsChange((prev) => {
           const newSection: SectionItem = { key, label: name };
-          if (insertAfterKey) {
+          const isStaticKey = (k: string): boolean =>
+            (STATIC_SECTION_KEYS as readonly string[]).includes(k);
+          if (insertAfterKey && !isStaticKey(insertAfterKey)) {
             const idx = prev.findIndex((s) => s.key === insertAfterKey);
             if (idx >= 0) {
               const updated = [...prev];
               updated.splice(idx + 1, 0, newSection);
               return updated;
             }
+          }
+          const firstStaticIdx = prev.findIndex((s) => isStaticKey(s.key));
+          if (firstStaticIdx >= 0) {
+            const updated = [...prev];
+            updated.splice(firstStaticIdx, 0, newSection);
+            return updated;
           }
           return [...prev, newSection];
         });

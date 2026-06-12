@@ -704,14 +704,36 @@
   color: var(--color-text-muted);
 }
 
+@media (max-width: 1280px) {
+  .clientHeader {
+    padding: 24px 32px;
+  }
+
+  .splitLayout {
+    padding: 0 32px 32px;
+  }
+}
+
 @media (max-width: 1024px) {
   .splitLayout {
     flex-direction: column;
+    overflow: auto; // Panels stack — let the page scroll instead of clipping
   }
 
   .knowledgeBase,
   .proposalHistory {
     width: 100%;
+    overflow: visible; // Remove clip so stacked panels show full content
+  }
+
+  .documentList {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .tableWrapper {
+    max-height: 480px;
+    overflow-y: auto;
   }
 }
 
@@ -720,13 +742,126 @@
     padding: 20px 24px;
     flex-direction: column;
     align-items: flex-start;
+    gap: 16px;
   }
 
   .splitLayout {
     padding: 0 24px 24px;
+    gap: 16px;
   }
 
   .clientName {
     font-size: 28px;
+  }
+
+  .panelHeader {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .headerActions {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .searchInput input {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .clientHeader {
+    padding: 16px;
+  }
+
+  .splitLayout {
+    padding: 0 16px 16px;
+    gap: 12px;
+  }
+
+  .clientName {
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+
+  .clientMeta {
+    font-size: 13px;
+  }
+
+  .clientHeaderActions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .knowledgeBase,
+  .proposalHistory {
+    padding: 16px;
+  }
+
+  .documentList {
+    max-height: none; // Let full list show on phone — page scrolls
+    overflow-y: visible;
+  }
+
+  .tableWrapper {
+    max-height: none; // Same — page scrolls
+    overflow-y: visible;
+  }
+
+  // Hide "Type" column on mobile — not critical at this width
+  .proposalTable thead tr th:nth-child(2),
+  .proposalTable tbody tr td:nth-child(2) {
+    display: none;
+  }
+
+  // Always show action buttons on touch (can't hover)
+  .actionButtons {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .clientHeader {
+    padding: 12px 16px;
+  }
+
+  .splitLayout {
+    padding: 0 12px 12px;
+    gap: 12px;
+  }
+
+  .clientName {
+    font-size: 20px;
+  }
+
+  .clientBadge {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .panelTitle {
+    font-size: 16px;
+  }
+
+  .documentItem {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .documentIcon {
+    width: 32px;
+    height: 32px;
+  }
+
+  // Also hide "Date" column on smallest phones
+  .proposalTable thead tr th:nth-child(3),
+  .proposalTable tbody tr td:nth-child(3) {
+    display: none;
+  }
+
+  .proposalRow td {
+    padding: 12px 8px 12px 0;
   }
 }
