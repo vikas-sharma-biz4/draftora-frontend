@@ -306,7 +306,6 @@ export default function ParametersPage(): JSX.Element {
       updateProposalData({
         selectedSections: keys,
         sectionDisplayNames: displayNames,
-        customSections: [],
       });
     }
   }, [sections, selectedSections, sectionDisplayNames, updateProposalData]);
@@ -392,7 +391,6 @@ export default function ParametersPage(): JSX.Element {
     updateProposalData({
       selectedSections: keys,
       sectionDisplayNames: displayNames,
-      customSections: [],
     });
 
     await handleSaveDraft();
@@ -411,7 +409,6 @@ export default function ParametersPage(): JSX.Element {
     updateProposalData({
       selectedSections: keys,
       sectionDisplayNames: displayNames,
-      customSections: [],
     });
 
     // Mark Step 1 as visited when proceeding to Review
@@ -536,7 +533,7 @@ export default function ParametersPage(): JSX.Element {
         proposalId={currentProposalId}
         maxStepReached={maxStepReached}
       />
-      <div className="page-badge">Phase 01</div>
+      <div className="page-badge">01</div>
       <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
 
       <p className="page-subtitle">
