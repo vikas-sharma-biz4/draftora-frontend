@@ -10,6 +10,7 @@
 
 "use client";
 
+import React from "react";
 import { Download } from "lucide-react";
 import Button from "@/components/common/Button";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -26,6 +27,7 @@ interface ProposalApprovalBarProps {
   onExecuteAction: (actionType: "approve" | "reject") => Promise<void>;
   confirmModal: { isOpen: boolean; message: string; actionType: "approve" | "reject" | null };
   onConfirmModalClose: () => void;
+  estimateHoursContent?: React.ReactNode;
 }
 
 export default function ProposalApprovalBar({
@@ -39,6 +41,7 @@ export default function ProposalApprovalBar({
   onExecuteAction,
   confirmModal,
   onConfirmModalClose,
+  estimateHoursContent,
 }: ProposalApprovalBarProps): JSX.Element {
   const { isDownloading, downloadProposal } = useProposalDownload();
   const isPending = !approvalStatus || approvalStatus === "pending";
@@ -46,6 +49,7 @@ export default function ProposalApprovalBar({
   return (
     <>
       <div className="proposal-actions-bar">
+        {estimateHoursContent}
         <Button
           variant="secondary"
           size="sm"
@@ -70,12 +74,7 @@ export default function ProposalApprovalBar({
         </Button>
 
         {isPending && onSaveDraft && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onSaveDraft}
-            disabled={isDownloading}
-          >
+          <Button variant="secondary" size="sm" onClick={onSaveDraft} disabled={isDownloading}>
             Save Draft
           </Button>
         )}
@@ -103,12 +102,8 @@ export default function ProposalApprovalBar({
           </>
         )}
 
-        {approvalStatus === "approved" && (
-          <span className="badge badge-success">Approved</span>
-        )}
-        {approvalStatus === "rejected" && (
-          <span className="badge badge-danger">Rejected</span>
-        )}
+        {approvalStatus === "approved" && <span className="badge badge-success">Approved</span>}
+        {approvalStatus === "rejected" && <span className="badge badge-danger">Rejected</span>}
       </div>
 
       <ConfirmModal

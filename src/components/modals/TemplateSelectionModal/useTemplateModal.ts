@@ -75,6 +75,8 @@ export interface UseTemplateModalReturn {
   // File upload
   uploadedFiles: UploadedFile[];
   viewingDocId: number | null;
+  viewingDocModal: { url: string; fileName: string; fileType: string } | null;
+  closeViewingDocModal: () => void;
 
   // View / navigation
   modalView: ModalView;
@@ -162,6 +164,11 @@ export function useTemplateModal({
   // ── File upload ───────────────────────────────────────────────────────────
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [viewingDocId, setViewingDocId] = useState<number | null>(null);
+  const [viewingDocModal, setViewingDocModal] = useState<{
+    url: string;
+    fileName: string;
+    fileType: string;
+  } | null>(null);
 
   // ── View / navigation ─────────────────────────────────────────────────────
   const [modalView, setModalView] = useState<ModalView>(initialView);
@@ -438,12 +445,22 @@ export function useTemplateModal({
     try {
       setViewingDocId(doc.id);
       const viewUrl = await getDocumentViewUrl(clientId, doc.id);
-      window.open(viewUrl, "_blank", "noopener,noreferrer");
+      // Resolve display metadata from the clients store
+      const clientData = clients.find((c) => c.id === clientId);
+      const docData = clientData?.documents?.find((d) => d.id === doc.id);
+      const fileName = docData?.name ?? String(doc.id);
+      const rawType = docData?.fileType ?? doc.s3FileUrl.split(".").pop() ?? "pdf";
+      const fileType = rawType.split("/").pop()?.split(".").pop() ?? "pdf";
+      setViewingDocModal({ url: viewUrl, fileName, fileType });
     } catch {
       toast.error("Could not open document. Please try again.");
     } finally {
       setViewingDocId(null);
     }
+  }
+
+  function closeViewingDocModal(): void {
+    setViewingDocModal(null);
   }
 
   // ── Form submission ───────────────────────────────────────────────────────
@@ -623,6 +640,8 @@ export function useTemplateModal({
     initialContextNotes,
     uploadedFiles,
     viewingDocId,
+    viewingDocModal,
+    closeViewingDocModal,
     modalView,
     showTemplateSelector,
     isPending,

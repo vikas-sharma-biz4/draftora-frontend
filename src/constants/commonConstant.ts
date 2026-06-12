@@ -93,11 +93,6 @@ export const SECTION_OPTIONS = [
     label: "Implementation Timeline",
     description: "Visual roadmap of the project lifecycle.",
   },
-  {
-    key: "conclusion",
-    label: "Conclusion",
-    description: "Summary and next steps.",
-  },
 ] as const;
 
 export const LANGUAGE_OPTIONS = [
@@ -119,7 +114,6 @@ export const SCRATCH_TEMPLATE_DEFAULT_SECTIONS = [
   "system_architecture",
   "implementation_plan",
   "timeline",
-  "conclusion",
 ] as const;
 
 export const SECTION_DISPLAY_NAMES: Record<string, string> = {
@@ -241,7 +235,6 @@ export const PROPOSAL_TEMPLATES = [
       "deliverables",
       "value_proposition",
       "prototypes_developed",
-      "our_approach_methodology",
     ],
     gradientClass: "tmpl-preview-gradient-3",
     icon: "✦",
@@ -455,7 +448,6 @@ export const TEMPLATE_TOCS = {
     { key: "deliverables", label: "Deliverables" },
     { key: "value_proposition", label: "Value Proposition" },
     { key: "prototypes_developed", label: "Similar Prototypes Developed by Biz4Group Experts" },
-    { key: "our_approach_methodology", label: "Our Approach & Methodology" },
   ],
   poc: [
     { key: "introduction", label: "Introduction" },

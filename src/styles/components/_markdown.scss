@@ -182,6 +182,15 @@
   line-height: 1.75;
 }
 
+// Paragraphs inside table cells must not be justified.
+.markdown-output td .ai-md-p,
+.markdown-output th .ai-md-p,
+.markdown-output td p,
+.markdown-output th p {
+  text-align: left;
+  margin-bottom: 0;
+}
+
 .markdown-output .ai-md-strong {
   font-weight: 700;
 }

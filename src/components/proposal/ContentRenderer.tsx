@@ -67,6 +67,16 @@ export default function ContentRenderer({
     return <DiagramRenderer content={content} sectionKey={sectionKey} />;
   }
 
+  // Markdown pipe tables must always use AIMarkdownRenderer — even when cells
+  // contain HTML tags like <br> that would otherwise trigger isHtmlContent().
+  // TableRenderer's isHtmlContent() guard would send the raw Markdown string
+  // through dangerouslySetInnerHTML, rendering | characters as plain text.
+  // AIMarkdownRenderer + remark-gfm correctly parses pipe tables and handles
+  // inline HTML (<br>) and Markdown bold (**text**) inside cells.
+  if (type === "table" && content.trimStart().startsWith("|")) {
+    return <AIMarkdownRenderer content={content} />;
+  }
+
   // Static HTML content: use existing renderers unchanged.
   // EXCEPT: Force AIMarkdownRenderer for keys in FORCE_MARKDOWN_RENDERER_KEYS
   // (e.g., similar_projects generates markdown with embedded HTML for image alignment)

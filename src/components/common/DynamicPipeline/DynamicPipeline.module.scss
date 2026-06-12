@@ -1,10 +1,13 @@
 .pipelineContainer {
   position: relative;
   width: 100%;
+  min-width: 0;
   background: var(--color-bg);
   padding: 0;
   padding-top: 21px;
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
   margin: 0 auto;
   height: auto;
   display: flex;
@@ -38,6 +41,9 @@
   margin: 0;
   padding: 0;
   max-width: 400px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .step {
@@ -72,7 +78,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(55, 48, 163, 0.3);
   }
   50% {

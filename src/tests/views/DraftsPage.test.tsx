@@ -308,10 +308,10 @@ describe("DraftsPage — loading state", () => {
 // ---------------------------------------------------------------------------
 
 describe("DraftsPage — empty state", () => {
-  it("shows the 'No drafts yet' empty state when no drafts exist", () => {
+  it("shows the 'Nothing to resume yet' empty state when no drafts exist", () => {
     render(<DraftsPage />);
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
-    expect(screen.getByText(/no drafts yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing to resume yet/i)).toBeInTheDocument();
   });
 
   it("does not render any draft cards in the empty state", () => {

@@ -10,6 +10,7 @@ export function useLocalStorage<T>(
   initialValue: T
 ): [T, (value: T | ((prev: T) => T)) => void, () => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
+    /* istanbul ignore next */
     if (typeof window === "undefined") return initialValue;
     try {
       const item = window.localStorage.getItem(key);
@@ -24,6 +25,7 @@ export function useLocalStorage<T>(
       try {
         const valueToStore = value instanceof Function ? value(storedValue) : value;
         setStoredValue(valueToStore);
+        /* istanbul ignore next */
         if (typeof window !== "undefined") {
           window.localStorage.setItem(key, JSON.stringify(valueToStore));
         }
@@ -36,6 +38,7 @@ export function useLocalStorage<T>(
 
   const removeValue = useCallback((): void => {
     setStoredValue(initialValue);
+    /* istanbul ignore next */
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(key);
     }

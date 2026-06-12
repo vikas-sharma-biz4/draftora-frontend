@@ -454,14 +454,24 @@ export default function ProposalOutputPage(): JSX.Element {
   ): void {
     const currentSections = proposal?.selectedSections ?? [];
     let newSelected: string[];
+
+    const insertBeforeStatic = (sections: string[]): string[] => {
+      const firstStaticIdx = sections.findIndex((k) =>
+        (STATIC_SECTION_KEYS as readonly string[]).includes(k)
+      );
+      return firstStaticIdx >= 0
+        ? [...sections.slice(0, firstStaticIdx), key, ...sections.slice(firstStaticIdx)]
+        : [...sections, key];
+    };
+
     if (afterKey) {
       const idx = currentSections.indexOf(afterKey);
       newSelected =
         idx >= 0
           ? [...currentSections.slice(0, idx + 1), key, ...currentSections.slice(idx + 1)]
-          : [...currentSections, key];
+          : insertBeforeStatic(currentSections);
     } else {
-      newSelected = [...currentSections, key];
+      newSelected = insertBeforeStatic(currentSections);
     }
 
     const newDisplayNames = { ...(proposal?.sectionDisplayNames ?? {}), [key]: label };
@@ -647,13 +657,6 @@ export default function ProposalOutputPage(): JSX.Element {
           visible={true}
           proposalId={proposalId}
         />
-        {proposal.status === "completed" && (
-          <EstimateHoursButton
-            estimatedHoursData={estimatedHoursData}
-            isEstimating={isEstimatingHours}
-            onOpenModal={() => setIsEstimateModalOpen(true)}
-          />
-        )}
         <ProposalApprovalBar
           proposalId={proposalId}
           approvalStatus={proposal.approvalStatus}
@@ -666,6 +669,15 @@ export default function ProposalOutputPage(): JSX.Element {
           confirmModal={confirmModal}
           onConfirmModalClose={() =>
             setConfirmModal({ isOpen: false, message: "", actionType: null })
+          }
+          estimateHoursContent={
+            proposal.status === "completed" ? (
+              <EstimateHoursButton
+                estimatedHoursData={estimatedHoursData}
+                isEstimating={isEstimatingHours}
+                onOpenModal={() => setIsEstimateModalOpen(true)}
+              />
+            ) : undefined
           }
         />
       </div>

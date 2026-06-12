@@ -179,11 +179,21 @@
     max-width: 100%;
   }
 
+  .modalHeader {
+    padding: 16px 20px 0;
+  }
+
+  .modalBody {
+    padding: 16px 20px;
+  }
+
   .modalFooter {
+    padding: 14px 20px;
     flex-direction: column-reverse;
 
     button {
       width: 100%;
+      justify-content: center;
     }
   }
 }

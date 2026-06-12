@@ -12,35 +12,140 @@ interface AIMarkdownRendererProps {
 }
 
 /**
+ * Fix escaped bold markers produced by the LLM: \*\*text\*\* → **text**
+ *
+ * The LLM occasionally outputs backslash-escaped asterisks (e.g. in table cells
+ * for milestone names) which cause remark to render them as literal **text**
+ * instead of bold. This restores the intended bold formatting.
+ */
+function fixEscapedBoldMarkers(content: string): string {
+  return content.replace(/\\\*\\\*(.*?)\\\*\\\*/g, "**$1**");
+}
+
+/**
+ * Fix multiline table rows by merging continuation lines with <br>.
+ *
+ * remark-gfm requires each table row to be on a single line. When the LLM
+ * generates Key Activities cells with soft line breaks (\n) instead of <br>,
+ * the table row is split across multiple lines and remark-gfm cannot parse
+ * the table — it falls back to rendering the content as paragraphs.
+ *
+ * Algorithm:
+ * 1. After a |---| separator row, the table body starts.
+ * 2. Any non-empty line that does NOT start with | is a continuation of the
+ *    previous table row — merge it with <br>.
+ * 3. An empty line ends the table body context.
+ */
+function fixTableMultilineRows(content: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let inTableBody = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Separator row (|---|---|) marks the start of the table body
+    if (/^\|[\s\-:|]+\|$/.test(trimmed)) {
+      inTableBody = true;
+      result.push(line);
+      continue;
+    }
+
+    // Header or data row — any line starting with |
+    if (trimmed.startsWith("|")) {
+      result.push(line);
+      continue;
+    }
+
+    // Non-empty continuation line inside the table body
+    if (inTableBody && trimmed.length > 0 && result.length > 0) {
+      result[result.length - 1] = result[result.length - 1].trimEnd() + "<br>" + trimmed;
+      continue;
+    }
+
+    // Empty line exits the table body context
+    if (trimmed === "") {
+      inTableBody = false;
+    }
+
+    result.push(line);
+  }
+
+  return result.join("\n");
+}
+
+/**
+ * Fix ordered list items that all use "1." (LLM reset pattern).
+ *
+ * Some LLMs consistently output every ordered list item as "1." because
+ * standard markdown auto-increments. However, when items are separated by
+ * bullet sub-lists or blank lines, ReactMarkdown creates separate <ol>
+ * elements that each start at 1, producing "1, 1, 1" instead of "1, 2, 3".
+ *
+ * This function detects when every ordered item in the content uses "1." and
+ * renumbers them sequentially so that a single counter runs across all items.
+ */
+function fixSteppedOrderedLists(content: string): string {
+  const lines = content.split("\n");
+  const orderedLines = lines.filter((line) => /^\d+\.\s/.test(line));
+  if (orderedLines.length < 2) return content;
+
+  // Only fix when every ordered item starts with "1." — the LLM reset pattern.
+  const allStartWith1 = orderedLines.every((line) => /^1\.\s/.test(line));
+  if (!allStartWith1) return content;
+
+  let counter = 0;
+  return lines
+    .map((line) => {
+      if (/^1\.\s/.test(line)) {
+        counter++;
+        return `${counter}. ${line.slice(3)}`;
+      }
+      return line;
+    })
+    .join("\n");
+}
+
+/**
  * Post-process markdown content to fix common formatting issues.
- * Specifically fixes similar_projects section formatting problems:
- * 1. Description on same line as heading → move to new line
- * 2. No blank line after heading → add blank line
- * 3. Leading space before "Key Highlights:" → remove leading space
- * 4. Bullet points on same line → split into separate lines
- * 5. No blank line between projects → add blank line
+ *
+ * Applied fixes (in order):
+ * 1. Escaped bold markers: \*\*text\*\* → **text** (LLM escape artifact)
+ * 2. Multiline table rows: continuation lines merged with <br> so remark-gfm
+ *    can parse the table (affects POC estimated_timeline and similar sections)
+ * 3. Sequential ordered list numbering: all-"1." items renumbered 1,2,3…
+ * 4–8. similar_projects section formatting (headings, bullets, blank lines)
  */
 function fixMarkdownFormatting(content: string): string {
   let fixed = content;
 
-  // Fix 1: Ensure heading is on its own line (description should not be on same line)
+  // Fix escaped bold markers produced by the LLM
+  fixed = fixEscapedBoldMarkers(fixed);
+
+  // Fix multiline table rows (newlines inside cells → <br>)
+  fixed = fixTableMultilineRows(fixed);
+
+  // Fix sequential ordered list numbering (all-"1." LLM pattern → 1,2,3…)
+  fixed = fixSteppedOrderedLists(fixed);
+
+  // Fix 3: Ensure heading is on its own line (description should not be on same line)
   // Pattern: ### **[Title](URL)** Description → ### **[Title](URL)**\nDescription
   fixed = fixed.replace(/^(###\s+\*\*[^*]+\*\*)\s+(.+)$/gm, "$1\n$2");
 
-  // Fix 2: Ensure blank line after heading (only for level-3 headings)
+  // Fix 4: Ensure blank line after heading (only for level-3 headings)
   // Pattern: ### Heading\nDescription → ### Heading\n\nDescription
   fixed = fixed.replace(/^(###\s+.+)$/gm, "$1\n");
 
-  // Fix 3: Remove leading space before "Key Highlights:"
+  // Fix 5: Remove leading space before "Key Highlights:"
   fixed = fixed.replace(/^\s+Key Highlights:/gm, "Key Highlights:");
 
-  // Fix 4: Split bullet points that are on the same line after "Key Highlights:"
+  // Fix 6: Split bullet points that are on the same line after "Key Highlights:"
   // Pattern: Key Highlights:\n- Item1 - Item2 - Item3 → Key Highlights:\n- Item1\n- Item2\n- Item3
   fixed = fixed
     .replace(/^(Key Highlights:\s*)$/gm, "$1\n")
     .replace(/(-\s+[^-\n]+)(\s+-\s+)/g, "$1\n$2");
 
-  // Fix 5: Add blank line before each new project heading (###)
+  // Fix 7: Add blank line before each new project heading (###)
   // Pattern: - Bullet\n### Next Project → - Bullet\n\n### Next Project
   fixed = fixed.replace(/(-\s+[^\n]+)\n(###\s+)/g, "$1\n\n$2");
 
