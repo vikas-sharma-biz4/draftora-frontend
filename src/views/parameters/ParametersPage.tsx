@@ -14,7 +14,6 @@ import {
   useTemplateId,
   useSelectedSections,
   useSectionDisplayNames,
-  useTone,
   useLengthPreference,
   useLanguage,
   useAiModel,
@@ -46,7 +45,6 @@ import SectionRecommendations, {
 } from "@/components/proposal/SectionRecommendations";
 import type { SectionRecommendation } from "@/services/proposal.service";
 import SectionManager from "./SectionManager";
-import ToneSelector from "./ToneSelector";
 import LengthLanguageSelector from "./LengthLanguageSelector";
 
 const PageLayout = dynamic(() => import("@/layouts/AppLayout"), { ssr: false });
@@ -106,7 +104,6 @@ export default function ParametersPage(): JSX.Element {
   const clientName = useClientName();
   const selectedSections = useSelectedSections();
   const sectionDisplayNames = useSectionDisplayNames();
-  const tone = useTone();
   const lengthPreference = useLengthPreference();
   const language = useLanguage();
   const aiModel = useAiModel();
@@ -533,7 +530,6 @@ export default function ParametersPage(): JSX.Element {
         proposalId={currentProposalId}
         maxStepReached={maxStepReached}
       />
-      <div className="page-badge">01</div>
       <h1 className="page-title">Step 1: Table of Contents &amp; Parameters</h1>
 
       <p className="page-subtitle">
@@ -561,8 +557,6 @@ export default function ParametersPage(): JSX.Element {
         </div>
 
         <div className="parameters-right-col">
-          <ToneSelector value={tone} onChange={(value) => updateProposalData({ tone: value })} />
-
           <LengthLanguageSelector
             lengthPreference={lengthPreference}
             language={language}

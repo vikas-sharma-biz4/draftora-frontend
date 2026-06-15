@@ -646,7 +646,6 @@ export default function ReviewPage(): JSX.Element {
                 </button>
               </div>
               <div className={`flex-row ${styles.badgeRow}`}>
-                <span className="badge badge-primary">{proposalData.tone}</span>
                 <span className="badge badge-muted">{proposalData.lengthPreference}</span>
                 <span className="badge badge-muted">{proposalData.language}</span>
               </div>
