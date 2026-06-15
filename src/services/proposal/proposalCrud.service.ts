@@ -335,6 +335,7 @@ export interface ListProposalsParams {
   limit?: number;
   offset?: number;
   page?: number;
+  clientId?: number;
 }
 
 function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
@@ -364,6 +365,14 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
       cache: "no-store",
     });
     return raw.map(mapProposalListItem);
+  }
+
+  // Client-scoped fetch: returns all completed proposals for the given client
+  if (params?.clientId !== undefined) {
+    const items = await http.get<ProposalListApiItem[]>(`/proposals?client_id=${params.clientId}`, {
+      cache: "no-store",
+    });
+    return items.map(mapProposalListItem);
   }
 
   // Page-based pagination: page + limit params (used by proposalSlice for infinite scroll)
@@ -442,10 +451,13 @@ export async function cancelProposal(id: number): Promise<void> {
 
 export async function updateApprovalStatus(
   proposalId: number,
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected",
+  signal?: AbortSignal
 ): Promise<ProposalData> {
-  const raw = await http.patch<RawProposalApiResponse>(`/proposals/${proposalId}/approval-status`, {
-    approval_status: status,
-  });
+  const raw = await http.patch<RawProposalApiResponse>(
+    `/proposals/${proposalId}/approval-status`,
+    { approval_status: status },
+    signal ? { signal } : undefined
+  );
   return mapProposal(raw);
 }

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, FileText, Mail, Trash2 } from "lucide-react";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 
@@ -36,6 +36,14 @@ const DeleteAllDocumentsModal = dynamic(
   () => import("@/components/modals/DeleteAllDocumentsModal"),
   { ssr: false }
 );
+const GenerateEmailModal = dynamic(
+  () => import("@/components/modals/GenerateEmailModal/GenerateEmailModal"),
+  { ssr: false }
+);
+const GenerateInvoiceModal = dynamic(
+  () => import("@/components/modals/GenerateInvoiceModal/GenerateInvoiceModal"),
+  { ssr: false }
+);
 
 export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
@@ -56,6 +64,8 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
+  const [showGenerateEmailModal, setShowGenerateEmailModal] = useState<boolean>(false);
+  const [showGenerateInvoiceModal, setShowGenerateInvoiceModal] = useState<boolean>(false);
 
   const docs = useClientDocuments(client);
   const proposals = useClientProposals(clientId, client?.name ?? "");
@@ -121,6 +131,14 @@ export default function ClientWorkspacePage(): JSX.Element {
           </p>
         </div>
         <div className={styles.clientHeaderActions}>
+          <button className="btn btn-secondary" onClick={() => setShowGenerateEmailModal(true)}>
+            <Mail size={18} />
+            Generate Email
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowGenerateInvoiceModal(true)}>
+            <FileText size={18} />
+            Generate Invoice
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
             <Edit size={18} />
             Edit Details
@@ -187,6 +205,14 @@ export default function ClientWorkspacePage(): JSX.Element {
           onClose={() => docs.setDeleteAllDocsModalOpen(false)}
           onConfirm={docs.confirmDeleteAllDocuments}
         />
+      )}
+
+      {showGenerateEmailModal && (
+        <GenerateEmailModal client={client} onClose={() => setShowGenerateEmailModal(false)} />
+      )}
+
+      {showGenerateInvoiceModal && (
+        <GenerateInvoiceModal client={client} onClose={() => setShowGenerateInvoiceModal(false)} />
       )}
     </PageLayout>
   );

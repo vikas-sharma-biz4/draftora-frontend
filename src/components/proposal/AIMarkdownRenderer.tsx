@@ -214,7 +214,11 @@ const MD_COMPONENTS: Components = {
   strong: ({ children }) => <strong className="ai-md-strong">{children}</strong>,
   em: ({ children }) => <em className="ai-md-em">{children}</em>,
   ul: ({ children }) => <ul className="ai-md-ul">{children}</ul>,
-  ol: ({ children }) => <ol className="ai-md-ol">{children}</ol>,
+  ol: ({ children, start }) => (
+    <ol className="ai-md-ol" start={start}>
+      {children}
+    </ol>
+  ),
   li: ({ children }) => <li className="ai-md-li">{children}</li>,
   table: ({ children }) => (
     <div className="ai-md-table-wrapper">

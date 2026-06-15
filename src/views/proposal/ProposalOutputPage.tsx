@@ -532,7 +532,10 @@ export default function ProposalOutputPage(): JSX.Element {
     });
   }
 
-  async function executeApprovalAction(actionType: "approve" | "reject"): Promise<void> {
+  async function executeApprovalAction(
+    actionType: "approve" | "reject",
+    signal: AbortSignal
+  ): Promise<void> {
     const status = actionType === "approve" ? "approved" : "rejected";
     const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
     const successMessage =
@@ -545,8 +548,11 @@ export default function ProposalOutputPage(): JSX.Element {
     try {
       // Update approval status in backend
       logger.info(`[Approval Flow] Calling API to update approval status to: ${status}`);
-      await updateApprovalStatus(proposalId, status);
+      await updateApprovalStatus(proposalId, status, signal);
       logger.info(`[Approval Flow] API call successful - approval status updated to: ${status}`);
+
+      // User may have clicked Cancel while the request was in-flight but it already completed
+      if (signal.aborted) return;
 
       // Remove from drafts via API
       try {
@@ -557,6 +563,8 @@ export default function ProposalOutputPage(): JSX.Element {
       } catch (draftError) {
         logger.error("Failed to remove draft:", draftError);
       }
+
+      if (signal.aborted) return;
 
       // CRITICAL: Invalidate cache FIRST to ensure history page fetches fresh data
       logger.info(`[Approval Flow] Invalidating Zustand cache to force fresh data fetch`);
@@ -576,8 +584,14 @@ export default function ProposalOutputPage(): JSX.Element {
 
       logger.info(`[Approval Flow] Redirecting to /history in 500ms`);
       await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (signal.aborted) return;
+
       router.push("/history");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       const message = error instanceof Error ? error.message : `Failed to ${actionType} proposal`;
       toast.error(message);
       throw error;

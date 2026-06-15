@@ -26,9 +26,7 @@ export default function TableRenderer({ content }: TableRendererProps): JSX.Elem
   if (!parsed) {
     return (
       <div className="proposal-section-content">
-        <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13 }}>
-          {content}
-        </pre>
+        <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13 }}>{content}</pre>
       </div>
     );
   }
@@ -39,24 +37,26 @@ export default function TableRenderer({ content }: TableRendererProps): JSX.Elem
     <div className="proposal-section-content">
       {preText && <p style={{ marginBottom: 16 }}>{preText}</p>}
 
-      <table className="content-table">
-        <thead>
-          <tr>
-            {headers.map((h, i) => (
-              <th key={i}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={ri}>
-              {row.map((cell, ci) => (
-                <td key={ci}>{cell}</td>
+      <div className="content-table-wrapper" style={{ margin: "16px 0" }}>
+        <table className="content-table">
+          <thead>
+            <tr>
+              {headers.map((h, i) => (
+                <th key={i}>{h}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri}>
+                {row.map((cell, ci) => (
+                  <td key={ci}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {postText && <p style={{ marginTop: 16 }}>{postText}</p>}
     </div>
