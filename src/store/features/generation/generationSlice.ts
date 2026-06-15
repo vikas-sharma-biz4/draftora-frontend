@@ -5,21 +5,21 @@
  * This store is backend-authoritative - it only reflects what the backend sends.
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 type GenerationStatus =
-  | 'queued'
-  | 'initializing'
-  | 'parsing'
-  | 'validating'
-  | 'planning'
-  | 'generating'
-  | 'refining'
-  | 'finalizing'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+  | "queued"
+  | "initializing"
+  | "parsing"
+  | "validating"
+  | "planning"
+  | "generating"
+  | "refining"
+  | "finalizing"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 interface GenerationState {
   // Core state
@@ -28,25 +28,25 @@ interface GenerationState {
   status: GenerationStatus;
   currentStage: string | null;
   progressPercent: number;
-  
+
   // Section tracking
   totalSections: number;
   completedSections: number;
   currentSection: string | null;
   selectedSections: string[];
   completedSectionKeys: string[];
-  
+
   // Connection state
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
   reconnectCount: number;
-  
+
   // Timing
   startedAt: string | null;
   completedAt: string | null;
   estimatedSecondsRemaining: number | null;
-  
+
   // Actions
   setProposalId: (id: number) => void;
   setJobId: (id: string) => void;
@@ -68,10 +68,30 @@ interface GenerationState {
   reset: () => void;
 }
 
-const INITIAL_STATE: Omit<GenerationState, 'setProposalId' | 'setJobId' | 'setStatus' | 'setCurrentStage' | 'setProgressPercent' | 'setCurrentSection' | 'setSelectedSections' | 'addCompletedSection' | 'setCompletedSections' | 'setTotalSections' | 'setConnectionState' | 'setError' | 'incrementReconnectCount' | 'resetReconnectCount' | 'setStartedAt' | 'setCompletedAt' | 'setEstimatedSecondsRemaining' | 'reset'> = {
+const INITIAL_STATE: Omit<
+  GenerationState,
+  | "setProposalId"
+  | "setJobId"
+  | "setStatus"
+  | "setCurrentStage"
+  | "setProgressPercent"
+  | "setCurrentSection"
+  | "setSelectedSections"
+  | "addCompletedSection"
+  | "setCompletedSections"
+  | "setTotalSections"
+  | "setConnectionState"
+  | "setError"
+  | "incrementReconnectCount"
+  | "resetReconnectCount"
+  | "setStartedAt"
+  | "setCompletedAt"
+  | "setEstimatedSecondsRemaining"
+  | "reset"
+> = {
   proposalId: null,
   jobId: null,
-  status: 'queued',
+  status: "queued",
   currentStage: null,
   progressPercent: 0,
   totalSections: 0,
@@ -92,7 +112,7 @@ export const useGenerationStore = create<GenerationState>()(
   persist(
     (set) => ({
       ...INITIAL_STATE,
-      
+
       setProposalId: (id) => set({ proposalId: id }),
       setJobId: (id) => set({ jobId: id }),
       setStatus: (status) => set({ status }),
@@ -100,10 +120,11 @@ export const useGenerationStore = create<GenerationState>()(
       setProgressPercent: (percent) => set({ progressPercent: percent }),
       setCurrentSection: (section) => set({ currentSection: section }),
       setSelectedSections: (sections) => set({ selectedSections: sections }),
-      addCompletedSection: (section) => set((state) => ({
-        completedSectionKeys: [...state.completedSectionKeys, section],
-        completedSections: state.completedSections + 1,
-      })),
+      addCompletedSection: (section) =>
+        set((state) => ({
+          completedSectionKeys: [...state.completedSectionKeys, section],
+          completedSections: state.completedSections + 1,
+        })),
       setCompletedSections: (count) => set({ completedSections: count }),
       setTotalSections: (count) => set({ totalSections: count }),
       setConnectionState: (isConnected, isConnecting) => set({ isConnected, isConnecting }),
@@ -113,11 +134,11 @@ export const useGenerationStore = create<GenerationState>()(
       setStartedAt: (timestamp) => set({ startedAt: timestamp }),
       setCompletedAt: (timestamp) => set({ completedAt: timestamp }),
       setEstimatedSecondsRemaining: (seconds) => set({ estimatedSecondsRemaining: seconds }),
-      
+
       reset: () => set(INITIAL_STATE),
     }),
     {
-      name: 'generation-storage',
+      name: "generation-storage",
       // Only persist certain fields
       partialize: (state) => ({
         proposalId: state.proposalId,
@@ -135,12 +156,3 @@ export const useGenerationStore = create<GenerationState>()(
     }
   )
 );
-
-// Selectors for common use cases
-export const selectGenerationStatus = (state: GenerationState) => state.status;
-export const selectGenerationProgress = (state: GenerationState) => state.progressPercent;
-export const selectIsGenerating = (state: GenerationState) => 
-  ['queued', 'initializing', 'parsing', 'validating', 'planning', 'generating', 'refining', 'finalizing'].includes(state.status);
-export const selectIsCompleted = (state: GenerationState) => state.status === 'completed';
-export const selectIsFailed = (state: GenerationState) => state.status === 'failed';
-export const selectIsCancelled = (state: GenerationState) => state.status === 'cancelled';

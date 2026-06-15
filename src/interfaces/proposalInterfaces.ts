@@ -41,16 +41,6 @@ export type TemplateType =
   | "architecture"
   | "sow";
 
-export interface OriginalSection {
-  id: string;
-  title: string;
-  content: string;
-  order: number;
-  type: "text" | "table" | "mixed";
-  level?: number;
-  parentId?: string;
-}
-
 export interface FileMeta {
   name: string;
   size: number;

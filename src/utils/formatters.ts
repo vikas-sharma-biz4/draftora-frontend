@@ -1,27 +1,6 @@
 /**
- * Data formatting utilities — currency, numbers, dates, strings
+ * Data formatting utilities — dates, files, strings
  */
-
-export function formatCurrency(amount: number, currency = "USD", locale = "en-US"): string {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-export function formatNumber(
-  value: number,
-  options?: Intl.NumberFormatOptions,
-  locale = "en-US"
-): string {
-  return new Intl.NumberFormat(locale, options).format(value);
-}
-
-export function formatPercent(value: number, decimals = 1): string {
-  return `${value.toFixed(decimals)}%`;
-}
 
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
