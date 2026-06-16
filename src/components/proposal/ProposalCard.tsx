@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { FileText, Download } from "lucide-react";
 import { toast } from "@/utils/toast";
 
 import StatusBadge from "@/components/common/StatusBadge";
-import { getDownloadUrl } from "@/services/proposal.service";
+import { getDownloadUrl } from "@/services/proposal";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 import { formatDate } from "@/utils/dateUtils";
 import styles from "./ProposalCard.module.scss";

@@ -3,40 +3,34 @@
  */
 
 export interface AuthUser {
-  id:         number;
-  name:       string;
-  email:      string;
-  role:       string;
+  id: number;
+  name: string;
+  email: string;
+  role: string;
   avatarUrl?: string;
 }
 
 export interface AuthTokens {
-  accessToken:  string;
+  accessToken: string;
   refreshToken: string;
-  expiresIn:    number;
+  expiresIn: number;
 }
 
 export interface LoginCredentials {
-  email:    string;
+  email: string;
   password: string;
 }
 
 export interface LoginResponse {
-  user:   AuthUser;
+  user: AuthUser;
   tokens: AuthTokens;
 }
 
-export interface RegisterPayload {
-  name:     string;
-  email:    string;
-  password: string;
-}
-
 export interface AuthState {
-  user:         AuthUser | null;
-  accessToken:  string | null;
+  user: AuthUser | null;
+  accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
-  isLoading:    boolean;
-  error:        string | null;
+  isLoading: boolean;
+  error: string | null;
 }

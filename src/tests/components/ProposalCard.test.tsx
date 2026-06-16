@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+﻿import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 
@@ -33,7 +33,7 @@ jest.mock("@/utils/toast", () => ({
   },
 }));
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   getDownloadUrl: (id: number) => `/download/${id}`,
 }));
 
