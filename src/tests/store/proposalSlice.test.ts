@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for proposalSlice Zustand store
  *
  * Coverage targets:
@@ -15,7 +15,7 @@
  */
 
 import { useProposalStore, INITIAL_PROPOSAL_STATE } from "@/store/features/proposals/proposalSlice";
-import * as proposalApi from "@/services/proposal.service";
+import * as proposalApi from "@/services/proposal";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ const mockProposals: ProposalListItem[] = [
   },
 ];
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   listProposals: jest.fn(),
   listProposalHistory: jest.fn(),
 }));

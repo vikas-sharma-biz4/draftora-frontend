@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ import { useClientDocuments } from "@/hooks/useClientDocuments";
 import { useClientProposals } from "@/hooks/useClientProposals";
 import { formatDate } from "@/utils/dateUtils";
 import PageLayout from "@/layouts/AppLayout";
-import ClientDetailSkeleton from "@/components/common/skeletons/ClientDetailSkeleton";
+import ClientDetailSkeleton from "@/components/common/Skeletons/ClientDetailSkeleton";
 import ClientDocumentsPanel from "./components/ClientDocumentsPanel";
 import ClientProposalsList from "./components/ClientProposalsList";
 
