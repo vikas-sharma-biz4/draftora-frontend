@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { cancelProposal, getProposalStatus } from "@/services/proposal.service";
+import { cancelProposal, getProposalStatus } from "@/services/proposal";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { logger } from "@/utils/logger";
 import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";

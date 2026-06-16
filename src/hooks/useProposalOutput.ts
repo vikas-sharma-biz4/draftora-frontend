@@ -1,6 +1,6 @@
-/**
+﻿/**
  * Hook for managing proposal fetching and polling
- * 
+ *
  * Handles:
  * - Fetching proposal data from backend
  * - Polling for status updates during generation
@@ -8,11 +8,11 @@
  * - Setting active section when proposal loads
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { getProposal } from '@/services/proposal.service';
-import type { ProposalData } from '@/interfaces/proposalInterfaces';
-import { logger } from '@/utils/logger';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { getProposal } from "@/services/proposal";
+import type { ProposalData } from "@/interfaces/proposalInterfaces";
+import { logger } from "@/utils/logger";
 
 interface UseProposalOutputOptions {
   proposalId: number;
@@ -31,12 +31,12 @@ interface UseProposalOutputReturn {
 export function useProposalOutput(options: UseProposalOutputOptions): UseProposalOutputReturn {
   const { proposalId, onProposalLoaded } = options;
   const router = useRouter();
-  
+
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string>('');
-  const [activeSection, setActiveSection] = useState<string>('');
-  
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [activeSection, setActiveSection] = useState<string>("");
+
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchProposal = useCallback(async (): Promise<void> => {
@@ -44,10 +44,10 @@ export function useProposalOutput(options: UseProposalOutputOptions): UseProposa
       const data = await getProposal(proposalId);
       setProposal(data);
 
-      if (data.status === 'completed') {
+      if (data.status === "completed") {
         setIsLoading(false);
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-        
+
         const sections = data.selectedSections ?? [];
         if (sections.length > 0 && !activeSection) {
           setActiveSection(sections[0]);
@@ -57,9 +57,9 @@ export function useProposalOutput(options: UseProposalOutputOptions): UseProposa
         return;
       }
 
-      if (data.status === 'failed') {
+      if (data.status === "failed") {
         setIsLoading(false);
-        setErrorMessage('Proposal generation failed. Please go back and try again.');
+        setErrorMessage("Proposal generation failed. Please go back and try again.");
         if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
         return;
       }
@@ -68,8 +68,8 @@ export function useProposalOutput(options: UseProposalOutputOptions): UseProposa
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       router.replace(`/generating/${proposalId}`);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load proposal.';
-      logger.error('[useProposalOutput] Failed to fetch proposal:', err);
+      const message = err instanceof Error ? err.message : "Failed to load proposal.";
+      logger.error("[useProposalOutput] Failed to fetch proposal:", err);
       setErrorMessage(message);
       setIsLoading(false);
     }

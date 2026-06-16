@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Proposal service barrel
  *
  * Re-exports all proposal-related service functions from their
  * single-responsibility sub-modules. Import from @/services/proposal
- * or from the legacy path @/services/proposal.service (both resolve here).
+ * or from the legacy path @/services/proposal (both resolve here).
  *
  * Sub-modules:
  *   proposalCrud.service.ts     — create, get, list, download, cancel, approval
@@ -18,18 +18,24 @@ export {
   getProposalStatus,
   getProposal,
   listProposals,
+  listProposalHistory,
   getDownloadUrl,
   cancelProposal,
   updateApprovalStatus,
   estimateProposalHours,
 } from "./proposalCrud.service";
 
-export type { ProposalStatus, ListProposalsParams } from "./proposalCrud.service";
+export type {
+  ProposalStatus,
+  ListProposalsParams,
+  PaginatedProposalResponse,
+} from "./proposalCrud.service";
 
 // Sections
 export {
   updateSection,
   regenerateSection,
+  regenerateSelection,
   addProposalSection,
   removeProposalSection,
   reorderProposalSections,

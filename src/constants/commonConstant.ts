@@ -2,21 +2,6 @@ import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
 export const SIDEBAR_LOGO_SRC = "/images/new%20logo%203.png";
 
-export const AI_MODEL_OPTIONS = [
-  {
-    value: "gpt-5.4",
-    label: "GPT-5.4",
-    provider: "OpenAI",
-    description: "Fast, highly capable model. Best for most proposals.",
-  },
-  {
-    value: "claude-sonnet-4-6",
-    label: "Claude Sonnet 4.6",
-    provider: "Anthropic",
-    description: "Exceptional writing quality and nuanced language.",
-  },
-] as const;
-
 export const TONE_OPTIONS = [
   {
     value: "professional",
@@ -409,17 +394,6 @@ export const INDUSTRIES = [
   "Consulting",
   "Other",
 ] as const;
-
-export const PIPELINE_STAGES = [
-  "Discovery",
-  "Qualification",
-  "Proposal",
-  "Negotiation",
-  "Closed Won",
-  "Closed Lost",
-] as const;
-
-export const CLIENT_TIERS = ["Enterprise", "Mid-Market", "Small Business"] as const;
 
 // ── Template TOCs (Table of Contents) ───────────────────────────────────────────
 // Maps template types to their predefined section structures
