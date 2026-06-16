@@ -18,15 +18,15 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+      "node node_modules/eslint/bin/eslint.js --fix",
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ],
     "*.{js,jsx,mjs}": [
-      "eslint --fix",
-      "prettier --write"
+      "node node_modules/eslint/bin/eslint.js --fix",
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ],
     "*.{css,scss,json,md}": [
-      "prettier --write"
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ]
   },
   "dependencies": {
