@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -10,7 +10,7 @@ import Button from "@/components/common/Button";
 
 import styles from "./ReviewPage.module.scss";
 
-import { generateProposal, getProposal } from "@/services/proposal.service";
+import { generateProposal, getProposal } from "@/services/proposal";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import {

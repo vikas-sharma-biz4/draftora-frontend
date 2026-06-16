@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for useProposalOutput hook
  *
  * Coverage targets:
@@ -15,7 +15,7 @@
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useProposalOutput } from "@/hooks/useProposalOutput";
-import * as proposalService from "@/services/proposal.service";
+import * as proposalService from "@/services/proposal";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ jest.mock("next/navigation", () => {
   };
 });
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   getProposal: jest.fn(),
 }));
 

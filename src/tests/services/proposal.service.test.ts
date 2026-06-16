@@ -1,4 +1,4 @@
-import {
+﻿import {
   generateProposal,
   getProposal,
   getDownloadUrl,
@@ -12,7 +12,7 @@ import {
   parseCustomTemplate,
   parseFiles,
   getSupportedParseFormats,
-} from "@/services/proposal.service";
+} from "@/services/proposal";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------

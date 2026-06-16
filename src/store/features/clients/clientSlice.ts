@@ -50,7 +50,7 @@ interface ClientState {
   fetchClients: (force?: boolean) => Promise<void>;
   setClients: (clients: ClientWithDocuments[]) => void;
   addClient: (client: ClientWithDocuments) => void;
-  updateClient: (id: number, updates: Partial<Client>) => void;
+  updateClientLocally: (id: number, updates: Partial<Client>) => void;
   removeClient: (id: number) => void;
   invalidateCache: () => void;
 
@@ -61,7 +61,7 @@ interface ClientState {
 
   // Mutation wrappers
   createClient: (data: CreateClientRequest) => Promise<{ id: number; name: string }>;
-  updateClientApi: (clientId: number, data: UpdateClientRequest) => Promise<Client>;
+  updateClient: (clientId: number, data: UpdateClientRequest) => Promise<Client>;
   deleteClient: (clientId: number) => Promise<void>;
   uploadDocument: (clientId: number, file: File) => Promise<ClientDocument | undefined>;
   deleteDocument: (clientId: number, documentId: number) => Promise<void>;
@@ -136,7 +136,7 @@ export const useClientStore = create<ClientState>()(
         }));
       },
 
-      updateClient: (id: number, updates: Partial<Client>) => {
+      updateClientLocally: (id: number, updates: Partial<Client>) => {
         set((state) => ({
           clients: state.clients.map((c) => (c.id === id ? { ...c, ...updates } : c)),
           lastFetched: Date.now(),
@@ -243,9 +243,9 @@ export const useClientStore = create<ClientState>()(
         return newClient;
       },
 
-      updateClientApi: async (clientId: number, data: UpdateClientRequest) => {
+      updateClient: async (clientId: number, data: UpdateClientRequest) => {
         const updatedClient = await clientApi.updateClient(clientId, data);
-        get().updateClient(clientId, updatedClient);
+        get().updateClientLocally(clientId, updatedClient);
         return updatedClient;
       },
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for useProposalApproval hook
  *
  * Coverage targets:
@@ -33,7 +33,7 @@ jest.mock("@/hooks/useProposalDownload", () => ({
   }),
 }));
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   updateApprovalStatus: jest.fn(),
 }));
 
@@ -71,7 +71,7 @@ jest.mock("@/constants/messages", () => ({
   },
 }));
 
-import * as proposalService from "@/services/proposal.service";
+import * as proposalService from "@/services/proposal";
 import * as draftService from "@/services/draft.service";
 import * as proposalVersionCache from "@/utils/proposalVersionCache";
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ProposalSidebar component
  *
  * Handles sidebar section management including:
@@ -38,7 +38,7 @@ import {
   addProposalSection,
   removeProposalSection,
   reorderProposalSections,
-} from "@/services/proposal.service";
+} from "@/services/proposal";
 import AddSectionModal from "@/components/modals/AddSectionModal";
 import { generateFormatRules } from "@/utils/formatRules";
 
