@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for useProposalDownload hook
  *
  * Coverage targets:
@@ -16,13 +16,13 @@
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
-import * as proposalService from "@/services/proposal.service";
+import * as proposalService from "@/services/proposal";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   getDownloadUrl: jest.fn((id: number) => `https://api.test/download/${id}`),
 }));
 

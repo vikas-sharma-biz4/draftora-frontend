@@ -1,4 +1,4 @@
-/**
+﻿/**
  * SectionManager component
  *
  * Manages the table of contents section list:
@@ -18,7 +18,7 @@ import Button from "@/components/common/Button";
 import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import type { ProposalWizardData } from "@/interfaces/proposalInterfaces";
-import type { SectionRecommendation } from "@/services/proposal.service";
+import type { SectionRecommendation } from "@/services/proposal";
 import { logger } from "@/utils/logger";
 import AddSectionModal from "@/components/modals/AddSectionModal";
 

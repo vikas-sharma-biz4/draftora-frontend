@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -20,7 +20,7 @@ import PageLayout from "@/layouts/AppLayout";
 import PageHeader from "@/components/common/PageHeader";
 import EmptyState from "@/components/common/EmptyState";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
-import ClientCardSkeleton from "@/components/common/skeletons/ClientCardSkeleton";
+import ClientCardSkeleton from "@/components/common/Skeletons/ClientCardSkeleton";
 
 const TemplateSelectionModal = dynamic(
   () => import("@/components/modals/TemplateSelectionModal/TemplateSelectionModal"),

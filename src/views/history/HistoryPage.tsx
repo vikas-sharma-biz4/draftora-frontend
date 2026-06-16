@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { History, Download, Eye, Loader2 } from "lucide-react";
@@ -18,7 +18,7 @@ import EmptyState from "@/components/common/EmptyState";
 import PageHeader from "@/components/common/PageHeader";
 import SearchBar from "@/components/common/SearchBar/SearchBar";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
-import HistoryCardSkeleton from "@/components/common/skeletons/HistoryCardSkeleton";
+import HistoryCardSkeleton from "@/components/common/Skeletons/HistoryCardSkeleton";
 import StatusBadge from "@/components/common/StatusBadge";
 
 type StatusFilter = "all" | "approved" | "rejected";

@@ -27,7 +27,7 @@ export default function EditClientModal({
   onClose,
   onClientUpdated,
 }: EditClientModalProps): JSX.Element | null {
-  const updateClientInStore = useClientStore((state) => state.updateClientApi);
+  const updateClientInStore = useClientStore((state) => state.updateClient);
   const [mounted, setMounted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
