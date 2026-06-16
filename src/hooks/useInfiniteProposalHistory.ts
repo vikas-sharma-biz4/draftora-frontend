@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Custom hook for infinite scroll pagination of proposal history
  *
  * Provides automatic loading of more proposals as user scrolls
@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
-import * as proposalApi from "@/services/proposal.service";
+import * as proposalApi from "@/services/proposal";
 import { logger } from "@/utils/logger";
 import { usePageVisibility } from "@/hooks/usePageVisibility";
 

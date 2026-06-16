@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Zustand store for proposal state management with smart caching
  *
  * Shared between Dashboard and History pages to eliminate duplicate API calls
@@ -14,7 +14,7 @@
 
 import { create } from "zustand";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
-import * as proposalApi from "@/services/proposal.service";
+import * as proposalApi from "@/services/proposal";
 import { sortByCreatedAtDesc } from "@/utils/sortUtils";
 
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes

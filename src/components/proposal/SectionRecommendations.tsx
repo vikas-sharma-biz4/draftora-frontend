@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "@/utils/toast";
-import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposal.service";
+import { getSectionRecommendations, type SectionRecommendation } from "@/services/proposal";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 import Spinner from "@/components/common/Spinner";
 import styles from "./SectionRecommendations.module.scss";
@@ -177,6 +177,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       });
 
       onAddSection(sectionKey, rec.sectionTitle, rec, index);
+      toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
 
       // Remove from recommendations list
       setRecommendations((prev) => prev.filter((_, i) => i !== index));

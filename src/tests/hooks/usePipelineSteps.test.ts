@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for usePipelineSteps hook
  *
  * Coverage targets:
@@ -16,14 +16,14 @@
 
 import { renderHook, act } from "@testing-library/react";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
-import * as proposalService from "@/services/proposal.service";
+import * as proposalService from "@/services/proposal";
 import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   getProposalStatus: jest.fn(),
   markProposalStepVisited: jest.fn(),
   validateProposalStepAccess: jest.fn(),

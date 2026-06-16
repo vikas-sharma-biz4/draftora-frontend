@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -14,7 +14,7 @@ import {
   updateApprovalStatus,
   reorderProposalSections,
   estimateProposalHours,
-} from "@/services/proposal.service";
+} from "@/services/proposal";
 import { HttpError } from "@/config/httpClient";
 import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";

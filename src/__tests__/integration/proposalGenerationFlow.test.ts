@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration tests for proposal generation flow
  *
  * Tests the complete end-to-end generation flow from API call
@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useProposalGenerationStream } from "@/hooks/useProposalGenerationStream";
 import { useGenerationStore } from "@/store/features/generation/generationSlice";
-import { generateProposal } from "@/services/proposal.service";
+import { generateProposal } from "@/services/proposal";
 import type {
   ProposalData,
   ToneOption,

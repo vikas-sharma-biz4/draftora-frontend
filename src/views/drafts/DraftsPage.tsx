@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ import EmptyState from "@/components/common/EmptyState";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
 import TemplateSelectionModal from "@/components/modals/TemplateSelectionModal/TemplateSelectionModal";
 import NewClientModal from "@/components/modals/NewClientModal";
-import DraftCardSkeleton from "@/components/common/skeletons/DraftCardSkeleton";
+import DraftCardSkeleton from "@/components/common/Skeletons/DraftCardSkeleton";
 
 const DeleteDraftModal = dynamic(() => import("@/components/modals/DeleteDraftModal"), {
   ssr: false,
