@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
-import { getDownloadUrl } from "@/services/proposal.service";
+import { getDownloadUrl } from "@/services/proposal";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import { MESSAGES } from "@/constants/messages";
@@ -36,7 +36,9 @@ export function useProposalDownload(): UseProposalDownloadReturn {
       if (!response.ok) {
         const errorText = await response.text();
         logger.error("[useProposalDownload] Download error response:", errorText);
-        throw new Error(`${MESSAGES.PROPOSAL_DOWNLOAD_FAILED}: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `${MESSAGES.PROPOSAL_DOWNLOAD_FAILED}: ${response.status} ${response.statusText}`
+        );
       }
 
       const blob = await response.blob();
@@ -64,7 +66,9 @@ export function useProposalDownload(): UseProposalDownloadReturn {
       logger.debug("[useProposalDownload] Using filename:", filename);
 
       // Create blob with correct MIME type for Word documents
-      const docxBlob = new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const docxBlob = new Blob([blob], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
       const downloadUrl = window.URL.createObjectURL(docxBlob);
       const a = document.createElement("a");
       a.href = downloadUrl;

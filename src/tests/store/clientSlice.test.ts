@@ -7,7 +7,7 @@
  *   - fetchClients: cache-hit skip, concurrent-guard skip, success, error
  *   - addDocument: client found (appends), client not found (mock client created)
  *   - removeDocument, updateDocument
- *   - createClient, updateClientApi
+ *   - createClient, updateClient
  *   - deleteClient: success, 404 (still removes), non-404 rethrows
  *   - uploadDocument: success (merges file size), 404 returns undefined, other error rethrows
  *   - deleteDocument: optimistic remove is immediate; API error is swallowed (H3 regression guard)
@@ -247,9 +247,9 @@ describe("clientSlice — basic CRUD actions", () => {
     expect(useClientStore.getState().total).toBe(2);
   });
 
-  it("updateClient patches matching client fields", () => {
+  it("updateClientLocally patches matching client fields", () => {
     useClientStore.setState({ clients: [makeClient(1)] });
-    useClientStore.getState().updateClient(1, { name: "Renamed" });
+    useClientStore.getState().updateClientLocally(1, { name: "Renamed" });
     expect(useClientStore.getState().clients[0].name).toBe("Renamed");
   });
 
@@ -335,10 +335,10 @@ describe("clientSlice — removeDocument / updateDocument", () => {
 });
 
 // ---------------------------------------------------------------------------
-// createClient / updateClientApi
+// createClient / updateClient
 // ---------------------------------------------------------------------------
 
-describe("clientSlice — createClient / updateClientApi", () => {
+describe("clientSlice — createClient / updateClient", () => {
   it("createClient calls API and adds full client to store", async () => {
     mockCreateClient.mockResolvedValueOnce({ id: 5, name: "New Client" });
     mockGetClient.mockResolvedValueOnce(makeClient(5));
@@ -352,11 +352,11 @@ describe("clientSlice — createClient / updateClientApi", () => {
     expect(useClientStore.getState().clients.find((c) => c.id === 5)).toBeDefined();
   });
 
-  it("updateClientApi patches client in store after API call", async () => {
+  it("updateClient patches client in store after API call", async () => {
     useClientStore.setState({ clients: [makeClient(1)] });
     mockUpdateClient.mockResolvedValueOnce({ ...makeClient(1), name: "Updated" });
 
-    await useClientStore.getState().updateClientApi(1, { name: "Updated" });
+    await useClientStore.getState().updateClient(1, { name: "Updated" });
 
     expect(useClientStore.getState().clients.find((c) => c.id === 1)?.name).toBe("Updated");
   });

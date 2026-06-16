@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for useInfiniteProposalHistory hook
  *
  * Coverage targets:
@@ -18,14 +18,14 @@
 
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useInfiniteProposalHistory } from "@/hooks/useInfiniteProposalHistory";
-import * as proposalApi from "@/services/proposal.service";
+import * as proposalApi from "@/services/proposal";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock("@/services/proposal.service", () => ({
+jest.mock("@/services/proposal", () => ({
   listProposalHistory: jest.fn(),
 }));
 

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useProposalPageData — data fetching hook for ProposalOutputPage
  *
  * Encapsulates:
@@ -24,7 +24,7 @@ import {
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
-import { getProposal } from "@/services/proposal.service";
+import { getProposal } from "@/services/proposal";
 
 // Statuses that indicate the proposal is actively being generated on the backend.
 // Only these statuses should trigger a redirect to the generating page.

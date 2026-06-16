@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Zustand store for proposal wizard state
  *
  * Migrated from ProposalWizardContext (React Context) to Zustand to allow
@@ -19,7 +19,7 @@ import { DEFAULT_AI_MODEL } from "@/config/config";
 import { DEFAULT_SELECTED_SECTIONS, PROPOSAL_WIZARD_STORAGE_KEY } from "@/constants";
 import type { ProposalWizardData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { logger } from "@/utils/logger";
-import { getSectionRecommendations } from "@/services/proposal.service";
+import { getSectionRecommendations } from "@/services/proposal";
 import type { SectionRecommendation } from "@/services/proposal/templateParser.service";
 import { SECTION_DISPLAY_NAMES } from "@/constants";
 
@@ -44,7 +44,7 @@ export const DEFAULT_PROPOSAL_DATA: ProposalWizardData = {
   templateType: "scratch",
 };
 
-export const INITIAL_WIZARD_STATE = {
+const INITIAL_WIZARD_STATE = {
   proposalData: DEFAULT_PROPOSAL_DATA,
   currentStep: 1 as WizardStep,
   isGenerating: false,

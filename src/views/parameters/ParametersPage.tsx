@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -6,7 +6,7 @@ import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import dynamic from "next/dynamic";
 import Button from "@/components/common/Button";
-import { getProposal } from "@/services/proposal.service";
+import { getProposal } from "@/services/proposal";
 
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 import {
@@ -44,7 +44,7 @@ import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import SectionRecommendations, {
   type SectionRecommendationsRef,
 } from "@/components/proposal/SectionRecommendations";
-import type { SectionRecommendation } from "@/services/proposal.service";
+import type { SectionRecommendation } from "@/services/proposal";
 import SectionManager from "./SectionManager";
 import ToneSelector from "./ToneSelector";
 import LengthLanguageSelector from "./LengthLanguageSelector";
