@@ -1,0 +1,48 @@
+.loadingState {
+  padding: 2rem;
+}
+
+.errorContainer {
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.errorCard {
+  padding: 2rem;
+  text-align: center;
+}
+
+.errorHeading {
+  color: var(--color-danger);
+  margin-bottom: 1rem;
+}
+
+.errorMessage {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.errorActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.historyBanner {
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  background: var(--color-surface-raised, #f8f9ff);
+  border-left: 3px solid var(--color-primary, #6366f1);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.historyBannerVersion {
+  font-family: monospace;
+}
+
+.historyBannerStatus {
+  text-transform: capitalize;
+}

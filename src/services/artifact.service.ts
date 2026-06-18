@@ -96,6 +96,14 @@ export async function generateArtifact(data: ArtifactGenerateRequest): Promise<G
     };
   }
 
+  if (data.ndaMetadata) {
+    body.nda_metadata = {
+      client_name: data.ndaMetadata.clientName,
+      client_company: data.ndaMetadata.clientCompany,
+      date: data.ndaMetadata.date,
+    };
+  }
+
   const result = await http.post<ArtifactApiShape>("/artifacts/generate", body, {
     requestTimeout: 60_000,
   });

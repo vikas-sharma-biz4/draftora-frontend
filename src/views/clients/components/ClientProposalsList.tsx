@@ -58,6 +58,7 @@ export default function ClientProposalsList({
   } = proposals;
 
   const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<"" | "draft" | "approved" | "rejected">("");
   const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
 
   // Build unique type list from BOTH proposals and drafts so the filter
@@ -69,15 +70,23 @@ export default function ClientProposalsList({
     ]),
   ].sort();
 
-  // Apply type filter to proposals
-  const displayedProposals = selectedType
-    ? filteredProposals.filter((p) => getTemplateTypeLabel(p) === selectedType)
-    : filteredProposals;
+  // Apply type + status filters to proposals
+  const displayedProposals = (
+    selectedType
+      ? filteredProposals.filter((p) => getTemplateTypeLabel(p) === selectedType)
+      : filteredProposals
+  ).filter((p) => {
+    if (!selectedStatus) return true;
+    if (selectedStatus === "draft") return p.approvalStatus === "pending";
+    return p.approvalStatus === selectedStatus;
+  });
 
-  // Apply type filter to drafts using the same label function
-  const displayedDrafts = selectedType
-    ? filteredDraftRows.filter((d) => getDraftTypeLabel(d.templateType) === selectedType)
-    : filteredDraftRows;
+  // Apply type + status filters to drafts (drafts are always "Draft" status)
+  const displayedDrafts = (
+    selectedType
+      ? filteredDraftRows.filter((d) => getDraftTypeLabel(d.templateType) === selectedType)
+      : filteredDraftRows
+  ).filter(() => !selectedStatus || selectedStatus === "draft");
 
   // Close 3-dot menu on outside click
   useEffect(() => {
@@ -124,12 +133,32 @@ export default function ClientProposalsList({
             }}
             aria-label="Filter by type"
           >
-            <option value="">Filter</option>
+            <option value="" disabled hidden>
+              Filter
+            </option>
             {uniqueTypes.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
             ))}
+          </select>
+        )}
+        {!isLoadingProposals && (
+          <select
+            className={styles.filterSelect}
+            value={selectedStatus}
+            onChange={(e) => {
+              setSelectedStatus(e.target.value as typeof selectedStatus);
+              setOpenMenuId(null);
+            }}
+            aria-label="Filter by status"
+          >
+            <option value="" disabled hidden>
+              Status
+            </option>
+            <option value="draft">Draft</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
           </select>
         )}
       </div>

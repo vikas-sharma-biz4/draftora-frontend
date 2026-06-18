@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
+import { useSteppedModal } from "@/hooks/useSteppedModal";
 import { X, Search, ChevronDown, Save, Copy, FileDown, FileText } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
@@ -10,6 +11,7 @@ import { EMAIL_TEMPLATES } from "@/constants/artifactTemplates";
 import { generateArtifact, listArtifacts, updateArtifact } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
+import { downloadBlob } from "@/utils/downloadBlob";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
@@ -27,8 +29,6 @@ interface GenerateEmailModalProps {
   initialProposalId?: number;
 }
 
-type ModalStep = 1 | 2;
-
 const DEFAULT_OPTIONS: ArtifactOptions = {
   includeSummary: true,
   includeScope: true,
@@ -41,8 +41,17 @@ export default function GenerateEmailModal({
   onClose,
   initialProposalId,
 }: GenerateEmailModalProps): JSX.Element | null {
-  const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<ModalStep>(1);
+  const {
+    mounted,
+    step,
+    setStep,
+    showVersionDropdown,
+    setShowVersionDropdown,
+    isGenerating,
+    setIsGenerating,
+    isSaving,
+    setIsSaving,
+  } = useSteppedModal(onClose);
 
   // Step 1 state
   const {
@@ -64,16 +73,9 @@ export default function GenerateEmailModal({
   const [artifacts, setArtifacts] = useState<GeneratedArtifact[]>([]);
   const [currentArtifact, setCurrentArtifact] = useState<GeneratedArtifact | null>(null);
   const [editorContent, setEditorContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
 
   const { isDownloading, downloadArtifact, isPdfDownloading, downloadArtifactPdf } =
     useArtifactDownload();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // When opened from a specific proposal, auto-load its version history
   useEffect(() => {
@@ -81,18 +83,6 @@ export default function GenerateEmailModal({
       void loadVersionHistory(initialProposalId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Close version dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-version-dropdown]")) {
-        setShowVersionDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const filteredProposals = clientProposals.filter((p) =>
@@ -182,17 +172,7 @@ export default function GenerateEmailModal({
 
   function handleExportHtml(): void {
     if (!currentArtifact) return;
-    const blob = new Blob([editorContent], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${currentArtifact.title}.html`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 300);
+    downloadBlob(editorContent, `${currentArtifact.title}.html`, "text/html;charset=utf-8");
   }
 
   function handleSelectVersion(artifact: GeneratedArtifact): void {
@@ -216,11 +196,18 @@ export default function GenerateEmailModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={`${styles.modal} ${step === 2 ? styles.modalWide : ""}`}>
+      <div
+        className={`${styles.modal} ${step === 2 ? styles.modalWide : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="email-modal-title"
+      >
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.title}>Generate Email</span>
+            <span className={styles.title} id="email-modal-title">
+              Generate Email
+            </span>
             <nav className={styles.stepNav} aria-label="Steps">
               <button
                 className={`${styles.stepNavItem} ${step === 1 ? styles.stepNavItemActive : ""}`}
@@ -448,6 +435,7 @@ export default function GenerateEmailModal({
                     className="btn btn-secondary btn-sm"
                     onClick={() => void handleSaveDraft()}
                     disabled={isSaving}
+                    aria-label="Save email draft"
                   >
                     <Save size={14} />
                     {isSaving ? "Saving…" : "Save Draft"}
@@ -455,13 +443,18 @@ export default function GenerateEmailModal({
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() => void handleCopyContent()}
+                    aria-label="Copy email content"
                   >
                     <Copy size={14} />
                     Copy
                   </button>
                 </div>
                 <div className={styles.footerRight}>
-                  <button className="btn btn-secondary btn-sm" onClick={handleExportHtml}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleExportHtml}
+                    aria-label="Export as HTML"
+                  >
                     <FileText size={14} />
                     HTML
                   </button>
@@ -472,6 +465,7 @@ export default function GenerateEmailModal({
                       void downloadArtifact(currentArtifact.id, currentArtifact.title)
                     }
                     disabled={isDownloading}
+                    aria-label="Download as DOCX"
                   >
                     <FileDown size={14} />
                     {isDownloading ? "…" : "DOCX"}
@@ -483,6 +477,7 @@ export default function GenerateEmailModal({
                       void downloadArtifactPdf(currentArtifact.id, currentArtifact.title)
                     }
                     disabled={isPdfDownloading}
+                    aria-label="Download as PDF"
                   >
                     <FileDown size={14} />
                     {isPdfDownloading ? "…" : "PDF"}

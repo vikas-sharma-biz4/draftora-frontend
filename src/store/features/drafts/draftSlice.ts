@@ -181,13 +181,12 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     get().addDraft(draftMetadata);
 
     // Persist template metadata for draft card display
-    const proposalData = payload.wizardState?.proposalData as unknown as
-      | Record<string, unknown>
-      | undefined;
+    const proposalData = payload.wizardState?.proposalData;
     if (proposalData) {
-      const templateId = (proposalData.templateId as string | null | undefined) ?? null;
-      const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
-      setDraftTemplateMeta(savedDraft.id, { templateId, templateType });
+      setDraftTemplateMeta(savedDraft.id, {
+        templateId: proposalData.templateId,
+        templateType: proposalData.templateType,
+      });
     }
 
     return savedDraft;
@@ -209,13 +208,12 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     get().updateDraft(draftId, draftMetadata);
 
     // Keep template cache in sync if payload includes wizard state
-    const proposalData = payload.wizardState?.proposalData as unknown as
-      | Record<string, unknown>
-      | undefined;
+    const proposalData = payload.wizardState?.proposalData;
     if (proposalData) {
-      const templateId = (proposalData.templateId as string | null | undefined) ?? null;
-      const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
-      setDraftTemplateMeta(draftId, { templateId, templateType });
+      setDraftTemplateMeta(draftId, {
+        templateId: proposalData.templateId,
+        templateType: proposalData.templateType,
+      });
     }
 
     return updatedDraft;

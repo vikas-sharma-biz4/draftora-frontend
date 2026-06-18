@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
+import { useSteppedModal } from "@/hooks/useSteppedModal";
 import { useQueryClient } from "@tanstack/react-query";
 import { X, Search, ChevronDown, RefreshCw, Save, FileDown } from "lucide-react";
 
@@ -37,8 +38,6 @@ interface GenerateInvoiceModalProps {
   initialProposalId?: number;
 }
 
-type ModalStep = 1 | 2;
-
 const DEFAULT_TEMPLATE_ID = INVOICE_TEMPLATES[0].id;
 
 function todayIso(): string {
@@ -52,8 +51,11 @@ function defaultInvoiceNumber(): string {
 }
 
 function formatInvoiceDate(isoDate: string): string {
+  if (!isoDate) return "";
   const d = new Date(`${isoDate}T00:00:00`);
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return isNaN(d.getTime())
+    ? isoDate
+    : d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function GenerateInvoiceModal({
@@ -63,8 +65,17 @@ export default function GenerateInvoiceModal({
 }: GenerateInvoiceModalProps): JSX.Element | null {
   const queryClient = useQueryClient();
 
-  const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<ModalStep>(1);
+  const {
+    mounted,
+    step,
+    setStep,
+    showVersionDropdown,
+    setShowVersionDropdown,
+    isGenerating,
+    setIsGenerating,
+    isSaving,
+    setIsSaving,
+  } = useSteppedModal(onClose);
 
   // ── Invoice Details Form (Step 1) ────────────────────────────────────────
   const [invoiceNumber, setInvoiceNumber] = useState<string>(defaultInvoiceNumber);
@@ -92,16 +103,9 @@ export default function GenerateInvoiceModal({
   const [artifacts, setArtifacts] = useState<GeneratedArtifact[]>([]);
   const [currentArtifact, setCurrentArtifact] = useState<GeneratedArtifact | null>(null);
   const [editorContent, setEditorContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
 
   const { isDownloading, downloadArtifact, isPdfDownloading, downloadArtifactPdf } =
     useArtifactDownload();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // When opened from a specific proposal, auto-load its milestones + version history
   useEffect(() => {
@@ -109,17 +113,6 @@ export default function GenerateInvoiceModal({
       void handleSelectProposal(initialProposalId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-version-dropdown]")) {
-        setShowVersionDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const filteredProposals = clientProposals.filter((p) =>
@@ -269,11 +262,18 @@ export default function GenerateInvoiceModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className={styles.modal}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invoice-modal-title"
+      >
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.title}>Generate Invoice</span>
+            <span className={styles.title} id="invoice-modal-title">
+              Generate Invoice
+            </span>
             <nav className={styles.stepNav} aria-label="Steps">
               <button
                 className={`${styles.stepNavItem} ${step === 1 ? styles.stepNavItemActive : ""}`}
