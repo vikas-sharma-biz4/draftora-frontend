@@ -36,3 +36,20 @@ export const INVOICE_TEMPLATES: ArtifactTemplate[] = [
       "Professional invoice with project scope line items and Biz4Group payment details.",
   },
 ];
+
+export const NDA_TEMPLATES: ArtifactTemplate[] = [
+  {
+    id: "standard_nda",
+    displayName: "Standard NDA",
+    description: "Mutual Non-Disclosure Agreement between Biz4Group LLC and the Second Party.",
+  },
+];
+
+export const PODCAST_TEMPLATES: ArtifactTemplate[] = [
+  {
+    id: "notebooklm_podcast_prompt",
+    displayName: "NotebookLM Podcast Prompt",
+    description:
+      "Generates a plain-text Video Overview prompt to paste into NotebookLM, producing a two-speaker business podcast from your proposal.",
+  },
+];

@@ -8,6 +8,7 @@ import {
   getDraft,
   updateDraft as updateDraftApi,
 } from "@/services/draft.service";
+import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { HttpError } from "@/config/httpClient";
 import type {
   DraftLocation,
@@ -15,7 +16,7 @@ import type {
   DraftUIState,
   SaveDraftPayload,
 } from "@/interfaces/draftInterfaces";
-import type { ProposalData, ProposalWizardData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { ProposalData, WizardStep } from "@/interfaces/proposalInterfaces";
 import { buildDraftPayload } from "@/utils/draftUtils";
 import { logger } from "@/utils/logger";
 
@@ -112,6 +113,11 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         }
       }
 
+      // Read wizard proposalData at call-time so user edits (e.g. a cleared
+      // description) are preserved. The API's ProposalData reflects what was
+      // stored at generation time and must not overwrite the wizard store.
+      const wizardProposalData = useProposalWizardStore.getState().proposalData;
+
       const draftPayload: SaveDraftPayload = buildDraftPayload({
         proposalId,
         title: proposal.title,
@@ -119,7 +125,7 @@ export function useDraftPersistence(options: UseDraftPersistenceOptions): void {
         status: (proposal.status || "draft") as SaveDraftPayload["status"],
         lastLocation,
         stage: stage as DraftStage,
-        proposalData: proposal as unknown as ProposalWizardData,
+        proposalData: wizardProposalData,
         currentStep: wizardStep as WizardStep,
         maxStepReached: wizardStep as WizardStep,
         completedSteps: [],

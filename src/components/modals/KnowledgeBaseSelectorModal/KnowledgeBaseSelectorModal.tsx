@@ -371,12 +371,10 @@ export default function KnowledgeBaseSelectorModal({
         fileName: file.name,
         wordCount: result.word_count,
       });
-      setUploadedFiles((prev) =>
-        prev.map((f) => (f.id === fileId ? { ...f, status: "parsed", parsedData: result } : f))
-      );
-      // toast.success(`"${file.name}" parsed — ${result.word_count} words`);
 
-      // Save to the selected client so it appears in Knowledge Base list
+      // Keep status as "parsing" until the client upload also completes — this prevents
+      // the document from being invisible in the list during the upload window and blocks
+      // the save button until the document is fully persisted with a real ID.
       await saveParsedDocumentToClient(file, fileId, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Backend connection failed";
@@ -454,6 +452,9 @@ export default function KnowledgeBaseSelectorModal({
     } catch (error) {
       logger.error("Failed to upload document:", error);
       toast.error(`Failed to upload ${file.name}`);
+      setUploadedFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, status: "error", error: "Upload failed" } : f))
+      );
     }
   }
 

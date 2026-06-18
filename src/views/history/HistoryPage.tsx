@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 
 import styles from "./HistoryPage.module.scss";
 import { PROPOSAL_TEMPLATES } from "@/constants";
+import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 import { useInfiniteProposalHistory } from "@/hooks/useInfiniteProposalHistory";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useErrorToast } from "@/hooks/useErrorToast";
@@ -45,6 +46,14 @@ export default function HistoryPage(): JSX.Element {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Tracks which version is selected per family card (keyed by rootId).
+  // Defaults to the root proposal (V1) — user can switch via the in-card dropdown.
+  const [selectedVersions, setSelectedVersions] = useState<Map<number, number>>(new Map());
+
+  const selectVersion = useCallback((rootId: number, proposalId: number): void => {
+    setSelectedVersions((prev) => new Map(prev).set(rootId, proposalId));
+  }, []);
 
   useEffect(() => {
     if (!isLoading && historyItems.length > 0) {
@@ -91,6 +100,41 @@ export default function HistoryPage(): JSX.Element {
   }, [historyItems, debouncedSearch, statusFilter]);
 
   const hasActiveFilter = debouncedSearch || statusFilter !== "all";
+
+  // Group filtered items into version families.
+  // Key = rootProposalId (or item.id for root proposals themselves).
+  // Each group is sorted by versionLabel so V1 always precedes V1.1.
+  const familyGroups = useMemo(() => {
+    const groups = new Map<number, ProposalListItem[]>();
+    for (const item of filteredItems) {
+      const rootId = item.rootProposalId ?? item.id;
+      const existing = groups.get(rootId);
+      if (existing) {
+        existing.push(item);
+      } else {
+        groups.set(rootId, [item]);
+      }
+    }
+    return Array.from(groups.entries())
+      .map(([rootId, items]) => ({
+        rootId,
+        items: [...items].sort((a, b) =>
+          (a.versionLabel ?? "").localeCompare(b.versionLabel ?? "", undefined, { numeric: true })
+        ),
+      }))
+      .sort((ga, gb) => {
+        // Sort groups by root's createdAt (newest first)
+        const ra = ga.items.find(
+          (i) => (i.rootProposalId ?? i.id) === ga.rootId && !i.rootProposalId
+        );
+        const rb = gb.items.find(
+          (i) => (i.rootProposalId ?? i.id) === gb.rootId && !i.rootProposalId
+        );
+        const dateA = ra?.createdAt ?? ga.items[0]?.createdAt ?? "";
+        const dateB = rb?.createdAt ?? gb.items[0]?.createdAt ?? "";
+        return dateB.localeCompare(dateA);
+      });
+  }, [filteredItems]);
 
   return (
     <PageLayout>
@@ -144,28 +188,57 @@ export default function HistoryPage(): JSX.Element {
       ) : (
         <>
           <div className={styles.historyGrid}>
-            {filteredItems.map((item) => {
-              const versionLabel = item.version != null ? `v${item.version}` : null;
+            {familyGroups.map(({ rootId, items }) => {
+              const isFamily = items.length > 1;
+              // Resolve the currently-selected item; default to the root proposal (V1).
+              const rootItem = items.find((i) => !i.rootProposalId && i.id === rootId) ?? items[0];
+              const selectedId = selectedVersions.get(rootId);
+              const item = (selectedId ? items.find((i) => i.id === selectedId) : null) ?? rootItem;
+
+              const versionLabel = item.versionLabel
+                ? `V${item.versionLabel}`
+                : item.version != null
+                  ? `v${item.version}`
+                  : null;
+
               const { templateId, templateType } = item;
               const templateName = (() => {
-                if (templateId) {
+                if (templateId)
                   return PROPOSAL_TEMPLATES.find((t) => t.id === templateId)?.name ?? "Template";
-                }
                 if (templateType === "scratch" || (!templateId && !templateType))
                   return "From Scratch";
-                if (templateType) {
+                if (templateType)
                   return (
                     PROPOSAL_TEMPLATES.find((t) => t.templateType === templateType)?.name ?? null
                   );
-                }
                 return null;
               })();
+
               return (
-                <div key={item.id} className={styles.historyCard} data-testid="proposal-card">
+                <div key={rootId} className={styles.historyCard} data-testid="proposal-card">
                   <div className={styles.cardHeader}>
                     <div className={styles.cardTitle}>{item.title}</div>
                     <div className={styles.cardHeaderRight}>
-                      {versionLabel && <span className={styles.versionBadge}>{versionLabel}</span>}
+                      {isFamily ? (
+                        <select
+                          className={styles.versionDropdown}
+                          value={item.id}
+                          onChange={(e) => selectVersion(rootId, Number(e.target.value))}
+                          aria-label="Select version"
+                        >
+                          {items.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.versionLabel
+                                ? `V${v.versionLabel}`
+                                : v.version != null
+                                  ? `v${v.version}`
+                                  : "V1"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        versionLabel && <span className={styles.versionBadge}>{versionLabel}</span>
+                      )}
                       <StatusBadge status={item.approvalStatus} />
                     </div>
                   </div>
@@ -194,7 +267,7 @@ export default function HistoryPage(): JSX.Element {
                       ) : (
                         <Download size={14} />
                       )}{" "}
-                      {downloadingIds.has(item.id) ? "Download..." : "Download"}
+                      {downloadingIds.has(item.id) ? "Downloading..." : "Download"}
                     </Button>
                   </div>
                 </div>

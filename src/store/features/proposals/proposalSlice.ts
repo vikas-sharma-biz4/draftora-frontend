@@ -36,6 +36,12 @@ export const INITIAL_PROPOSAL_STATE = {
   historyProposals: [] as ProposalListItem[],
   historyLastFetched: null as number | null,
   historyInitialized: false,
+
+  // Version draft proposals — pending proposals branched from History rows.
+  // Kept separate so the DraftsPage can optimistically add/remove them without
+  // triggering a full proposals refetch after each branch operation.
+  versionDrafts: [] as ProposalListItem[],
+  versionDraftsLastFetched: null as number | null,
 };
 
 interface ProposalState {
@@ -54,6 +60,10 @@ interface ProposalState {
   historyProposals: ProposalListItem[];
   historyLastFetched: number | null;
   historyInitialized: boolean;
+
+  // Version draft proposals state (Drafts page — version-draft section)
+  versionDrafts: ProposalListItem[];
+  versionDraftsLastFetched: number | null;
 
   // Computed selectors
   isCacheValid: () => boolean;
@@ -74,6 +84,11 @@ interface ProposalState {
   removeProposal: (id: number) => void;
   invalidateCache: () => void;
   reset: () => void;
+
+  // Version-draft actions — operate on the versionDrafts list only
+  addVersionDraft: (draft: ProposalListItem) => void;
+  removeVersionDraft: (id: number) => void;
+  fetchVersionDrafts: (force?: boolean) => Promise<void>;
 }
 
 export const useProposalStore = create<ProposalState>((set, get) => ({
@@ -260,7 +275,60 @@ export const useProposalStore = create<ProposalState>((set, get) => ({
     set({
       lastFetched: null,
       historyLastFetched: null,
+      versionDraftsLastFetched: null,
     });
+  },
+
+  // --- Version-draft actions ---
+
+  // Prepend a newly-created version draft so it appears immediately in the
+  // DraftsPage without waiting for a full proposals refetch.
+  addVersionDraft: (draft: ProposalListItem) => {
+    set((state) => ({
+      versionDrafts: [draft, ...state.versionDrafts],
+      versionDraftsLastFetched: Date.now(),
+    }));
+  },
+
+  // Remove a version draft by id (called after successful soft-delete).
+  removeVersionDraft: (id: number) => {
+    set((state) => ({
+      versionDrafts: state.versionDrafts.filter((d) => d.id !== id),
+    }));
+  },
+
+  // Fetch (or serve cached) version drafts — i.e. pending proposals that have
+  // a parent_proposal_id.  Falls back to filtering the main proposals list when
+  // the proposals cache is warm so we avoid a second API round-trip.
+  fetchVersionDrafts: async (force = false) => {
+    const { versionDraftsLastFetched, proposals, isInitialized, lastFetched } = get();
+    const isCacheFresh =
+      versionDraftsLastFetched !== null && Date.now() - versionDraftsLastFetched < CACHE_TTL_MS;
+
+    if (!force && isCacheFresh) return;
+
+    // If the main proposals list is already populated AND its cache is still valid,
+    // derive version drafts from it in-memory instead of making an additional API call.
+    // Guard on lastFetched !== null: when invalidateCache() was called (lastFetched = null)
+    // the proposals array is stale and must not overwrite an optimistic addVersionDraft().
+    if (isInitialized && proposals.length > 0 && lastFetched !== null) {
+      const drafts = proposals.filter(
+        (p) => p.approvalStatus === "pending" && p.parentProposalId != null
+      );
+      set({ versionDrafts: drafts, versionDraftsLastFetched: Date.now() });
+      return;
+    }
+
+    // Otherwise fetch the first page of pending proposals and filter.
+    try {
+      const items = await proposalApi.listProposals({ page: 1, limit: 100 });
+      const drafts = items.filter(
+        (p) => p.approvalStatus === "pending" && p.parentProposalId != null
+      );
+      set({ versionDrafts: sortByCreatedAtDesc(drafts), versionDraftsLastFetched: Date.now() });
+    } catch {
+      // Non-fatal: DraftsPage can still render without version drafts
+    }
   },
 
   reset: () => set(INITIAL_PROPOSAL_STATE),

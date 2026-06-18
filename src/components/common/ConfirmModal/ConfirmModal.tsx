@@ -61,7 +61,7 @@ export default function ConfirmModal({
         )}
         <p className={styles.message}>{message}</p>
         <div className={styles.footer}>
-          <Button variant="secondary" size="sm" onClick={handleCancel}>
+          <Button variant="secondary" size="sm" onClick={handleCancel} disabled={isConfirming}>
             Cancel
           </Button>
           <Button variant="primary" size="sm" onClick={handleConfirm} loading={isConfirming}>

@@ -75,35 +75,73 @@ function fixTableMultilineRows(content: string): string {
 }
 
 /**
- * Fix ordered list items that all use "1." (LLM reset pattern).
+ * Fix numbered steps whose sub-content (bullets, Outcome paragraphs) interrupts
+ * the ordered list, causing remark to emit multiple <ol> elements that each
+ * reset to "1." in the browser.
  *
- * Some LLMs consistently output every ordered list item as "1." because
- * standard markdown auto-increments. However, when items are separated by
- * bullet sub-lists or blank lines, ReactMarkdown creates separate <ol>
- * elements that each start at 1, producing "1, 1, 1" instead of "1, 2, 3".
+ * Pattern detected: ≥2 top-level ordered items with bold titles ("N. **Title**"),
+ * separated by bullet lists and plain paragraphs — characteristic of the
+ * our_proven_approach and deliverables sections.
  *
- * This function detects when every ordered item in the content uses "1." and
- * renumbers them sequentially so that a single counter runs across all items.
+ * Fix: indent each item's sub-content by 3 spaces (CommonMark continuation
+ * indent for "N. "), and ensure a blank line follows each item header.
+ * remark then parses the whole block as ONE <ol> with nested content inside
+ * each <li>, eliminating the counter-reset issue entirely.
  */
-function fixSteppedOrderedLists(content: string): string {
+function fixNumberedStepsWithSubcontent(content: string): string {
   const lines = content.split("\n");
-  const orderedLines = lines.filter((line) => /^\d+\.\s/.test(line));
-  if (orderedLines.length < 2) return content;
 
-  // Only fix when every ordered item starts with "1." — the LLM reset pattern.
-  const allStartWith1 = orderedLines.every((line) => /^1\.\s/.test(line));
-  if (!allStartWith1) return content;
+  // Only apply when ≥2 TOP-LEVEL numbered items exist (not indented)
+  const topLevelNumbered = lines.filter((l) => /^\d+\.\s/.test(l));
+  if (topLevelNumbered.length < 2) return content;
 
-  let counter = 0;
-  return lines
-    .map((line) => {
-      if (/^1\.\s/.test(line)) {
-        counter++;
-        return `${counter}. ${line.slice(3)}`;
+  // Only apply when numbered items are INTERRUPTED by sub-content.
+  // Simple lists (1. 2. 3. with no other content between) don't need this fix —
+  // remark already parses them as one <ol> automatically.
+  let hasInterruption = false;
+  let lastNumIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\d+\.\s/.test(lines[i])) {
+      if (lastNumIdx !== -1) {
+        for (let j = lastNumIdx + 1; j < i; j++) {
+          if (lines[j].trim() !== "") {
+            hasInterruption = true;
+            break;
+          }
+        }
       }
-      return line;
-    })
-    .join("\n");
+      lastNumIdx = i;
+      if (hasInterruption) break;
+    }
+  }
+  if (!hasInterruption) return content;
+
+  const INDENT = "   "; // 3 spaces = continuation indent for "N. " (single-digit steps)
+  const result: string[] = [];
+  let inStep = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // A step header is a top-level numbered item (not indented)
+    const isStepHeader = /^\d+\.\s/.test(line) && !line.startsWith(" ");
+    const isEmpty = line.trim() === "";
+
+    if (isStepHeader) {
+      inStep = true;
+      result.push(line);
+      // Add blank line after header so remark treats this as a loose list item
+      if (i + 1 < lines.length && lines[i + 1].trim() !== "") {
+        result.push("");
+      }
+    } else if (inStep) {
+      // Indent sub-content so it is continuation of the current <li>
+      result.push(isEmpty ? "" : INDENT + line.trimStart());
+    } else {
+      result.push(line);
+    }
+  }
+
+  return result.join("\n");
 }
 
 /**
@@ -125,8 +163,9 @@ function fixMarkdownFormatting(content: string): string {
   // Fix multiline table rows (newlines inside cells → <br>)
   fixed = fixTableMultilineRows(fixed);
 
-  // Fix sequential ordered list numbering (all-"1." LLM pattern → 1,2,3…)
-  fixed = fixSteppedOrderedLists(fixed);
+  // Fix numbered steps whose sub-content interrupts the <ol>, causing each
+  // step to render as a separate <ol> that resets to "1." in the browser.
+  fixed = fixNumberedStepsWithSubcontent(fixed);
 
   // Fix 3: Ensure heading is on its own line (description should not be on same line)
   // Pattern: ### **[Title](URL)** Description → ### **[Title](URL)**\nDescription

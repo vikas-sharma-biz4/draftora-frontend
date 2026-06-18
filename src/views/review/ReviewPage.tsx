@@ -49,6 +49,7 @@ import type {
   ProposalData,
 } from "@/interfaces/proposalInterfaces";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
+import { useVersionDraft } from "@/hooks/useVersionDraft";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useClients } from "@/hooks/useClients";
 import { useClientStore } from "@/store/features/clients/clientSlice";
@@ -174,6 +175,19 @@ export default function ReviewPage(): JSX.Element {
   const handleSaveDraft = useSaveDraft();
   const isRegenerating = currentProposalId !== null;
   const approvalStatus = useApprovalStatus();
+
+  // Versioning: when reviewing a History proposal, any "Edit" action should
+  // branch a new pending version draft rather than mutating the locked proposal.
+  const isHistoryProposal = Boolean(approvalStatus && approvalStatus !== "pending");
+  const { isCreating: isCreatingVersion, triggerVersionDraft } = useVersionDraft(
+    currentProposalId ?? 0
+  );
+
+  async function handleCreateVersionDraft(): Promise<void> {
+    if (!currentProposalId) return;
+    await triggerVersionDraft("review_edit");
+    // useVersionDraft handles navigation to the new draft.
+  }
   const {
     clients,
     isLoading: isLoadingClients,
@@ -264,6 +278,9 @@ export default function ReviewPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
+  // Tracks only what the user explicitly selected in THIS review session.
+  // Initialized to [] so stale selections from prior drafts/proposals never pre-populate the modal.
+  const [sessionSelectedDocIds, setSessionSelectedDocIds] = useState<string[]>([]);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -390,6 +407,7 @@ export default function ReviewPage(): JSX.Element {
           }))
       : filesMeta; // Preserve existing filesMeta when the client is not in the store
 
+    setSessionSelectedDocIds(selectedIds);
     updateProposalData({
       selectedDocumentIds: selectedIds.map(Number),
       filesMeta: newFilesMeta,
@@ -589,6 +607,37 @@ export default function ReviewPage(): JSX.Element {
         Everything looks right? Hit Generate.
       </p>
 
+      {/* Read-only banner for History proposals */}
+      {isHistoryProposal && (
+        <div
+          className="card"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            padding: "0.875rem 1.25rem",
+            marginBottom: "1.25rem",
+            borderLeft: "4px solid var(--color-primary, #6366f1)",
+            background: "var(--color-surface-raised, #f8f9ff)",
+          }}
+        >
+          <span style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
+            This proposal is{" "}
+            <strong style={{ textTransform: "capitalize" }}>{approvalStatus}</strong> and is
+            read-only. Click <strong>Edit (New Version)</strong> to branch a new draft.
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={handleCreateVersionDraft}
+            disabled={isCreatingVersion || !currentProposalId}
+            style={{ whiteSpace: "nowrap", flexShrink: 0 }}
+          >
+            {isCreatingVersion ? "Creating…" : "Edit (New Version)"}
+          </button>
+        </div>
+      )}
+
       {errorMessage && <div className={styles.errorAlert}>{errorMessage}</div>}
 
       {/* Sticky Download Documents Button */}
@@ -616,7 +665,13 @@ export default function ReviewPage(): JSX.Element {
             <div className="review-card">
               <div className="review-card-header">
                 <span className="review-card-title">CLIENT</span>
-                <button className="link-plain" onClick={() => setShowScopeModal(true)}>
+                <button
+                  className="link-plain"
+                  onClick={
+                    isHistoryProposal ? handleCreateVersionDraft : () => setShowScopeModal(true)
+                  }
+                  disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
+                >
                   Edit
                 </button>
               </div>
@@ -641,7 +696,15 @@ export default function ReviewPage(): JSX.Element {
             <div className="review-card">
               <div className="review-card-header">
                 <span className="review-card-title">STYLE & VOICE</span>
-                <button className="link-plain" onClick={() => setShowStyleVoiceModal(true)}>
+                <button
+                  className="link-plain"
+                  onClick={
+                    isHistoryProposal
+                      ? handleCreateVersionDraft
+                      : () => setShowStyleVoiceModal(true)
+                  }
+                  disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
+                >
                   Edit
                 </button>
               </div>
@@ -656,7 +719,11 @@ export default function ReviewPage(): JSX.Element {
           <div className="review-card">
             <div className="review-card-header">
               <span className="review-card-title">KNOWLEDGE BASE</span>
-              <button className="link-plain" onClick={handleOpenKnowledgeBase}>
+              <button
+                className="link-plain"
+                onClick={isHistoryProposal ? handleCreateVersionDraft : handleOpenKnowledgeBase}
+                disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
+              >
                 Edit
               </button>
             </div>
@@ -694,7 +761,13 @@ export default function ReviewPage(): JSX.Element {
           <div className="review-card">
             <div className="review-card-header">
               <span className="review-card-title">INCLUDED SECTIONS</span>
-              <button className="link-plain" onClick={() => setShowSectionsModal(true)}>
+              <button
+                className="link-plain"
+                onClick={
+                  isHistoryProposal ? handleCreateVersionDraft : () => setShowSectionsModal(true)
+                }
+                disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
+              >
                 Edit
               </button>
             </div>
@@ -721,12 +794,22 @@ export default function ReviewPage(): JSX.Element {
 
             <Button
               variant="primary"
-              onClick={handleGenerate}
-              disabled={proposalData.selectedSections.length === 0}
-              loading={isGenerating}
+              onClick={isHistoryProposal ? handleCreateVersionDraft : handleGenerate}
+              disabled={
+                isHistoryProposal
+                  ? isCreatingVersion || !currentProposalId
+                  : proposalData.selectedSections.length === 0
+              }
+              loading={isHistoryProposal ? isCreatingVersion : isGenerating}
               className="launch-btn"
             >
-              {isGenerating ? "Generating Proposal..." : "Generate Proposal"}
+              {isHistoryProposal
+                ? isCreatingVersion
+                  ? "Creating Version…"
+                  : "Edit (New Version)"
+                : isGenerating
+                  ? "Generating Proposal..."
+                  : "Generate Proposal"}
             </Button>
 
             <Button
@@ -756,7 +839,7 @@ export default function ReviewPage(): JSX.Element {
       {showKnowledgeBaseModal && (
         <KnowledgeBaseSelectorModal
           availableDocuments={clientDocuments}
-          selectedDocumentIds={selectedDocumentIdsMemoized}
+          selectedDocumentIds={sessionSelectedDocIds}
           onClose={() => setShowKnowledgeBaseModal(false)}
           onSave={handleSaveKnowledgeBase}
           clientId={proposalData.clientId}

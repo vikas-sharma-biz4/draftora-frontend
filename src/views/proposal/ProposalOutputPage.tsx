@@ -14,6 +14,7 @@ import {
   updateApprovalStatus,
   reorderProposalSections,
   estimateProposalHours,
+  createVersionDraft as createVersionDraftApi,
 } from "@/services/proposal";
 import { HttpError } from "@/config/httpClient";
 import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
@@ -114,18 +115,28 @@ export default function ProposalOutputPage(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resetProposal = useProposalWizardStore((s) => s.resetProposal);
+  const setWizardProposalId = useProposalWizardStore((s) => s.setCurrentProposalId);
+  const updateWizardProposalData = useProposalWizardStore((s) => s.updateProposalData);
   const visitedPipelineSteps = useVisitedPipelineSteps();
   const handleSaveDraft = useSaveDraft();
   const invalidateCache = useProposalStore((state) => state.invalidateCache);
   const updateProposalInStore = useProposalStore((state) => state.updateProposal);
+  const addVersionDraft = useProposalStore((state) => state.addVersionDraft);
   const proposalId = Number(params.id);
   const currentDraftId = useDraftSessionStore((state) => state.currentDraftId);
   const fromHistory = useDraftSessionStore((state) => state.fromHistory);
   const updateDraftInStore = useDraftStore((state) => state.updateDraftApi);
   const [mounted, setMounted] = useState<boolean>(false);
+  const [createdVersionLabel, setCreatedVersionLabel] = useState<string | null>(null);
   const currentActiveSectionRef = useRef<string | null>(null);
   const pendingEditsRef = useRef<Record<string, string>>({});
   const draftUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Lazy version draft: starts as the original proposal id, switches to the new draft id
+  // on the first mutation so the user edits immediately without a click or page reload.
+  const activeSaveProposalIdRef = useRef<number>(proposalId);
+  // Deduplication guard — stores the in-flight creation Promise so rapid consecutive
+  // saves all await the same draft instead of spawning multiple versions.
+  const versionCreationRef = useRef<Promise<number | null> | null>(null);
   const proposalSectionsRef = useRef<Record<string, string>>({});
   // Prevents the IntersectionObserver from overriding active section during programmatic scroll
   const isProgrammaticScrollRef = useRef<boolean>(false);
@@ -139,6 +150,76 @@ export default function ProposalOutputPage(): JSX.Element {
   // Data fetching + auto-save hook
   const { proposal, setProposal, isLoading, errorMessage, activeSection, setActiveSection } =
     useProposalPageData(proposalId, searchParams);
+
+  const isHistoryProposal = Boolean(proposal && proposal.approvalStatus !== "pending");
+
+  /**
+   * Lazily create a version draft on the first mutation of a History proposal.
+   *
+   * Subsequent calls return the already-created draft id immediately.
+   * Concurrent calls (e.g. two rapid section saves) share the same Promise so
+   * only one draft is ever created per editing session.
+   */
+  const ensureVersionDraftId = useCallback(async (): Promise<number> => {
+    // Already branched — return the live draft id directly
+    if (activeSaveProposalIdRef.current !== proposalId) {
+      return activeSaveProposalIdRef.current;
+    }
+
+    if (!versionCreationRef.current) {
+      versionCreationRef.current = createVersionDraftApi(proposalId, "section_edit")
+        .then((draft) => {
+          activeSaveProposalIdRef.current = draft.id;
+          addVersionDraft({
+            id: draft.id,
+            title: draft.title,
+            clientId: 0,
+            clientName: "",
+            status: draft.status as "draft" | "generating" | "completed",
+            approvalStatus: draft.approvalStatus as "pending" | "approved" | "rejected",
+            tone: "professional",
+            lengthPreference: "balanced",
+            templateType: "scratch",
+            createdAt: draft.createdAt,
+            updatedAt: draft.createdAt,
+            versionLabel: draft.versionLabel,
+            parentProposalId: draft.parentProposalId,
+            rootProposalId: draft.rootProposalId,
+          });
+          invalidateCache();
+          // Update browser URL without triggering Next.js navigation (no remount)
+          window.history.replaceState({}, "", `/proposal/${draft.id}`);
+          // Sync the wizard store so ReviewPage sees the NEW draft (pending),
+          // not the original History proposal (approved). This prevents ReviewPage
+          // from showing the "Edit (New Version)" banner or creating another draft.
+          setWizardProposalId(draft.id);
+          updateWizardProposalData({ approvalStatus: "pending" });
+          setCreatedVersionLabel(draft.versionLabel ?? null);
+          logger.info(
+            "[ProposalOutputPage] Lazy version draft created | id=%d | label=%s",
+            draft.id,
+            draft.versionLabel
+          );
+          return draft.id;
+        })
+        .catch((err) => {
+          logger.error("[ProposalOutputPage] Failed to create version draft lazily", err);
+          versionCreationRef.current = null; // Allow retry on next save
+          return null;
+        });
+    }
+
+    const id = await versionCreationRef.current;
+    // Fall back to original id so the save doesn't silently disappear
+    return id ?? proposalId;
+  }, [
+    proposalId,
+    addVersionDraft,
+    invalidateCache,
+    setWizardProposalId,
+    updateWizardProposalData,
+    setCreatedVersionLabel,
+  ]);
 
   // Keep proposalSectionsRef in sync so the debounced draft update can access latest sections
   useEffect(() => {
@@ -354,8 +435,11 @@ export default function ProposalOutputPage(): JSX.Element {
 
   const handleSaveSection = useCallback(
     async (key: string, content: string): Promise<void> => {
+      // For History proposals: lazily create a version draft on first save,
+      // then target all subsequent saves at the new draft id.
+      const targetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
       try {
-        await updateSection(proposalId, key, content);
+        await updateSection(targetId, key, content);
 
         // Debounce-update the draft with edited content (1.5s) so reopening the draft shows edits
         if (currentDraftId && !fromHistory) {
@@ -383,7 +467,14 @@ export default function ProposalOutputPage(): JSX.Element {
         // Silently ignore save failures
       }
     },
-    [proposalId, currentDraftId, fromHistory, updateDraftInStore]
+    [
+      isHistoryProposal,
+      ensureVersionDraftId,
+      proposalId,
+      currentDraftId,
+      fromHistory,
+      updateDraftInStore,
+    ]
   );
 
   // Clean up timers on unmount
@@ -396,12 +487,9 @@ export default function ProposalOutputPage(): JSX.Element {
 
   const handleRegenerate = useCallback(
     async (key: string, instructions?: string): Promise<string | null> => {
-      // This callback is now used for selection-based regeneration
-      // The RichEditor passes selectedText via the RegenerateSelectionParams
-      // For now, we keep the old signature for backward compatibility
-      // The actual selection regeneration happens in ProposalSectionEditor
+      const targetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
       try {
-        const newContent = await regenerateSection(proposalId, key, instructions);
+        const newContent = await regenerateSection(targetId, key, instructions);
         handleContentChange(key, newContent);
         toast.success("Section regenerated.");
         return newContent;
@@ -410,7 +498,7 @@ export default function ProposalOutputPage(): JSX.Element {
         return null;
       }
     },
-    [proposalId, handleContentChange]
+    [isHistoryProposal, ensureVersionDraftId, proposalId, handleContentChange]
   );
 
   // ── Sidebar callbacks ───────────────────────────────────────────────────────
@@ -445,13 +533,13 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleSectionAdded(
+  async function handleSectionAdded(
     key: string,
     label: string,
     content: string,
     afterKey?: string,
     formatType?: string
-  ): void {
+  ): Promise<void> {
     const currentSections = proposal?.selectedSections ?? [];
     let newSelected: string[];
 
@@ -493,8 +581,10 @@ export default function ProposalOutputPage(): JSX.Element {
     });
     setActiveSection(key);
 
-    // Persist insertion order to backend so it survives reload
-    reorderProposalSections(proposalId, {
+    // Persist insertion order to backend — for History proposals, ensure a version draft
+    // exists first so the reorder targets the editable draft, not the immutable History row.
+    const reorderTargetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
+    reorderProposalSections(reorderTargetId, {
       order: newSelected,
       sectionDisplayNames: newDisplayNames,
     }).catch((err) => {
@@ -722,6 +812,37 @@ export default function ProposalOutputPage(): JSX.Element {
           {errorMessage && <div className="alert-error">{errorMessage}</div>}
 
           {isLoading && sectionMetas.length === 0 && <ProposalSkeleton />}
+
+          {/* Subtle notice for History (approved / rejected) proposals.
+              Editing is allowed immediately — a version draft is created automatically
+              on the first save without any button click or page reload. */}
+          {isHistoryProposal && (
+            <div
+              style={{
+                padding: "0.5rem 1rem",
+                marginBottom: "0.75rem",
+                background: "var(--color-surface-raised, #f8f9ff)",
+                borderLeft: "3px solid var(--color-primary, #6366f1)",
+                borderRadius: "0 4px 4px 0",
+                fontSize: "0.8125rem",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              {createdVersionLabel ? (
+                <>
+                  Editing{" "}
+                  <strong style={{ fontFamily: "monospace" }}>V{createdVersionLabel}</strong> —
+                  changes are saved to this version draft automatically.
+                </>
+              ) : (
+                <>
+                  This proposal is{" "}
+                  <strong style={{ textTransform: "capitalize" }}>{proposal.approvalStatus}</strong>
+                  . Start editing — a new version draft will be created automatically.
+                </>
+              )}
+            </div>
+          )}
 
           {sectionMetas.map(({ key, label, isStatic }) =>
             isStatic ? (

@@ -72,6 +72,13 @@ export const MESSAGES = {
   ARTIFACT_DOWNLOAD_FAILED: "Failed to download artifact.",
   ARTIFACT_COPIED: "Content copied to clipboard",
 
+  PODCAST_GENERATE_FAILED: "Failed to generate podcast prompt. Please try again.",
+  MILESTONES_LOAD_FAILED: "Failed to load milestones. Please try again.",
+  INVOICE_HISTORY_LOAD_FAILED: "Failed to load invoice history.",
+  INVOICE_STATUS_UPDATED: "Invoice status updated",
+  INVOICE_STATUS_UPDATE_FAILED: "Failed to update invoice status.",
+  EMAIL_HISTORY_LOAD_FAILED: "Failed to load email history.",
+
   UPLOAD_IN_PROGRESS: "Uploading file\u2026",
   UPLOAD_SUCCESS: "File uploaded",
   UPLOAD_FAILED: "File upload failed. Please try again.",

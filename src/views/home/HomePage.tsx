@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { logger } from "@/utils/logger";
 import styles from "./HomePage.module.scss";
@@ -14,7 +14,6 @@ import {
   useClientId,
   useCurrentStep,
   useWizardActions,
-  useCurrentProposalId,
 } from "@/store/features/wizard/proposalWizardSlice";
 import DynamicPipeline from "@/components/common/DynamicPipeline";
 import { useDraftAutoSave } from "@/hooks/useDraftAutoSave";
@@ -38,21 +37,11 @@ export default function HomePage(): JSX.Element {
   const title = useProposalTitle();
   const clientId = useClientId();
   const currentStep = useCurrentStep();
-  const currentProposalId = useCurrentProposalId();
   const { updateProposalData, setCurrentStep, resetProposal } = useWizardActions();
   const draftStage = useDraftSessionStore((s) => s.draftStage);
   const completedSteps = useDraftSessionStore((s) => s.completedSteps);
   const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
-
-  // Reset wizard state when on home page to clear stale proposal data
-  useEffect(() => {
-    if (currentProposalId !== null) {
-      logger.info("[HomePage] Resetting wizard state to clear stale proposal data");
-      resetProposal();
-      setCurrentDraftId(null);
-    }
-  }, [currentProposalId, resetProposal, setCurrentDraftId]);
 
   const hasMeaningfulData = Boolean(title && clientId);
   useDraftAutoSave({ enabled: hasMeaningfulData });
@@ -74,8 +63,9 @@ export default function HomePage(): JSX.Element {
   const showPipeline = draftStage !== "template_selection" && Boolean(title && clientId);
 
   function handleSelectTemplate(id: string): void {
+    resetProposal();
+    setCurrentDraftId(null);
     setSelectedTemplateId(id);
-    setCurrentDraftId(null); // Clear draft ID for new proposal
     setShowTemplateModal(true);
   }
 
@@ -86,9 +76,10 @@ export default function HomePage(): JSX.Element {
   }
 
   function handleSelectScratch(): void {
+    resetProposal();
+    setCurrentDraftId(null);
     setSelectionMode("scratch");
     setSelectedTemplateId(null);
-    setCurrentDraftId(null); // Clear draft ID for new proposal
     setShowTemplateModal(true);
   }
 
