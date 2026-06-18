@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
+import { useSteppedModal } from "@/hooks/useSteppedModal";
 import { X, ChevronDown, RefreshCw, Save, FileDown } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
@@ -14,7 +15,7 @@ import { formatDate } from "@/utils/dateUtils";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import type { ClientWithDocuments } from "@/interfaces/clientInterfaces";
-import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
+import type { GeneratedArtifact, NdaFormData } from "@/interfaces/artifactInterfaces";
 
 import styles from "./GenerateNdaModal.module.scss";
 
@@ -25,16 +26,23 @@ interface GenerateNdaModalProps {
   onClose: () => void;
 }
 
-type ModalStep = 1 | 2;
-
 const DEFAULT_TEMPLATE_ID = NDA_TEMPLATES[0].id;
 
 export default function GenerateNdaModal({
   client,
   onClose,
 }: GenerateNdaModalProps): JSX.Element | null {
-  const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState<ModalStep>(1);
+  const {
+    mounted,
+    step,
+    setStep,
+    showVersionDropdown,
+    setShowVersionDropdown,
+    isGenerating,
+    setIsGenerating,
+    isSaving,
+    setIsSaving,
+  } = useSteppedModal(onClose);
 
   // NDA is client-specific — auto-select the most recent proposal internally.
   // The backend uses proposal.client_name to fill in the NDA second_party_name.
@@ -43,19 +51,18 @@ export default function GenerateNdaModal({
   );
   const [selectedProposalId, setSelectedProposalId] = useState<number | null>(null);
 
+  const [ndaForm, setNdaForm] = useState<NdaFormData>({
+    clientName: client.name ?? "",
+    clientCompany: "",
+    date: new Date().toISOString().split("T")[0],
+  });
+
   const [artifacts, setArtifacts] = useState<GeneratedArtifact[]>([]);
   const [currentArtifact, setCurrentArtifact] = useState<GeneratedArtifact | null>(null);
   const [editorContent, setEditorContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
 
   const { isDownloading, downloadArtifact, isPdfDownloading, downloadArtifactPdf } =
     useArtifactDownload();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Auto-select the most recent proposal when proposals load
   useEffect(() => {
@@ -63,17 +70,6 @@ export default function GenerateNdaModal({
       setSelectedProposalId(clientProposals[0].id);
     }
   }, [clientProposals, selectedProposalId]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent): void {
-      const target = e.target as HTMLElement;
-      if (!target.closest("[data-version-dropdown]")) {
-        setShowVersionDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const loadVersionHistory = useCallback(async (): Promise<void> => {
     try {
@@ -92,12 +88,20 @@ export default function GenerateNdaModal({
     void loadVersionHistory();
   }, [loadVersionHistory]);
 
+  function isNdaFormValid(): boolean {
+    return (
+      ndaForm.clientName.trim() !== "" &&
+      ndaForm.clientCompany.trim() !== "" &&
+      ndaForm.date.trim() !== ""
+    );
+  }
+
   function buildTitle(): string {
     return `NDA — ${client.name}`;
   }
 
   async function handleGenerate(): Promise<void> {
-    if (!selectedProposalId) return;
+    if (!selectedProposalId || !isNdaFormValid()) return;
     setIsGenerating(true);
     setStep(2);
     try {
@@ -107,6 +111,7 @@ export default function GenerateNdaModal({
         templateId: DEFAULT_TEMPLATE_ID,
         artifactType: "nda",
         title: buildTitle(),
+        ndaMetadata: ndaForm,
       });
       setArtifacts((prev) => [artifact, ...prev]);
       setCurrentArtifact(artifact);
@@ -130,6 +135,7 @@ export default function GenerateNdaModal({
         templateId: DEFAULT_TEMPLATE_ID,
         artifactType: "nda",
         title: buildTitle(),
+        ndaMetadata: ndaForm,
       });
       setArtifacts((prev) => [artifact, ...prev]);
       setCurrentArtifact(artifact);
@@ -168,12 +174,24 @@ export default function GenerateNdaModal({
   if (!mounted) return null;
 
   const content = (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget}>
-      <div className={styles.modal}>
+    <div
+      className={styles.overlay}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nda-modal-title"
+      >
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.title}>Generate NDA</span>
+            <span className={styles.title} id="nda-modal-title">
+              Generate NDA
+            </span>
             <nav className={styles.stepNav} aria-label="Steps">
               <button
                 className={`${styles.stepNavItem} ${step === 1 ? styles.stepNavItemActive : ""}`}
@@ -224,7 +242,7 @@ export default function GenerateNdaModal({
           </button>
         </div>
 
-        {/* Step 1 — client-specific NDA, no proposal picker needed */}
+        {/* Step 1 — client-specific NDA, second party details form */}
         {step === 1 && (
           <>
             <div className={styles.body}>
@@ -235,6 +253,50 @@ export default function GenerateNdaModal({
                   {client.industry && (
                     <div className={styles.templateCardDesc}>{client.industry}</div>
                   )}
+                </div>
+              </div>
+
+              <div className={styles.section}>
+                <span className={styles.sectionLabel}>Second Party Details</span>
+                <div className={styles.formGrid}>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="nda-client-name">
+                      Client Name
+                    </label>
+                    <input
+                      id="nda-client-name"
+                      className={styles.formInput}
+                      type="text"
+                      value={ndaForm.clientName}
+                      onChange={(e) => setNdaForm((f) => ({ ...f, clientName: e.target.value }))}
+                      placeholder="Enter client name"
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="nda-client-company">
+                      Client Company
+                    </label>
+                    <input
+                      id="nda-client-company"
+                      className={styles.formInput}
+                      type="text"
+                      value={ndaForm.clientCompany}
+                      onChange={(e) => setNdaForm((f) => ({ ...f, clientCompany: e.target.value }))}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <div className={styles.formField}>
+                    <label className={styles.formLabel} htmlFor="nda-date">
+                      Effective Date
+                    </label>
+                    <input
+                      id="nda-date"
+                      className={styles.formInput}
+                      type="date"
+                      value={ndaForm.date}
+                      onChange={(e) => setNdaForm((f) => ({ ...f, date: e.target.value }))}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -256,7 +318,7 @@ export default function GenerateNdaModal({
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => void handleGenerate()}
-                  disabled={isLoadingProposals || !selectedProposalId}
+                  disabled={isLoadingProposals || !selectedProposalId || !isNdaFormValid()}
                 >
                   {isLoadingProposals ? "Loading…" : "Generate NDA →"}
                 </button>

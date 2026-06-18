@@ -45,6 +45,7 @@ export const MESSAGES = {
   PROPOSAL_SECTION_GENERATING: "Generating content for new section...",
   PROPOSAL_APPROVED: "Proposal approved and moved to history",
   PROPOSAL_REJECTED: "Proposal rejected and moved to history",
+  PROPOSAL_CACHE_STALE: "Proposal approved, but page data may be stale — please refresh.",
   PROPOSAL_APPROVE_FAILED: "Failed to approve proposal",
   PROPOSAL_REJECT_FAILED: "Failed to reject proposal",
   PROPOSAL_DOWNLOADED: "Proposal downloaded",

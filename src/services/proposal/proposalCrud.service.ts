@@ -15,6 +15,7 @@ import type {
   TemplateType,
   EstimatedHoursData,
 } from "@/interfaces/proposalInterfaces";
+import { assertApiShape } from "@/utils/assertApiShape";
 import { logger } from "@/utils/logger";
 
 const ALLOWED_UPLOAD_EXTENSIONS = ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt"];
@@ -316,10 +317,21 @@ export async function estimateProposalHours(
   };
 }
 
+const PROPOSAL_REQUIRED_FIELDS: (keyof RawProposalApiResponse)[] = [
+  "id",
+  "title",
+  "client_name",
+  "status",
+  "tone",
+  "length_preference",
+  "language",
+];
+
 export async function getProposal(id: number): Promise<ProposalData> {
   const d = await http.get<RawProposalApiResponse>(`/proposals/${id}`, {
     cache: "no-store",
   });
+  assertApiShape<RawProposalApiResponse>(d, PROPOSAL_REQUIRED_FIELDS, "[getProposal]");
   return mapProposal(d);
 }
 

@@ -56,6 +56,13 @@ export interface InvoiceFormData {
   milestoneCosts: MilestoneCost[];
 }
 
+/** Second-party details collected in the NDA generation form */
+export interface NdaFormData {
+  clientName: string;
+  clientCompany: string;
+  date: string;
+}
+
 /** Request body for POST /artifacts/generate */
 export interface ArtifactGenerateRequest {
   clientId: number;
@@ -67,6 +74,7 @@ export interface ArtifactGenerateRequest {
   options?: ArtifactOptions;
   createdBy?: string;
   invoiceMetadata?: InvoiceFormData;
+  ndaMetadata?: NdaFormData;
 }
 
 /** Request body for PUT /artifacts/{id} */

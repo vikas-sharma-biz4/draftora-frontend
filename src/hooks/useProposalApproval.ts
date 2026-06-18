@@ -28,6 +28,8 @@ interface UseProposalApprovalReturn {
   isApproving: boolean;
   isRejecting: boolean;
   isDownloading: boolean;
+  /** Direct execution entry-point — used by ProposalApprovalBar's confirm flow. */
+  executeApprovalAction: (actionType: "approve" | "reject", signal?: AbortSignal) => Promise<void>;
   handleApprove: () => Promise<void>;
   handleReject: () => Promise<void>;
   handleDownload: () => Promise<void>;
@@ -44,7 +46,9 @@ export function useProposalApproval(
   const { isDownloading, downloadProposal } = useProposalDownload();
 
   const executeApprovalAction = useCallback(
-    async (actionType: "approve" | "reject"): Promise<void> => {
+    async (actionType: "approve" | "reject", signal?: AbortSignal): Promise<void> => {
+      if (signal?.aborted) return;
+
       const status = actionType === "approve" ? "approved" : "rejected";
       const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
       const successMessage =
@@ -54,6 +58,8 @@ export function useProposalApproval(
       try {
         // Update approval status via API
         await updateApprovalStatus(proposalId, status);
+
+        if (signal?.aborted) return;
 
         // Remove from drafts via API, capturing version label before deletion
         try {
@@ -67,18 +73,28 @@ export function useProposalApproval(
           logger.error("[useProposalApproval] Failed to remove draft:", draftError);
         }
 
+        if (signal?.aborted) return;
+
         // Notify parent component
         onApprovalSuccess?.(status);
 
         // Invalidate cache to force refresh on history page
-        onCacheInvalidate?.();
+        try {
+          onCacheInvalidate?.();
+        } catch {
+          toast.warning(MESSAGES.PROPOSAL_CACHE_STALE);
+        }
 
         toast.success(successMessage);
 
         // Small delay to ensure toast is shown before redirect
         await new Promise((resolve) => setTimeout(resolve, 500));
+
+        if (signal?.aborted) return;
+
         router.push("/history");
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
         const message =
           error instanceof Error
             ? error.message
@@ -111,6 +127,7 @@ export function useProposalApproval(
     isApproving,
     isRejecting,
     isDownloading,
+    executeApprovalAction,
     handleApprove,
     handleReject,
     handleDownload,
