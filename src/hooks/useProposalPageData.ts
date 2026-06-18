@@ -110,6 +110,10 @@ export function useProposalPageData(
   }, [proposalId, syncVisitedStepsFromBackend]);
 
   const fetchProposal = useCallback(async (): Promise<void> => {
+    // Determine if the user navigated here from History at call-time so we
+    // can decide whether to restore all proposal fields into the wizard store.
+    const isFromHistory = searchParams.get("from") === "history";
+
     try {
       logger.info(`[useProposalPageData] Fetching proposal ${proposalId}`);
       const data = await getProposal(proposalId);
@@ -138,23 +142,32 @@ export function useProposalPageData(
           setActiveSection(sections[0]);
         }
 
-        // Update proposal context with current data for regeneration
-        updateProposalData({
-          title: data.title || "",
-          clientName: data.clientName || "",
-          clientId: data.clientId,
-          description: data.description || "",
-          tone: data.tone,
-          lengthPreference: data.lengthPreference,
-          language: data.language || "English",
-          aiModel: data.aiModel,
-          selectedSections: data.selectedSections || [],
-          sectionDisplayNames: data.sectionDisplayNames || {},
-          contextualInstructions: data.contextualInstructions || "",
-          webReferences: data.webReferences || [],
-          selectedDocumentIds: data.selectedDocumentIds || [],
-          approvalStatus: data.approvalStatus,
-        });
+        // Only restore the full proposal data into the wizard store when the user
+        // navigated here from History. For the normal generation flow
+        // (review → generating → web view), the wizard store already holds what
+        // the user entered; overwriting it would silently discard edits such as a
+        // cleared description.
+        if (isFromHistory) {
+          updateProposalData({
+            title: data.title || "",
+            clientName: data.clientName || "",
+            clientId: data.clientId,
+            description: data.description || "",
+            tone: data.tone,
+            lengthPreference: data.lengthPreference,
+            language: data.language || "English",
+            aiModel: data.aiModel,
+            selectedSections: data.selectedSections || [],
+            sectionDisplayNames: data.sectionDisplayNames || {},
+            contextualInstructions: data.contextualInstructions || "",
+            webReferences: data.webReferences || [],
+            selectedDocumentIds: data.selectedDocumentIds || [],
+            approvalStatus: data.approvalStatus,
+          });
+        } else {
+          // Always sync the approval status since it can change server-side.
+          updateProposalData({ approvalStatus: data.approvalStatus });
+        }
         setDraftStage("generated");
         setCompletedSteps([1, 2, 3]);
         return;
@@ -191,6 +204,7 @@ export function useProposalPageData(
   }, [
     proposalId,
     router,
+    searchParams,
     setCurrentProposalId,
     updateProposalData,
     setDraftStage,

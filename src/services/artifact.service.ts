@@ -10,6 +10,7 @@ import type {
   ArtifactGenerateRequest,
   ArtifactUpdateRequest,
   GeneratedArtifact,
+  MilestoneCost,
 } from "@/interfaces/artifactInterfaces";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ function transformArtifact(api: ArtifactApiShape): GeneratedArtifact {
  * Uses a 60-second timeout to accommodate LLM generation latency.
  */
 export async function generateArtifact(data: ArtifactGenerateRequest): Promise<GeneratedArtifact> {
-  const body = {
+  const body: Record<string, unknown> = {
     client_id: data.clientId,
     proposal_id: data.proposalId,
     template_id: data.templateId,
@@ -78,6 +79,22 @@ export async function generateArtifact(data: ArtifactGenerateRequest): Promise<G
       : undefined,
     created_by: data.createdBy ?? null,
   };
+
+  if (data.invoiceMetadata) {
+    const totalAmount = data.invoiceMetadata.milestoneCosts.reduce((sum, mc) => sum + mc.amount, 0);
+    body.invoice_metadata = {
+      invoice_number: data.invoiceMetadata.invoiceNumber,
+      invoice_date: data.invoiceMetadata.invoiceDate,
+      client_name: data.invoiceMetadata.clientName,
+      company_name: data.invoiceMetadata.companyName || null,
+      job_to_be_done: data.invoiceMetadata.jobToBeDone,
+      milestone_costs: data.invoiceMetadata.milestoneCosts.map((mc: MilestoneCost) => ({
+        milestone: mc.milestone,
+        amount: mc.amount,
+      })),
+      total_amount: totalAmount,
+    };
+  }
 
   const result = await http.post<ArtifactApiShape>("/artifacts/generate", body, {
     requestTimeout: 60_000,
@@ -132,4 +149,18 @@ export function getArtifactDownloadUrl(artifactId: number): string {
  */
 export function getArtifactPdfUrl(artifactId: number): string {
   return buildUrl(`/artifacts/${artifactId}/download?format=pdf`);
+}
+
+/**
+ * Fetch milestones for a proposal — used to pre-populate the invoice form.
+ */
+export async function getMilestones(proposalId: number): Promise<string[]> {
+  interface MilestonesApiShape {
+    proposal_id: number;
+    milestones: string[];
+  }
+  const result = await http.get<MilestonesApiShape>(
+    `/artifacts/milestones?proposal_id=${proposalId}`
+  );
+  return result.milestones;
 }

@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, FileText, FileDown, CheckCircle, Clock, Edit, X } from "lucide-react";
+import { Search, FileText, FileDown, CheckCircle, Clock, Edit, X, Eye } from "lucide-react";
+
 import { formatDate } from "@/utils/dateUtils";
 import { getTemplateTypeLabel } from "@/utils/proposalUtils";
+import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import type { useClientProposals } from "@/hooks/useClientProposals";
 import styles from "../ClientDetailPage.module.scss";
 
@@ -14,11 +17,35 @@ interface ClientProposalsListProps {
   onNewProposal: () => void;
 }
 
+// Maps raw draft.templateType values to consistent display labels.
+// These match what DraftMetadata.templateType holds (e.g. "mvp", "design", "full").
+const DRAFT_TYPE_LABELS: Record<string, string> = {
+  mvp: "MVP",
+  poc: "POC",
+  design: "Design (IP)",
+  full: "Full Proposal",
+  brd: "BRD",
+  frd: "FRD",
+  srs: "SRS",
+  sow: "SOW",
+  architecture: "Architecture",
+  scratch: "From Scratch",
+  predefined: "Template",
+  custom: "Custom",
+};
+
+function getDraftTypeLabel(templateType: string | undefined): string {
+  if (!templateType) return "Draft";
+  return DRAFT_TYPE_LABELS[templateType.toLowerCase()] ?? templateType;
+}
+
 export default function ClientProposalsList({
   proposals,
   onNewProposal,
 }: ClientProposalsListProps): JSX.Element {
   const router = useRouter();
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const { isPdfDownloading, downloadArtifactPdf } = useArtifactDownload();
 
   const {
     proposalSearchQuery,
@@ -30,42 +57,101 @@ export default function ClientProposalsList({
     handleDownloadProposal,
   } = proposals;
 
+  const [selectedType, setSelectedType] = useState<string>("");
+  const [openMenuId, setOpenMenuId] = useState<number | string | null>(null);
+
+  // Build unique type list from BOTH proposals and drafts so the filter
+  // is always populated regardless of which document types exist.
+  const uniqueTypes = [
+    ...new Set([
+      ...filteredProposals.map((p) => getTemplateTypeLabel(p)),
+      ...filteredDraftRows.map((d) => getDraftTypeLabel(d.templateType)),
+    ]),
+  ].sort();
+
+  // Apply type filter to proposals
+  const displayedProposals = selectedType
+    ? filteredProposals.filter((p) => getTemplateTypeLabel(p) === selectedType)
+    : filteredProposals;
+
+  // Apply type filter to drafts using the same label function
+  const displayedDrafts = selectedType
+    ? filteredDraftRows.filter((d) => getDraftTypeLabel(d.templateType) === selectedType)
+    : filteredDraftRows;
+
+  // Close 3-dot menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent): void {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const hasNoDocuments = filteredProposals.length === 0 && filteredDraftRows.length === 0;
+  const hasNoResults = displayedProposals.length === 0 && displayedDrafts.length === 0;
+
   return (
     <div className={styles.proposalHistory}>
-      <div className={styles.panelHeader}>
-        <div>
-          <h2 className={styles.panelTitle}>Proposal History</h2>
-          <p className={styles.panelSubtitle}>Recent outputs and generated drafts</p>
+      {/* Row 1: title + action button */}
+      <div className={styles.panelTopRow}>
+        <h2 className={styles.panelTitle}>Generated Documents</h2>
+        <button className="btn btn-primary btn-sm" onClick={onNewProposal}>
+          New Document
+        </button>
+      </div>
+
+      {/* Row 2: search + filter */}
+      <div className={styles.panelSearchRow}>
+        <div className={styles.searchInputFull}>
+          <Search size={14} className={styles.searchIcon} />
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={proposalSearchQuery}
+            onChange={(e) => setProposalSearchQuery(e.target.value)}
+          />
         </div>
-        <div className={styles.headerActions}>
-          <div className={styles.searchInput}>
-            <Search size={14} className={styles.searchIcon} />
-            <input
-              type="text"
-              placeholder="Search proposals..."
-              value={proposalSearchQuery}
-              onChange={(e) => setProposalSearchQuery(e.target.value)}
-            />
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={onNewProposal}>
-            New Proposal
-          </button>
-        </div>
+        {!isLoadingProposals && uniqueTypes.length > 0 && (
+          <select
+            className={styles.filterSelect}
+            value={selectedType}
+            onChange={(e) => {
+              setSelectedType(e.target.value);
+              setOpenMenuId(null);
+            }}
+            aria-label="Filter by type"
+          >
+            <option value="">Filter</option>
+            {uniqueTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {isLoadingProposals ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyTitle}>Loading proposals...</div>
+          <p>Loading documents…</p>
         </div>
-      ) : filteredProposals.length === 0 && filteredDraftRows.length === 0 ? (
+      ) : hasNoDocuments ? (
         <div className={styles.emptyState}>
           <FileText size={48} />
-          <p>No proposals yet</p>
-          <p>Create a proposal to get started</p>
+          <p>No documents yet</p>
+          <p>Generate a proposal to get started</p>
+        </div>
+      ) : hasNoResults ? (
+        <div className={styles.emptyState}>
+          <FileText size={32} />
+          <p>No documents match the selected filter</p>
         </div>
       ) : (
         <div className={styles.tableWrapper}>
-          <table className={styles.proposalTable}>
+          <table className={styles.proposalTable} style={{ minWidth: 560 }}>
             <thead>
               <tr>
                 <th>Document Name</th>
@@ -76,7 +162,7 @@ export default function ClientProposalsList({
               </tr>
             </thead>
             <tbody>
-              {filteredProposals.map((proposal) => (
+              {displayedProposals.map((proposal) => (
                 <tr
                   key={`proposal-${proposal.id}`}
                   className={styles.proposalRow}
@@ -115,39 +201,62 @@ export default function ClientProposalsList({
                       )}
                     </div>
                   </td>
-                  <td className={styles.actionsCol}>
-                    <div className={styles.actionsCol}>
+                  <td className={styles.actionsCol} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.invoiceActions}>
                       <button
                         className={styles.actionBtn}
-                        style={{ minWidth: "80px" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleDownloadProposal(proposal.id);
-                        }}
-                        disabled={downloadingProposalId === proposal.id}
-                        title="Download as Word Document"
+                        onClick={() => router.push(`/proposal/${proposal.id}`)}
+                        title="View document"
                       >
-                        {downloadingProposalId === proposal.id ? (
-                          <div className="flex items-center gap-2 justify-center">
-                            <span
-                              className="spinner spinner-white"
-                              style={{ width: 14, height: 14 }}
-                            />
-                            <span className={styles.actionLabel}>Downloading...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <FileDown size={16} />
-                            <span className={styles.actionLabel}>DOCX</span>
-                          </>
-                        )}
+                        <Eye size={15} />
                       </button>
+                      <div
+                        className={styles.threeDotWrap}
+                        ref={openMenuId === proposal.id ? menuRef : null}
+                      >
+                        <button
+                          className={styles.actionBtn}
+                          onClick={() =>
+                            setOpenMenuId((id) => (id === proposal.id ? null : proposal.id))
+                          }
+                          title="Download"
+                          disabled={downloadingProposalId === proposal.id || isPdfDownloading}
+                        >
+                          <FileDown size={15} />
+                        </button>
+                        {openMenuId === proposal.id && (
+                          <div className={styles.actionMenu}>
+                            <button
+                              className={styles.actionMenuItem}
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                void handleDownloadProposal(proposal.id);
+                              }}
+                              disabled={downloadingProposalId === proposal.id}
+                            >
+                              <FileDown size={14} />
+                              Download DOCX
+                            </button>
+                            <button
+                              className={styles.actionMenuItem}
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                void downloadArtifactPdf(proposal.id, proposal.title);
+                              }}
+                              disabled={isPdfDownloading}
+                            >
+                              <FileDown size={14} />
+                              Download PDF
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
               ))}
 
-              {filteredDraftRows.map((draft) => (
+              {displayedDrafts.map((draft) => (
                 <tr
                   key={`draft-${draft.id}`}
                   className={styles.proposalRow}
@@ -157,18 +266,12 @@ export default function ClientProposalsList({
                 >
                   <td>
                     <div className={styles.proposalName}>{draft.title || "Untitled Draft"}</div>
-                    <div
-                      className={styles.proposalVersion}
-                      style={{ color: "var(--color-text-muted)" }}
-                    >
-                      In Progress
-                    </div>
+                    <div className={styles.proposalVersion}>In Progress</div>
                   </td>
                   <td>
+                    {/* Use getDraftTypeLabel for consistent matching with the filter */}
                     <span className={styles.typeBadge}>
-                      {draft.templateType === "scratch" || !draft.templateType
-                        ? "From Scratch"
-                        : draft.templateType}
+                      {getDraftTypeLabel(draft.templateType)}
                     </span>
                   </td>
                   <td className={styles.dateCell}>{formatDate(draft.updatedAt)}</td>
@@ -178,19 +281,21 @@ export default function ClientProposalsList({
                       <span>Draft</span>
                     </div>
                   </td>
-                  <td className={styles.actionsCol}>
-                    <div className={styles.actionsCol}>
+                  <td className={styles.actionsCol} onClick={(e) => e.stopPropagation()}>
+                    <div className={styles.invoiceActions}>
                       <button
                         className={styles.actionBtn}
-                        style={{ minWidth: "80px" }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push("/drafts");
-                        }}
-                        title="Resume editing this draft"
+                        onClick={() => router.push("/drafts")}
+                        title="Resume draft"
                       >
-                        <Edit size={16} />
-                        <span className={styles.actionLabel}>Resume</span>
+                        <Eye size={15} />
+                      </button>
+                      <button
+                        className={styles.actionBtn}
+                        disabled
+                        title="Draft cannot be downloaded yet"
+                      >
+                        <FileDown size={15} />
                       </button>
                     </div>
                   </td>

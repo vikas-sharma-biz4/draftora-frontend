@@ -11,11 +11,17 @@
  * is managed by useDraftSessionStore (src/store/features/drafts/draftSessionSlice.ts)
  */
 
-import { create } from 'zustand';
-import type { DraftMetadata, SavedDraft, SaveDraftPayload, DraftStage } from '@/interfaces/draftInterfaces';
-import * as draftApi from '@/services/draft.service';
-import { setDraftTemplateMeta } from '@/utils/draftTemplateCache';
-import { logger } from '@/utils/logger';
+import { create } from "zustand";
+import type {
+  DraftMetadata,
+  SavedDraft,
+  SaveDraftPayload,
+  DraftStage,
+} from "@/interfaces/draftInterfaces";
+import * as draftApi from "@/services/draft.service";
+import { setDraftTemplateMeta } from "@/utils/draftTemplateCache";
+import { sortByUpdatedAtDesc } from "@/utils/sortUtils";
+import { logger } from "@/utils/logger";
 
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes (drafts change frequently)
 
@@ -73,7 +79,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   },
 
   getDraftById: (id: string) => {
-    return get().drafts.find(d => d.id === id);
+    return get().drafts.find((d) => d.id === id);
   },
 
   // Actions
@@ -93,7 +99,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const drafts = await draftApi.listDrafts();
+      const drafts = sortByUpdatedAtDesc(await draftApi.listDrafts());
       set({
         drafts,
         isLoading: false,
@@ -102,7 +108,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
         error: null,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch drafts';
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch drafts";
       set({
         isLoading: false,
         error: errorMessage,
@@ -120,24 +126,22 @@ export const useDraftStore = create<DraftState>((set, get) => ({
   },
 
   addDraft: (draft: DraftMetadata) => {
-    set(state => ({
+    set((state) => ({
       drafts: [draft, ...state.drafts],
       lastFetched: Date.now(),
     }));
   },
 
   updateDraft: (id: string, updates: Partial<DraftMetadata>) => {
-    set(state => ({
-      drafts: state.drafts.map(d =>
-        d.id === id ? { ...d, ...updates } : d
-      ),
+    set((state) => ({
+      drafts: state.drafts.map((d) => (d.id === id ? { ...d, ...updates } : d)),
       lastFetched: Date.now(),
     }));
   },
 
   removeDraft: (id: string) => {
-    set(state => ({
-      drafts: state.drafts.filter(d => d.id !== id),
+    set((state) => ({
+      drafts: state.drafts.filter((d) => d.id !== id),
       lastFetched: Date.now(),
     }));
   },
@@ -177,7 +181,9 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     get().addDraft(draftMetadata);
 
     // Persist template metadata for draft card display
-    const proposalData = payload.wizardState?.proposalData as unknown as Record<string, unknown> | undefined;
+    const proposalData = payload.wizardState?.proposalData as unknown as
+      | Record<string, unknown>
+      | undefined;
     if (proposalData) {
       const templateId = (proposalData.templateId as string | null | undefined) ?? null;
       const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
@@ -203,7 +209,9 @@ export const useDraftStore = create<DraftState>((set, get) => ({
     get().updateDraft(draftId, draftMetadata);
 
     // Keep template cache in sync if payload includes wizard state
-    const proposalData = payload.wizardState?.proposalData as unknown as Record<string, unknown> | undefined;
+    const proposalData = payload.wizardState?.proposalData as unknown as
+      | Record<string, unknown>
+      | undefined;
     if (proposalData) {
       const templateId = (proposalData.templateId as string | null | undefined) ?? null;
       const templateType = (proposalData.templateType as string | undefined) ?? "scratch";
@@ -224,7 +232,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       // Remove from store
       get().removeDraft(draftId);
     } catch (error) {
-      logger.error('[draftSlice] deleteDraft failed:', error);
+      logger.error("[draftSlice] deleteDraft failed:", error);
       throw error;
     }
   },
@@ -236,7 +244,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
       // Remove all from store
       get().removeAllDrafts();
     } catch (error) {
-      logger.error('[draftSlice] deleteAllDrafts failed:', error);
+      logger.error("[draftSlice] deleteAllDrafts failed:", error);
       throw error;
     }
   },

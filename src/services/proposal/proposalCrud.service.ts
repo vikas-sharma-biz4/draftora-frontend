@@ -91,7 +91,7 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
     title: data.title,
     client_id: data.clientId || 0,
     client_name: data.clientName,
-    description: data.description || data.title,
+    description: data.description,
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
@@ -241,6 +241,10 @@ interface RawProposalApiResponse {
   estimated_hours_data?: RawEstimatedHoursData | null;
   created_at: string;
   updated_at: string;
+  // Versioning hierarchy fields
+  version_label?: string | null;
+  parent_proposal_id?: number | null;
+  root_proposal_id?: number | null;
 }
 
 /** Map raw snake_case backend response to camelCase ProposalData */
@@ -279,6 +283,9 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
       : undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
+    versionLabel: d.version_label ?? null,
+    parentProposalId: d.parent_proposal_id ?? null,
+    rootProposalId: d.root_proposal_id ?? null,
   };
 }
 
@@ -329,6 +336,10 @@ interface ProposalListApiItem {
   created_at: string;
   updated_at: string;
   version?: number | null;
+  // Versioning hierarchy fields
+  version_label?: string | null;
+  parent_proposal_id?: number | null;
+  root_proposal_id?: number | null;
 }
 
 export interface ListProposalsParams {
@@ -352,6 +363,9 @@ function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     version: item.version ?? null,
+    versionLabel: item.version_label ?? null,
+    parentProposalId: item.parent_proposal_id ?? null,
+    rootProposalId: item.root_proposal_id ?? null,
   };
 }
 
@@ -454,10 +468,10 @@ export async function updateApprovalStatus(
   status: "pending" | "approved" | "rejected",
   signal?: AbortSignal
 ): Promise<ProposalData> {
-  const raw = await http.patch<RawProposalApiResponse>(
-    `/proposals/${proposalId}/approval-status`,
-    { approval_status: status },
-    signal ? { signal } : undefined
-  );
+  const endpoint = `/proposals/${proposalId}/approval-status`;
+  const body = { approval_status: status };
+  const raw = signal
+    ? await http.patch<RawProposalApiResponse>(endpoint, body, { signal })
+    : await http.patch<RawProposalApiResponse>(endpoint, body);
   return mapProposal(raw);
 }

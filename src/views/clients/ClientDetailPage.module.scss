@@ -9,17 +9,19 @@
 }
 
 .clientHeader {
-  padding: 24px 52px 24px;
+  padding: 24px 52px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   gap: 24px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; // Actions row scrolls instead of wrapping
+  overflow: hidden;
 }
 
 .clientHeaderLeft {
   flex: 1;
-  min-width: 0;
+  min-width: 180px;
+  overflow: hidden;
 }
 
 .clientBadge {
@@ -49,23 +51,61 @@
 }
 
 .clientName {
-  font-size: 40px;
+  font-size: clamp(22px, 3.5vw, 40px);
   font-weight: 900;
   color: var(--color-text);
   letter-spacing: -1.2px;
-  line-height: 1;
+  line-height: 1.1;
   margin-bottom: 8px;
+  word-break: break-word;
 }
 
 .clientMeta {
-  font-size: 14px;
+  font-size: clamp(12px, 1.4vw, 14px);
   font-weight: 500;
   color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clientHeaderActions {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+
+  // Hidden scrollbar by default — shown on hover (WebKit/Blink)
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    height: 0;
+    transition: height 0.2s;
+  }
+
+  &:hover {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  &:hover::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  &:hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 2px;
+  }
+
+  // Ensure buttons never shrink so they stay pill-shaped
+  > * {
+    flex-shrink: 0;
+  }
 }
 
 .deleteClientBtn {
@@ -92,6 +132,19 @@
   gap: 24px;
   padding: 0 52px 52px;
   overflow: hidden;
+}
+
+/* 2×2 grid — equal-width columns */
+.gridLayout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  padding: 0 52px 52px;
+
+  > .knowledgeBase,
+  > .proposalHistory {
+    width: 100%;
+  }
 }
 
 .knowledgeBase {
@@ -123,6 +176,78 @@
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 20px;
+}
+
+/* Two-row header: title + button on top, search + filter below */
+.panelTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panelSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.searchInputFull {
+  position: relative;
+  flex: 1;
+
+  .searchIcon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    outline: none;
+    color: var(--color-text);
+    transition: border-color 0.15s;
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+
+    &::placeholder {
+      color: var(--color-text-light);
+    }
+  }
+}
+
+.filterSelect {
+  padding: 8px 28px 8px 10px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 14px;
+  white-space: nowrap;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+  }
 }
 
 .headerActions {
@@ -348,6 +473,61 @@
   color: var(--color-danger);
 }
 
+.infoDocBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.infoDocBtn:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.docInfoPopup {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(19, 27, 46, 0.12);
+  padding: 12px 16px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.docInfoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.docInfoLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.docInfoValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
 .pendingSection {
   background: var(--color-primary-light);
   border: 1px solid var(--color-primary-medium);
@@ -520,8 +700,10 @@
 }
 
 .tableWrapper {
-  flex: 1;
-  overflow-y: auto;
+  height: 300px;
+  overflow: auto;
+  position: relative;
+  scrollbar-width: thin;
 }
 
 .proposalTable {
@@ -535,13 +717,14 @@
 }
 
 .proposalTable th {
-  padding-bottom: 12px;
+  padding: 0 16px 12px 0;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text-muted);
   text-align: left;
+  white-space: nowrap;
 }
 
 .proposalRow {
@@ -610,6 +793,113 @@
 
 .actionsCol {
   text-align: right;
+  width: 90px;
+}
+
+.invoiceActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+/* ---------- Type filter dropdown ---------- */
+.typeFilter {
+  padding: 6px 28px 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+}
+
+/* ---------- 3-dot action menu ---------- */
+.threeDotWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.threeDotBtn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s;
+
+  &:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+
+.proposalRow:hover .threeDotBtn {
+  opacity: 1;
+}
+
+.actionMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  overflow: hidden;
+}
+
+.actionMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.actionMenuDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
 }
 
 .actionButtons {
@@ -662,6 +952,143 @@
   gap: 8px;
 }
 
+/* ---------- Invoice & Email history panels ---------- */
+.invoiceHistory,
+.emailHistory {
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 30px rgba(19, 27, 46, 0.03);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---------- Payment status badges ---------- */
+.paymentStatus {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  user-select: none;
+}
+
+.paymentStatusPaid {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.paymentStatusUnpaid {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ---------- Email viewer modal (portal) ---------- */
+.emailViewOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 27, 46, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.emailViewModal {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 860px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+}
+
+.emailViewHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.emailViewHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.emailViewSubject {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.emailViewMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.emailViewHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.emailViewCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+}
+
+.emailViewBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: #f9f9f9;
+}
+
+.emailViewHtml {
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #222;
+}
+
 .uploadingIndicator {
   padding: 12px 16px;
   background: var(--color-primary-light);
@@ -712,18 +1139,38 @@
   .splitLayout {
     padding: 0 32px 32px;
   }
+
+  .gridLayout {
+    padding: 0 32px 32px;
+  }
 }
 
 @media (max-width: 1024px) {
   .splitLayout {
     flex-direction: column;
-    overflow: auto; // Panels stack — let the page scroll instead of clipping
+    overflow: auto;
   }
 
   .knowledgeBase,
   .proposalHistory {
     width: 100%;
-    overflow: visible; // Remove clip so stacked panels show full content
+    overflow: visible;
+  }
+
+  .gridLayout {
+    grid-template-columns: 1fr;
+    overflow: auto;
+
+    > .knowledgeBase,
+    > .proposalHistory {
+      width: 100%;
+      overflow: visible;
+    }
+  }
+
+  .invoiceHistory,
+  .emailHistory {
+    overflow: visible;
   }
 
   .documentList {
@@ -732,6 +1179,7 @@
   }
 
   .tableWrapper {
+    height: auto;
     max-height: 480px;
     overflow-y: auto;
   }
@@ -740,18 +1188,33 @@
 @media (max-width: 768px) {
   .clientHeader {
     padding: 20px 24px;
-    flex-direction: column;
+    flex-wrap: wrap; // Stack on mobile
     align-items: flex-start;
     gap: 16px;
+  }
+
+  .clientHeaderLeft {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .clientHeaderActions {
+    width: 100%;
+  }
+
+  .clientName {
+    overflow: visible;
+  }
+
+  .clientMeta {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
   }
 
   .splitLayout {
     padding: 0 24px 24px;
     gap: 16px;
-  }
-
-  .clientName {
-    font-size: 28px;
   }
 
   .panelHeader {
@@ -781,36 +1244,35 @@
     gap: 12px;
   }
 
-  .clientName {
-    font-size: 22px;
-    letter-spacing: -0.5px;
-  }
-
-  .clientMeta {
-    font-size: 13px;
-  }
-
-  .clientHeaderActions {
-    flex-wrap: wrap;
-    gap: 8px;
+  .gridLayout {
+    padding: 0 16px 16px;
+    gap: 12px;
   }
 
   .knowledgeBase,
-  .proposalHistory {
+  .proposalHistory,
+  .invoiceHistory,
+  .emailHistory {
     padding: 16px;
   }
 
   .documentList {
-    max-height: none; // Let full list show on phone — page scrolls
+    max-height: none;
     overflow-y: visible;
   }
 
   .tableWrapper {
-    max-height: none; // Same — page scrolls
+    height: auto;
+    max-height: none;
+    overflow-x: auto; // Tables scroll horizontally on small screens
     overflow-y: visible;
   }
 
-  // Hide "Type" column on mobile — not critical at this width
+  .proposalTable {
+    min-width: 480px; // Force table to full width so it scrolls rather than squishes
+  }
+
+  // Hide "Type" column on mobile
   .proposalTable thead tr th:nth-child(2),
   .proposalTable tbody tr td:nth-child(2) {
     display: none;
@@ -832,8 +1294,9 @@
     gap: 12px;
   }
 
-  .clientName {
-    font-size: 20px;
+  .gridLayout {
+    padding: 0 12px 12px;
+    gap: 12px;
   }
 
   .clientBadge {

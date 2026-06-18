@@ -311,6 +311,7 @@ export function plainTextToHtml(content: string): string {
   let bulletItems: string[] = [];
   let isOrdered = false;
   let inTable = false;
+  let orderedCounter = 0;
 
   function flushTable(): void {
     if (tableLines.length === 0) return;
@@ -332,10 +333,15 @@ export function plainTextToHtml(content: string): string {
 
   function flushBullets(): void {
     if (bulletItems.length === 0) return;
-    const tag = isOrdered ? "ol" : "ul";
     // Convert Markdown syntax in list items
     const lis = bulletItems.map((item) => `<li>${convertInlineMarkdownToHtml(item)}</li>`).join("");
-    parts.push(`<${tag}>${lis}</${tag}>`);
+    if (isOrdered) {
+      const startAttr = orderedCounter > 0 ? ` start="${orderedCounter + 1}"` : "";
+      orderedCounter += bulletItems.length;
+      parts.push(`<ol${startAttr}>${lis}</ol>`);
+    } else {
+      parts.push(`<ul>${lis}</ul>`);
+    }
     bulletItems = [];
   }
 
@@ -371,11 +377,13 @@ export function plainTextToHtml(content: string): string {
       continue;
     }
 
-    const numberedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/);
     if (numberedMatch) {
+      const itemNumber = parseInt(numberedMatch[1], 10);
       if (bulletItems.length > 0 && !isOrdered) flushBullets();
+      if (itemNumber === 1) orderedCounter = 0;
       isOrdered = true;
-      bulletItems.push(numberedMatch[1]);
+      bulletItems.push(numberedMatch[2]);
       continue;
     }
 

@@ -419,6 +419,27 @@ describe("plainTextToHtml — ordered lists", () => {
     const olMatches = result.match(/<ol>/g);
     expect(olMatches).toHaveLength(1);
   });
+
+  it("adds start attribute to subsequent ol blocks interrupted by sub-content", () => {
+    const content = "1. Step One\n- bullet\n2. Step Two\n- bullet\n3. Step Three";
+    const result = plainTextToHtml(content);
+    expect(result).toContain("<ol>");
+    expect(result).toContain('<ol start="2">');
+    expect(result).toContain('<ol start="3">');
+    expect(result).toContain("<li>Step One</li>");
+    expect(result).toContain("<li>Step Two</li>");
+    expect(result).toContain("<li>Step Three</li>");
+  });
+
+  it("resets start counter when a new sequence begins from 1", () => {
+    const content =
+      "1. First\n- bullet\n2. Second\n\nParagraph\n\n1. New One\n- bullet\n2. New Two";
+    const result = plainTextToHtml(content);
+    const startAttrs = [...result.matchAll(/ start="(\d+)"/g)].map((m) => parseInt(m[1], 10));
+    expect(startAttrs).toContain(2);
+    const olCount = (result.match(/<ol[^>]*>/g) ?? []).length;
+    expect(olCount).toBe(4);
+  });
 });
 
 describe("plainTextToHtml — markdown headings", () => {

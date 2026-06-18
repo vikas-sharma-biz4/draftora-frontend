@@ -6,7 +6,7 @@
  * a union so future types (SOW, Contract, etc.) require no interface changes.
  */
 
-export type ArtifactType = "email" | "invoice";
+export type ArtifactType = "email" | "invoice" | "nda" | "podcast";
 
 export interface GeneratedArtifact {
   id: number;
@@ -40,6 +40,22 @@ export interface ArtifactOptions {
   includePodcast: boolean;
 }
 
+/** A single milestone with its associated cost for invoice generation */
+export interface MilestoneCost {
+  milestone: string;
+  amount: number;
+}
+
+/** User-provided invoice details collected in the invoice details form */
+export interface InvoiceFormData {
+  invoiceNumber: string;
+  invoiceDate: string;
+  clientName: string;
+  companyName: string;
+  jobToBeDone: string;
+  milestoneCosts: MilestoneCost[];
+}
+
 /** Request body for POST /artifacts/generate */
 export interface ArtifactGenerateRequest {
   clientId: number;
@@ -50,6 +66,7 @@ export interface ArtifactGenerateRequest {
   additionalInstructions?: string;
   options?: ArtifactOptions;
   createdBy?: string;
+  invoiceMetadata?: InvoiceFormData;
 }
 
 /** Request body for PUT /artifacts/{id} */
