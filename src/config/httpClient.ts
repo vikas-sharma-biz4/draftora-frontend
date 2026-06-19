@@ -126,97 +126,60 @@ export class HttpError extends Error {
   }
 }
 
-/**
- * Handle API response with standard error checking.
- * Validates the response status and success flag, then extracts the data.
- * Throws HttpError (with statusCode) if the request failed.
- */
-async function handleResponse<T>(res: Response, method: string): Promise<T> {
-  // Handle OPTIONS requests (CORS preflight) - no JSON body expected
-  if (method === "OPTIONS" || res.status === 204) {
-    return undefined as T;
-  }
+interface ParsedApiBody {
+  success: boolean;
+  data?: unknown;
+  meta?: PaginationMeta;
+  error?: { code: string; message: string; details?: unknown };
+}
 
-  // Read response body once to avoid double-read bug
-  const rawText = await res.text();
-
-  let json: ApiResponse<T> | undefined;
-
-  // Handle empty response bodies
+function parseApiResponse(rawText: string, status: number, ok: boolean): ParsedApiBody {
   if (!rawText || rawText.trim() === "") {
-    throw new HttpError(res.status, "Response body is empty");
+    throw new HttpError(status, "Response body is empty");
   }
 
-  // Parse JSON safely from raw text (not res.json() since stream was already consumed)
+  let json: ParsedApiBody | undefined;
   try {
     json = JSON.parse(rawText);
-  } catch (parseError) {
-    throw new HttpError(res.status, `Failed to parse JSON response: ${rawText.substring(0, 200)}`);
+  } catch {
+    throw new HttpError(status, `Failed to parse JSON response: ${rawText.substring(0, 200)}`);
   }
 
   if (!json) {
-    throw new HttpError(res.status, "Response body is empty or invalid");
+    throw new HttpError(status, "Response body is empty or invalid");
   }
 
-  if (!res.ok || !json.success) {
+  if (!ok || !json.success) {
     const message: string =
-      json?.error?.message ??
-      (res.ok ? "API request failed" : `Request failed with status ${res.status}`);
-    throw new HttpError(res.status, message);
+      json?.error?.message ?? (ok ? "API request failed" : `Request failed with status ${status}`);
+    throw new HttpError(status, message);
   }
 
+  return json;
+}
+
+async function handleResponse<T>(res: Response, method: string): Promise<T> {
+  if (method === "OPTIONS" || res.status === 204) {
+    return undefined as T;
+  }
+  const rawText = await res.text();
+  const json = parseApiResponse(rawText, res.status, res.ok);
   return json.data as T;
 }
 
-/**
- * Like handleResponse but for paginated endpoints.
- * Returns both `data` and `meta` instead of stripping the envelope.
- */
 async function handlePaginatedResponse<T>(res: Response): Promise<PaginatedApiResponse<T>> {
   if (res.status === 204) {
     return { data: [], meta: { page: 1, per_page: 0, total: 0, total_pages: 0 } };
   }
-
   const rawText = await res.text();
-
-  if (!rawText || rawText.trim() === "") {
-    throw new HttpError(res.status, "Response body is empty");
-  }
-
-  let json:
-    | {
-        success: boolean;
-        data?: T[];
-        meta?: PaginationMeta;
-        error?: { code: string; message: string; details?: unknown };
-      }
-    | undefined;
-
-  try {
-    json = JSON.parse(rawText);
-  } catch {
-    throw new HttpError(res.status, `Failed to parse JSON response: ${rawText.substring(0, 200)}`);
-  }
-
-  if (!json) {
-    throw new HttpError(res.status, "Response body is empty or invalid");
-  }
-
-  if (!res.ok || !json.success) {
-    const message: string =
-      json?.error?.message ??
-      (res.ok ? "API request failed" : `Request failed with status ${res.status}`);
-    throw new HttpError(res.status, message);
-  }
-
-  const data = json.data ?? [];
-  const meta: PaginationMeta = json.meta ?? {
+  const json = parseApiResponse(rawText, res.status, res.ok);
+  const data = (json.data as T[] | undefined) ?? [];
+  const meta: PaginationMeta = (json.meta as PaginationMeta | undefined) ?? {
     page: 1,
     per_page: data.length,
     total: data.length,
     total_pages: 1,
   };
-
   return { data, meta };
 }
 

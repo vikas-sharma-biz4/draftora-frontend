@@ -16,3 +16,8 @@ if (!_defaultAiModel) {
   );
 }
 export const DEFAULT_AI_MODEL = _defaultAiModel ?? "gpt-4o";
+
+// Debounce delay before batching section edits and persisting the draft.
+// Long enough to avoid hammering the API on every keystroke; short enough
+// that users don't lose data on unexpected tab closes.
+export const SECTION_AUTOSAVE_DEBOUNCE_MS = 1_500;

@@ -3,6 +3,8 @@ import dynamic from "next/dynamic";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "@/styles/styles.scss";
 
+import ReactQueryProvider from "@/components/common/ReactQueryProvider";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
@@ -35,8 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning>
-        <ErrorBoundary>{children}</ErrorBoundary>
-        <ToastProvider />
+        <ReactQueryProvider>
+          <ErrorBoundary>{children}</ErrorBoundary>
+          <ToastProvider />
+        </ReactQueryProvider>
       </body>
     </html>
   );

@@ -21,7 +21,7 @@ export default function AppLayout({ children, noPadding = false }: AppLayoutProp
   return (
     <div className="app-container">
       <MainSidebar />
-      <main className={noPadding ? "main-content no-top-padding" : "main-content"}>
+      <main data-scroll-root className={noPadding ? "main-content no-top-padding" : "main-content"}>
         {children}
       </main>
     </div>

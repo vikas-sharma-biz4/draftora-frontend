@@ -242,6 +242,31 @@ describe("proposalCrud — mapProposal", () => {
 });
 
 // ---------------------------------------------------------------------------
+// getProposal — runtime shape validation
+// ---------------------------------------------------------------------------
+
+describe("getProposal — shape validation", () => {
+  it("throws HttpError(502) when API response is missing a required field", async () => {
+    // Simulate an API contract violation: 'status' field is absent
+    const { status: _status, ...incomplete } = baseRawProposal;
+    mockGet.mockResolvedValue(incomplete);
+    await expect(getProposal(1)).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it("throws HttpError(502) when API response is null", async () => {
+    mockGet.mockResolvedValue(null);
+    await expect(getProposal(1)).rejects.toMatchObject({ statusCode: 502 });
+  });
+
+  it("succeeds and maps correctly when all required fields are present", async () => {
+    mockGet.mockResolvedValue(baseRawProposal);
+    const result = await getProposal(1);
+    expect(result.id).toBe(1);
+    expect(result.title).toBe("Test Proposal");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // generateProposal
 // ---------------------------------------------------------------------------
 

@@ -24,7 +24,7 @@ interface ProposalApprovalBarProps {
   onSaveDraft?: () => void;
   onApprove: () => void;
   onReject: () => void;
-  onExecuteAction: (actionType: "approve" | "reject") => Promise<void>;
+  onExecuteAction: (actionType: "approve" | "reject", signal: AbortSignal) => Promise<void>;
   confirmModal: { isOpen: boolean; message: string; actionType: "approve" | "reject" | null };
   onConfirmModalClose: () => void;
   estimateHoursContent?: React.ReactNode;
@@ -109,11 +109,11 @@ export default function ProposalApprovalBar({
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         message={confirmModal.message}
-        onConfirm={async () => {
+        onConfirm={async (signal: AbortSignal) => {
           const actionType = confirmModal.actionType;
           if (actionType) {
             try {
-              await onExecuteAction(actionType);
+              await onExecuteAction(actionType, signal);
               onConfirmModalClose();
             } catch (error) {
               // Keep modal open on error - user can retry or cancel

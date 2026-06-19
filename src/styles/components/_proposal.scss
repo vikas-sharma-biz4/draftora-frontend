@@ -733,6 +733,12 @@
 
 // ─── Responsive — mobile (≤ 768px) ───────────────────────────────────────────
 @media (max-width: 768px) {
+  // Let HTML tables expand to content width so the scroll container can scroll
+  .proposal-section-content table {
+    width: max-content;
+    min-width: 100%;
+  }
+
   .proposal-layout {
     flex-direction: column;
     overflow-x: hidden;
@@ -793,6 +799,12 @@
   .proposal-section-content {
     padding: 12px;
     font-size: 13px;
+  }
+
+  // Let HTML tables size to content so the display:block overflow-x:auto can scroll
+  .proposal-section-content table {
+    width: max-content;
+    min-width: 100%;
   }
 
   .proposal-page-title {

@@ -7,6 +7,11 @@ import type { useClientDocuments } from "@/hooks/useClientDocuments";
 import DocumentViewerModal from "@/components/modals/DocumentViewerModal";
 import styles from "../ClientDetailPage.module.scss";
 
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
 type DocumentsHook = ReturnType<typeof useClientDocuments>;
 
 interface ClientDocumentsPanelProps {
@@ -106,7 +111,7 @@ export default function ClientDocumentsPanel({
                 key={doc.id}
                 className={styles.documentItem}
                 onClick={() => handleViewDocument(doc)}
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", position: "relative" }}
                 title="Click to view file"
               >
                 <div className={`${styles.documentIcon} ${iconClass}`}>
@@ -119,7 +124,7 @@ export default function ClientDocumentsPanel({
                 <div className={styles.documentInfo}>
                   <div className={styles.documentName}>{doc.name}</div>
                   <div className={styles.documentMeta}>
-                    <span>{Math.round(doc.sizeBytes / 1024)} KB</span>
+                    <span>{formatFileSize(doc.sizeBytes)}</span>
                     <span>{formatDate(doc.createdAt)}</span>
                   </div>
                 </div>
@@ -136,6 +141,20 @@ export default function ClientDocumentsPanel({
                     </span>
                   )}
                 </div>
+
+                {/* Eye — view document */}
+                <button
+                  className={styles.actionBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleViewDocument(doc);
+                  }}
+                  title="View document"
+                >
+                  <Eye size={15} />
+                </button>
+
+                {/* Delete */}
                 <button
                   className={styles.deleteDocBtn}
                   onClick={(e) => {

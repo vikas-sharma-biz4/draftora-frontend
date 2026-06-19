@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -19,6 +19,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
   type Modifier,
 } from "@dnd-kit/core";
 import {
@@ -71,13 +72,6 @@ export interface ProposalSidebarProps {
   /** Template type for format rules */
   templateType?: string;
 }
-
-// ─── DnD modifier — restrict to vertical axis ─────────────────────────────────
-
-const restrictToVerticalAxis: Modifier = ({ transform }) => ({
-  ...transform,
-  x: 0,
-});
 
 // ─── Key builder (shared with AddSectionModal validation) ─────────────────────
 
@@ -271,6 +265,35 @@ export default function ProposalSidebar({
   // ── Sidebar list ref for active-section scroll sync ──────────────────────
   const listRef = useRef<HTMLUListElement>(null);
 
+  // ── Sidebar nav ref — gives the sidebar's live getBoundingClientRect() ─────
+  // dnd-kit's containerNodeRect resolves to the viewport rect, not the sidebar.
+  const sidebarNavRef = useRef<HTMLElement>(null);
+
+  // ── Drag start rect — captured once when drag begins; stable throughout drag ─
+  // draggingNodeRect from the modifier args is unreliable without a DragOverlay
+  // (it can be null during some frames), so we capture the initial rect ourselves.
+  const dragStartRectRef = useRef<{ top: number; bottom: number } | null>(null);
+
+  const restrictToSidebarBounds = useMemo<Modifier>(
+    () =>
+      ({ transform }) => {
+        const initialRect = dragStartRectRef.current;
+        if (!initialRect || !sidebarNavRef.current) {
+          return { ...transform, x: 0 };
+        }
+        const sidebarRect = sidebarNavRef.current.getBoundingClientRect();
+        return {
+          ...transform,
+          x: 0,
+          y: Math.min(
+            Math.max(transform.y, sidebarRect.top - initialRect.top),
+            sidebarRect.bottom - initialRect.bottom
+          ),
+        };
+      },
+    []
+  );
+
   useEffect(() => {
     if (!listRef.current) return;
     const activeItem = listRef.current.querySelector<HTMLElement>(
@@ -423,7 +446,21 @@ export default function ProposalSidebar({
 
   // ── Drag-end handler ──────────────────────────────────────────────────────
 
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+
+  function handleDragStart(event: DragStartEvent): void {
+    // Capture the element's viewport rect at drag start.
+    // We use event.active.rect.current.initial (dnd-kit's own snapshot) rather than
+    // calling getBoundingClientRect() ourselves so it's consistent with dnd-kit's state.
+    const initial = event.active.rect.current.initial;
+    if (initial) {
+      dragStartRectRef.current = { top: initial.top, bottom: initial.bottom };
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent): void {
+    dragStartRectRef.current = null;
+
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -455,15 +492,17 @@ export default function ProposalSidebar({
 
   return (
     <>
-      <nav className="proposal-sidebar" aria-label="Proposal sections">
+      <nav ref={sidebarNavRef} className="proposal-sidebar" aria-label="Proposal sections">
         {templateName && <div className="proposal-sidebar-template-name">{templateName}</div>}
         <div className="proposal-sidebar-title">Sections</div>
 
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          modifiers={[restrictToVerticalAxis]}
+          modifiers={[restrictToSidebarBounds]}
+          autoScroll={false}
         >
           <SortableContext
             items={orderedSections.map((s) => s.key)}

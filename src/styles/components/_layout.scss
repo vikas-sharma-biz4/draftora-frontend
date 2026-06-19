@@ -21,6 +21,13 @@
   transition:
     margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
     width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+
+  // Hide scrollbar visually but keep scroll functional
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .main-content.no-top-padding {

@@ -15,6 +15,7 @@ import type {
   TemplateType,
   EstimatedHoursData,
 } from "@/interfaces/proposalInterfaces";
+import { assertApiShape } from "@/utils/assertApiShape";
 import { logger } from "@/utils/logger";
 
 const ALLOWED_UPLOAD_EXTENSIONS = ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt"];
@@ -91,7 +92,7 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
     title: data.title,
     client_id: data.clientId || 0,
     client_name: data.clientName,
-    description: data.description || data.title,
+    description: data.description,
     tone: data.tone,
     length_preference: data.lengthPreference,
     language: data.language,
@@ -241,6 +242,10 @@ interface RawProposalApiResponse {
   estimated_hours_data?: RawEstimatedHoursData | null;
   created_at: string;
   updated_at: string;
+  // Versioning hierarchy fields
+  version_label?: string | null;
+  parent_proposal_id?: number | null;
+  root_proposal_id?: number | null;
 }
 
 /** Map raw snake_case backend response to camelCase ProposalData */
@@ -279,6 +284,9 @@ function mapProposal(d: RawProposalApiResponse): ProposalData {
       : undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at,
+    versionLabel: d.version_label ?? null,
+    parentProposalId: d.parent_proposal_id ?? null,
+    rootProposalId: d.root_proposal_id ?? null,
   };
 }
 
@@ -309,10 +317,21 @@ export async function estimateProposalHours(
   };
 }
 
+const PROPOSAL_REQUIRED_FIELDS: (keyof RawProposalApiResponse)[] = [
+  "id",
+  "title",
+  "client_name",
+  "status",
+  "tone",
+  "length_preference",
+  "language",
+];
+
 export async function getProposal(id: number): Promise<ProposalData> {
   const d = await http.get<RawProposalApiResponse>(`/proposals/${id}`, {
     cache: "no-store",
   });
+  assertApiShape<RawProposalApiResponse>(d, PROPOSAL_REQUIRED_FIELDS, "[getProposal]");
   return mapProposal(d);
 }
 
@@ -329,12 +348,17 @@ interface ProposalListApiItem {
   created_at: string;
   updated_at: string;
   version?: number | null;
+  // Versioning hierarchy fields
+  version_label?: string | null;
+  parent_proposal_id?: number | null;
+  root_proposal_id?: number | null;
 }
 
 export interface ListProposalsParams {
   limit?: number;
   offset?: number;
   page?: number;
+  clientId?: number;
 }
 
 function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
@@ -351,6 +375,9 @@ function mapProposalListItem(item: ProposalListApiItem): ProposalListItem {
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     version: item.version ?? null,
+    versionLabel: item.version_label ?? null,
+    parentProposalId: item.parent_proposal_id ?? null,
+    rootProposalId: item.root_proposal_id ?? null,
   };
 }
 
@@ -364,6 +391,14 @@ export async function listProposals(params?: ListProposalsParams): Promise<Propo
       cache: "no-store",
     });
     return raw.map(mapProposalListItem);
+  }
+
+  // Client-scoped fetch: returns all completed proposals for the given client
+  if (params?.clientId !== undefined) {
+    const items = await http.get<ProposalListApiItem[]>(`/proposals?client_id=${params.clientId}`, {
+      cache: "no-store",
+    });
+    return items.map(mapProposalListItem);
   }
 
   // Page-based pagination: page + limit params (used by proposalSlice for infinite scroll)
@@ -442,10 +477,13 @@ export async function cancelProposal(id: number): Promise<void> {
 
 export async function updateApprovalStatus(
   proposalId: number,
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected",
+  signal?: AbortSignal
 ): Promise<ProposalData> {
-  const raw = await http.patch<RawProposalApiResponse>(`/proposals/${proposalId}/approval-status`, {
-    approval_status: status,
-  });
+  const endpoint = `/proposals/${proposalId}/approval-status`;
+  const body = { approval_status: status };
+  const raw = signal
+    ? await http.patch<RawProposalApiResponse>(endpoint, body, { signal })
+    : await http.patch<RawProposalApiResponse>(endpoint, body);
   return mapProposal(raw);
 }
