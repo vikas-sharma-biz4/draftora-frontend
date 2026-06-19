@@ -16,6 +16,7 @@ interface UseClientDocumentsReturn {
   viewingDocModal: { url: string; fileName: string; fileType: string } | null;
   closeDocViewer: () => void;
   restoringDocId: number | null;
+  isDownloadingDocId: number | null;
   isMigratingToS3: boolean;
   deleteDocModalData: { id: number; name: string } | null;
   setDeleteDocModalData: (data: { id: number; name: string } | null) => void;
@@ -27,6 +28,7 @@ interface UseClientDocumentsReturn {
   handleFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRestoreFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleViewDocument: (doc: ClientDocument) => Promise<void>;
+  handleDownloadDocument: (doc: ClientDocument) => Promise<void>;
   handleDeleteDocument: (docId: number, docName: string) => void;
   confirmDeleteDocument: () => Promise<void>;
   handleDeleteAllDocuments: () => void;
@@ -52,6 +54,7 @@ export function useClientDocuments(
     fileType: string;
   } | null>(null);
   const [restoringDocId, setRestoringDocId] = useState<number | null>(null);
+  const [isDownloadingDocId, setIsDownloadingDocId] = useState<number | null>(null);
   const [isMigratingToS3, setIsMigratingToS3] = useState<boolean>(false);
   const [deleteDocModalData, setDeleteDocModalData] = useState<{ id: number; name: string } | null>(
     null
@@ -131,6 +134,38 @@ export function useClientDocuments(
   const closeDocViewer = useCallback((): void => {
     setViewingDocModal(null);
   }, []);
+
+  const handleDownloadDocument = useCallback(
+    async (doc: ClientDocument): Promise<void> => {
+      if (!client) return;
+      if (!doc.s3FileUrl) {
+        toast.error("No file available for download.");
+        return;
+      }
+      setIsDownloadingDocId(doc.id);
+      try {
+        const url = await clientApi.getDocumentViewUrl(client.id, doc.id);
+        if (!url.startsWith("https://")) {
+          throw new Error("Invalid download URL");
+        }
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = doc.name;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 500);
+      } catch (error) {
+        logger.error("[useClientDocuments] Failed to download document", { docId: doc.id, error });
+        toast.error("Could not download document. Please try again.");
+      } finally {
+        setIsDownloadingDocId(null);
+      }
+    },
+    [client]
+  );
 
   const handleViewDocument = useCallback(
     async (doc: ClientDocument): Promise<void> => {
@@ -248,6 +283,7 @@ export function useClientDocuments(
     viewingDocModal,
     closeDocViewer,
     restoringDocId,
+    isDownloadingDocId,
     isMigratingToS3,
     deleteDocModalData,
     setDeleteDocModalData,
@@ -259,6 +295,7 @@ export function useClientDocuments(
     handleFileInputChange,
     handleRestoreFileInputChange,
     handleViewDocument,
+    handleDownloadDocument,
     handleDeleteDocument,
     confirmDeleteDocument,
     handleDeleteAllDocuments,

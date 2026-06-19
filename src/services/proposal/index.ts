@@ -6,10 +6,11 @@
  * or from the legacy path @/services/proposal (both resolve here).
  *
  * Sub-modules:
- *   proposalCrud.service.ts     — create, get, list, download, cancel, approval
- *   proposalSections.service.ts — add, remove, reorder, update, regenerate sections
- *   templateParser.service.ts   — template parsing, file parsing, section suggestions, AI recommendations
- *   proposalWizard.service.ts   — mark step visited, validate step access
+ *   proposalCrud.service.ts        — create, get, list, download, cancel, approval
+ *   proposalSections.service.ts    — add, remove, reorder, update, regenerate sections
+ *   templateParser.service.ts      — template parsing, file parsing, section suggestions, AI recommendations
+ *   proposalWizard.service.ts      — mark step visited, validate step access
+ *   proposalVersioning.service.ts  — create version draft, family tree, delete version draft
  */
 
 // CRUD
@@ -66,3 +67,10 @@ export type {
 
 // Wizard step navigation
 export { markProposalStepVisited, validateProposalStepAccess } from "./proposalWizard.service";
+
+// Versioning
+export {
+  createVersionDraft,
+  getProposalFamilyTree,
+  deleteVersionDraft,
+} from "./proposalVersioning.service";

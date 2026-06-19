@@ -16,6 +16,9 @@ interface DraftCardProps {
   loadingDraftId: string | null;
   onLoad: (id: string) => void;
   onDelete: (id: string, title: string, e: React.MouseEvent) => void;
+  /** Hierarchical version label from the proposals versioning system (e.g. "1.1").
+   *  When provided, shown as "V1.1" instead of the generic "v1" / "v2" heuristic. */
+  proposalVersionLabel?: string | null;
 }
 
 function getStatusLabel(status: string): string {
@@ -45,6 +48,7 @@ export default function DraftCard({
   loadingDraftId,
   onLoad,
   onDelete,
+  proposalVersionLabel,
 }: DraftCardProps): JSX.Element {
   const templateMeta = getDraftTemplateMeta(draft.id);
   const templateId = templateMeta?.templateId ?? draft.templateId;
@@ -64,7 +68,15 @@ export default function DraftCard({
 
   const isGenerated = draft.stage === "generated";
   const hasEdits = draft.hasEdits ?? false;
-  const versionLabel = isGenerated ? (hasEdits ? "v2" : "v1") : null;
+  // Use the hierarchical version label (e.g. "V1.1") when the draft is linked to a
+  // versioned proposal; fall back to the generic "v1" / "v2" heuristic otherwise.
+  const versionLabel = proposalVersionLabel
+    ? `V${proposalVersionLabel}`
+    : isGenerated
+      ? hasEdits
+        ? "v2"
+        : "v1"
+      : null;
 
   return (
     <article

@@ -1,3 +1,10 @@
+// ─── Content table wrapper (TableRenderer horizontal scroll container) ────────
+.content-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
 // ─── Content subheading (component renderer) ──────────────────────────────────
 .content-subheading {
   font-size: 13px;
@@ -11,10 +18,10 @@
 .content-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 16px 0;
   font-size: 13px;
   border-radius: 4px;
   overflow: hidden;
+  // Margin lives on .content-table-wrapper so it is outside the scroll boundary
 }
 
 .content-table th {
@@ -123,8 +130,8 @@
   border-collapse: collapse;
   font-size: 13px;
   margin: 16px 0;
-  overflow-x: auto;
-  display: table;
+  // overflow-x and display:table are intentionally omitted:
+  // the .ai-md-table-wrapper handles horizontal scroll
 }
 
 .markdown-output thead {
@@ -217,6 +224,9 @@
 
 .markdown-output .ai-md-table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
   margin: 16px 0;
 }
 
@@ -299,6 +309,94 @@
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 2px;
+}
+
+// ─── Responsive — tablet (≤ 768px) ───────────────────────────────────────────
+@media (max-width: 768px) {
+  .markdown-output {
+    padding: 16px;
+    font-size: 13px;
+  }
+
+  // Let tables size to their natural content width so the wrapper can scroll.
+  // min-width: 100% ensures they still fill the container when content is narrow.
+  .markdown-output table {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .markdown-output th {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+
+  .markdown-output td {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .content-table {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .content-table th {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+
+  .content-table td {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+}
+
+// ─── Responsive — small phone (≤ 480px) ──────────────────────────────────────
+@media (max-width: 480px) {
+  .markdown-output {
+    padding: 12px 8px;
+    font-size: 12px;
+  }
+
+  .markdown-output .ai-md-h1 {
+    font-size: 1.25em;
+  }
+  .markdown-output .ai-md-h2 {
+    font-size: 1.1em;
+  }
+  .markdown-output .ai-md-h3 {
+    font-size: 1em;
+  }
+
+  .markdown-output h1 {
+    font-size: 15px;
+  }
+  .markdown-output h2 {
+    font-size: 13px;
+  }
+  .markdown-output h3 {
+    font-size: 12px;
+  }
+
+  .markdown-output th {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+
+  .markdown-output td {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .content-table th {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+
+  .content-table td {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
 }
 
 // ─── Debug comparison styles ──────────────────────────────────────────────────

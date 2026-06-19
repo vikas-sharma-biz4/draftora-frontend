@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import styles from "../EditModal.module.scss";
 import BaseModal from "@/components/common/BaseModal";
 import Button from "@/components/common/Button";
-import { TONE_OPTIONS, LENGTH_OPTIONS } from "@/constants";
+import { LENGTH_OPTIONS } from "@/constants";
 import type { ToneOption, LengthOption } from "@/interfaces/proposalInterfaces";
 
 interface StyleVoiceEditorModalProps {
@@ -21,12 +21,11 @@ export default function StyleVoiceEditorModal({
   onClose,
   onSave,
 }: StyleVoiceEditorModalProps): JSX.Element | null {
-  const [selectedTone, setSelectedTone] = useState<ToneOption>(tone);
   const [selectedLength, setSelectedLength] = useState<LengthOption>(lengthPreference);
 
   function handleSave(): void {
     onSave({
-      tone: selectedTone,
+      tone,
       lengthPreference: selectedLength,
     });
   }
@@ -49,23 +48,6 @@ export default function StyleVoiceEditorModal({
       </div>
 
       <div className={styles.modalBody}>
-        <div className={styles.formGroup}>
-          <label className={styles.label}>Tone</label>
-          <div className={styles.optionGrid}>
-            {TONE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                className={`${styles.optionCard} ${selectedTone === option.value ? styles.selected : ""}`}
-                onClick={() => setSelectedTone(option.value)}
-              >
-                <span className={styles.optionIcon}>{option.icon}</span>
-                <span className={styles.optionLabel}>{option.label}</span>
-                <span className={styles.optionDesc}>{option.description}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className={styles.formGroup}>
           <label className={styles.label}>Length</label>
           <div className={styles.segmentedControl}>

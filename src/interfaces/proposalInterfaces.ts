@@ -98,6 +98,10 @@ export interface ProposalData extends ProposalBaseFields {
   estimatedHoursData?: EstimatedHoursData | null;
   createdAt?: string;
   updatedAt?: string;
+  // Versioning hierarchy fields
+  versionLabel?: string | null;
+  parentProposalId?: number | null;
+  rootProposalId?: number | null;
 }
 
 export type ToneOption = "professional" | "persuasive" | "technical" | "creative";
@@ -118,6 +122,40 @@ export interface ProposalListItem {
   createdAt: string;
   updatedAt: string;
   version?: number | null;
+  // Versioning hierarchy fields
+  versionLabel?: string | null;
+  parentProposalId?: number | null;
+  rootProposalId?: number | null;
+}
+
+// --- Versioning types ---
+
+export type VersionDraftTrigger = "section_edit" | "review_edit" | "duplicate" | "restore";
+
+export interface VersionDraftOut {
+  id: number;
+  versionLabel: string;
+  parentProposalId: number;
+  rootProposalId: number;
+  approvalStatus: string;
+  status: string;
+  title: string;
+  createdAt: string;
+}
+
+export interface FamilyTreeItem {
+  id: number;
+  versionLabel: string;
+  approvalStatus: string;
+  status: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProposalFamilyTree {
+  rootId: number;
+  versions: FamilyTreeItem[];
 }
 
 export type TemplateCategory = "Popular" | "Business" | "Technical" | "Creative" | "Documentation";

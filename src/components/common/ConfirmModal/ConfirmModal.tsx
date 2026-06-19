@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import React from "react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
@@ -14,7 +14,7 @@ interface ConfirmModalProps {
   isOpen: boolean;
   title?: string;
   message: string;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (signal: AbortSignal) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -26,41 +26,45 @@ export default function ConfirmModal({
   onCancel,
 }: ConfirmModalProps): JSX.Element | null {
   const [isConfirming, setIsConfirming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   async function handleConfirm(): Promise<void> {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsConfirming(true);
     try {
-      await onConfirm();
+      await onConfirm(controller.signal);
     } catch (error) {
       logger.error("[ConfirmModal] Error in onConfirm:", error);
       toast.error(MESSAGES.GENERIC_ERROR);
     } finally {
+      abortControllerRef.current = null;
       setIsConfirming(false);
     }
   }
 
+  function handleCancel(): void {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    onCancel();
+  }
+
   return (
-    <BaseModal isOpen={isOpen} onClose={onCancel} size="sm" labelId="confirm-modal-title">
+    <BaseModal isOpen={isOpen} onClose={handleCancel} size="sm" labelId="confirm-modal-title">
       <div className={styles.body}>
         {title && (
-          <h3 id="confirm-modal-title" className={styles.title}>{title}</h3>
+          <h3 id="confirm-modal-title" className={styles.title}>
+            {title}
+          </h3>
         )}
         <p className={styles.message}>{message}</p>
         <div className={styles.footer}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onCancel}
-            disabled={isConfirming}
-          >
+          <Button variant="secondary" size="sm" onClick={handleCancel} disabled={isConfirming}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleConfirm}
-            loading={isConfirming}
-          >
+          <Button variant="primary" size="sm" onClick={handleConfirm} loading={isConfirming}>
             Confirm
           </Button>
         </div>

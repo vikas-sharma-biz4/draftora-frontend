@@ -1,0 +1,193 @@
+/* InvoicePreviewModal styles */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(19, 27, 46, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.modal {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 900px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- Header ---------- */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.invoiceId {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.invoiceMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.amount {
+  font-weight: 700;
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.statusBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.statusPaid {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.statusUnpaid {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+}
+
+/* ---------- Body ---------- */
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: #f9f9f9;
+}
+
+.htmlContent {
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 0;
+  overflow: hidden;
+  min-width: 700px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #222;
+
+  // Hide company logo header — irrelevant in modal preview
+  :global(.inv-header) {
+    display: none;
+  }
+}
+
+// ─── Responsive ───────────────────────────────────────────────────────────────
+
+@media (max-width: 900px) {
+  .modal {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal {
+    max-height: 100dvh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .header {
+    padding: 16px 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .body {
+    padding: 16px;
+  }
+
+  // Allow the invoice HTML to scale down inside its container
+  .htmlContent {
+    min-width: 0;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 14px 16px;
+  }
+
+  .body {
+    padding: 12px;
+  }
+}
