@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { logger } from "@/utils/logger";
 import { useProposalWizardStore } from "@/store/features/wizard/proposalWizardSlice";
 import { useVisitedPipelineSteps } from "@/store/features/pipeline/pipelineSlice";
@@ -11,19 +11,23 @@ import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import {
   updateSection,
   regenerateSection,
-  updateApprovalStatus,
   reorderProposalSections,
   estimateProposalHours,
+  createVersionDraft as createVersionDraftApi,
 } from "@/services/proposal";
-import { HttpError } from "@/config/httpClient";
-import { deleteDraft as deleteDraftApi, getDraftByProposalId } from "@/services/draft.service";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
+import { SECTION_AUTOSAVE_DEBOUNCE_MS } from "@/config/config";
 import type { ProposalData, EstimatedHoursData } from "@/interfaces/proposalInterfaces";
 import { toast } from "@/utils/toast";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { useProposalPageData } from "@/hooks/useProposalPageData";
+import { useSectionScrollSpy } from "@/hooks/useSectionScrollSpy";
+import { useProposalApproval } from "@/hooks/useProposalApproval";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDraftStore } from "@/store/features/drafts/draftSlice";
+
+import styles from "./ProposalOutputPage.module.scss";
 
 const ProposalSectionEditor = dynamic(() => import("@/components/proposal/ProposalSectionEditor"), {
   ssr: false,
@@ -114,22 +118,28 @@ export default function ProposalOutputPage(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resetProposal = useProposalWizardStore((s) => s.resetProposal);
+  const setWizardProposalId = useProposalWizardStore((s) => s.setCurrentProposalId);
+  const updateWizardProposalData = useProposalWizardStore((s) => s.updateProposalData);
   const visitedPipelineSteps = useVisitedPipelineSteps();
   const handleSaveDraft = useSaveDraft();
   const invalidateCache = useProposalStore((state) => state.invalidateCache);
   const updateProposalInStore = useProposalStore((state) => state.updateProposal);
+  const addVersionDraft = useProposalStore((state) => state.addVersionDraft);
   const proposalId = Number(params.id);
   const currentDraftId = useDraftSessionStore((state) => state.currentDraftId);
   const fromHistory = useDraftSessionStore((state) => state.fromHistory);
   const updateDraftInStore = useDraftStore((state) => state.updateDraftApi);
   const [mounted, setMounted] = useState<boolean>(false);
-  const currentActiveSectionRef = useRef<string | null>(null);
+  const [createdVersionLabel, setCreatedVersionLabel] = useState<string | null>(null);
   const pendingEditsRef = useRef<Record<string, string>>({});
   const draftUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Lazy version draft: starts as the original proposal id, switches to the new draft id
+  // on the first mutation so the user edits immediately without a click or page reload.
+  const activeSaveProposalIdRef = useRef<number>(proposalId);
+  // Deduplication guard — stores the in-flight creation Promise so rapid consecutive
+  // saves all await the same draft instead of spawning multiple versions.
+  const versionCreationRef = useRef<Promise<number | null> | null>(null);
   const proposalSectionsRef = useRef<Record<string, string>>({});
-  // Prevents the IntersectionObserver from overriding active section during programmatic scroll
-  const isProgrammaticScrollRef = useRef<boolean>(false);
-  const programmaticScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autoEstimatedRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -140,6 +150,76 @@ export default function ProposalOutputPage(): JSX.Element {
   const { proposal, setProposal, isLoading, errorMessage, activeSection, setActiveSection } =
     useProposalPageData(proposalId, searchParams);
 
+  const isHistoryProposal = Boolean(proposal && proposal.approvalStatus !== "pending");
+
+  /**
+   * Lazily create a version draft on the first mutation of a History proposal.
+   *
+   * Subsequent calls return the already-created draft id immediately.
+   * Concurrent calls (e.g. two rapid section saves) share the same Promise so
+   * only one draft is ever created per editing session.
+   */
+  const ensureVersionDraftId = useCallback(async (): Promise<number> => {
+    // Already branched — return the live draft id directly
+    if (activeSaveProposalIdRef.current !== proposalId) {
+      return activeSaveProposalIdRef.current;
+    }
+
+    if (!versionCreationRef.current) {
+      versionCreationRef.current = createVersionDraftApi(proposalId, "section_edit")
+        .then((draft) => {
+          activeSaveProposalIdRef.current = draft.id;
+          addVersionDraft({
+            id: draft.id,
+            title: draft.title,
+            clientId: 0,
+            clientName: "",
+            status: draft.status as "draft" | "generating" | "completed",
+            approvalStatus: draft.approvalStatus as "pending" | "approved" | "rejected",
+            tone: "professional",
+            lengthPreference: "balanced",
+            templateType: "scratch",
+            createdAt: draft.createdAt,
+            updatedAt: draft.createdAt,
+            versionLabel: draft.versionLabel,
+            parentProposalId: draft.parentProposalId,
+            rootProposalId: draft.rootProposalId,
+          });
+          invalidateCache();
+          // Update browser URL without triggering Next.js navigation (no remount)
+          window.history.replaceState({}, "", `/proposal/${draft.id}`);
+          // Sync the wizard store so ReviewPage sees the NEW draft (pending),
+          // not the original History proposal (approved). This prevents ReviewPage
+          // from showing the "Edit (New Version)" banner or creating another draft.
+          setWizardProposalId(draft.id);
+          updateWizardProposalData({ approvalStatus: "pending" });
+          setCreatedVersionLabel(draft.versionLabel ?? null);
+          logger.info(
+            "[ProposalOutputPage] Lazy version draft created | id=%d | label=%s",
+            draft.id,
+            draft.versionLabel
+          );
+          return draft.id;
+        })
+        .catch((err) => {
+          logger.error("[ProposalOutputPage] Failed to create version draft lazily", err);
+          versionCreationRef.current = null; // Allow retry on next save
+          return null;
+        });
+    }
+
+    const id = await versionCreationRef.current;
+    // Fall back to original id so the save doesn't silently disappear
+    return id ?? proposalId;
+  }, [
+    proposalId,
+    addVersionDraft,
+    invalidateCache,
+    setWizardProposalId,
+    updateWizardProposalData,
+    setCreatedVersionLabel,
+  ]);
+
   // Keep proposalSectionsRef in sync so the debounced draft update can access latest sections
   useEffect(() => {
     if (proposal?.sections) {
@@ -147,112 +227,53 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }, [proposal?.sections]);
 
-  // Sync ref when activeSection changes from user clicks (not from scroll)
-  useEffect(() => {
-    currentActiveSectionRef.current = activeSection;
-  }, [activeSection]);
+  const { handleScrollToSection } = useSectionScrollSpy(
+    proposal?.selectedSections,
+    mounted,
+    activeSection,
+    setActiveSection
+  );
 
   // Intercept browser back button to always navigate to review page
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      // Intercept browser back navigation and redirect to review
       event.preventDefault();
       router.push("/review");
     };
 
     window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-    };
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [router]);
 
-  /**
-   * Scroll spy: highlight the sidebar item for the section currently being read.
-   *
-   * Strategy: on every scroll event, find the section whose top edge has most
-   * recently crossed the container's top edge (largest negative offset ≤ TRIGGER_OFFSET).
-   * This correctly handles tall sections (images, tables) that remain partially
-   * visible long after the reader has moved past them — unlike an IntersectionObserver
-   * "smallest top" approach which keeps the old section active far too long.
-   */
+  // Warn before tab close if there are pending autosave edits that haven't been flushed yet
   useEffect(() => {
-    if (!proposal || !mounted) return;
-
-    const sectionKeys = proposal.selectedSections ?? [];
-    if (sectionKeys.length === 0) return;
-
-    const scrollRoot = document.querySelector<HTMLElement>(".main-content");
-    if (!scrollRoot) return;
-
-    // px below the container's top edge that triggers a section switch.
-    // A small positive offset accounts for section headers having some padding.
-    const TRIGGER_OFFSET = 80;
-
-    function updateActiveSection(): void {
-      if (isProgrammaticScrollRef.current) return;
-
-      const containerTop = scrollRoot!.getBoundingClientRect().top;
-
-      let bestKey: string | null = null;
-      let bestRelTop = -Infinity;
-
-      // Pick the section whose top is the largest value still ≤ TRIGGER_OFFSET
-      // (i.e., the section that most recently scrolled past the container's top edge).
-      sectionKeys.forEach((key) => {
-        const el = document.getElementById(`section-${key}`);
-        if (!el) return;
-        const relTop = el.getBoundingClientRect().top - containerTop;
-        if (relTop <= TRIGGER_OFFSET && relTop > bestRelTop) {
-          bestRelTop = relTop;
-          bestKey = key;
-        }
-      });
-
-      // Fallback: nothing has reached the trigger yet — pick first visible section.
-      if (!bestKey) {
-        let firstRelTop = Infinity;
-        sectionKeys.forEach((key) => {
-          const el = document.getElementById(`section-${key}`);
-          if (!el) return;
-          const relTop = el.getBoundingClientRect().top - containerTop;
-          if (relTop < firstRelTop) {
-            firstRelTop = relTop;
-            bestKey = key;
-          }
-        });
-      }
-
-      if (bestKey && bestKey !== currentActiveSectionRef.current) {
-        currentActiveSectionRef.current = bestKey;
-        setActiveSection(bestKey);
+    function handleBeforeUnload(e: BeforeUnloadEvent): void {
+      if (draftUpdateTimerRef.current !== null) {
+        e.preventDefault();
+        e.returnValue = "";
       }
     }
-
-    scrollRoot.addEventListener("scroll", updateActiveSection, { passive: true });
-    window.addEventListener("resize", updateActiveSection, { passive: true });
-
-    // Set the correct active section immediately on mount / proposal load.
-    updateActiveSection();
-
-    return () => {
-      scrollRoot.removeEventListener("scroll", updateActiveSection);
-      window.removeEventListener("resize", updateActiveSection);
-    };
-  }, [proposal, mounted, setActiveSection]);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
 
   // Approval workflow state
-  const [isApproving, setIsApproving] = useState<boolean>(false);
-  const [isRejecting, setIsRejecting] = useState<boolean>(false);
+  const { isApproving, isRejecting, executeApprovalAction } = useProposalApproval({
+    proposalId,
+    onApprovalSuccess: (status) => {
+      setProposal((prev) => {
+        if (!prev) return prev;
+        return { ...prev, approvalStatus: status };
+      });
+      updateProposalInStore(proposalId, { approvalStatus: status });
+    },
+    onCacheInvalidate: invalidateCache,
+  });
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     message: string;
     actionType: "approve" | "reject" | null;
-  }>({
-    isOpen: false,
-    message: "",
-    actionType: null,
-  });
+  }>({ isOpen: false, message: "", actionType: null });
 
   // Hours estimation state
   const [estimatedHoursData, setEstimatedHoursData] = useState<EstimatedHoursData | null>(null);
@@ -277,11 +298,7 @@ export default function ProposalOutputPage(): JSX.Element {
         toast.success("Hours estimated successfully.");
       })
       .catch((error) => {
-        const message =
-          error instanceof HttpError
-            ? error.message
-            : "Failed to estimate hours. Please try again.";
-        toast.error(message);
+        toast.error(getErrorMessage(error, "Failed to estimate hours. Please try again."));
       })
       .finally(() => {
         setIsEstimatingHours(false);
@@ -303,47 +320,13 @@ export default function ProposalOutputPage(): JSX.Element {
       setIsEstimateModalOpen(false);
       toast.success("Hours estimated successfully.");
     } catch (error) {
-      const message =
-        error instanceof HttpError ? error.message : "Failed to estimate hours. Please try again.";
-      toast.error(message);
+      toast.error(getErrorMessage(error, "Failed to estimate hours. Please try again."));
     } finally {
       setIsEstimatingHours(false);
     }
   }
 
   // ── Section editing callbacks ────────────────────────────────────────────────
-
-  function handleScrollToSection(key: string): void {
-    setActiveSection(key);
-    currentActiveSectionRef.current = key;
-
-    // Suppress IntersectionObserver for 1.5s so it doesn't override the click-selected section
-    isProgrammaticScrollRef.current = true;
-    if (programmaticScrollTimerRef.current) clearTimeout(programmaticScrollTimerRef.current);
-    programmaticScrollTimerRef.current = setTimeout(() => {
-      isProgrammaticScrollRef.current = false;
-    }, 1500);
-
-    // Defer scroll to the next animation frame so React can commit the state update first.
-    // Using getBoundingClientRect inside rAF gives stable layout coordinates.
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`section-${key}`);
-      if (!el) return;
-
-      const container = document.querySelector<HTMLElement>(".main-content");
-      if (!container) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-
-      // Viewport-relative positions are stable within a single animation frame.
-      // Adding container.scrollTop converts to absolute scroll-container coordinates.
-      const elTop = el.getBoundingClientRect().top;
-      const containerTop = container.getBoundingClientRect().top;
-      const targetScrollTop = container.scrollTop + (elTop - containerTop) - 24;
-      container.scrollTo({ top: Math.max(0, targetScrollTop), behavior: "smooth" });
-    });
-  }
 
   const handleContentChange = useCallback((key: string, html: string): void => {
     setProposal((prev) => {
@@ -354,8 +337,11 @@ export default function ProposalOutputPage(): JSX.Element {
 
   const handleSaveSection = useCallback(
     async (key: string, content: string): Promise<void> => {
+      // For History proposals: lazily create a version draft on first save,
+      // then target all subsequent saves at the new draft id.
+      const targetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
       try {
-        await updateSection(proposalId, key, content);
+        await updateSection(targetId, key, content);
 
         // Debounce-update the draft with edited content (1.5s) so reopening the draft shows edits
         if (currentDraftId && !fromHistory) {
@@ -365,6 +351,7 @@ export default function ProposalOutputPage(): JSX.Element {
           draftUpdateTimerRef.current = setTimeout(async () => {
             const edits = pendingEditsRef.current;
             pendingEditsRef.current = {};
+            draftUpdateTimerRef.current = null;
             // Merge edits into the full sections to avoid wiping out other sections via PUT
             const fullContent = { ...proposalSectionsRef.current, ...edits };
             try {
@@ -377,31 +364,34 @@ export default function ProposalOutputPage(): JSX.Element {
             } catch (err) {
               logger.warn("[ProposalOutputPage] Draft update after edit failed", err);
             }
-          }, 1500);
+          }, SECTION_AUTOSAVE_DEBOUNCE_MS);
         }
       } catch {
         // Silently ignore save failures
       }
     },
-    [proposalId, currentDraftId, fromHistory, updateDraftInStore]
+    [
+      isHistoryProposal,
+      ensureVersionDraftId,
+      proposalId,
+      currentDraftId,
+      fromHistory,
+      updateDraftInStore,
+    ]
   );
 
-  // Clean up timers on unmount
+  // Clean up draft-update debounce timer on unmount
   useEffect(() => {
     return () => {
       if (draftUpdateTimerRef.current) clearTimeout(draftUpdateTimerRef.current);
-      if (programmaticScrollTimerRef.current) clearTimeout(programmaticScrollTimerRef.current);
     };
   }, []);
 
   const handleRegenerate = useCallback(
     async (key: string, instructions?: string): Promise<string | null> => {
-      // This callback is now used for selection-based regeneration
-      // The RichEditor passes selectedText via the RegenerateSelectionParams
-      // For now, we keep the old signature for backward compatibility
-      // The actual selection regeneration happens in ProposalSectionEditor
+      const targetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
       try {
-        const newContent = await regenerateSection(proposalId, key, instructions);
+        const newContent = await regenerateSection(targetId, key, instructions);
         handleContentChange(key, newContent);
         toast.success("Section regenerated.");
         return newContent;
@@ -410,7 +400,7 @@ export default function ProposalOutputPage(): JSX.Element {
         return null;
       }
     },
-    [proposalId, handleContentChange]
+    [isHistoryProposal, ensureVersionDraftId, proposalId, handleContentChange]
   );
 
   // ── Sidebar callbacks ───────────────────────────────────────────────────────
@@ -445,13 +435,13 @@ export default function ProposalOutputPage(): JSX.Element {
     }
   }
 
-  function handleSectionAdded(
+  async function handleSectionAdded(
     key: string,
     label: string,
     content: string,
     afterKey?: string,
     formatType?: string
-  ): void {
+  ): Promise<void> {
     const currentSections = proposal?.selectedSections ?? [];
     let newSelected: string[];
 
@@ -493,8 +483,10 @@ export default function ProposalOutputPage(): JSX.Element {
     });
     setActiveSection(key);
 
-    // Persist insertion order to backend so it survives reload
-    reorderProposalSections(proposalId, {
+    // Persist insertion order to backend — for History proposals, ensure a version draft
+    // exists first so the reorder targets the editable draft, not the immutable History row.
+    const reorderTargetId = isHistoryProposal ? await ensureVersionDraftId() : proposalId;
+    reorderProposalSections(reorderTargetId, {
       order: newSelected,
       sectionDisplayNames: newDisplayNames,
     }).catch((err) => {
@@ -532,75 +524,23 @@ export default function ProposalOutputPage(): JSX.Element {
     });
   }
 
-  async function executeApprovalAction(actionType: "approve" | "reject"): Promise<void> {
-    const status = actionType === "approve" ? "approved" : "rejected";
-    const setLoading = actionType === "approve" ? setIsApproving : setIsRejecting;
-    const successMessage =
-      actionType === "approve"
-        ? "Proposal approved and moved to history!"
-        : "Proposal rejected and moved to history";
-
-    logger.info(`[Approval Flow] Starting ${actionType} action for proposal ${proposalId}`);
-    setLoading(true);
-    try {
-      // Update approval status in backend
-      logger.info(`[Approval Flow] Calling API to update approval status to: ${status}`);
-      await updateApprovalStatus(proposalId, status);
-      logger.info(`[Approval Flow] API call successful - approval status updated to: ${status}`);
-
-      // Remove from drafts via API
-      try {
-        const proposalDraft = await getDraftByProposalId(proposalId);
-        if (proposalDraft) {
-          await deleteDraftApi(proposalDraft.id);
-        }
-      } catch (draftError) {
-        logger.error("Failed to remove draft:", draftError);
-      }
-
-      // CRITICAL: Invalidate cache FIRST to ensure history page fetches fresh data
-      logger.info(`[Approval Flow] Invalidating Zustand cache to force fresh data fetch`);
-      invalidateCache();
-
-      // Then update local state for immediate UI feedback
-      setProposal((prev) => {
-        if (!prev) return prev;
-        return { ...prev, approvalStatus: status };
-      });
-
-      // Update Zustand store (optimistic update)
-      logger.info(`[Approval Flow] Updating Zustand store with new approval status: ${status}`);
-      updateProposalInStore(proposalId, { approvalStatus: status });
-
-      toast.success(successMessage);
-
-      logger.info(`[Approval Flow] Redirecting to /history in 500ms`);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      router.push("/history");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to ${actionType} proposal`;
-      toast.error(message);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  const displayNames = proposal?.sectionDisplayNames ?? {};
-  const sectionMetas: SectionMeta[] = (proposal?.selectedSections ?? []).map((key) => ({
-    key,
-    label: resolveSectionLabel(key, displayNames),
-    hasContent: Boolean(proposal?.sections?.[key]),
-    isStatic: (STATIC_SECTION_KEYS as readonly string[]).includes(key),
-  }));
+  const sectionMetas = useMemo<SectionMeta[]>(() => {
+    const displayNames = proposal?.sectionDisplayNames ?? {};
+    return (proposal?.selectedSections ?? []).map((key) => ({
+      key,
+      label: resolveSectionLabel(key, displayNames),
+      hasContent: Boolean(proposal?.sections?.[key]),
+      isStatic: (STATIC_SECTION_KEYS as readonly string[]).includes(key),
+    }));
+  }, [proposal?.selectedSections, proposal?.sectionDisplayNames, proposal?.sections]);
 
   // Show loading state while fetching
   if (!mounted || (isLoading && !proposal)) {
     return (
       <PageLayout noPadding>
-        <div className="proposal-content" style={{ padding: "2rem" }}>
+        <div className={`proposal-content ${styles.loadingState}`}>
           <ProposalSkeleton />
         </div>
       </PageLayout>
@@ -611,18 +551,11 @@ export default function ProposalOutputPage(): JSX.Element {
   if (errorMessage && !proposal) {
     return (
       <PageLayout noPadding>
-        <div
-          className="proposal-content"
-          style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto" }}
-        >
-          <div className="card" style={{ padding: "2rem", textAlign: "center" }}>
-            <h2 style={{ color: "var(--color-danger)", marginBottom: "1rem" }}>
-              Failed to Load Proposal
-            </h2>
-            <p style={{ color: "var(--color-text-muted)", marginBottom: "1.5rem" }}>
-              {errorMessage}
-            </p>
-            <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+        <div className={`proposal-content ${styles.errorContainer}`}>
+          <div className={`card ${styles.errorCard}`}>
+            <h2 className={styles.errorHeading}>Failed to Load Proposal</h2>
+            <p className={styles.errorMessage}>{errorMessage}</p>
+            <div className={styles.errorActions}>
               <button className="btn btn-primary" onClick={() => router.push("/review")}>
                 ← Back to Review
               </button>
@@ -640,7 +573,7 @@ export default function ProposalOutputPage(): JSX.Element {
   if (!proposal) {
     return (
       <PageLayout noPadding>
-        <div className="proposal-content" style={{ padding: "2rem" }}>
+        <div className={`proposal-content ${styles.loadingState}`}>
           <ProposalSkeleton />
         </div>
       </PageLayout>
@@ -708,6 +641,27 @@ export default function ProposalOutputPage(): JSX.Element {
           {errorMessage && <div className="alert-error">{errorMessage}</div>}
 
           {isLoading && sectionMetas.length === 0 && <ProposalSkeleton />}
+
+          {/* Subtle notice for History (approved / rejected) proposals.
+              Editing is allowed immediately — a version draft is created automatically
+              on the first save without any button click or page reload. */}
+          {isHistoryProposal && (
+            <div className={styles.historyBanner}>
+              {createdVersionLabel ? (
+                <>
+                  Editing{" "}
+                  <strong className={styles.historyBannerVersion}>V{createdVersionLabel}</strong> —
+                  changes are saved to this version draft automatically.
+                </>
+              ) : (
+                <>
+                  This proposal is{" "}
+                  <strong className={styles.historyBannerStatus}>{proposal.approvalStatus}</strong>.
+                  Start editing — a new version draft will be created automatically.
+                </>
+              )}
+            </div>
+          )}
 
           {sectionMetas.map(({ key, label, isStatic }) =>
             isStatic ? (

@@ -1,23 +1,25 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, FileText, Mic, Trash2 } from "lucide-react";
+
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
-
-import styles from "./ClientDetailPage.module.scss";
-
+import { formatDate } from "@/utils/dateUtils";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useClientDocuments } from "@/hooks/useClientDocuments";
 import { useClientProposals } from "@/hooks/useClientProposals";
-import { formatDate } from "@/utils/dateUtils";
 import PageLayout from "@/layouts/AppLayout";
 import ClientDetailSkeleton from "@/components/common/Skeletons/ClientDetailSkeleton";
 import ClientDocumentsPanel from "./components/ClientDocumentsPanel";
 import ClientProposalsList from "./components/ClientProposalsList";
+import InvoiceHistoryPanel from "./components/InvoiceHistoryPanel";
+import EmailHistoryPanel from "./components/EmailHistoryPanel";
+
+import styles from "./ClientDetailPage.module.scss";
 
 const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
   ssr: false,
@@ -34,6 +36,22 @@ const DeleteDocumentModal = dynamic(() => import("@/components/modals/DeleteDocu
 });
 const DeleteAllDocumentsModal = dynamic(
   () => import("@/components/modals/DeleteAllDocumentsModal"),
+  { ssr: false }
+);
+const GenerateEmailModal = dynamic(
+  () => import("@/components/modals/GenerateEmailModal/GenerateEmailModal"),
+  { ssr: false }
+);
+const GenerateInvoiceModal = dynamic(
+  () => import("@/components/modals/GenerateInvoiceModal/GenerateInvoiceModal"),
+  { ssr: false }
+);
+const GenerateNdaModal = dynamic(
+  () => import("@/components/modals/GenerateNdaModal/GenerateNdaModal"),
+  { ssr: false }
+);
+const GeneratePodcastModal = dynamic(
+  () => import("@/components/modals/GeneratePodcastModal/GeneratePodcastModal"),
   { ssr: false }
 );
 
@@ -56,6 +74,13 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
+  const [showGenerateEmailModal, setShowGenerateEmailModal] = useState<boolean>(false);
+  const [showGenerateInvoiceModal, setShowGenerateInvoiceModal] = useState<boolean>(false);
+  const [showGenerateNdaModal, setShowGenerateNdaModal] = useState<boolean>(false);
+  const [showGeneratePodcastModal, setShowGeneratePodcastModal] = useState<boolean>(false);
+  const [emailProposalId, setEmailProposalId] = useState<number | undefined>(undefined);
+  const [invoiceProposalId, setInvoiceProposalId] = useState<number | undefined>(undefined);
+  const [podcastProposalId, setPodcastProposalId] = useState<number | undefined>(undefined);
 
   const docs = useClientDocuments(client);
   const proposals = useClientProposals(clientId, client?.name ?? "");
@@ -101,7 +126,7 @@ export default function ClientWorkspacePage(): JSX.Element {
     return (
       <PageLayout>
         <div className={styles.emptyState}>
-          <div className={styles.emptyTitle}>Client not found</div>
+          <p className={styles.panelTitle}>Client not found</p>
         </div>
       </PageLayout>
     );
@@ -117,10 +142,18 @@ export default function ClientWorkspacePage(): JSX.Element {
           </div>
           <h1 className={styles.clientName}>{client.name}</h1>
           <p className={styles.clientMeta}>
-            {client.industry} Active Created {formatDate(client.createdAt)}
+            {client.industry} · Active · Created {formatDate(client.createdAt)}
           </p>
         </div>
         <div className={styles.clientHeaderActions}>
+          <button className="btn btn-secondary" onClick={() => setShowGenerateNdaModal(true)}>
+            <FileText size={18} />
+            Generate NDA
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowGeneratePodcastModal(true)}>
+            <Mic size={18} />
+            Generate Podcast
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowEditModal(true)}>
             <Edit size={18} />
             Edit Details
@@ -135,9 +168,19 @@ export default function ClientWorkspacePage(): JSX.Element {
         </div>
       </div>
 
-      <div className={styles.splitLayout}>
+      {/* 2×2 grid layout */}
+      <div className={styles.gridLayout}>
         <ClientDocumentsPanel documents={client.documents} docs={docs} />
         <ClientProposalsList proposals={proposals} onNewProposal={handleNewProposal} />
+        <InvoiceHistoryPanel
+          clientId={clientId}
+          onGenerateInvoice={() => setShowGenerateInvoiceModal(true)}
+        />
+        <EmailHistoryPanel
+          clientId={clientId}
+          proposals={proposals.clientProposals}
+          onGenerateEmail={() => setShowGenerateEmailModal(true)}
+        />
       </div>
 
       {showEditModal && (
@@ -186,6 +229,43 @@ export default function ClientWorkspacePage(): JSX.Element {
           documentCount={client.documents.length}
           onClose={() => docs.setDeleteAllDocsModalOpen(false)}
           onConfirm={docs.confirmDeleteAllDocuments}
+        />
+      )}
+
+      {showGenerateEmailModal && (
+        <GenerateEmailModal
+          client={client}
+          initialProposalId={emailProposalId}
+          onClose={() => {
+            setShowGenerateEmailModal(false);
+            setEmailProposalId(undefined);
+          }}
+        />
+      )}
+
+      {showGenerateInvoiceModal && (
+        <GenerateInvoiceModal
+          client={client}
+          initialProposalId={invoiceProposalId}
+          onClose={() => {
+            setShowGenerateInvoiceModal(false);
+            setInvoiceProposalId(undefined);
+          }}
+        />
+      )}
+
+      {showGenerateNdaModal && (
+        <GenerateNdaModal client={client} onClose={() => setShowGenerateNdaModal(false)} />
+      )}
+
+      {showGeneratePodcastModal && (
+        <GeneratePodcastModal
+          client={client}
+          initialProposalId={podcastProposalId}
+          onClose={() => {
+            setShowGeneratePodcastModal(false);
+            setPodcastProposalId(undefined);
+          }}
         />
       )}
     </PageLayout>
