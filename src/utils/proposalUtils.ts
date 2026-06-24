@@ -6,27 +6,29 @@ const TEMPLATE_ID_LABELS: Record<string, string> = {
   agency: "Agency",
   ecommerce: "E-Commerce",
   enterprise: "Enterprise",
+  // Common template types — normalized to consistent casing
+  sow: "SOW",
+  mvp: "MVP",
+  poc: "POC",
+  brd: "BRD",
+  frd: "FRD",
+  srs: "SRS",
+  full: "Full Proposal",
+  design: "Design (IP)",
+  architecture: "Architecture",
+  predefined: "Template",
+  custom: "Custom",
+  scratch: "From Scratch",
 };
 
 /**
  * Returns a human-readable label for a proposal's template type.
  * Prefers the templateId lookup table; falls back to templateType.
+ * All lookups are case-insensitive so "sow" and "SOW" both resolve to "SOW".
  */
 export function getTemplateTypeLabel(
   proposal: Pick<ProposalListItem, "templateId" | "templateType">
 ): string {
-  if (proposal.templateId) {
-    return TEMPLATE_ID_LABELS[proposal.templateId] ?? proposal.templateId;
-  }
-
-  switch (proposal.templateType) {
-    case "predefined":
-      return "Template";
-    case "custom":
-      return "Custom";
-    case "scratch":
-      return "From Scratch";
-    default:
-      return proposal.templateType || "Template";
-  }
+  const key = (proposal.templateId ?? proposal.templateType ?? "").toLowerCase();
+  return TEMPLATE_ID_LABELS[key] ?? proposal.templateId ?? proposal.templateType ?? "Template";
 }

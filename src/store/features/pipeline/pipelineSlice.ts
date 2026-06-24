@@ -46,6 +46,7 @@ interface PipelineState {
   markStepAsVisited: (stepId: number) => void;
   resetVisitedSteps: () => void;
   setVisitedSteps: (steps: number[]) => void;
+  reset: () => void;
 }
 
 export const usePipelineStore = create<PipelineState>((set) => ({
@@ -73,6 +74,11 @@ export const usePipelineStore = create<PipelineState>((set) => ({
     saveToStorage([]);
     set(INITIAL_PIPELINE_STATE);
   },
+
+  reset: (): void => {
+    saveToStorage([]);
+    set(INITIAL_PIPELINE_STATE);
+  },
 }));
 
 // ─── Selector Hooks ─────────────────────────────────────────────────────
@@ -80,5 +86,4 @@ export const usePipelineStore = create<PipelineState>((set) => ({
 /**
  * Selects the visited pipeline steps array.
  */
-export const useVisitedPipelineSteps = () =>
-  usePipelineStore((state) => state.visitedSteps);
+export const useVisitedPipelineSteps = () => usePipelineStore((state) => state.visitedSteps);

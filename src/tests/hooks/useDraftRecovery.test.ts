@@ -97,7 +97,6 @@ const savedDraft: SavedDraft = {
       customSections: [],
       contextualInstructions: "",
       webReferences: [],
-      files: [],
       filesMeta: [],
       templateId: null,
       templateType: "scratch",

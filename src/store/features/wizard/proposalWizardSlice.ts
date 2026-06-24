@@ -37,7 +37,6 @@ export const DEFAULT_PROPOSAL_DATA: ProposalWizardData = {
   customSections: [],
   contextualInstructions: "",
   webReferences: [],
-  files: [],
   filesMeta: [],
   selectedDocumentIds: [],
   templateId: null,
@@ -220,7 +219,6 @@ export const useProposalWizardStore = create<ProposalWizardState>()(
       partialize: (state): PersistedWizardState => ({
         proposalData: {
           ...state.proposalData,
-          files: [], // File objects cannot be serialized to JSON
         },
         currentStep: state.currentStep,
         currentProposalId: state.currentProposalId,
@@ -237,7 +235,6 @@ export const useProposalWizardStore = create<ProposalWizardState>()(
           proposalData: {
             ...DEFAULT_PROPOSAL_DATA,
             ...(persisted.proposalData ?? {}),
-            files: [],
           },
           hydrated: false, // set to true by onRehydrateStorage below
         };

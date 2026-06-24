@@ -2,7 +2,8 @@
  * ProposalApprovalBar component
  *
  * Renders the action bar for proposal approval workflow:
- * - Download button
+ * - Download DOCX button
+ * - Download PDF button
  * - Save Draft button
  * - Approve / Reject buttons with confirmation modal
  * - Approval status badges
@@ -43,8 +44,10 @@ export default function ProposalApprovalBar({
   onConfirmModalClose,
   estimateHoursContent,
 }: ProposalApprovalBarProps): JSX.Element {
-  const { isDownloading, downloadProposal } = useProposalDownload();
+  const { isDownloading, isPdfDownloading, downloadProposal, downloadProposalPdf } =
+    useProposalDownload();
   const isPending = !approvalStatus || approvalStatus === "pending";
+  const isAnyDownloading = isDownloading || isPdfDownloading;
 
   return (
     <>
@@ -54,7 +57,7 @@ export default function ProposalApprovalBar({
           variant="secondary"
           size="sm"
           onClick={() => downloadProposal(proposalId)}
-          disabled={isDownloading}
+          disabled={isAnyDownloading}
           className={isDownloading ? "downloading-btn" : ""}
         >
           {isDownloading ? (
@@ -68,13 +71,36 @@ export default function ProposalApprovalBar({
             </div>
           ) : (
             <>
-              <Download size={14} /> Download
+              <Download size={14} /> Download DOCX
+            </>
+          )}
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => downloadProposalPdf(proposalId)}
+          disabled={isAnyDownloading}
+          className={isPdfDownloading ? "downloading-btn" : ""}
+        >
+          {isPdfDownloading ? (
+            <div className="flex items-center gap-2">
+              <span className="downloading-text">Downloading</span>
+              <span className="downloading-dots">
+                <span className="dot"></span>
+                <span className="dot"></span>
+                <span className="dot"></span>
+              </span>
+            </div>
+          ) : (
+            <>
+              <Download size={14} /> Download PDF
             </>
           )}
         </Button>
 
         {isPending && onSaveDraft && (
-          <Button variant="secondary" size="sm" onClick={onSaveDraft} disabled={isDownloading}>
+          <Button variant="secondary" size="sm" onClick={onSaveDraft} disabled={isAnyDownloading}>
             Save Draft
           </Button>
         )}
@@ -86,7 +112,7 @@ export default function ProposalApprovalBar({
               size="sm"
               onClick={onApprove}
               loading={isApproving}
-              disabled={isDownloading}
+              disabled={isAnyDownloading}
             >
               Approve
             </Button>
@@ -95,7 +121,7 @@ export default function ProposalApprovalBar({
               size="sm"
               onClick={onReject}
               loading={isRejecting}
-              disabled={isDownloading}
+              disabled={isAnyDownloading}
             >
               Reject
             </Button>

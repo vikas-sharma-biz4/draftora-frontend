@@ -18,9 +18,6 @@ import type {
 import { assertApiShape } from "@/utils/assertApiShape";
 import { logger } from "@/utils/logger";
 
-const ALLOWED_UPLOAD_EXTENSIONS = ["pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt"];
-const MAX_UPLOAD_SIZE_MB = 50;
-
 function parseToneOption(raw: string): ToneOption {
   const valid: ToneOption[] = ["professional", "persuasive", "technical", "creative"];
   if ((valid as string[]).includes(raw)) return raw as ToneOption;
@@ -69,23 +66,29 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
 
   const formData = new FormData();
 
+  // Only use custom sections that are actually selected
+  const selectedCustomSections = data.customSections.filter((s) =>
+    data.selectedSections.includes(s.key)
+  );
+
   // Build contextual instructions — append custom section descriptions so the AI
   // knows what content to produce for user-defined sections.
   let contextual = data.contextualInstructions ?? "";
-  if (data.customSections.length > 0) {
-    const customBlock = data.customSections
+  if (selectedCustomSections.length > 0) {
+    const customBlock = selectedCustomSections
       .map((s) => `- "${s.label}": ${s.description}`)
       .join("\n");
     const separator = contextual.trim() ? "\n\n" : "";
     contextual += `${separator}[Additional custom sections to include in the proposal]:\n${customBlock}`;
   }
 
-  const allSections = [...data.selectedSections, ...data.customSections.map((s) => s.key)];
+  // selectedSections already contains selected custom section keys — no need to append again
+  const allSections = [...data.selectedSections];
 
-  // Merge section display names: custom sections + any from template parsing
+  // Merge section display names: selected custom sections + any from template parsing
   const sectionDisplayNames: Record<string, string> = {
     ...data.sectionDisplayNames,
-    ...Object.fromEntries(data.customSections.map((s) => [s.key, s.label])),
+    ...Object.fromEntries(selectedCustomSections.map((s) => [s.key, s.label])),
   };
 
   const proposalPayload: Record<string, unknown> = {
@@ -106,19 +109,6 @@ export async function generateProposal(data: ProposalWizardData): Promise<Create
   };
 
   formData.append("proposal_data", JSON.stringify(proposalPayload));
-
-  for (const file of data.files) {
-    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-    if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
-      throw new Error(
-        `Unsupported file type: "${file.name}". Allowed: ${ALLOWED_UPLOAD_EXTENSIONS.join(", ")}`
-      );
-    }
-    if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
-      throw new Error(`File too large: "${file.name}". Maximum size is ${MAX_UPLOAD_SIZE_MB}MB.`);
-    }
-    formData.append("files", file);
-  }
 
   logger.info("[generateProposal] Sending POST request to /proposals at", new Date().toISOString());
   const requestStartTime = Date.now();
@@ -300,6 +290,64 @@ interface RawEstimateHoursResponse {
   estimated_hours_data: RawEstimatedHoursData;
 }
 
+export async function regenerateProposal(
+  proposalId: number,
+  data: ProposalWizardData
+): Promise<CreateProposalResponse> {
+  const formData = new FormData();
+
+  const selectedCustomSections = data.customSections.filter((s) =>
+    data.selectedSections.includes(s.key)
+  );
+
+  let contextual = data.contextualInstructions ?? "";
+  if (selectedCustomSections.length > 0) {
+    const customBlock = selectedCustomSections
+      .map((s) => `- "${s.label}": ${s.description}`)
+      .join("\n");
+    const separator = contextual.trim() ? "\n\n" : "";
+    contextual += `${separator}[Additional custom sections to include in the proposal]:\n${customBlock}`;
+  }
+
+  const allSections = [...data.selectedSections];
+  const sectionDisplayNames: Record<string, string> = {
+    ...data.sectionDisplayNames,
+    ...Object.fromEntries(selectedCustomSections.map((s) => [s.key, s.label])),
+  };
+
+  const proposalPayload: Record<string, unknown> = {
+    title: data.title,
+    client_id: data.clientId || 0,
+    client_name: data.clientName,
+    description: data.description,
+    tone: data.tone,
+    length_preference: data.lengthPreference,
+    language: data.language,
+    template_type: data.templateType || "scratch",
+    ai_model: data.aiModel || DEFAULT_AI_MODEL,
+    selected_sections: allSections,
+    section_display_names: Object.keys(sectionDisplayNames).length > 0 ? sectionDisplayNames : null,
+    contextual_instructions: contextual || null,
+    web_references: data.webReferences,
+    selected_document_ids: data.selectedDocumentIds || [],
+  };
+
+  formData.append("proposal_data", JSON.stringify(proposalPayload));
+
+  const response = await http.post<CreateProposalResponse>(
+    `/proposals/${proposalId}/regenerate`,
+    formData
+  );
+
+  logger.info("[regenerateProposal] Regeneration started", {
+    proposalId,
+    responseId: response.id,
+    status: response.status,
+  });
+
+  return response;
+}
+
 export async function estimateProposalHours(
   proposalId: number,
   body: EstimateHoursPayload = {}
@@ -461,6 +509,10 @@ export async function listProposalHistory(
 
 export function getDownloadUrl(id: number): string {
   return buildUrl(`/proposals/${id}/download`);
+}
+
+export function getProposalPdfUrl(id: number): string {
+  return buildUrl(`/proposals/${id}/download?format=pdf`);
 }
 
 export async function cancelProposal(id: number): Promise<void> {

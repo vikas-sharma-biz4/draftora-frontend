@@ -11,7 +11,6 @@
   suggestSections,
   parseCustomTemplate,
   parseFiles,
-  getSupportedParseFormats,
 } from "@/services/proposal";
 import type { ProposalData } from "@/interfaces/proposalInterfaces";
 
@@ -44,7 +43,6 @@ const minimalProposalData: ProposalData = {
   customSections: [],
   contextualInstructions: "",
   webReferences: [],
-  files: [],
   filesMeta: [],
   aiModel: "gpt-4o",
   templateId: null,
@@ -464,37 +462,5 @@ describe("parseFiles", () => {
     } as unknown as Response);
     const file = new File(["x"], "bad.exe");
     await expect(parseFiles([file])).rejects.toThrow("Unprocessable entity");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getSupportedParseFormats
-// ---------------------------------------------------------------------------
-
-describe("getSupportedParseFormats", () => {
-  it("returns extensions array from response", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () =>
-        JSON.stringify({
-          success: true,
-          data: { extensions: [".pdf", ".docx", ".txt"] },
-        }),
-    } as unknown as Response);
-
-    const result = await getSupportedParseFormats();
-    expect(result).toEqual([".pdf", ".docx", ".txt"]);
-  });
-
-  it("returns empty array when extensions missing from response", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ success: true, data: {} }),
-    } as unknown as Response);
-
-    const result = await getSupportedParseFormats();
-    expect(result).toEqual([]);
   });
 });

@@ -38,6 +38,7 @@ import type { SectionItem } from "@/components/common/SortableSectionList";
 import { useWizardAutoSave } from "@/hooks/useWizardAutoSave";
 import { useSaveDraft } from "@/hooks/useSaveDraft";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS, TEMPLATE_TOCS } from "@/constants";
+import { MESSAGES } from "@/constants/messages";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 
 import SectionRecommendations, {
@@ -395,7 +396,7 @@ export default function ParametersPage(): JSX.Element {
 
   const handleNext = useCallback(async (): Promise<void> => {
     if (sections.length === 0) {
-      toast.error("Please add at least one section.");
+      toast.error(MESSAGES.PARAMETERS_SECTION_REQUIRED);
       return;
     }
     const keys = sections.map((s) => s.key);
@@ -425,7 +426,7 @@ export default function ParametersPage(): JSX.Element {
     router.push("/review");
 
     if (isRegenerating) {
-      toast.info("Parameters updated. Review and regenerate to apply changes");
+      toast.info(MESSAGES.PARAMETERS_UPDATED);
     }
   }, [
     sections,

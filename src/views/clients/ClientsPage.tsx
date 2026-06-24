@@ -9,6 +9,7 @@ import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
 import SearchBar from "@/components/common/SearchBar/SearchBar";
 import { useDebounce } from "@/hooks/useDebounce";
+import { MESSAGES } from "@/constants/messages";
 
 import styles from "./ClientsPage.module.scss";
 
@@ -75,11 +76,11 @@ export default function ClientsPage(): JSX.Element {
 
     try {
       await deleteClientFromStore(deleteModalData.id);
-      toast.success("Client deleted");
+      toast.success(MESSAGES.CLIENT_DELETED);
       setDeleteModalData(null);
     } catch (error) {
       logger.error("Failed to delete client:", error);
-      toast.error("Failed to delete client");
+      toast.error(MESSAGES.CLIENT_DELETE_FAILED);
     }
   }
 

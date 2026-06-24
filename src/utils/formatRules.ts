@@ -164,23 +164,3 @@ export function generateFormatRules(
 
   return rules.join("\n\n");
 }
-
-/**
- * Get a simple format hint for a section based on its name.
- * This is a lighter version for quick format suggestions.
- *
- * @param sectionName - The name of the section
- * @returns Format hint string or empty string if no match
- */
-export function getSectionFormatHint(sectionName?: string): string {
-  if (!sectionName) return "";
-
-  const sectionLower = sectionName.toLowerCase();
-  for (const [keyword, hint] of Object.entries(SECTION_FORMAT_HINTS)) {
-    if (sectionLower.includes(keyword)) {
-      return hint;
-    }
-  }
-
-  return "";
-}

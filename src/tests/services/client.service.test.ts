@@ -21,8 +21,6 @@ import {
   uploadDocument,
   deleteDocument,
   getDocumentViewUrl,
-  migrateDocumentsToS3,
-  restoreDocumentToS3,
   invalidateClientsCache,
 } from "@/services/client.service";
 import { http } from "@/config/httpClient";
@@ -405,42 +403,5 @@ describe("getDocumentViewUrl", () => {
     });
     const result = await getDocumentViewUrl(1, 10);
     expect(result).toBe("https://s3.amazonaws.com/signed-url");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// migrateDocumentsToS3
-// ---------------------------------------------------------------------------
-
-describe("migrateDocumentsToS3", () => {
-  it("posts migration and transforms snake_case result", async () => {
-    mockPost.mockResolvedValue({
-      migrated: 2,
-      failed: 0,
-      skipped: 1,
-      results: [
-        { id: 1, name: "doc1.pdf", s3_file_url: "https://s3.example.com/1.pdf" },
-        { id: 2, name: "doc2.pdf", s3_file_url: "https://s3.example.com/2.pdf" },
-      ],
-    });
-    const result = await migrateDocumentsToS3(1);
-    expect(result.migrated).toBe(2);
-    expect(result.failed).toBe(0);
-    expect(result.skipped).toBe(1);
-    expect(result.results[0].s3FileUrl).toBe("https://s3.example.com/1.pdf");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// restoreDocumentToS3
-// ---------------------------------------------------------------------------
-
-describe("restoreDocumentToS3", () => {
-  it("posts file and returns id and s3FileUrl", async () => {
-    mockPost.mockResolvedValue({ id: 5, s3_file_url: "https://s3.example.com/restored.pdf" });
-    const file = new File(["pdf content"], "restored.pdf");
-    const result = await restoreDocumentToS3(1, 5, file);
-    expect(result.id).toBe(5);
-    expect(result.s3FileUrl).toBe("https://s3.example.com/restored.pdf");
   });
 });

@@ -1,12 +1,21 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
-import { X, Search, ChevronDown, RefreshCw, Save, Copy } from "lucide-react";
+import { X, Search, ChevronDown, RefreshCw, Save, Copy, Wand2 } from "lucide-react";
+
+// Lazy-load RichEditor — it imports Tiptap which is heavy
+const RichEditor = dynamic(() => import("@/components/common/RichEditor"), { ssr: false });
 
 import { MESSAGES } from "@/constants/messages";
 import { PODCAST_TEMPLATES } from "@/constants/artifactTemplates";
-import { generateArtifact, listArtifacts, updateArtifact } from "@/services/artifact.service";
+import {
+  generateArtifact,
+  listArtifacts,
+  regenerateArtifactSelection,
+  updateArtifact,
+} from "@/services/artifact.service";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "@/utils/toast";
@@ -53,6 +62,10 @@ export default function GeneratePodcastModal({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+
+  // Regenerate instructions inline prompt (step 2)
+  const [showRegenInput, setShowRegenInput] = useState<boolean>(false);
+  const [regenInstructions, setRegenInstructions] = useState<string>("");
 
   useEffect(() => {
     setMounted(true);
@@ -107,6 +120,17 @@ export default function GeneratePodcastModal({
     return `NotebookLM Prompt — ${client.name} — ${proposalTitle}`;
   }
 
+  /** Convert plain-text podcast prompt into paragraphed HTML for the RichEditor. */
+  function plainTextToHtml(text: string): string {
+    // Split on any sequence of newlines (single or double) so LLM output
+    // without explicit \n\n paragraph breaks still renders as separate paragraphs.
+    return text
+      .split(/\n+/)
+      .filter((block) => block.trim().length > 0)
+      .map((block) => `<p>${block.trim()}</p>`)
+      .join("");
+  }
+
   async function handleGenerate(): Promise<void> {
     if (!selectedProposalId) return;
     setIsGenerating(true);
@@ -122,7 +146,7 @@ export default function GeneratePodcastModal({
       });
       setArtifacts((prev) => [artifact, ...prev]);
       setCurrentArtifact(artifact);
-      setEditorContent(artifact.content);
+      setEditorContent(plainTextToHtml(artifact.content));
     } catch (err) {
       logger.error("[GeneratePodcastModal] Generation failed:", err);
       toast.error(MESSAGES.PODCAST_GENERATE_FAILED);
@@ -132,27 +156,54 @@ export default function GeneratePodcastModal({
     }
   }
 
-  async function handleRegenerate(): Promise<void> {
+  async function handleRegenerate(regenNote?: string): Promise<void> {
     if (!selectedProposalId) return;
     setIsGenerating(true);
     try {
+      // Merge Step 1 instructions with any per-regeneration notes
+      const combinedInstructions =
+        [additionalInstructions, regenNote]
+          .map((s) => s?.trim())
+          .filter(Boolean)
+          .join("\n\nAdditional regeneration notes: ") || undefined;
+
       const artifact = await generateArtifact({
         clientId: client.id,
         proposalId: selectedProposalId,
         templateId: selectedTemplateId,
         artifactType: "podcast",
         title: buildTitle(),
-        additionalInstructions: additionalInstructions || undefined,
+        additionalInstructions: combinedInstructions,
       });
       setArtifacts((prev) => [artifact, ...prev]);
       setCurrentArtifact(artifact);
-      setEditorContent(artifact.content);
+      setEditorContent(plainTextToHtml(artifact.content));
       toast.success(`Podcast prompt v${artifact.version} generated`);
     } catch (err) {
       logger.error("[GeneratePodcastModal] Regeneration failed:", err);
       toast.error(MESSAGES.PODCAST_GENERATE_FAILED);
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleRegenerateSelection(params: {
+    selectedText: string;
+    selectionRange: { from: number; to: number };
+    instructions?: string;
+    selectionContext?: string;
+  }) {
+    if (!currentArtifact) return null;
+    try {
+      return await regenerateArtifactSelection(currentArtifact.id, {
+        selectedText: params.selectedText,
+        selectionContext: params.selectionContext,
+        instructions: params.instructions,
+      });
+    } catch (err) {
+      logger.error("[GeneratePodcastModal] AI regeneration failed:", err);
+      toast.error("AI regeneration failed. Please try again.");
+      return null;
     }
   }
 
@@ -175,7 +226,10 @@ export default function GeneratePodcastModal({
   async function handleCopyPrompt(): Promise<void> {
     if (!currentArtifact) return;
     try {
-      await navigator.clipboard.writeText(currentArtifact.content);
+      // Strip HTML tags from the editor content so the clipboard gets plain text
+      const plainText =
+        new DOMParser().parseFromString(editorContent, "text/html").body.textContent ?? "";
+      await navigator.clipboard.writeText(plainText);
       toast.success(MESSAGES.ARTIFACT_COPIED);
     } catch {
       toast.error("Failed to copy prompt.");
@@ -184,7 +238,7 @@ export default function GeneratePodcastModal({
 
   function handleSelectVersion(artifact: GeneratedArtifact): void {
     setCurrentArtifact(artifact);
-    setEditorContent(artifact.content);
+    setEditorContent(plainTextToHtml(artifact.content));
     setShowVersionDropdown(false);
   }
 
@@ -211,7 +265,7 @@ export default function GeneratePodcastModal({
                   if (artifacts.length > 0) {
                     if (!currentArtifact) {
                       setCurrentArtifact(artifacts[0]);
-                      setEditorContent(artifacts[0].content);
+                      setEditorContent(plainTextToHtml(artifacts[0].content));
                     }
                     setStep(2);
                   }
@@ -370,22 +424,59 @@ export default function GeneratePodcastModal({
                 </div>
               ) : (
                 <div className={styles.promptWrapper}>
-                  <textarea
-                    className={styles.promptTextarea}
-                    value={editorContent}
-                    readOnly
+                  <RichEditor
+                    content={editorContent}
+                    onChange={setEditorContent}
                     placeholder="Your NotebookLM prompt will appear here…"
+                    onRegenerateSelection={handleRegenerateSelection}
                   />
                 </div>
               )}
             </div>
 
+            {/* Regen prompt bar — slides in between body and footer */}
+            {showRegenInput && !isGenerating && (
+              <div className={styles.regenBar}>
+                <Wand2 size={15} className={styles.regenBarIcon} />
+                <input
+                  className={styles.regenBarInput}
+                  type="text"
+                  placeholder="What would you like to change? (optional — press Enter to generate)"
+                  value={regenInstructions}
+                  onChange={(e) => setRegenInstructions(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setShowRegenInput(false);
+                      void handleRegenerate(regenInstructions || undefined);
+                      setRegenInstructions("");
+                    }
+                    if (e.key === "Escape") {
+                      setShowRegenInput(false);
+                      setRegenInstructions("");
+                    }
+                  }}
+                />
+                <span className={styles.regenBarOptional}>optional</span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setShowRegenInput(false);
+                    void handleRegenerate(regenInstructions || undefined);
+                    setRegenInstructions("");
+                  }}
+                >
+                  Generate
+                </button>
+              </div>
+            )}
+
             {!isGenerating && (
               <div className={styles.footer}>
                 <div className={styles.footerLeft}>
                   <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => void handleRegenerate()}
+                    className={`btn btn-secondary btn-sm${showRegenInput ? ` ${styles.regenBtnActive}` : ""}`}
+                    onClick={() => setShowRegenInput((v) => !v)}
                     disabled={isGenerating}
                   >
                     <RefreshCw size={14} />

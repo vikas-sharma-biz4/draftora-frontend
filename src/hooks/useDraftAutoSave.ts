@@ -55,7 +55,7 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
   const filesMeta = useFilesMeta();
   const selectedDocumentIds = useSelectedDocumentIds();
   const webReferences = useWebReferences();
-  const draftStage = useDraftSessionStore(state => state.draftStage);
+  const draftStage = useDraftSessionStore((state) => state.draftStage);
   const pathname = usePathname();
 
   // Determine lastLocation based on current pathname
@@ -79,25 +79,42 @@ export function useDraftAutoSave(options: UseDraftAutoSaveOptions): void {
       draftStage !== "template_selection");
 
   // Memoize proposalData object to prevent reference changes on every render
-  const proposalData = useMemo(() => ({
-    title,
-    clientName,
-    description,
-    selectedSections,
-    sectionDisplayNames,
-    tone,
-    lengthPreference,
-    language,
-    aiModel,
-    templateId,
-    templateType,
-    files: [],
-    filesMeta,
-    selectedDocumentIds,
-    customSections: [],
-    contextualInstructions: "",
-    webReferences,
-  }), [title, clientName, description, selectedSections, sectionDisplayNames, tone, lengthPreference, language, aiModel, templateId, templateType, filesMeta, selectedDocumentIds, webReferences]);
+  const proposalData = useMemo(
+    () => ({
+      title,
+      clientName,
+      description,
+      selectedSections,
+      sectionDisplayNames,
+      tone,
+      lengthPreference,
+      language,
+      aiModel,
+      templateId,
+      templateType,
+      filesMeta,
+      selectedDocumentIds,
+      customSections: [],
+      contextualInstructions: "",
+      webReferences,
+    }),
+    [
+      title,
+      clientName,
+      description,
+      selectedSections,
+      sectionDisplayNames,
+      tone,
+      lengthPreference,
+      language,
+      aiModel,
+      templateId,
+      templateType,
+      filesMeta,
+      selectedDocumentIds,
+      webReferences,
+    ]
+  );
 
   useDraftPersistence({
     enabled: hasData,
