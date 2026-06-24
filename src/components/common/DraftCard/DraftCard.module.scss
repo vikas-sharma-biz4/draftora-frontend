@@ -160,8 +160,28 @@
 
 .footer {
   background: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .resumeBtn {
+  color: #000 !important;
+}
+
+.downloadBtnWrapper {
+  display: inline-flex;
+  flex-shrink: 0;
+
+  &:has(button:disabled) {
+    cursor: not-allowed;
+
+    button {
+      pointer-events: none;
+    }
+  }
+}
+
+.downloadBtn {
   color: #000 !important;
 }

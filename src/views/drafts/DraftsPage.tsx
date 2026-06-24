@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { FileText } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
+import { MESSAGES } from "@/constants/messages";
 import Button from "@/components/common/Button";
 import SearchBar from "@/components/common/SearchBar/SearchBar";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -16,6 +17,7 @@ import { removeDraftTemplateMeta } from "@/utils/draftTemplateCache";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import DraftCard from "@/components/common/DraftCard";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
+import { useProposalDownload } from "@/hooks/useProposalDownload";
 import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDrafts } from "@/hooks/useDrafts";
@@ -62,6 +64,7 @@ export default function DraftsPage(): JSX.Element {
 
   const { drafts, isLoading, error } = useDrafts({ force: true });
   const { clients } = useClients({ autoFetch: false });
+  const { downloadProposal, downloadProposalPdf } = useProposalDownload();
   const getDraftFromStore = useDraftStore((state) => state.getDraft);
   const deleteDraftFromStore = useDraftStore((state) => state.deleteDraft);
   const deleteAllDraftsFromStore = useDraftStore((state) => state.deleteAllDrafts);
@@ -69,6 +72,8 @@ export default function DraftsPage(): JSX.Element {
   useErrorToast(error, "Failed to load drafts");
 
   const [loadingDraftId, setLoadingDraftId] = useState<string | null>(null);
+  const [downloadingDocxIds, setDownloadingDocxIds] = useState<Set<number>>(new Set());
+  const [downloadingPdfIds, setDownloadingPdfIds] = useState<Set<number>>(new Set());
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [showNewClientModal, setShowNewClientModal] = useState<boolean>(false);
   const [newClientData, setNewClientData] = useState<
@@ -146,6 +151,38 @@ export default function DraftsPage(): JSX.Element {
     setFromHistory(false);
     setShowTemplateModal(true);
   }, [setCurrentDraftId, setFromHistory]);
+
+  const handleDraftDownloadDocx = useCallback(
+    async (proposalId: number): Promise<void> => {
+      setDownloadingDocxIds((prev) => new Set(prev).add(proposalId));
+      try {
+        await downloadProposal(proposalId);
+      } finally {
+        setDownloadingDocxIds((prev) => {
+          const next = new Set(prev);
+          next.delete(proposalId);
+          return next;
+        });
+      }
+    },
+    [downloadProposal]
+  );
+
+  const handleDraftDownloadPdf = useCallback(
+    async (proposalId: number): Promise<void> => {
+      setDownloadingPdfIds((prev) => new Set(prev).add(proposalId));
+      try {
+        await downloadProposalPdf(proposalId);
+      } finally {
+        setDownloadingPdfIds((prev) => {
+          const next = new Set(prev);
+          next.delete(proposalId);
+          return next;
+        });
+      }
+    },
+    [downloadProposalPdf]
+  );
 
   const handleNewClientFromModal = useCallback((): void => {
     setShowTemplateModal(false);
@@ -243,7 +280,7 @@ export default function DraftsPage(): JSX.Element {
         }
       } catch (loadError) {
         logger.error("[DraftsPage] Failed to load draft:", loadError);
-        toast.error("Failed to load draft");
+        toast.error(MESSAGES.DRAFT_LOAD_FAILED);
       } finally {
         setLoadingDraftId(null);
       }
@@ -280,22 +317,22 @@ export default function DraftsPage(): JSX.Element {
         await deleteDraftFromStore(id);
         removeDraftTemplateMeta(id);
       }
-      toast.success("Draft deleted");
+      toast.success(MESSAGES.DRAFT_DELETED);
       setDeleteModalData(null);
     } catch (deleteError) {
       logger.error("Failed to delete draft:", deleteError);
-      toast.error("Failed to delete draft");
+      toast.error(MESSAGES.DRAFT_DELETE_FAILED);
     }
   }, [deleteModalData, deleteDraftFromStore, removeVersionDraft]);
 
   const confirmDeleteAllDrafts = useCallback(async (): Promise<void> => {
     try {
       await deleteAllDraftsFromStore();
-      toast.success("All drafts deleted");
+      toast.success(MESSAGES.DRAFT_ALL_DELETED);
       setShowDeleteAllModal(false);
     } catch (deleteError) {
       logger.error("Failed to delete all drafts:", deleteError);
-      toast.error("Failed to delete all drafts");
+      toast.error(MESSAGES.DRAFT_ALL_DELETE_FAILED);
     }
   }, [deleteAllDraftsFromStore]);
 
@@ -350,6 +387,22 @@ export default function DraftsPage(): JSX.Element {
                   onLoad={(id) => void handleLoadDraft(id)}
                   onDelete={handleDeleteDraft}
                   proposalVersionLabel={getProposalVersionLabel(draft.proposalId)}
+                  isDownloadingDocx={
+                    draft.proposalId !== null && downloadingDocxIds.has(draft.proposalId)
+                  }
+                  isDownloadingPdf={
+                    draft.proposalId !== null && downloadingPdfIds.has(draft.proposalId)
+                  }
+                  onDownloadDocx={
+                    draft.proposalId !== null
+                      ? () => void handleDraftDownloadDocx(draft.proposalId as number)
+                      : undefined
+                  }
+                  onDownloadPdf={
+                    draft.proposalId !== null
+                      ? () => void handleDraftDownloadPdf(draft.proposalId as number)
+                      : undefined
+                  }
                 />
               ))}
             </div>

@@ -25,4 +25,5 @@ export interface TemplateSelectionModalProps {
   };
   enableTemplateSelection?: boolean;
   initialView?: ModalView;
+  hideNewClient?: boolean;
 }

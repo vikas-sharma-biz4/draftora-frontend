@@ -1,12 +1,15 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Eye, FileText, X, FileDown, Mail } from "lucide-react";
+import { Eye, FileText, X, FileDown, Mail, Search } from "lucide-react";
 
-import { listArtifacts } from "@/services/artifact.service";
+import { listArtifacts, regenerateArtifactSelection } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
+import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { formatDate } from "@/utils/dateUtils";
+import { fixProposalLinks } from "@/utils/emailUtils";
 import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
@@ -15,6 +18,9 @@ import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
 import type { ProposalListItem } from "@/interfaces/proposalInterfaces";
 
 import styles from "../ClientDetailPage.module.scss";
+
+// Lazy-load RichEditor — it imports Tiptap which is heavy
+const RichEditor = dynamic(() => import("@/components/common/RichEditor"), { ssr: false });
 
 const EMAIL_TEMPLATE_LABELS: Record<string, string> = {
   enterprise_partnership: "Enterprise Partnership",
@@ -40,6 +46,22 @@ function extractTime(isoString: string): string {
   }
 }
 
+function stripSubjectLine(html: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const paragraphs = doc.querySelectorAll("p");
+  for (const p of paragraphs) {
+    if (p.textContent?.trim().startsWith("Subject:")) {
+      if (p.nextElementSibling?.tagName === "HR") {
+        p.nextElementSibling.remove();
+      }
+      p.remove();
+      break;
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 function EmailViewerModal({
   artifact,
   proposalTitle,
@@ -51,9 +73,34 @@ function EmailViewerModal({
 }): JSX.Element {
   const { isDownloading, downloadArtifact, isPdfDownloading, downloadArtifactPdf } =
     useArtifactDownload();
+  const [editorContent, setEditorContent] = useState<string>(() => {
+    const sanitized =
+      artifact.proposalId !== null
+        ? fixProposalLinks(sanitizeHtml(artifact.content), artifact.proposalId)
+        : sanitizeHtml(artifact.content);
+    return stripSubjectLine(sanitized);
+  });
 
   const subject = (artifact.metadataJson?.subject as string | undefined) ?? artifact.title;
-  const safeHtml = sanitizeHtml(artifact.content);
+
+  async function handleRegenerateSelection(params: {
+    selectedText: string;
+    selectionRange: { from: number; to: number };
+    instructions?: string;
+    selectionContext?: string;
+  }) {
+    try {
+      return await regenerateArtifactSelection(artifact.id, {
+        selectedText: params.selectedText,
+        selectionContext: params.selectionContext,
+        instructions: params.instructions,
+      });
+    } catch (err) {
+      logger.error("[EmailViewerModal] AI regeneration failed:", err);
+      toast.error(MESSAGES.ARTIFACT_REGEN_FAILED);
+      return null;
+    }
+  }
 
   return createPortal(
     <div
@@ -71,7 +118,7 @@ function EmailViewerModal({
           </div>
           <div className={styles.emailViewHeaderActions}>
             <button
-              className="btn btn-ghost btn-sm"
+              className="btn btn-secondary btn-sm"
               onClick={() => void downloadArtifact(artifact.id, artifact.title)}
               disabled={isDownloading}
             >
@@ -92,7 +139,11 @@ function EmailViewerModal({
           </div>
         </div>
         <div className={styles.emailViewBody}>
-          <div className={styles.emailViewHtml} dangerouslySetInnerHTML={{ __html: safeHtml }} />
+          <RichEditor
+            content={editorContent}
+            onChange={setEditorContent}
+            onRegenerateSelection={handleRegenerateSelection}
+          />
         </div>
       </div>
     </div>,
@@ -102,17 +153,21 @@ function EmailViewerModal({
 
 export default function EmailHistoryPanel({
   clientId,
-  proposals,
+  proposals: _proposalsProp,
   onGenerateEmail,
 }: EmailHistoryPanelProps): JSX.Element {
   const [emails, setEmails] = useState<GeneratedArtifact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [viewingArtifact, setViewingArtifact] = useState<GeneratedArtifact | null>(null);
 
   const hasFetched = useRef(false);
 
-  const proposalMap = new Map(proposals.map((p) => [p.id, p.title]));
+  // Use TanStack Query to fetch proposals so the map is always populated,
+  // even when the parent store hasn't loaded all proposals yet.
+  const { proposals: fetchedProposals } = useClientProposalsQuery(clientId);
+  const proposalMap = new Map(fetchedProposals.map((p) => [p.id, p.title]));
 
   const load = useCallback(async (): Promise<void> => {
     setIsLoading(true);
@@ -133,18 +188,30 @@ export default function EmailHistoryPanel({
     void load();
   }, [load]);
 
-  const displayedEmails = selectedTemplate
-    ? emails.filter((e) => (e.metadataJson?.template_id as string | undefined) === selectedTemplate)
-    : emails;
+  const displayedEmails = emails.filter((e) => {
+    const effectiveTemplateId = (e.metadataJson?.template_id as string | undefined) ?? e.templateId;
+    if (selectedTemplate && effectiveTemplateId !== selectedTemplate) return false;
+    if (searchQuery) {
+      const subject = ((e.metadataJson?.subject as string | undefined) ?? e.title).toLowerCase();
+      const proposalTitle = (
+        e.proposalId != null ? (proposalMap.get(e.proposalId) ?? "") : ""
+      ).toLowerCase();
+      if (
+        !subject.includes(searchQuery.toLowerCase()) &&
+        !proposalTitle.includes(searchQuery.toLowerCase())
+      )
+        return false;
+    }
+    return true;
+  });
 
-  const viewingProposalTitle = viewingArtifact
-    ? (proposalMap.get(viewingArtifact.proposalId) ?? "")
-    : "";
+  const viewingProposalTitle =
+    viewingArtifact?.proposalId != null ? (proposalMap.get(viewingArtifact.proposalId) ?? "") : "";
 
   return (
     <>
       <div className={styles.emailHistory}>
-        <div className={styles.panelHeader}>
+        <div className={styles.panelTopRow}>
           <div>
             <h2 className={styles.panelTitle}>Email History</h2>
             <p className={styles.panelSubtitle}>All generated emails and outreach drafts</p>
@@ -167,6 +234,18 @@ export default function EmailHistoryPanel({
               <Mail size={14} />
               Generate Email
             </button>
+          </div>
+        </div>
+
+        <div className={styles.panelSearchRow}>
+          <div className={styles.searchInputFull}>
+            <Search size={14} className={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Search by subject or proposal…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
 
@@ -200,15 +279,11 @@ export default function EmailHistoryPanel({
                   const templateId =
                     (email.metadataJson?.template_id as string | undefined) ?? email.templateId;
                   const templateLabel = EMAIL_TEMPLATE_LABELS[templateId] ?? templateId ?? "—";
-                  const proposalTitle = proposalMap.get(email.proposalId) ?? "—";
+                  const proposalTitle =
+                    email.proposalId != null ? (proposalMap.get(email.proposalId) ?? "—") : "—";
 
                   return (
-                    <tr
-                      key={email.id}
-                      className={styles.proposalRow}
-                      onClick={() => setViewingArtifact(email)}
-                      style={{ cursor: "pointer" }}
-                    >
+                    <tr key={email.id} className={styles.proposalRow}>
                       <td>
                         <div
                           className={styles.proposalName}
@@ -247,8 +322,9 @@ export default function EmailHistoryPanel({
                           className={styles.actionBtn}
                           onClick={() => setViewingArtifact(email)}
                           title="View email"
+                          style={{ width: 40, height: 40, padding: 0, flexShrink: 0 }}
                         >
-                          <Eye size={15} />
+                          <Eye size={18} />
                         </button>
                       </td>
                     </tr>

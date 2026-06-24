@@ -3,13 +3,16 @@
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { Edit, FileText, Mic, Trash2 } from "lucide-react";
+import { Edit, FileText, Mic } from "lucide-react";
 
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
+import { MESSAGES } from "@/constants/messages";
 import { formatDate } from "@/utils/dateUtils";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
+import { usePipelineStore } from "@/store/features/pipeline/pipelineSlice";
+import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
 import { useClientDocuments } from "@/hooks/useClientDocuments";
 import { useClientProposals } from "@/hooks/useClientProposals";
 import PageLayout from "@/layouts/AppLayout";
@@ -58,7 +61,9 @@ const GeneratePodcastModal = dynamic(
 export default function ClientWorkspacePage(): JSX.Element {
   const params = useParams();
   const router = useRouter();
-  const setCurrentDraftId = useDraftSessionStore((state) => state.setCurrentDraftId);
+  const resetDraftSession = useDraftSessionStore((state) => state.resetDraftSession);
+  const { resetProposal } = useWizardActions();
+  const setVisitedSteps = usePipelineStore((state) => state.setVisitedSteps);
 
   const clientIdParam = Array.isArray(params.clientId) ? params.clientId[0] : params.clientId;
   const clientId =
@@ -98,7 +103,9 @@ export default function ClientWorkspacePage(): JSX.Element {
   }, []);
 
   function handleNewProposal(): void {
-    setCurrentDraftId(null);
+    resetProposal();
+    resetDraftSession();
+    setVisitedSteps([]);
     setShowTemplateModal(true);
   }
 
@@ -106,11 +113,11 @@ export default function ClientWorkspacePage(): JSX.Element {
     if (!client) return;
     try {
       await deleteClientFromStore(client.id);
-      toast.success("Client deleted");
+      toast.success(MESSAGES.CLIENT_DELETED);
       router.push("/clients");
     } catch (error) {
       logger.error("[ClientDetailPage] Failed to delete client:", error);
-      toast.error("Failed to delete client");
+      toast.error(MESSAGES.CLIENT_DELETE_FAILED);
     }
   }
 
@@ -158,13 +165,6 @@ export default function ClientWorkspacePage(): JSX.Element {
             <Edit size={18} />
             Edit Details
           </button>
-          <button
-            className={styles.deleteClientBtn}
-            onClick={() => setDeleteClientModalOpen(true)}
-            title="Delete client"
-          >
-            <Trash2 size={18} />
-          </button>
         </div>
       </div>
 
@@ -198,6 +198,7 @@ export default function ClientWorkspacePage(): JSX.Element {
           onClose={() => setShowTemplateModal(false)}
           onNewClient={() => {}}
           initialClients={[client]}
+          hideNewClient={true}
           newClientData={{
             client: { id: client.id, name: client.name },
             notes: client.notes || "",

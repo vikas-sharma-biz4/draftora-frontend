@@ -108,16 +108,6 @@ export async function parseFiles(files: File[]): Promise<ParseFilesResponse> {
   };
 }
 
-/**
- * Fetch the list of file extensions supported by the backend parser.
- */
-export async function getSupportedParseFormats(): Promise<string[]> {
-  const data = await http.get<{ extensions: string[] }>("/parse/supported-formats/", {
-    cache: "no-store",
-  });
-  return data.extensions ?? [];
-}
-
 // ── Section Suggestion ─────────────────────────────────────────────────────────
 
 export interface SuggestSectionsPayload {

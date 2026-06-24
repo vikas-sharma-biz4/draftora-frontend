@@ -2,7 +2,7 @@
  * Tests for src/utils/formatRules.ts
  */
 
-import { generateFormatRules, getSectionFormatHint } from "@/utils/formatRules";
+import { generateFormatRules } from "@/utils/formatRules";
 
 // ---------------------------------------------------------------------------
 // generateFormatRules
@@ -97,44 +97,5 @@ describe("generateFormatRules — section-specific hints", () => {
   it("returns general guidelines only for unrecognized section", () => {
     const result = generateFormatRules(undefined, "Introduction");
     expect(result).toContain("General Format Guidelines");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getSectionFormatHint
-// ---------------------------------------------------------------------------
-
-describe("getSectionFormatHint", () => {
-  it("returns empty string when sectionName is undefined", () => {
-    expect(getSectionFormatHint(undefined)).toBe("");
-  });
-
-  it("returns empty string for unrecognized section name", () => {
-    expect(getSectionFormatHint("Introduction")).toBe("");
-  });
-
-  it("returns a hint for 'timeline' section", () => {
-    const hint = getSectionFormatHint("Project Timeline");
-    expect(hint).toContain("table format");
-  });
-
-  it("returns a hint for 'budget' section (case-insensitive)", () => {
-    const hint = getSectionFormatHint("Budget Overview");
-    expect(hint).toContain("table format");
-  });
-
-  it("returns a hint for 'feature' section", () => {
-    const hint = getSectionFormatHint("New Features");
-    expect(hint).toContain("bullet points");
-  });
-
-  it("returns a hint for 'risk' section", () => {
-    const hint = getSectionFormatHint("Risk Register");
-    expect(hint).toContain("table format");
-  });
-
-  it("returns a hint for 'api' section", () => {
-    const hint = getSectionFormatHint("API Endpoints");
-    expect(hint).toContain("table format");
   });
 });

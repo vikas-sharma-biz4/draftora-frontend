@@ -38,6 +38,16 @@ export default function InvoicePreviewModal({
   const totalAmount = (meta.total_amount as number | undefined) ?? 0;
   const paymentStatus = (meta.payment_status as string | undefined) ?? "Unpaid";
 
+  // Use the stored S3 PDF (if available) for an inline preview instead of
+  // re-rendering the HTML. The PDF was stored to S3 by the backend on first
+  // download. We serve it via the download endpoint with ?inline=true so the
+  // browser renders it directly in an iframe.
+  const s3Block = (artifact.metadataJson?.s3 ?? {}) as Record<string, unknown>;
+  const hasPdfKey = Boolean(s3Block.pdf_key);
+  const pdfPreviewUrl = hasPdfKey
+    ? `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/artifacts/${artifact.id}/download?format=pdf&inline=true`
+    : null;
+
   // Strip legacy duplicate total-row injected by old template versions
   const strippedContent = artifact.content.replace(
     /<tr[^>]*\bclass="total-row"[^>]*>[\s\S]*?<\/tr>/g,
@@ -73,7 +83,7 @@ export default function InvoicePreviewModal({
           </div>
           <div className={styles.headerActions}>
             <button
-              className="btn btn-ghost btn-sm"
+              className="btn btn-secondary btn-sm"
               onClick={() => void downloadArtifact(artifact.id, artifact.title)}
               disabled={isDownloading}
             >
@@ -94,9 +104,13 @@ export default function InvoicePreviewModal({
           </div>
         </div>
 
-        {/* Invoice HTML preview */}
+        {/* Invoice body — PDF iframe when available, HTML fallback otherwise */}
         <div className={styles.body}>
-          <div className={styles.htmlContent} dangerouslySetInnerHTML={{ __html: safeHtml }} />
+          {pdfPreviewUrl ? (
+            <iframe src={pdfPreviewUrl} className={styles.pdfIframe} title="Invoice PDF Preview" />
+          ) : (
+            <div className={styles.htmlContent} dangerouslySetInnerHTML={{ __html: safeHtml }} />
+          )}
         </div>
       </div>
     </div>

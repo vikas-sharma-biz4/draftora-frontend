@@ -210,13 +210,13 @@ export default function SectionsSelectorModal({
       return;
     }
 
-    const newCustomSections: CustomSection[] = Object.entries(customSectionNames).map(
-      ([key, label]) => ({
+    const newCustomSections: CustomSection[] = Object.entries(customSectionNames)
+      .filter(([key]) => finalSelected.has(key))
+      .map(([key, label]) => ({
         key,
         label,
         description: customSectionInstructions[key] ?? "",
-      })
-    );
+      }));
 
     const allSelected = Array.from(finalSelected);
     const nonStaticSelected = allSelected.filter((s) => !STATIC_SECTIONS_GROUP.includes(s));
