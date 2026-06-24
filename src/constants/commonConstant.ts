@@ -1,6 +1,6 @@
 import type { ProposalTemplate } from "@/interfaces/proposalInterfaces";
 
-export const SIDEBAR_LOGO_SRC = "/images/new%20logo%203.png";
+export const SIDEBAR_LOGO_SRC = "/images/draftora-logo.png";
 
 export const TONE_OPTIONS = [
   {
@@ -78,14 +78,6 @@ export const SECTION_OPTIONS = [
     label: "Implementation Timeline",
     description: "Visual roadmap of the project lifecycle.",
   },
-] as const;
-
-export const LANGUAGE_OPTIONS = [
-  "English - US",
-  "English - UK",
-  "Spanish",
-  "French",
-  "German",
 ] as const;
 
 export const DEFAULT_SELECTED_SECTIONS = SECTION_OPTIONS.map((s) => s.key);
@@ -340,32 +332,6 @@ export const STATIC_SECTION_DISPLAY_NAMES: Record<string, string> = {
   brain_behind_development: "Brain Behind Innovative Development",
 };
 
-// ── RichEditor toolbar colors ─────────────────────────────────────────────────
-// Empty string represents "remove highlight / default color" action.
-// "custom" string represents custom color picker option.
-export const EDITOR_HIGHLIGHT_COLORS: string[] = [
-  "#fef08a", // yellow
-  "#bfdbfe", // blue
-  "custom", // custom color picker
-  "", // remove
-];
-
-export const EDITOR_TEXT_COLORS: string[] = [
-  "#000000", // Black
-  "#1d4ed8", // Blue
-  "custom", // custom color picker
-  "", // default
-];
-
-export const GENERATION_STEPS = [
-  { id: "parsing", label: "Parsing Uploaded Documents" },
-  { id: "validating", label: "Validating Knowledge Base" },
-  { id: "synthesizing", label: "Synthesizing Strategic Context" },
-  { id: "structuring", label: "Structuring Proposal Outline" },
-  { id: "generating", label: "Generating Section Content" },
-  { id: "finalizing", label: "Finalizing Document" },
-] as const;
-
 export const SPECIAL_CARDS = {
   START_FROM_SCRATCH: {
     id: "start-from-scratch",
@@ -449,12 +415,4 @@ export const TEMPLATE_TOCS = {
     { key: "similar_projects", label: "Similar Projects Developed By Biz4Group Experts" },
     { key: "our_approach_methodology", label: "Our Approach & Methodology" },
   ],
-} as const;
-
-// ── Breakpoints (must match SCSS $bp-* in _variables.scss) ────────────────────
-export const BREAKPOINTS = {
-  mobile: 640,
-  tablet: 1024,
-  desktop: 1280,
-  wide: 1536,
 } as const;

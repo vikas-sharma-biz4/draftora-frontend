@@ -41,8 +41,9 @@ export default function HistoryPage(): JSX.Element {
     refetch,
     observerRef,
   } = useInfiniteProposalHistory();
-  const { downloadProposal } = useProposalDownload();
+  const { downloadProposal, downloadProposalPdf } = useProposalDownload();
   const [downloadingIds, setDownloadingIds] = useState<Set<number>>(new Set());
+  const [downloadingPdfIds, setDownloadingPdfIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -83,6 +84,22 @@ export default function HistoryPage(): JSX.Element {
       }
     },
     [downloadProposal]
+  );
+
+  const handleDownloadPdf = useCallback(
+    async (id: number): Promise<void> => {
+      setDownloadingPdfIds((prev) => new Set(prev).add(id));
+      try {
+        await downloadProposalPdf(id);
+      } finally {
+        setDownloadingPdfIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }
+    },
+    [downloadProposalPdf]
   );
 
   const filteredItems = useMemo(() => {
@@ -190,10 +207,11 @@ export default function HistoryPage(): JSX.Element {
           <div className={styles.historyGrid}>
             {familyGroups.map(({ rootId, items }) => {
               const isFamily = items.length > 1;
-              // Resolve the currently-selected item; default to the root proposal (V1).
-              const rootItem = items.find((i) => !i.rootProposalId && i.id === rootId) ?? items[0];
+              // Resolve the currently-selected item; default to the latest version.
+              const latestItem = items[items.length - 1];
               const selectedId = selectedVersions.get(rootId);
-              const item = (selectedId ? items.find((i) => i.id === selectedId) : null) ?? rootItem;
+              const item =
+                (selectedId ? items.find((i) => i.id === selectedId) : null) ?? latestItem;
 
               const versionLabel = item.versionLabel
                 ? `V${item.versionLabel}`
@@ -267,7 +285,20 @@ export default function HistoryPage(): JSX.Element {
                       ) : (
                         <Download size={14} />
                       )}{" "}
-                      {downloadingIds.has(item.id) ? "Downloading..." : "Download"}
+                      {downloadingIds.has(item.id) ? "Downloading..." : "DOCX"}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={downloadingPdfIds.has(item.id)}
+                      onClick={() => handleDownloadPdf(item.id)}
+                    >
+                      {downloadingPdfIds.has(item.id) ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Download size={14} />
+                      )}{" "}
+                      {downloadingPdfIds.has(item.id) ? "Downloading..." : "PDF"}
                     </Button>
                   </div>
                 </div>

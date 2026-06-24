@@ -123,7 +123,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       };
@@ -246,7 +245,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       };
@@ -323,7 +321,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       };
@@ -397,7 +394,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       };
@@ -484,7 +480,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       };
@@ -553,7 +548,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       } as ProposalData);
@@ -622,7 +616,6 @@ describe("Proposal Generation Flow Integration", () => {
         customSections: [],
         contextualInstructions: "",
         webReferences: [],
-        files: [],
         filesMeta: [],
         templateId: null,
       } as ProposalData);

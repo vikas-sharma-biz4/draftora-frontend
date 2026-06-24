@@ -61,7 +61,6 @@ const baseProposal: ProposalData = {
   customSections: [],
   contextualInstructions: "",
   webReferences: [],
-  files: [],
   filesMeta: [],
   templateId: null,
   templateType: "scratch",

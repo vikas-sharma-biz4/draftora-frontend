@@ -4,11 +4,11 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { useSteppedModal } from "@/hooks/useSteppedModal";
-import { X, ChevronDown, RefreshCw, Save, FileDown } from "lucide-react";
+import { X, ChevronDown, FileDown } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
 import { NDA_TEMPLATES } from "@/constants/artifactTemplates";
-import { generateArtifact, listArtifacts, updateArtifact } from "@/services/artifact.service";
+import { generateArtifact, listArtifacts } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { formatDate } from "@/utils/dateUtils";
@@ -40,8 +40,6 @@ export default function GenerateNdaModal({
     setShowVersionDropdown,
     isGenerating,
     setIsGenerating,
-    isSaving,
-    setIsSaving,
   } = useSteppedModal(onClose);
 
   // NDA is client-specific — auto-select the most recent proposal internally.
@@ -122,46 +120,6 @@ export default function GenerateNdaModal({
       setStep(1);
     } finally {
       setIsGenerating(false);
-    }
-  }
-
-  async function handleRegenerate(): Promise<void> {
-    if (!selectedProposalId) return;
-    setIsGenerating(true);
-    try {
-      const artifact = await generateArtifact({
-        clientId: client.id,
-        proposalId: selectedProposalId,
-        templateId: DEFAULT_TEMPLATE_ID,
-        artifactType: "nda",
-        title: buildTitle(),
-        ndaMetadata: ndaForm,
-      });
-      setArtifacts((prev) => [artifact, ...prev]);
-      setCurrentArtifact(artifact);
-      setEditorContent(artifact.content);
-      toast.success(`NDA v${artifact.version} generated`);
-    } catch (err) {
-      logger.error("[GenerateNdaModal] Regeneration failed:", err);
-      toast.error(MESSAGES.ARTIFACT_GENERATE_FAILED);
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function handleSaveDraft(): Promise<void> {
-    if (!currentArtifact) return;
-    setIsSaving(true);
-    try {
-      const updated = await updateArtifact(currentArtifact.id, { content: editorContent });
-      setCurrentArtifact(updated);
-      setArtifacts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-      toast.success(MESSAGES.ARTIFACT_SAVED);
-    } catch (err) {
-      logger.error("[GenerateNdaModal] Save failed:", err);
-      toast.error(MESSAGES.ARTIFACT_SAVE_FAILED);
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -353,27 +311,10 @@ export default function GenerateNdaModal({
 
             {!isGenerating && (
               <div className={styles.footer}>
-                <div className={styles.footerLeft}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => void handleRegenerate()}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw size={14} />
-                    Regenerate
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => void handleSaveDraft()}
-                    disabled={isSaving}
-                  >
-                    <Save size={14} />
-                    {isSaving ? "Saving…" : "Save Draft"}
-                  </button>
-                </div>
+                <div className={styles.footerLeft} />
                 <div className={styles.footerRight}>
                   <button
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-secondary btn-sm"
                     onClick={() =>
                       currentArtifact &&
                       void downloadArtifact(currentArtifact.id, currentArtifact.title)

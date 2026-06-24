@@ -1,10 +1,11 @@
 "use client";
 
-import { Clock, FileText, Trash2 } from "lucide-react";
+import { Clock, Download, FileText, Loader2, Trash2 } from "lucide-react";
 
 import Button from "@/components/common/Button";
 import Card from "@/components/common/Card";
 import { PROPOSAL_TEMPLATES } from "@/constants";
+import { MESSAGES } from "@/constants/messages";
 import type { DraftMetadata } from "@/interfaces/draftInterfaces";
 import { getDraftTemplateMeta } from "@/utils/draftTemplateCache";
 import { formatDateWithTime } from "@/utils/dateUtils";
@@ -19,6 +20,10 @@ interface DraftCardProps {
   /** Hierarchical version label from the proposals versioning system (e.g. "1.1").
    *  When provided, shown as "V1.1" instead of the generic "v1" / "v2" heuristic. */
   proposalVersionLabel?: string | null;
+  isDownloadingDocx?: boolean;
+  isDownloadingPdf?: boolean;
+  onDownloadDocx?: () => void;
+  onDownloadPdf?: () => void;
 }
 
 function getStatusLabel(status: string): string {
@@ -49,6 +54,10 @@ export default function DraftCard({
   onLoad,
   onDelete,
   proposalVersionLabel,
+  isDownloadingDocx = false,
+  isDownloadingPdf = false,
+  onDownloadDocx,
+  onDownloadPdf,
 }: DraftCardProps): JSX.Element {
   const templateMeta = getDraftTemplateMeta(draft.id);
   const templateId = templateMeta?.templateId ?? draft.templateId;
@@ -68,6 +77,7 @@ export default function DraftCard({
 
   const isGenerated = draft.stage === "generated";
   const hasEdits = draft.hasEdits ?? false;
+  const canDownload = draft.proposalId !== null;
   // Use the hierarchical version label (e.g. "V1.1") when the draft is linked to a
   // versioned proposal; fall back to the generic "v1" / "v2" heuristic otherwise.
   const versionLabel = proposalVersionLabel
@@ -139,7 +149,6 @@ export default function DraftCard({
         <Button
           variant="secondary"
           size="sm"
-          fullWidth
           disabled={loadingDraftId === draft.id}
           onClick={(e) => {
             e.stopPropagation();
@@ -149,6 +158,52 @@ export default function DraftCard({
         >
           Resume Editing
         </Button>
+        <span
+          className={styles.downloadBtnWrapper}
+          title={!canDownload ? MESSAGES.DRAFT_DOWNLOAD_NOT_READY : undefined}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!canDownload || isDownloadingDocx}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownloadDocx?.();
+            }}
+            aria-label="Download DOCX"
+            className={styles.downloadBtn}
+          >
+            {isDownloadingDocx ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}{" "}
+            {isDownloadingDocx ? "..." : "DOCX"}
+          </Button>
+        </span>
+        <span
+          className={styles.downloadBtnWrapper}
+          title={!canDownload ? MESSAGES.DRAFT_DOWNLOAD_NOT_READY : undefined}
+        >
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!canDownload || isDownloadingPdf}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownloadPdf?.();
+            }}
+            aria-label="Download PDF"
+            className={styles.downloadBtn}
+          >
+            {isDownloadingPdf ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Download size={14} />
+            )}{" "}
+            {isDownloadingPdf ? "..." : "PDF"}
+          </Button>
+        </span>
       </Card.Footer>
     </article>
   );

@@ -27,6 +27,7 @@ export default function TemplateSelectionModal(
     onClose,
     isScratch = false,
     enableTemplateSelection = false,
+    hideNewClient = false,
   } = props;
 
   const {
@@ -164,6 +165,7 @@ export default function TemplateSelectionModal(
                 onKeyDown={handleClientKeyDown}
                 onClientSelect={handleClientSelect}
                 onNewClient={handleNewClientClick}
+                hideNewClient={hideNewClient}
               />
 
               <FormField label="Proposal Name">
@@ -238,7 +240,9 @@ export default function TemplateSelectionModal(
             <Button
               variant="primary"
               onClick={handleContinue}
-              disabled={uploadedFiles.some((f) => f.status === "parsing")}
+              disabled={
+                proposalName.trim().length < 3 || uploadedFiles.some((f) => f.status === "parsing")
+              }
               loading={isPending}
               style={{ marginLeft: "auto" }}
             >

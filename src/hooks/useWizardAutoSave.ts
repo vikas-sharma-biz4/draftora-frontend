@@ -437,7 +437,6 @@ export function useWizardAutoSave(options: UseWizardAutoSaveOptions = { enabled:
               aiModel,
               templateId,
               templateType,
-              files: [],
               filesMeta,
               selectedDocumentIds,
               contextualInstructions: "",

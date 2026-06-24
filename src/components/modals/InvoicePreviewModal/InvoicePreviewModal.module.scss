@@ -119,6 +119,13 @@
   background: #f9f9f9;
 }
 
+.pdfIframe {
+  width: 100%;
+  min-height: 500px;
+  border: none;
+  display: block;
+}
+
 .htmlContent {
   background: #fff;
   border-radius: var(--radius-md);

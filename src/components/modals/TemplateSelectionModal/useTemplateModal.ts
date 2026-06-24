@@ -471,8 +471,8 @@ export function useTemplateModal({
       return;
     }
 
-    if (!proposalName.trim()) {
-      toast.error("Please enter a proposal name");
+    if (proposalName.trim().length < 3) {
+      toast.error("Proposal name must be at least 3 characters");
       return;
     }
 

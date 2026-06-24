@@ -107,13 +107,7 @@ export default function ClientDocumentsPanel({
                     : styles.iconDefault;
 
             return (
-              <div
-                key={doc.id}
-                className={styles.documentItem}
-                onClick={() => handleViewDocument(doc)}
-                style={{ cursor: "pointer", position: "relative" }}
-                title="Click to view file"
-              >
+              <div key={doc.id} className={styles.documentItem} style={{ position: "relative" }}>
                 <div className={`${styles.documentIcon} ${iconClass}`}>
                   {viewingDocId === doc.id ? (
                     <Eye size={20} style={{ opacity: 0.5 }} />
@@ -150,8 +144,9 @@ export default function ClientDocumentsPanel({
                     void handleViewDocument(doc);
                   }}
                   title="View document"
+                  style={{ width: 40, height: 40, padding: 0, flexShrink: 0 }}
                 >
-                  <Eye size={15} />
+                  <Eye size={18} />
                 </button>
 
                 {/* Delete */}

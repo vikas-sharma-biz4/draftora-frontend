@@ -16,11 +16,13 @@
 // CRUD
 export {
   generateProposal,
+  regenerateProposal,
   getProposalStatus,
   getProposal,
   listProposals,
   listProposalHistory,
   getDownloadUrl,
+  getProposalPdfUrl,
   cancelProposal,
   updateApprovalStatus,
   estimateProposalHours,
@@ -48,7 +50,6 @@ export type { AddSectionPayload, ReorderSectionsPayload } from "./proposalSectio
 export {
   parseCustomTemplate,
   parseFiles,
-  getSupportedParseFormats,
   suggestSections,
   getSectionRecommendations,
 } from "./templateParser.service";
@@ -69,8 +70,4 @@ export type {
 export { markProposalStepVisited, validateProposalStepAccess } from "./proposalWizard.service";
 
 // Versioning
-export {
-  createVersionDraft,
-  getProposalFamilyTree,
-  deleteVersionDraft,
-} from "./proposalVersioning.service";
+export { createVersionDraft, deleteVersionDraft } from "./proposalVersioning.service";

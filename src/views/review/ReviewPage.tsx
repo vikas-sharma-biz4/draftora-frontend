@@ -10,8 +10,9 @@ import Button from "@/components/common/Button";
 
 import styles from "./ReviewPage.module.scss";
 
-import { generateProposal, getProposal } from "@/services/proposal";
+import { generateProposal, regenerateProposal, getProposal } from "@/services/proposal";
 import { SECTION_DISPLAY_NAMES, PROPOSAL_TEMPLATES } from "@/constants";
+import { MESSAGES } from "@/constants/messages";
 import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import {
   useProposalTitle,
@@ -136,7 +137,6 @@ export default function ReviewPage(): JSX.Element {
         aiModel,
         templateId,
         templateType,
-        files: [],
         filesMeta,
         selectedDocumentIds,
         customSections,
@@ -170,10 +170,11 @@ export default function ReviewPage(): JSX.Element {
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
   const markStepCompleted = useDraftSessionStore((s) => s.markStepCompleted);
   const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
+  const setFromHistory = useDraftSessionStore((s) => s.setFromHistory);
+  const setCurrentDraftId = useDraftSessionStore((s) => s.setCurrentDraftId);
   const router = useRouter();
   const searchParams = useSearchParams();
   const handleSaveDraft = useSaveDraft();
-  const isRegenerating = currentProposalId !== null;
   const approvalStatus = useApprovalStatus();
 
   // Versioning: when reviewing a History proposal, any "Edit" action should
@@ -188,6 +189,22 @@ export default function ReviewPage(): JSX.Element {
     await triggerVersionDraft("review_edit");
     // useVersionDraft handles navigation to the new draft.
   }
+
+  // Opens the relevant modal immediately, then creates the version draft.
+  // After creation, synchronously update wizard + session state so the
+  // 2-second autosave debounce never fires against stale "approved" status,
+  // a stale fromHistory flag, or the parent's draft ID.
+  async function handleVersionedEdit(openModal: () => void): Promise<void> {
+    openModal();
+    if (!isHistoryProposal || !currentProposalId) return;
+    const newProposalId = await triggerVersionDraft("review_edit");
+    if (newProposalId !== null) {
+      setCurrentProposalId(newProposalId);
+      updateProposalData({ approvalStatus: "pending" });
+      setFromHistory(false);
+      setCurrentDraftId(null);
+    }
+  }
   const {
     clients,
     isLoading: isLoadingClients,
@@ -200,8 +217,11 @@ export default function ReviewPage(): JSX.Element {
   // Restore currentProposalId from URL params if not set in store
   useEffect(() => {
     const urlProposalId = searchParams.get("proposalId");
-    if (urlProposalId && !currentProposalId) {
-      setCurrentProposalId(Number(urlProposalId));
+    if (urlProposalId) {
+      const numId = Number(urlProposalId);
+      if (numId !== currentProposalId) {
+        setCurrentProposalId(numId);
+      }
     }
   }, [searchParams, currentProposalId, setCurrentProposalId]);
 
@@ -376,7 +396,7 @@ export default function ReviewPage(): JSX.Element {
     // Close modal after a brief delay to ensure state update completes
     setTimeout(() => {
       setShowScopeModal(false);
-      toast.success("Client details updated");
+      toast.success(MESSAGES.CLIENT_DETAILS_UPDATED);
     }, 0);
   }
 
@@ -442,13 +462,13 @@ export default function ReviewPage(): JSX.Element {
         templateType: selectedTemplate.templateType,
         selectedSections: [...selectedTemplate.sections],
       });
-      toast.success(`Template updated to ${selectedTemplate.name}`);
+      toast.success(MESSAGES.PROPOSAL_TEMPLATE_UPDATED_NAMED(selectedTemplate.name));
     } else {
       updateProposalData({
         templateId,
         templateType: "predefined" as const,
       });
-      toast.success("Template updated");
+      toast.success(MESSAGES.PROPOSAL_TEMPLATE_UPDATED);
     }
 
     setShowTemplateModal(false);
@@ -482,30 +502,22 @@ export default function ReviewPage(): JSX.Element {
   async function handleGenerate(): Promise<void> {
     // Check if sections are selected
     if (proposalData.selectedSections.length === 0) {
-      toast.error("Please select at least one section before generating the proposal");
+      toast.error(MESSAGES.REVIEW_SECTION_REQUIRED);
       return;
     }
 
     if (!proposalData.clientId || proposalData.clientId === 0) {
-      toast.error("Please select a client before generating the proposal");
+      toast.error(MESSAGES.REVIEW_CLIENT_REQUIRED);
       return;
     }
 
     setIsGenerating(true);
     setErrorMessage("");
 
-    // Show immediate feedback to user
-    // if (isRegenerating) {
-    //   toast.info("Regenerating proposal with updated parameters...");
-    // } else {
-    //   toast.info("Starting proposal generation...");
-    // }
-
     logger.debug("[ReviewPage] Starting proposal generation with data:", {
       title: proposalData.title,
       clientId: proposalData.clientId,
       sectionsCount: proposalData.selectedSections.length,
-      filesCount: proposalData.files.length,
       templateType: proposalData.templateType,
       templateId: proposalData.templateId,
     });
@@ -513,15 +525,19 @@ export default function ReviewPage(): JSX.Element {
     const generateStartTime = Date.now();
 
     try {
-      // CRITICAL FIX: Call the API to create the proposal
-      logger.info("[ReviewPage] Calling generateProposal API at", new Date().toISOString());
-      const response = await generateProposal(proposalData);
+      // If a proposal already exists for this wizard session, regenerate it in-place
+      // rather than creating a new proposal. This preserves the existing sections that
+      // haven't changed and only generates newly added sections.
+      const response = currentProposalId
+        ? await regenerateProposal(currentProposalId, proposalData)
+        : await generateProposal(proposalData);
 
       const generateEndTime = Date.now();
       const generateDuration = generateEndTime - generateStartTime;
 
-      logger.info("[ReviewPage] Proposal created successfully at", new Date().toISOString(), ":", {
+      logger.info("[ReviewPage] Proposal generation started", {
         proposalId: response.id,
+        isRegeneration: Boolean(currentProposalId),
         status: response.status,
         generateDurationMs: generateDuration,
       });
@@ -607,15 +623,11 @@ export default function ReviewPage(): JSX.Element {
         Everything looks right? Hit Generate.
       </p>
 
-      {/* Read-only banner for History proposals */}
+      {/* Informational banner for History proposals */}
       {isHistoryProposal && (
         <div
           className="card"
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
             padding: "0.875rem 1.25rem",
             marginBottom: "1.25rem",
             borderLeft: "4px solid var(--color-primary, #6366f1)",
@@ -624,17 +636,10 @@ export default function ReviewPage(): JSX.Element {
         >
           <span style={{ color: "var(--color-text-muted)", fontSize: "0.875rem" }}>
             This proposal is{" "}
-            <strong style={{ textTransform: "capitalize" }}>{approvalStatus}</strong> and is
-            read-only. Click <strong>Edit (New Version)</strong> to branch a new draft.
+            <strong style={{ textTransform: "capitalize" }}>{approvalStatus}</strong>. Start editing
+            — a new version draft will be created automatically.
+            {isCreatingVersion && " Creating new version…"}
           </span>
-          <button
-            className="btn btn-primary"
-            onClick={handleCreateVersionDraft}
-            disabled={isCreatingVersion || !currentProposalId}
-            style={{ whiteSpace: "nowrap", flexShrink: 0 }}
-          >
-            {isCreatingVersion ? "Creating…" : "Edit (New Version)"}
-          </button>
         </div>
       )}
 
@@ -649,7 +654,7 @@ export default function ReviewPage(): JSX.Element {
             </span>
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => toast.info("Download functionality coming soon")}
+              onClick={() => toast.info(MESSAGES.DOWNLOAD_COMING_SOON)}
             >
               Download All Docs
             </button>
@@ -668,9 +673,10 @@ export default function ReviewPage(): JSX.Element {
                 <button
                   className="link-plain"
                   onClick={
-                    isHistoryProposal ? handleCreateVersionDraft : () => setShowScopeModal(true)
+                    isHistoryProposal
+                      ? () => void handleVersionedEdit(() => setShowScopeModal(true))
+                      : () => setShowScopeModal(true)
                   }
-                  disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
                 >
                   Edit
                 </button>
@@ -700,10 +706,9 @@ export default function ReviewPage(): JSX.Element {
                   className="link-plain"
                   onClick={
                     isHistoryProposal
-                      ? handleCreateVersionDraft
+                      ? () => void handleVersionedEdit(() => setShowStyleVoiceModal(true))
                       : () => setShowStyleVoiceModal(true)
                   }
-                  disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
                 >
                   Edit
                 </button>
@@ -721,8 +726,11 @@ export default function ReviewPage(): JSX.Element {
               <span className="review-card-title">KNOWLEDGE BASE</span>
               <button
                 className="link-plain"
-                onClick={isHistoryProposal ? handleCreateVersionDraft : handleOpenKnowledgeBase}
-                disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
+                onClick={
+                  isHistoryProposal
+                    ? () => void handleVersionedEdit(handleOpenKnowledgeBase)
+                    : handleOpenKnowledgeBase
+                }
               >
                 Edit
               </button>
@@ -764,9 +772,10 @@ export default function ReviewPage(): JSX.Element {
               <button
                 className="link-plain"
                 onClick={
-                  isHistoryProposal ? handleCreateVersionDraft : () => setShowSectionsModal(true)
+                  isHistoryProposal
+                    ? () => void handleVersionedEdit(() => setShowSectionsModal(true))
+                    : () => setShowSectionsModal(true)
                 }
-                disabled={isHistoryProposal && (isCreatingVersion || !currentProposalId)}
               >
                 Edit
               </button>
