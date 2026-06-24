@@ -118,7 +118,6 @@ const makeProposal = (status: string): ProposalData => ({
   customSections: [],
   contextualInstructions: "",
   webReferences: [],
-  files: [],
   filesMeta: [],
   templateId: null,
   templateType: "scratch",

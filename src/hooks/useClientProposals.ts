@@ -16,6 +16,8 @@ interface UseClientProposalsReturn {
   clientDrafts: DraftMetadata[];
   isLoadingProposals: boolean;
   downloadingProposalId: number | null;
+  /** null = idle, -1 = indeterminate, 0-100 = real percent for the active DOCX download */
+  docxProgress: number | null;
   filteredProposals: ProposalListItem[];
   filteredDraftRows: DraftMetadata[];
   handleDownloadProposal: (proposalId: number) => Promise<void>;
@@ -28,7 +30,7 @@ interface UseClientProposalsReturn {
  * Drafts are fetched directly as there is no shared draft list store.
  */
 export function useClientProposals(clientId: number, clientName: string): UseClientProposalsReturn {
-  const { downloadProposal } = useProposalDownload();
+  const { downloadProposal, progress: docxProgress } = useProposalDownload();
 
   const allProposals = useProposalStore((s) => s.proposals);
   const isStoreLoading = useProposalStore((s) => s.isLoading);
@@ -114,6 +116,7 @@ export function useClientProposals(clientId: number, clientName: string): UseCli
     clientDrafts,
     isLoadingProposals: isLoadingProposalsLocal || isStoreLoading || isLoadingDrafts,
     downloadingProposalId,
+    docxProgress,
     filteredProposals,
     filteredDraftRows,
     handleDownloadProposal,

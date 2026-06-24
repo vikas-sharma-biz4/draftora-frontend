@@ -134,10 +134,11 @@
   overflow: hidden;
 }
 
-/* 2×2 grid — equal-width columns */
+/* 2×2 grid — equal-width columns, equal-height rows */
 .gridLayout {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 480px;
   gap: 24px;
   padding: 0 52px 52px;
 
@@ -169,6 +170,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  // Let the table grow to fill remaining card height instead of leaving empty space
+  .tableWrapper {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 .panelHeader {
@@ -329,12 +338,11 @@
   background: var(--color-bg);
   border: 1px solid transparent;
   transition: all 0.15s;
-  cursor: pointer;
 }
 
 .documentItem:hover {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary-medium);
+  background: var(--color-bg);
+  border-color: transparent;
 }
 
 .documentIcon {
@@ -733,7 +741,7 @@
 }
 
 .proposalRow:hover {
-  background: var(--color-primary-light);
+  background: transparent;
 }
 
 .proposalRow td {
@@ -800,7 +808,22 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  justify-content: flex-end;
+  justify-content: center;
+}
+
+/*
+ * Wrapper for download buttons that shows a circular progress ring overlay.
+ * Fixed square size so the absolutely-positioned SVG ring (inset:0, 100%×100%)
+ * fills the container exactly — zero overflow, no table clipping.
+ */
+.downloadBtnWrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* ---------- Type filter dropdown ---------- */
@@ -819,6 +842,24 @@
   background-position: right 8px center;
   background-size: 14px;
   transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+}
+
+.dateInput {
+  padding: 7px 10px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:focus {
     border-color: var(--color-primary);
@@ -963,6 +1004,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+
+  // Fill the table to the card height (mirrors .proposalHistory pattern)
+  .tableWrapper {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 /* ---------- Payment status badges ---------- */
@@ -1089,6 +1138,16 @@
   color: #222;
 }
 
+.emailViewFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
 .uploadingIndicator {
   padding: 12px 16px;
   background: var(--color-primary-light);
@@ -1159,6 +1218,7 @@
 
   .gridLayout {
     grid-template-columns: 1fr;
+    grid-auto-rows: auto;
     overflow: auto;
 
     > .knowledgeBase,
@@ -1179,6 +1239,7 @@
   }
 
   .tableWrapper {
+    flex: none;
     height: auto;
     max-height: 480px;
     overflow-y: auto;
@@ -1187,7 +1248,7 @@
 
 @media (max-width: 768px) {
   .clientHeader {
-    padding: 20px 24px;
+    padding: 16px;
     flex-wrap: wrap; // Stack on mobile
     align-items: flex-start;
     gap: 16px;
@@ -1213,7 +1274,12 @@
   }
 
   .splitLayout {
-    padding: 0 24px 24px;
+    padding: 0 16px 16px;
+    gap: 16px;
+  }
+
+  .gridLayout {
+    padding: 0 16px 16px;
     gap: 16px;
   }
 
@@ -1257,15 +1323,15 @@
   }
 
   .documentList {
-    max-height: none;
-    overflow-y: visible;
+    max-height: 360px;
+    overflow-y: auto;
   }
 
   .tableWrapper {
     height: auto;
-    max-height: none;
-    overflow-x: auto; // Tables scroll horizontally on small screens
-    overflow-y: visible;
+    max-height: 360px;
+    overflow-x: auto;
+    overflow-y: auto;
   }
 
   .proposalTable {
@@ -1326,5 +1392,13 @@
 
   .proposalRow td {
     padding: 12px 8px 12px 0;
+  }
+
+  .tableWrapper {
+    max-height: 280px;
+  }
+
+  .documentList {
+    max-height: 280px;
   }
 }

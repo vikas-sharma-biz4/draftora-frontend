@@ -22,7 +22,6 @@ import type { ClientWithDocuments, ClientDocument } from "@/interfaces/clientInt
 const mockUploadDocument = jest.fn();
 const mockRemoveDocument = jest.fn();
 const mockDeleteDocument = jest.fn();
-const mockUpdateDocument = jest.fn();
 
 jest.mock("@/store/features/clients/clientSlice", () => ({
   useClientStore: (selector: (s: unknown) => unknown) => {
@@ -30,7 +29,6 @@ jest.mock("@/store/features/clients/clientSlice", () => ({
       uploadDocument: mockUploadDocument,
       removeDocument: mockRemoveDocument,
       deleteDocument: mockDeleteDocument,
-      updateDocument: mockUpdateDocument,
     };
     return selector(state);
   },
@@ -42,17 +40,10 @@ jest.mock("@/store/features/clients/clientSlice", () => ({
 
 const mockGetDocumentViewUrl = jest.fn();
 const mockDeleteClientDocument = jest.fn();
-const mockMigrateDocumentsToS3 = jest.fn();
-const mockRestoreDocumentToS3 = jest.fn();
 
 jest.mock("@/services/client.service", () => ({
   getDocumentViewUrl: (...args: unknown[]) => mockGetDocumentViewUrl(...args),
   deleteDocument: (...args: unknown[]) => mockDeleteClientDocument(...args),
-  migrateDocumentsToS3: (...args: unknown[]) => mockMigrateDocumentsToS3(...args),
-  restoreDocumentToS3: (...args: unknown[]) => mockRestoreDocumentToS3(...args),
-  // re-export named imports used by the hook
-  migrateDocumentsToS3: (...args: unknown[]) => mockMigrateDocumentsToS3(...args),
-  restoreDocumentToS3: (...args: unknown[]) => mockRestoreDocumentToS3(...args),
 }));
 
 // ---------------------------------------------------------------------------

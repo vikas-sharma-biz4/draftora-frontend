@@ -24,6 +24,7 @@ interface ClientSearchDropdownProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onClientSelect: (clientId: number, clientName: string) => void;
   onNewClient: () => void;
+  hideNewClient?: boolean;
 }
 
 export default function ClientSearchDropdown({
@@ -40,6 +41,7 @@ export default function ClientSearchDropdown({
   onKeyDown,
   onClientSelect,
   onNewClient,
+  hideNewClient = false,
 }: ClientSearchDropdownProps): JSX.Element {
   return (
     <div className={styles.section}>
@@ -52,10 +54,12 @@ export default function ClientSearchDropdown({
       ) : allClients.length === 0 ? (
         <div className={styles.noClients}>
           <p>No clients found. Create your first client to continue.</p>
-          <Button variant="primary" size="sm" onClick={onNewClient}>
-            <Plus size={16} />
-            New Client
-          </Button>
+          {!hideNewClient && (
+            <Button variant="primary" size="sm" onClick={onNewClient}>
+              <Plus size={16} />
+              New Client
+            </Button>
+          )}
         </div>
       ) : (
         <div className={styles.searchWrapper}>
@@ -74,15 +78,17 @@ export default function ClientSearchDropdown({
               aria-expanded={showDropdown}
               role="combobox"
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onNewClient}
-              className={styles.newClientBtn}
-            >
-              <Plus size={16} />
-              New Client
-            </Button>
+            {!hideNewClient && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onNewClient}
+                className={styles.newClientBtn}
+              >
+                <Plus size={16} />
+                New Client
+              </Button>
+            )}
           </div>
 
           {showDropdown && filteredClients.length > 0 && (

@@ -7,11 +7,12 @@
  *
  *   // Inside an edit-click handler:
  *   const newId = await triggerVersionDraft("section_edit");
- *   // URL is already updated to /proposal/{newId} — nothing else needed.
+ *   // URL is updated to /review?proposalId={newId} when called from the review
+ *   // page, or /proposal/{newId} from any other page.
  */
 
 import { useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createVersionDraft } from "@/services/proposal";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import type { ProposalListItem, VersionDraftTrigger } from "@/interfaces/proposalInterfaces";
@@ -26,6 +27,7 @@ interface UseVersionDraftReturn {
 
 export function useVersionDraft(parentProposalId: number): UseVersionDraftReturn {
   const router = useRouter();
+  const pathname = usePathname();
   const addVersionDraft = useProposalStore((s) => s.addVersionDraft);
   const invalidateCache = useProposalStore((s) => s.invalidateCache);
 
@@ -83,8 +85,12 @@ export function useVersionDraft(parentProposalId: number): UseVersionDraftReturn
           trigger
         );
 
-        // Navigate to the new draft so all subsequent edits target its row.
-        router.push(`/proposal/${draft.id}`);
+        // Navigate back to the same page context but targeting the new draft.
+        // Review page → stay on review. All other pages → go to proposal output.
+        const destination = pathname.startsWith("/review")
+          ? `/review?proposalId=${draft.id}`
+          : `/proposal/${draft.id}`;
+        router.push(destination);
 
         return draft.id;
       } catch (error) {
@@ -99,7 +105,7 @@ export function useVersionDraft(parentProposalId: number): UseVersionDraftReturn
         pendingRef.current = null;
       }
     },
-    [parentProposalId, addVersionDraft, invalidateCache, router]
+    [parentProposalId, addVersionDraft, invalidateCache, router, pathname]
   );
 
   return { isCreating, draftId, triggerVersionDraft };

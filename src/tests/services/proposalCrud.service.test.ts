@@ -102,7 +102,6 @@ const baseWizardData = {
   selectedDocumentIds: [],
   templateId: null,
   templateType: "scratch" as const,
-  files: [],
   filesMeta: [],
   approvalStatus: "pending" as const,
 };

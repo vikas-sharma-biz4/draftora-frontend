@@ -8,19 +8,18 @@ import type { ProposalWizardData, WizardStep } from "@/interfaces/proposalInterf
 
 /**
  * Builds a `ProposalWizardData` object from the fields that vary per save,
- * filling in the two fields that are always reset on save: `files` and
- * `contextualInstructions`. `customSections` is passed through so that
- * user-defined custom sections survive draft saves and recovery.
+ * resetting `contextualInstructions` to empty on each save. `customSections`
+ * is passed through so that user-defined custom sections survive draft saves
+ * and recovery.
  *
  * Previously duplicated identically in useSaveDraft, useWizardAutoSave,
  * and useDraftPersistence.
  */
-export type DraftProposalDataInput = Omit<ProposalWizardData, "files" | "contextualInstructions">;
+export type DraftProposalDataInput = Omit<ProposalWizardData, "contextualInstructions">;
 
 export function buildDraftProposalData(input: DraftProposalDataInput): ProposalWizardData {
   return {
     ...input,
-    files: [],
     contextualInstructions: "",
   };
 }

@@ -93,22 +93,6 @@ export async function createVersionDraft(
 }
 
 /**
- * Retrieve the full version family tree for any proposal in the family.
- *
- * @param proposalId - PK of any proposal in the family (root or child).
- * @returns          Family tree with root_id and ordered version list.
- */
-export async function getProposalFamilyTree(proposalId: number): Promise<ProposalFamilyTree> {
-  const raw = await http.get<RawFamilyTreeResponse>(`/proposals/${proposalId}/family`, {
-    cache: "no-store",
-  });
-  return {
-    rootId: raw.root_id,
-    versions: raw.versions.map(mapFamilyTreeItem),
-  };
-}
-
-/**
  * Soft-delete a pending version draft.
  *
  * Only proposals with approval_status='pending' and a non-null

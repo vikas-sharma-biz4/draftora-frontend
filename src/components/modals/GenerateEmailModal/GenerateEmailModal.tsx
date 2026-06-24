@@ -4,15 +4,16 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { useSteppedModal } from "@/hooks/useSteppedModal";
-import { X, Search, ChevronDown, Save, Copy, FileDown, FileText } from "lucide-react";
+import { X, Search, ChevronDown, Copy, FileDown, RefreshCw, Wand2 } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
 import { EMAIL_TEMPLATES } from "@/constants/artifactTemplates";
 import { generateArtifact, listArtifacts, updateArtifact } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
-import { downloadBlob } from "@/utils/downloadBlob";
 import { formatDate } from "@/utils/dateUtils";
+import { fixProposalLinks } from "@/utils/emailUtils";
+import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import type { ClientWithDocuments } from "@/interfaces/clientInterfaces";
@@ -69,6 +70,10 @@ export default function GenerateEmailModal({
 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
+  // Regenerate instructions inline prompt (step 2)
+  const [showRegenInput, setShowRegenInput] = useState<boolean>(false);
+  const [regenInstructions, setRegenInstructions] = useState<string>("");
+
   // Step 2 state
   const [artifacts, setArtifacts] = useState<GeneratedArtifact[]>([]);
   const [currentArtifact, setCurrentArtifact] = useState<GeneratedArtifact | null>(null);
@@ -116,23 +121,35 @@ export default function GenerateEmailModal({
     return `Email — ${client.name} — ${proposalTitle}`;
   }
 
-  async function callGenerateArtifact(isInitial: boolean): Promise<void> {
-    if (!selectedProposalId) return;
+  async function callGenerateArtifact(isInitial: boolean, regenNote?: string): Promise<void> {
     setIsGenerating(true);
     if (isInitial) setStep(2);
     try {
+      // Merge Step 1 instructions with any per-regeneration notes
+      const combinedInstructions =
+        [additionalInstructions, regenNote]
+          .map((s) => s?.trim())
+          .filter(Boolean)
+          .join("\n\nAdditional regeneration notes: ") || undefined;
+
       const artifact = await generateArtifact({
         clientId: client.id,
-        proposalId: selectedProposalId,
+        proposalId: selectedProposalId ?? undefined,
         templateId: selectedTemplateId,
         artifactType: "email",
         title: buildTitle(),
-        additionalInstructions: additionalInstructions || undefined,
+        additionalInstructions: combinedInstructions,
         options,
+        clientName: client.name,
       });
       setArtifacts((prev) => [artifact, ...prev]);
       setCurrentArtifact(artifact);
-      setEditorContent(artifact.content);
+      const generatedHtml = sanitizeHtml(artifact.content);
+      setEditorContent(
+        artifact.proposalId !== null
+          ? fixProposalLinks(generatedHtml, artifact.proposalId)
+          : generatedHtml
+      );
       if (!isInitial) toast.success(`Email v${artifact.version} generated`);
     } catch (err) {
       logger.error("[GenerateEmailModal] Generation failed:", err);
@@ -170,14 +187,14 @@ export default function GenerateEmailModal({
     }
   }
 
-  function handleExportHtml(): void {
-    if (!currentArtifact) return;
-    downloadBlob(editorContent, `${currentArtifact.title}.html`, "text/html;charset=utf-8");
-  }
-
   function handleSelectVersion(artifact: GeneratedArtifact): void {
     setCurrentArtifact(artifact);
-    setEditorContent(artifact.content);
+    const versionHtml = sanitizeHtml(artifact.content);
+    setEditorContent(
+      artifact.proposalId !== null
+        ? fixProposalLinks(versionHtml, artifact.proposalId)
+        : versionHtml
+    );
     setShowVersionDropdown(false);
   }
 
@@ -384,7 +401,6 @@ export default function GenerateEmailModal({
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={() => void callGenerateArtifact(true)}
-                  disabled={!selectedProposalId}
                 >
                   Generate Email →
                 </button>
@@ -403,42 +419,73 @@ export default function GenerateEmailModal({
                   <div className={styles.generatingSubtext}>This usually takes 5–15 seconds</div>
                 </div>
               ) : (
-                <>
-                  {subjectLine && (
-                    <div className={styles.subjectRow}>
-                      <label>Subject:</label>
-                      <span>{subjectLine}</span>
-                    </div>
-                  )}
-                  <div className={styles.editorWrapper}>
-                    <RichEditor
-                      content={editorContent}
-                      onChange={setEditorContent}
-                      placeholder="Email content will appear here…"
-                    />
-                  </div>
-                </>
+                <div className={styles.editorWrapper}>
+                  <RichEditor
+                    content={editorContent}
+                    onChange={setEditorContent}
+                    placeholder="Email content will appear here…"
+                  />
+                </div>
               )}
             </div>
+
+            {/* Regen prompt bar — slides in between editor and footer */}
+            {showRegenInput && !isGenerating && (
+              <div className={styles.regenBar}>
+                <Wand2 size={15} className={styles.regenBarIcon} />
+                <input
+                  className={styles.regenBarInput}
+                  type="text"
+                  placeholder="What would you like to change? (optional — press Enter to generate)"
+                  value={regenInstructions}
+                  onChange={(e) => setRegenInstructions(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setShowRegenInput(false);
+                      void callGenerateArtifact(false, regenInstructions || undefined);
+                      setRegenInstructions("");
+                    }
+                    if (e.key === "Escape") {
+                      setShowRegenInput(false);
+                      setRegenInstructions("");
+                    }
+                  }}
+                />
+                <span className={styles.regenBarOptional}>optional</span>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={() => {
+                    setShowRegenInput(false);
+                    void callGenerateArtifact(false, regenInstructions || undefined);
+                    setRegenInstructions("");
+                  }}
+                >
+                  Generate
+                </button>
+                <button
+                  className={styles.regenBarDismiss}
+                  onClick={() => {
+                    setShowRegenInput(false);
+                    setRegenInstructions("");
+                  }}
+                  aria-label="Dismiss"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {!isGenerating && (
               <div className={styles.footer}>
                 <div className={styles.footerLeft}>
                   <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => void callGenerateArtifact(false)}
+                    className={`btn btn-secondary btn-sm${showRegenInput ? ` ${styles.regenBtnActive}` : ""}`}
+                    onClick={() => setShowRegenInput((v) => !v)}
                     disabled={isGenerating}
                   >
+                    <RefreshCw size={13} />
                     Regenerate
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => void handleSaveDraft()}
-                    disabled={isSaving}
-                    aria-label="Save email draft"
-                  >
-                    <Save size={14} />
-                    {isSaving ? "Saving…" : "Save Draft"}
                   </button>
                   <button
                     className="btn btn-secondary btn-sm"
@@ -450,14 +497,6 @@ export default function GenerateEmailModal({
                   </button>
                 </div>
                 <div className={styles.footerRight}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleExportHtml}
-                    aria-label="Export as HTML"
-                  >
-                    <FileText size={14} />
-                    HTML
-                  </button>
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() =>

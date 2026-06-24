@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Home, Users, FileText, History, PanelLeft } from "lucide-react";
+import { Home, Users, FileText, History, Menu, PanelLeft } from "lucide-react";
 
 import styles from "./MainSidebar.module.scss";
 import { MAIN_NAV_ITEMS, SIDEBAR_LOGO_SRC } from "@/constants";
-import { useIsTablet } from "@/hooks/useMediaQuery";
+import { useIsTablet, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useUIStore } from "@/store/features/ui/uiSlice";
 
 /** Maps nav item id → lucide icon */
@@ -26,6 +26,8 @@ export default function MainSidebar(): JSX.Element {
 
   // True when viewport ≤ 1024px — sidebar behaves as an overlay drawer
   const isOverlayMode = useIsTablet();
+  // True when viewport ≤ 768px — sidebar is fully off-screen (no icon strip)
+  const isMobileView = useMediaQuery("(max-width: 768px)");
 
   // Collapse when entering overlay mode (resize) or when navigating
   useEffect(() => {
@@ -48,6 +50,18 @@ export default function MainSidebar(): JSX.Element {
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
+      )}
+
+      {isMobileView && collapsed && (
+        <button
+          type="button"
+          className={styles.mobileToggleBtn}
+          onClick={toggleSidebar}
+          aria-label="Open navigation"
+          title="Open navigation"
+        >
+          <Menu size={20} />
+        </button>
       )}
 
       <aside className={styles.sidebar} data-collapsed={collapsed} aria-label="Main navigation">

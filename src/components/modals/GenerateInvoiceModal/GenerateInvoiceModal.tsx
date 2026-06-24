@@ -5,16 +5,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useState, useCallback } from "react";
 import { useSteppedModal } from "@/hooks/useSteppedModal";
 import { useQueryClient } from "@tanstack/react-query";
-import { X, Search, ChevronDown, RefreshCw, Save, FileDown } from "lucide-react";
+import { X, Search, ChevronDown, FileDown } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
 import { INVOICE_TEMPLATES } from "@/constants/artifactTemplates";
-import {
-  generateArtifact,
-  getMilestones,
-  listArtifacts,
-  updateArtifact,
-} from "@/services/artifact.service";
+import { generateArtifact, getMilestones, listArtifacts } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { clientInvoicesQueryKey } from "@/hooks/useClientInvoicesQuery";
@@ -73,8 +68,6 @@ export default function GenerateInvoiceModal({
     setShowVersionDropdown,
     isGenerating,
     setIsGenerating,
-    isSaving,
-    setIsSaving,
   } = useSteppedModal(onClose);
 
   // ── Invoice Details Form (Step 1) ────────────────────────────────────────
@@ -228,22 +221,6 @@ export default function GenerateInvoiceModal({
       if (isInitial) setStep(1);
     } finally {
       setIsGenerating(false);
-    }
-  }
-
-  async function handleSaveDraft(): Promise<void> {
-    if (!currentArtifact) return;
-    setIsSaving(true);
-    try {
-      const updated = await updateArtifact(currentArtifact.id, { content: editorContent });
-      setCurrentArtifact(updated);
-      setArtifacts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-      toast.success(MESSAGES.ARTIFACT_SAVED);
-    } catch (err) {
-      logger.error("[GenerateInvoiceModal] Save failed:", err);
-      toast.error(MESSAGES.ARTIFACT_SAVE_FAILED);
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -538,27 +515,10 @@ export default function GenerateInvoiceModal({
 
             {!isGenerating && (
               <div className={styles.footer}>
-                <div className={styles.footerLeft}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => void callGenerateArtifact(false)}
-                    disabled={isGenerating}
-                  >
-                    <RefreshCw size={14} />
-                    Regenerate
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => void handleSaveDraft()}
-                    disabled={isSaving}
-                  >
-                    <Save size={14} />
-                    {isSaving ? "Saving…" : "Save Draft"}
-                  </button>
-                </div>
+                <div className={styles.footerLeft} />
                 <div className={styles.footerRight}>
                   <button
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-secondary btn-sm"
                     onClick={() =>
                       currentArtifact &&
                       void downloadArtifact(currentArtifact.id, currentArtifact.title)
