@@ -12,6 +12,7 @@ import type {
   GeneratedArtifact,
   MilestoneCost,
 } from "@/interfaces/artifactInterfaces";
+import type { RegenerateSelectionResult } from "@/services/proposal/proposalSections.service";
 
 // ---------------------------------------------------------------------------
 // Internal snake_case API shapes (not exported)
@@ -20,7 +21,7 @@ import type {
 interface ArtifactApiShape {
   id: number;
   client_id: number;
-  proposal_id: number;
+  proposal_id: number | null;
   template_id: string;
   artifact_type: string;
   title: string;
@@ -64,7 +65,7 @@ function transformArtifact(api: ArtifactApiShape): GeneratedArtifact {
 export async function generateArtifact(data: ArtifactGenerateRequest): Promise<GeneratedArtifact> {
   const body: Record<string, unknown> = {
     client_id: data.clientId,
-    proposal_id: data.proposalId,
+    proposal_id: data.proposalId ?? null,
     template_id: data.templateId,
     artifact_type: data.artifactType,
     title: data.title,
@@ -78,6 +79,7 @@ export async function generateArtifact(data: ArtifactGenerateRequest): Promise<G
         }
       : undefined,
     created_by: data.createdBy ?? null,
+    client_name: data.clientName ?? null,
   };
 
   if (data.invoiceMetadata) {
@@ -157,6 +159,35 @@ export function getArtifactDownloadUrl(artifactId: number): string {
  */
 export function getArtifactPdfUrl(artifactId: number): string {
   return buildUrl(`/artifacts/${artifactId}/download?format=pdf`);
+}
+
+/**
+ * Regenerate a user-selected text span within an artifact using AI.
+ * Returns the same RegenerateSelectionResult shape used by the RichEditor's
+ * onRegenerateSelection prop, so it can be passed directly as the handler.
+ */
+export async function regenerateArtifactSelection(
+  artifactId: number,
+  params: {
+    selectedText: string;
+    selectionContext?: string;
+    instructions?: string;
+  }
+): Promise<RegenerateSelectionResult> {
+  interface RegenApiShape {
+    regenerated_text: string;
+    format: string | null;
+  }
+  const data = await http.post<RegenApiShape>(
+    `/artifacts/${artifactId}/regenerate-selection`,
+    {
+      selected_text: params.selectedText,
+      selection_context: params.selectionContext ?? null,
+      instructions: params.instructions ?? null,
+    },
+    { requestTimeout: 45_000 }
+  );
+  return { regeneratedText: data.regenerated_text, format: data.format ?? null };
 }
 
 /**

@@ -8,10 +8,9 @@ import { logger } from "@/utils/logger";
 
 import styles from "../NewClientModal.module.scss";
 import Button from "@/components/common/Button";
-import { Input, Select, Textarea } from "@/components/common/Input";
+import { Input, Textarea } from "@/components/common/Input";
 import FormField from "@/components/common/FormField";
 
-import { INDUSTRIES } from "@/constants";
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useModalHistory } from "@/hooks/useModalHistory";
 import type { Client } from "@/services/client.service";
@@ -33,7 +32,6 @@ export default function EditClientModal({
 
   const [formData, setFormData] = useState({
     clientName: client.name,
-    industry: client.industry,
     notes: client.notes || "",
   });
 
@@ -63,17 +61,11 @@ export default function EditClientModal({
       return;
     }
 
-    if (!formData.industry) {
-      toast.error("Please select an industry");
-      return;
-    }
-
     setIsSaving(true);
 
     try {
       const updatedClient = await updateClientInStore(client.id, {
         name: formData.clientName.trim(),
-        industry: formData.industry,
         notes: formData.notes || undefined,
       });
 
@@ -121,23 +113,6 @@ export default function EditClientModal({
                 />
               )}
             </FormField>
-
-            <FormField label="Industry">
-              {(fieldProps) => (
-                <Select
-                  {...fieldProps}
-                  value={formData.industry}
-                  onChange={(e) => handleInputChange("industry", e.target.value)}
-                >
-                  <option value="">Select industry...</option>
-                  {INDUSTRIES.map((industry) => (
-                    <option key={industry} value={industry}>
-                      {industry}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </FormField>
           </div>
 
           <div className={styles.section}>
@@ -163,7 +138,7 @@ export default function EditClientModal({
           <Button
             variant="primary"
             onClick={handleSave}
-            disabled={!formData.clientName.trim() || !formData.industry}
+            disabled={!formData.clientName.trim()}
             loading={isSaving}
           >
             Save Changes

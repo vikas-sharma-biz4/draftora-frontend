@@ -49,8 +49,7 @@ export interface FileMeta {
 
 /**
  * Fields shared between the wizard form input (ProposalWizardData) and the
- * backend API response (ProposalData).  Browser-specific types such as
- * `File` must NOT appear here — they belong only on ProposalWizardData.
+ * backend API response (ProposalData).
  */
 export interface ProposalBaseFields {
   title: string;
@@ -76,18 +75,12 @@ export interface ProposalBaseFields {
 }
 
 /**
- * Core wizard form data — extends ProposalBaseFields with browser File
- * objects that are only available during the wizard upload phase and are
- * never present on API responses.
+ * Core wizard form data — extends ProposalBaseFields with wizard-only fields.
  */
-export interface ProposalWizardData extends ProposalBaseFields {
-  files: File[];
-}
+export interface ProposalWizardData extends ProposalBaseFields {}
 
 /**
  * Full proposal shape as returned by the backend API.
- * Extends ProposalBaseFields directly — does NOT include `files: File[]`
- * because browser File objects are never returned by the server.
  */
 export interface ProposalData extends ProposalBaseFields {
   id?: number;

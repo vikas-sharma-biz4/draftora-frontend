@@ -231,6 +231,13 @@
   :global(.ProseMirror) {
     min-height: 300px;
   }
+
+  /* Constrain logos — sanitizeHtml strips <style> tags so template CSS never applies */
+  :global(.ProseMirror) img {
+    max-height: 64px;
+    width: auto;
+    display: block;
+  }
 }
 
 /* ---------- Section ---------- */
@@ -397,6 +404,14 @@
   font-size: 11px;
   line-height: 1.5;
   color: #333;
+
+  // Constrain logos to their intended size — sanitizeHtml strips <style> tags
+  // so the invoice template's height: 64px CSS never reaches the browser.
+  img {
+    max-height: 64px;
+    width: auto;
+    display: block;
+  }
 }
 
 /* ---------- Footer ---------- */

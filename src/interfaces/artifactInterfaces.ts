@@ -11,7 +11,7 @@ export type ArtifactType = "email" | "invoice" | "nda" | "podcast";
 export interface GeneratedArtifact {
   id: number;
   clientId: number;
-  proposalId: number;
+  proposalId: number | null;
   templateId: string;
   artifactType: ArtifactType;
   title: string;
@@ -66,13 +66,15 @@ export interface NdaFormData {
 /** Request body for POST /artifacts/generate */
 export interface ArtifactGenerateRequest {
   clientId: number;
-  proposalId: number;
+  proposalId?: number;
   templateId: string;
   artifactType: ArtifactType;
   title: string;
   additionalInstructions?: string;
   options?: ArtifactOptions;
   createdBy?: string;
+  /** Passed when proposal is not selected, used as fallback for client name in email prompt */
+  clientName?: string;
   invoiceMetadata?: InvoiceFormData;
   ndaMetadata?: NdaFormData;
 }

@@ -16,6 +16,7 @@ import { Check, X, Plus, Lock } from "lucide-react";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
 import { STATIC_SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
+import { MESSAGES } from "@/constants/messages";
 import type { SectionItem } from "@/components/common/SortableSectionList";
 import type { ProposalWizardData } from "@/interfaces/proposalInterfaces";
 import type { SectionRecommendation } from "@/services/proposal";
@@ -76,7 +77,7 @@ export default function SectionManager({
       setEditingKey((prev) => {
         const label = editLabel.trim();
         if (!label) {
-          toast.error("Section name cannot be empty");
+          toast.error(MESSAGES.PROPOSAL_SECTION_NAME_EMPTY);
           return prev;
         }
         onSectionsChange((sections) => sections.map((s) => (s.key === key ? { ...s, label } : s)));
@@ -94,7 +95,7 @@ export default function SectionManager({
     (key: string): void => {
       onSectionsChange((prev) => {
         if (prev.length <= 1) {
-          toast.error("At least one section is required");
+          toast.error(MESSAGES.PROPOSAL_MIN_SECTIONS);
           return prev;
         }
         return prev.filter((s) => s.key !== key);
@@ -152,7 +153,7 @@ export default function SectionManager({
 
       // Check for duplicates
       if (sections.some((s) => s.key === key || s.label.toLowerCase() === name.toLowerCase())) {
-        toast.error("A section with this name already exists");
+        toast.error(MESSAGES.PROPOSAL_SECTION_NAME_EXISTS);
         return;
       }
 
@@ -179,9 +180,9 @@ export default function SectionManager({
           return [...prev, newSection];
         });
         closeAddModal();
-        toast.success(`Section "${name}" added`);
+        toast.success(MESSAGES.PROPOSAL_CUSTOM_SECTION_ADDED(name));
       } catch (error) {
-        toast.error("Failed to add section");
+        toast.error(MESSAGES.PROPOSAL_SECTION_ADD_FAILED);
       } finally {
         setIsGenerating(false);
       }

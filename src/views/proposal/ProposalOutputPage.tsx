@@ -16,6 +16,7 @@ import {
   createVersionDraft as createVersionDraftApi,
 } from "@/services/proposal";
 import { SECTION_DISPLAY_NAMES, STATIC_SECTION_KEYS } from "@/constants";
+import { MESSAGES } from "@/constants/messages";
 import { SECTION_AUTOSAVE_DEBOUNCE_MS } from "@/config/config";
 import type { ProposalData, EstimatedHoursData } from "@/interfaces/proposalInterfaces";
 import { toast } from "@/utils/toast";
@@ -295,7 +296,7 @@ export default function ProposalOutputPage(): JSX.Element {
     estimateProposalHours(proposalId, {})
       .then((result) => {
         setEstimatedHoursData(result);
-        toast.success("Hours estimated successfully.");
+        toast.success(MESSAGES.HOURS_ESTIMATED);
       })
       .catch((error) => {
         toast.error(getErrorMessage(error, "Failed to estimate hours. Please try again."));
@@ -393,10 +394,10 @@ export default function ProposalOutputPage(): JSX.Element {
       try {
         const newContent = await regenerateSection(targetId, key, instructions);
         handleContentChange(key, newContent);
-        toast.success("Section regenerated.");
+        toast.success(MESSAGES.PROPOSAL_SECTION_REGENERATED);
         return newContent;
       } catch {
-        toast.error("Regeneration failed");
+        toast.error(MESSAGES.PROPOSAL_SECTION_REGEN_FAILED);
         return null;
       }
     },
@@ -418,7 +419,7 @@ export default function ProposalOutputPage(): JSX.Element {
   function handleSectionRemoved(key: string): void {
     // Prevent removal of static sections
     if ((STATIC_SECTION_KEYS as readonly string[]).includes(key)) {
-      toast.error("Not allowed on static sections");
+      toast.error(MESSAGES.PROPOSAL_STATIC_SECTION_NOT_ALLOWED);
       return;
     }
 

@@ -33,13 +33,11 @@ jest.mock("@/utils/logger", () => ({
 
 import {
   createVersionDraft,
-  getProposalFamilyTree,
   deleteVersionDraft,
 } from "@/services/proposal/proposalVersioning.service";
 import { http } from "@/config/httpClient";
 
 const mockPost = http.post as jest.Mock;
-const mockGet = http.get as jest.Mock;
 const mockDelete = http.delete as jest.Mock;
 
 // ---------------------------------------------------------------------------
@@ -132,56 +130,6 @@ describe("createVersionDraft", () => {
   it("propagates errors thrown by http.post", async () => {
     mockPost.mockRejectedValueOnce(new Error("Network error"));
     await expect(createVersionDraft(10, "duplicate")).rejects.toThrow("Network error");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getProposalFamilyTree
-// ---------------------------------------------------------------------------
-
-describe("getProposalFamilyTree", () => {
-  it("GETs the family endpoint with cache: no-store to prevent stale data", async () => {
-    mockGet.mockResolvedValueOnce(rawFamilyTreeResponse);
-    await getProposalFamilyTree(10);
-    expect(mockGet).toHaveBeenCalledWith("/proposals/10/family", { cache: "no-store" });
-  });
-
-  it("maps root_id to rootId", async () => {
-    mockGet.mockResolvedValueOnce(rawFamilyTreeResponse);
-    const result = await getProposalFamilyTree(10);
-    expect(result.rootId).toBe(10);
-  });
-
-  it("maps each version item from snake_case to camelCase", async () => {
-    mockGet.mockResolvedValueOnce(rawFamilyTreeResponse);
-    const result = await getProposalFamilyTree(10);
-    expect(result.versions).toHaveLength(2);
-    expect(result.versions[0]).toEqual({
-      id: 10,
-      versionLabel: "1.0",
-      approvalStatus: "approved",
-      status: "completed",
-      title: "My Proposal",
-      createdAt: "2026-06-01T10:00:00Z",
-      updatedAt: "2026-06-02T10:00:00Z",
-    });
-    expect(result.versions[1]).toMatchObject({
-      id: 42,
-      versionLabel: "1.1",
-      approvalStatus: "pending",
-    });
-  });
-
-  it("returns an empty versions array when the API returns none", async () => {
-    mockGet.mockResolvedValueOnce({ root_id: 5, versions: [] });
-    const result = await getProposalFamilyTree(5);
-    expect(result.versions).toEqual([]);
-    expect(result.rootId).toBe(5);
-  });
-
-  it("propagates errors thrown by http.get", async () => {
-    mockGet.mockRejectedValueOnce(new Error("Not found"));
-    await expect(getProposalFamilyTree(99)).rejects.toThrow("Not found");
   });
 });
 

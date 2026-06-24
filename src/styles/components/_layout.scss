@@ -87,17 +87,17 @@ aside[data-collapsed="true"] + .main-content {
   }
 }
 
-// ─── Responsive — mobile (≤ 768px): sidebar stays as icon strip ──────────────
+// ─── Responsive — mobile (≤ 768px): sidebar fully hidden; hamburger toggle ───
 @media (max-width: 768px) {
   .main-content {
-    margin-left: var(--sidebar-collapsed-width) !important;
-    width: calc(100% - var(--sidebar-collapsed-width)) !important;
-    padding: 16px;
+    margin-left: 0 !important;
+    width: 100% !important;
+    // Extra top padding creates clearance for the fixed hamburger button (38px + 14px offset + 4px gap)
+    padding: 56px 16px 16px !important;
   }
 
   .sidebar-skeleton {
-    width: var(--sidebar-collapsed-width);
-    min-width: var(--sidebar-collapsed-width);
+    display: none;
   }
 }
 
