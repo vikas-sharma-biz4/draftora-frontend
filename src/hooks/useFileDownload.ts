@@ -64,7 +64,7 @@ export function useFileDownload(config: FileDownloadConfig): UseFileDownloadRetu
       }
 
       const contentLength = Number(response.headers.get("Content-Length")) || 0;
-      const chunks: Uint8Array[] = [];
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
       let received = 0;
 
       // Start indeterminate or at 0 depending on whether we know the total size
