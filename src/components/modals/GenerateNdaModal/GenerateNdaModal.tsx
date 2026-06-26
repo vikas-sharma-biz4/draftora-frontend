@@ -87,11 +87,7 @@ export default function GenerateNdaModal({
   }, [loadVersionHistory]);
 
   function isNdaFormValid(): boolean {
-    return (
-      ndaForm.clientName.trim() !== "" &&
-      ndaForm.clientCompany.trim() !== "" &&
-      ndaForm.date.trim() !== ""
-    );
+    return ndaForm.clientName.trim() !== "" && ndaForm.date.trim() !== "";
   }
 
   function buildTitle(): string {
@@ -218,21 +214,8 @@ export default function GenerateNdaModal({
                 <span className={styles.sectionLabel}>Second Party Details</span>
                 <div className={styles.formGrid}>
                   <div className={styles.formField}>
-                    <label className={styles.formLabel} htmlFor="nda-client-name">
-                      Client Name
-                    </label>
-                    <input
-                      id="nda-client-name"
-                      className={styles.formInput}
-                      type="text"
-                      value={ndaForm.clientName}
-                      onChange={(e) => setNdaForm((f) => ({ ...f, clientName: e.target.value }))}
-                      placeholder="Enter client name"
-                    />
-                  </div>
-                  <div className={styles.formField}>
                     <label className={styles.formLabel} htmlFor="nda-client-company">
-                      Client Company
+                      Client Company <span className={styles.optionalTag}>(optional)</span>
                     </label>
                     <input
                       id="nda-client-company"
@@ -240,7 +223,7 @@ export default function GenerateNdaModal({
                       type="text"
                       value={ndaForm.clientCompany}
                       onChange={(e) => setNdaForm((f) => ({ ...f, clientCompany: e.target.value }))}
-                      placeholder="Enter company name"
+                      placeholder="Enter company name (optional)"
                     />
                   </div>
                   <div className={styles.formField}>

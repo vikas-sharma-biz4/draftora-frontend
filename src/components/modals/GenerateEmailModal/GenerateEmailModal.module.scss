@@ -424,6 +424,10 @@
   &::-webkit-scrollbar {
     display: none;
   }
+
+  :global(a) {
+    font-weight: bold;
+  }
 }
 
 /* ---------- Generating state ---------- */

@@ -236,7 +236,24 @@
   :global(.ProseMirror) img {
     max-height: 64px;
     width: auto;
-    display: block;
+    display: inline-block;
+  }
+
+  /* class attr survives DOMPurify — restore header table alignment */
+  :global(.ProseMirror .inv-logo) {
+    width: 100%;
+  }
+
+  :global(.ProseMirror .inv-side-logo) {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* class attr survives DOMPurify — center address + thank-you as a pair */
+  :global(.ProseMirror .inv-footer-wrap),
+  :global(.ProseMirror .inv-address-line),
+  :global(.ProseMirror .inv-footer) {
+    text-align: center;
   }
 }
 

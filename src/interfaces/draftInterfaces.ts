@@ -1,4 +1,5 @@
 import type { ProposalWizardData, WizardStep, TemplateType } from "./proposalInterfaces";
+import type { SectionRecommendation } from "@/services/proposal";
 
 export type DraftStage =
   | "template_selection"
@@ -21,6 +22,7 @@ export interface DraftWizardState {
   maxStepReached: WizardStep;
   completedSteps: number[];
   proposalData: ProposalWizardData;
+  prefetchedRecommendations?: SectionRecommendation[] | null;
 }
 
 export interface SavedDraft {

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useRef, useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -13,7 +13,7 @@ const RECOMMENDATIONS_SESSION_KEY = "section_recommendations_cache_v1";
 
 export interface SectionRecommendationsRef {
   removeRecommendation: (sectionKey: string) => void;
-  startBackgroundFetch: () => void;
+  triggerAutoFetch: () => Promise<void>;
   restoreRecommendation: (
     sectionKey: string,
     recommendation: SectionRecommendation,
@@ -35,6 +35,8 @@ interface SectionRecommendationsProps {
   ) => void;
   onSectionAdded?: (sectionKey: string) => void;
   proposalId?: number | null;
+  initialRecommendations?: SectionRecommendation[] | null;
+  onRecommendationsFetched?: (recs: SectionRecommendation[]) => void;
 }
 
 const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionRecommendationsProps>(
@@ -47,13 +49,19 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       onAddSection,
       onSectionAdded,
       proposalId,
+      initialRecommendations,
+      onRecommendationsFetched,
     }: SectionRecommendationsProps,
     ref
   ) => {
-    // For new proposals (no proposalId), always start fresh — ignore any cached state
     const isNewProposal = proposalId === null || proposalId === undefined;
+    const hasInitialRecs =
+      Array.isArray(initialRecommendations) && initialRecommendations.length > 0;
 
     const [recommendations, setRecommendations] = useState<SectionRecommendation[]>(() => {
+      // Draft restore: use stored recommendations directly
+      if (hasInitialRecs) return initialRecommendations!;
+      // New proposals: start fresh, no session cache
       if (isNewProposal || typeof window === "undefined") return [];
       try {
         const cached = sessionStorage.getItem(RECOMMENDATIONS_SESSION_KEY);
@@ -72,8 +80,12 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       }
       return [];
     });
+
     const [isLoading, setIsLoading] = useState<boolean>(false);
+
     const [isRevealed, setIsRevealed] = useState<boolean>(() => {
+      // Draft restore: already revealed
+      if (hasInitialRecs) return true;
       if (isNewProposal || typeof window === "undefined") return false;
       try {
         const cached = sessionStorage.getItem(RECOMMENDATIONS_SESSION_KEY);
@@ -92,6 +104,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       }
       return false;
     });
+
     const [showPromptInput, setShowPromptInput] = useState<boolean>(false);
     const [userPrompt, setUserPrompt] = useState<string>("");
     const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
@@ -100,12 +113,14 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
     const documentContextRef = useRef(documentContext);
     const templateIdRef = useRef(templateId);
     const existingSectionsRef = useRef(existingSections);
+    const onRecommendationsFetchedRef = useRef(onRecommendationsFetched);
 
     useEffect(() => {
       contextRef.current = context;
       documentContextRef.current = documentContext;
       templateIdRef.current = templateId;
       existingSectionsRef.current = existingSections;
+      onRecommendationsFetchedRef.current = onRecommendationsFetched;
     });
 
     useEffect(() => {
@@ -126,7 +141,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       const prompt = customPrompt ?? userPrompt;
 
       setIsLoading(true);
-      setRecommendations([]); // Clear existing recommendations to show loading state
+      setRecommendations([]);
       try {
         const fullContext = [docCtx, ctx].filter(Boolean).join("\n\n");
 
@@ -149,6 +164,7 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         });
 
         setRecommendations(recs);
+        onRecommendationsFetchedRef.current?.(recs);
       } catch (error) {
         logger.error("Failed to fetch recommendations:", error);
         toast.error("Failed to generate recommendations. Please try again");
@@ -164,7 +180,6 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_|_$/g, "");
 
-      // Check if section already exists to prevent duplicates
       if (existingSections.includes(sectionKey)) {
         toast.info(`"${rec.sectionTitle}" is already in your Table of Contents`);
         return;
@@ -179,10 +194,8 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       onAddSection(sectionKey, rec.sectionTitle, rec, index);
       toast.success(`Added "${rec.sectionTitle}" to Table of Contents`);
 
-      // Remove from recommendations list
       setRecommendations((prev) => prev.filter((_, i) => i !== index));
 
-      // Notify parent that section was added
       if (onSectionAdded) {
         onSectionAdded(sectionKey);
       }
@@ -215,49 +228,27 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
       }
     };
 
-    const handleGenerateClick = async (): Promise<void> => {
-      if (!isRevealed) {
-        // First click: fetch recommendations via API
+    // Regenerate button: always toggles prompt input or submits custom prompt.
+    // Initial fetch is triggered automatically via triggerAutoFetch() or initialRecommendations.
+    const handleRegenerateClick = async (): Promise<void> => {
+      if (!showPromptInput) {
+        setShowPromptInput(true);
+      } else if (userPrompt.trim()) {
         setIsLoading(true);
         try {
-          await fetchRecommendations();
+          await fetchRecommendations(userPrompt);
+          setShowPromptInput(false);
           setIsRevealed(true);
         } catch (error) {
-          logger.error("Failed to fetch recommendations on generate click", error);
+          logger.error("Failed to regenerate recommendations", error);
         } finally {
           setIsLoading(false);
         }
       } else {
-        // Regenerate: if input is not shown, show it
-        if (!showPromptInput) {
-          setShowPromptInput(true);
-        } else {
-          // If input is shown, check if it has content
-          if (userPrompt.trim()) {
-            // Has content: trigger API with prompt
-            setIsLoading(true);
-            try {
-              await fetchRecommendations(userPrompt);
-              setShowPromptInput(false);
-            } catch (error) {
-              logger.error("Failed to regenerate recommendations", error);
-            } finally {
-              setIsLoading(false);
-            }
-          } else {
-            // Empty: close the input without triggering API
-            setShowPromptInput(false);
-          }
-        }
+        setShowPromptInput(false);
       }
     };
 
-    const handleRetryFetch = (): void => {
-      setRecommendations([]);
-      fetchRecommendations();
-    };
-
-    // Expose removeRecommendation, startBackgroundFetch, and restoreRecommendation methods to parent via ref
     useImperativeHandle(ref, () => ({
       removeRecommendation: (sectionKey: string) => {
         setRecommendations((prev) => {
@@ -274,8 +265,18 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
           return prev;
         });
       },
-      startBackgroundFetch: () => {
-        // No-op: auto-fetch is now triggered via prefetchRecommendations() in ParametersPage
+      triggerAutoFetch: async () => {
+        // Skip if already revealed (session cache hit or draft restore)
+        if (isRevealed) return;
+        setIsLoading(true);
+        try {
+          await fetchRecommendations();
+          setIsRevealed(true);
+        } catch (error) {
+          logger.error("[SectionRecommendations] Auto-fetch failed", error);
+        } finally {
+          setIsLoading(false);
+        }
       },
       restoreRecommendation: (
         sectionKey: string,
@@ -283,7 +284,6 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
         originalIndex?: number
       ) => {
         setRecommendations((prev) => {
-          // Check if recommendation already exists to avoid duplicates
           const normalizedKey = sectionKey
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "_")
@@ -296,10 +296,8 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
                 .replace(/^_|_$/g, "") === normalizedKey
           );
           if (existingIndex !== -1) {
-            // Already exists, don't add duplicate
             return prev;
           }
-          // Insert at original index if provided, otherwise add to end
           if (originalIndex !== undefined && originalIndex >= 0 && originalIndex <= prev.length) {
             const newRecs = [...prev];
             newRecs.splice(originalIndex, 0, recommendation);
@@ -331,20 +329,18 @@ const SectionRecommendations = forwardRef<SectionRecommendationsRef, SectionReco
             className={styles.ctaBtn}
             disabled={isLoading}
             aria-busy={isLoading || undefined}
-            onClick={handleGenerateClick}
+            onClick={handleRegenerateClick}
           >
-            {isLoading ? (
-              <span className={styles.ctaBtnLoadingContent}>
-                <Spinner size="sm" />
-                <span>{isRevealed ? "Regenerating..." : "Generating..."}</span>
-              </span>
-            ) : isRevealed ? (
-              "Regenerate"
-            ) : (
-              "Generate"
-            )}
+            Regenerate
           </button>
         </div>
+
+        {isLoading && (
+          <div className={styles.inlineLoadingRow}>
+            <Spinner size="sm" />
+            <span>Generating recommendations...</span>
+          </div>
+        )}
 
         {showPromptInput && (
           <div className={styles.promptSection}>

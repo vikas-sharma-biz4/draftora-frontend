@@ -1,15 +1,26 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { X, FileDown } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
-import { formatDate } from "@/utils/dateUtils";
+import { clientInvoicesQueryKey } from "@/hooks/useClientInvoicesQuery";
+import { updateArtifact } from "@/services/artifact.service";
 import { sanitizeHtml } from "@/utils/sanitizeHtml";
+import { formatDate } from "@/utils/dateUtils";
 import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
 
 import styles from "./InvoicePreviewModal.module.scss";
+
+const AUTO_SAVE_DEBOUNCE_MS = 300;
+
+// Lazy-load RichEditor — Tiptap is heavy
+const RichEditor = dynamic(() => import("@/components/common/RichEditor"), { ssr: false });
+
+type SaveStatus = "idle" | "saving" | "saved";
 
 interface InvoicePreviewModalProps {
   artifact: GeneratedArtifact;
@@ -21,6 +32,11 @@ export default function InvoicePreviewModal({
   onClose,
 }: InvoicePreviewModalProps): JSX.Element | null {
   const [mounted, setMounted] = useState(false);
+  const [content, setContent] = useState<string>(sanitizeHtml(artifact.content));
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
 
   const { isDownloading, downloadArtifact, isPdfDownloading, downloadArtifactPdf } =
     useArtifactDownload();
@@ -28,6 +44,32 @@ export default function InvoicePreviewModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      setContent(newContent);
+
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+      setSaveStatus("saving");
+
+      saveTimerRef.current = setTimeout(() => {
+        void updateArtifact(artifact.id, { content: newContent }).then(() => {
+          setSaveStatus("saved");
+          void queryClient.invalidateQueries({
+            queryKey: clientInvoicesQueryKey(artifact.clientId),
+          });
+        });
+      }, AUTO_SAVE_DEBOUNCE_MS);
+    },
+    [artifact.id, artifact.clientId, queryClient]
+  );
 
   if (!mounted) return null;
 
@@ -38,25 +80,8 @@ export default function InvoicePreviewModal({
   const totalAmount = (meta.total_amount as number | undefined) ?? 0;
   const paymentStatus = (meta.payment_status as string | undefined) ?? "Unpaid";
 
-  // Use the stored S3 PDF (if available) for an inline preview instead of
-  // re-rendering the HTML. The PDF was stored to S3 by the backend on first
-  // download. We serve it via the download endpoint with ?inline=true so the
-  // browser renders it directly in an iframe.
-  const s3Block = (artifact.metadataJson?.s3 ?? {}) as Record<string, unknown>;
-  const hasPdfKey = Boolean(s3Block.pdf_key);
-  const pdfPreviewUrl = hasPdfKey
-    ? `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/artifacts/${artifact.id}/download?format=pdf&inline=true`
-    : null;
-
-  // Strip legacy duplicate total-row injected by old template versions
-  const strippedContent = artifact.content.replace(
-    /<tr[^>]*\bclass="total-row"[^>]*>[\s\S]*?<\/tr>/g,
-    ""
-  );
-  const safeHtml = sanitizeHtml(strippedContent);
-
-  const content = (
-    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget}>
+  const modalContent = (
+    <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         {/* Header */}
         <div className={styles.header}>
@@ -79,6 +104,11 @@ export default function InvoicePreviewModal({
               >
                 {paymentStatus}
               </span>
+              {saveStatus !== "idle" && (
+                <span className={styles.saveStatus}>
+                  {saveStatus === "saving" ? "Saving…" : "Saved"}
+                </span>
+              )}
             </div>
           </div>
           <div className={styles.headerActions}>
@@ -104,17 +134,19 @@ export default function InvoicePreviewModal({
           </div>
         </div>
 
-        {/* Invoice body — PDF iframe when available, HTML fallback otherwise */}
+        {/* Invoice body — editable rich text */}
         <div className={styles.body}>
-          {pdfPreviewUrl ? (
-            <iframe src={pdfPreviewUrl} className={styles.pdfIframe} title="Invoice PDF Preview" />
-          ) : (
-            <div className={styles.htmlContent} dangerouslySetInnerHTML={{ __html: safeHtml }} />
-          )}
+          <div className={styles.editorWrapper}>
+            <RichEditor
+              content={content}
+              onChange={handleContentChange}
+              placeholder="Invoice content…"
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
-  return createPortal(content, document.body);
+  return createPortal(modalContent, document.body);
 }

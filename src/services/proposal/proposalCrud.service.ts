@@ -527,6 +527,20 @@ export async function cancelProposal(id: number): Promise<void> {
   }
 }
 
+/**
+ * Soft-delete a single proposal by ID.
+ */
+export async function deleteProposal(proposalId: number): Promise<void> {
+  await http.delete(`/proposals/${proposalId}`);
+}
+
+/**
+ * Soft-delete multiple proposals in one request.
+ */
+export async function bulkDeleteProposals(proposalIds: number[]): Promise<void> {
+  await http.post("/proposals/history/bulk-delete", { proposal_ids: proposalIds });
+}
+
 export async function updateApprovalStatus(
   proposalId: number,
   status: "pending" | "approved" | "rejected",

@@ -56,6 +56,7 @@ const INITIAL_WIZARD_STATE = {
   prefetchedRecommendations: null as SectionRecommendation[] | null,
   recommendationsFetchStatus: "idle" as "idle" | "loading" | "success" | "error",
   recommendationsError: null as string | null,
+  loadedFromDraft: false,
 };
 
 interface ProposalWizardState {
@@ -71,6 +72,7 @@ interface ProposalWizardState {
   prefetchedRecommendations: SectionRecommendation[] | null;
   recommendationsFetchStatus: "idle" | "loading" | "success" | "error";
   recommendationsError: string | null;
+  loadedFromDraft: boolean;
 
   updateProposalData: (updates: Partial<ProposalWizardData>) => void;
   setCurrentStep: (step: WizardStep) => void;
@@ -81,6 +83,8 @@ interface ProposalWizardState {
   setEditMode: (val: boolean) => void;
   setMaxStepReached: (step: WizardStep) => void;
   setShouldStartBackgroundFetch: (val: boolean) => void;
+  setLoadedFromDraft: (val: boolean) => void;
+  setPrefetchedRecommendations: (recs: SectionRecommendation[] | null) => void;
   resetProposal: () => void;
   reset: () => void;
   prefetchRecommendations: () => void;
@@ -137,6 +141,14 @@ export const useProposalWizardStore = create<ProposalWizardState>()(
 
       setShouldStartBackgroundFetch: (val: boolean): void => {
         set({ shouldStartBackgroundFetch: val });
+      },
+
+      setLoadedFromDraft: (val: boolean): void => {
+        set({ loadedFromDraft: val });
+      },
+
+      setPrefetchedRecommendations: (recs: SectionRecommendation[] | null): void => {
+        set({ prefetchedRecommendations: recs });
       },
 
       // After reset, keep hydrated: true since the component is already mounted
@@ -419,6 +431,11 @@ export const useRecommendationsError = () =>
   useProposalWizardStore((state) => state.recommendationsError);
 
 /**
+ * Selects whether the wizard was loaded from a saved draft.
+ */
+export const useLoadedFromDraft = () => useProposalWizardStore((state) => state.loadedFromDraft);
+
+/**
  * Selects all wizard actions (stable reference).
  * Use this when you need multiple actions without subscribing to state changes.
  */
@@ -434,6 +451,8 @@ export const useWizardActions = () =>
       setEditMode: state.setEditMode,
       setMaxStepReached: state.setMaxStepReached,
       setShouldStartBackgroundFetch: state.setShouldStartBackgroundFetch,
+      setLoadedFromDraft: state.setLoadedFromDraft,
+      setPrefetchedRecommendations: state.setPrefetchedRecommendations,
       resetProposal: state.resetProposal,
       reset: state.reset,
       prefetchRecommendations: state.prefetchRecommendations,

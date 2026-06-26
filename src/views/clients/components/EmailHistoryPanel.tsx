@@ -3,9 +3,13 @@
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Eye, FileText, X, FileDown, Mail, Search } from "lucide-react";
+import { Eye, FileText, X, FileDown, Mail, Search, Trash2 } from "lucide-react";
 
-import { listArtifacts, regenerateArtifactSelection } from "@/services/artifact.service";
+import {
+  listArtifacts,
+  regenerateArtifactSelection,
+  deleteArtifact,
+} from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { formatDate } from "@/utils/dateUtils";
@@ -22,19 +26,16 @@ import styles from "../ClientDetailPage.module.scss";
 // Lazy-load RichEditor — it imports Tiptap which is heavy
 const RichEditor = dynamic(() => import("@/components/common/RichEditor"), { ssr: false });
 
-const EMAIL_TEMPLATE_LABELS: Record<string, string> = {
-  enterprise_partnership: "Enterprise Partnership",
-  advisory_phased_delivery: "Advisory Delivery",
-  saas_product_launch: "SaaS Launch",
-  podcast_proposal_script: "Podcast Script",
-};
-
-const TEMPLATE_FILTER_OPTIONS = Object.keys(EMAIL_TEMPLATE_LABELS);
+const DeleteConfirmModal = dynamic(
+  () => import("@/components/modals/DeleteConfirmModal/DeleteConfirmModal"),
+  { ssr: false }
+);
 
 interface EmailHistoryPanelProps {
   clientId: number;
   proposals: ProposalListItem[];
   onGenerateEmail: () => void;
+  refreshKey?: number;
 }
 
 function extractTime(isoString: string): string {
@@ -107,10 +108,17 @@ function EmailViewerModal({
       className={styles.emailViewOverlay}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className={styles.emailViewModal}>
+      <div
+        className={styles.emailViewModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="email-viewer-title"
+      >
         <div className={styles.emailViewHeader}>
           <div className={styles.emailViewHeaderLeft}>
-            <div className={styles.emailViewSubject}>{subject}</div>
+            <div id="email-viewer-title" className={styles.emailViewSubject}>
+              {subject}
+            </div>
             <div className={styles.emailViewMeta}>
               {proposalTitle && <span>Re: {proposalTitle}</span>}
               <span>{formatDate(artifact.createdAt)}</span>
@@ -155,12 +163,13 @@ export default function EmailHistoryPanel({
   clientId,
   proposals: _proposalsProp,
   onGenerateEmail,
+  refreshKey = 0,
 }: EmailHistoryPanelProps): JSX.Element {
   const [emails, setEmails] = useState<GeneratedArtifact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingArtifact, setViewingArtifact] = useState<GeneratedArtifact | null>(null);
+  const [emailToDelete, setEmailToDelete] = useState<GeneratedArtifact | null>(null);
 
   const hasFetched = useRef(false);
 
@@ -188,9 +197,25 @@ export default function EmailHistoryPanel({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!refreshKey) return;
+    void load();
+  }, [load, refreshKey]);
+
+  async function confirmDeleteEmail(): Promise<void> {
+    if (!emailToDelete) return;
+    try {
+      await deleteArtifact(emailToDelete.id);
+      setEmails((prev) => prev.filter((e) => e.id !== emailToDelete.id));
+      toast.success("Email deleted");
+      setEmailToDelete(null);
+    } catch (err) {
+      logger.error("[EmailHistoryPanel] Delete failed:", err);
+      toast.error("Failed to delete email");
+    }
+  }
+
   const displayedEmails = emails.filter((e) => {
-    const effectiveTemplateId = (e.metadataJson?.template_id as string | undefined) ?? e.templateId;
-    if (selectedTemplate && effectiveTemplateId !== selectedTemplate) return false;
     if (searchQuery) {
       const subject = ((e.metadataJson?.subject as string | undefined) ?? e.title).toLowerCase();
       const proposalTitle = (
@@ -217,19 +242,6 @@ export default function EmailHistoryPanel({
             <p className={styles.panelSubtitle}>All generated emails and outreach drafts</p>
           </div>
           <div className={styles.headerActions}>
-            <select
-              className={styles.typeFilter}
-              value={selectedTemplate}
-              onChange={(e) => setSelectedTemplate(e.target.value)}
-              aria-label="Filter by template"
-            >
-              <option value="">All Templates</option>
-              {TEMPLATE_FILTER_OPTIONS.map((id) => (
-                <option key={id} value={id}>
-                  {EMAIL_TEMPLATE_LABELS[id]}
-                </option>
-              ))}
-            </select>
             <button className="btn btn-secondary btn-sm" onClick={onGenerateEmail}>
               <Mail size={14} />
               Generate Email
@@ -265,7 +277,6 @@ export default function EmailHistoryPanel({
               <thead>
                 <tr>
                   <th>Subject</th>
-                  <th>Template</th>
                   <th>Proposal</th>
                   <th>Date</th>
                   <th>Time</th>
@@ -276,9 +287,6 @@ export default function EmailHistoryPanel({
                 {displayedEmails.map((email) => {
                   const subject =
                     (email.metadataJson?.subject as string | undefined) ?? email.title;
-                  const templateId =
-                    (email.metadataJson?.template_id as string | undefined) ?? email.templateId;
-                  const templateLabel = EMAIL_TEMPLATE_LABELS[templateId] ?? templateId ?? "—";
                   const proposalTitle =
                     email.proposalId != null ? (proposalMap.get(email.proposalId) ?? "—") : "—";
 
@@ -287,29 +295,16 @@ export default function EmailHistoryPanel({
                       <td>
                         <div
                           className={styles.proposalName}
-                          style={{
-                            maxWidth: 200,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
+                          style={{ wordBreak: "break-word" }}
                           title={subject}
                         >
                           {subject}
                         </div>
                       </td>
                       <td>
-                        <span className={styles.typeBadge}>{templateLabel}</span>
-                      </td>
-                      <td>
                         <div
                           className={styles.dateCell}
-                          style={{
-                            maxWidth: 140,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
+                          style={{ wordBreak: "break-word" }}
                           title={proposalTitle}
                         >
                           {proposalTitle}
@@ -318,14 +313,30 @@ export default function EmailHistoryPanel({
                       <td className={styles.dateCell}>{formatDate(email.createdAt)}</td>
                       <td className={styles.dateCell}>{extractTime(email.createdAt)}</td>
                       <td className={styles.actionsCol} onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className={styles.actionBtn}
-                          onClick={() => setViewingArtifact(email)}
-                          title="View email"
-                          style={{ width: 40, height: 40, padding: 0, flexShrink: 0 }}
-                        >
-                          <Eye size={18} />
-                        </button>
+                        <div className={styles.invoiceActions}>
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => setViewingArtifact(email)}
+                            title="View email"
+                            style={{ width: 40, height: 40, padding: 0, flexShrink: 0 }}
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button
+                            className={styles.actionBtn}
+                            onClick={() => setEmailToDelete(email)}
+                            title="Delete email"
+                            style={{
+                              width: 40,
+                              height: 40,
+                              padding: 0,
+                              flexShrink: 0,
+                              color: "var(--color-danger, #e53e3e)",
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -341,6 +352,18 @@ export default function EmailHistoryPanel({
           artifact={viewingArtifact}
           proposalTitle={viewingProposalTitle}
           onClose={() => setViewingArtifact(null)}
+        />
+      )}
+
+      {emailToDelete && (
+        <DeleteConfirmModal
+          title="Delete Email"
+          itemName={
+            (emailToDelete.metadataJson?.subject as string | undefined) ?? emailToDelete.title
+          }
+          warningMessage="This action cannot be undone. The email will be permanently removed."
+          onClose={() => setEmailToDelete(null)}
+          onConfirm={confirmDeleteEmail}
         />
       )}
     </>
