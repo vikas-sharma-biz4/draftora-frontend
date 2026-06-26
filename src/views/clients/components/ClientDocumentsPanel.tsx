@@ -5,7 +5,8 @@ import { formatDate } from "@/utils/dateUtils";
 import type { ClientDocument } from "@/interfaces/clientInterfaces";
 import type { useClientDocuments } from "@/hooks/useClientDocuments";
 import DocumentViewerModal from "@/components/modals/DocumentViewerModal";
-import styles from "../ClientDetailPage.module.scss";
+import panelStyles from "./ClientDocumentsPanel.module.scss";
+import sharedStyles from "../ClientDetailPage.module.scss";
 
 function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -39,20 +40,20 @@ export default function ClientDocumentsPanel({
   } = docs;
 
   return (
-    <div className={styles.knowledgeBase}>
-      <div className={styles.panelHeader}>
+    <div className={sharedStyles.knowledgeBase}>
+      <div className={sharedStyles.panelHeader}>
         <div>
-          <h2 className={styles.panelTitle}>Knowledge Base</h2>
-          <p className={styles.panelSubtitle}>Source documents for context generation</p>
+          <h2 className={sharedStyles.panelTitle}>Knowledge Base</h2>
+          <p className={sharedStyles.panelSubtitle}>Source documents for context generation</p>
         </div>
-        <div className={styles.headerActions}>
+        <div className={sharedStyles.headerActions}>
           {filteredDocuments.length > 0 && (
-            <button className={styles.deleteAllBtn} onClick={handleDeleteAllDocuments}>
+            <button className={panelStyles.deleteAllBtn} onClick={handleDeleteAllDocuments}>
               Delete All
             </button>
           )}
           <button
-            className={styles.uploadBtn}
+            className={panelStyles.uploadBtn}
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingFiles.size > 0}
             title="Upload Document"
@@ -72,13 +73,13 @@ export default function ClientDocumentsPanel({
       </div>
 
       {uploadingFiles.size > 0 && (
-        <div className={styles.uploadingIndicator}>
-          <div className={styles.uploadingText}>Uploading and parsing documents...</div>
+        <div className={panelStyles.uploadingIndicator}>
+          <div className={panelStyles.uploadingText}>Uploading and parsing documents...</div>
         </div>
       )}
 
       {searchQuery !== "" && documents.length > 0 && (
-        <div className={styles.searchInput} style={{ margin: "0 0 12px" }}>
+        <div className={panelStyles.searchInput} style={{ margin: "0 0 12px" }}>
           <input
             type="text"
             placeholder="Search documents..."
@@ -89,56 +90,59 @@ export default function ClientDocumentsPanel({
       )}
 
       {filteredDocuments.length === 0 && uploadingFiles.size === 0 ? (
-        <div className={styles.emptyState}>
+        <div className={sharedStyles.emptyState}>
           <FileText size={48} />
           <p>No documents yet</p>
           <p>Upload documents to build context</p>
         </div>
       ) : (
-        <div className={styles.documentList}>
+        <div className={panelStyles.documentList}>
           {filteredDocuments.map((doc) => {
             const iconClass =
               doc.fileType === "pdf"
-                ? styles.iconPdf
+                ? panelStyles.iconPdf
                 : doc.fileType === "docx"
-                  ? styles.iconDocx
+                  ? panelStyles.iconDocx
                   : doc.fileType === "xlsx"
-                    ? styles.iconXlsx
-                    : styles.iconDefault;
+                    ? panelStyles.iconXlsx
+                    : panelStyles.iconDefault;
 
             return (
-              <div key={doc.id} className={styles.documentItem} style={{ position: "relative" }}>
-                <div className={`${styles.documentIcon} ${iconClass}`}>
+              <div
+                key={doc.id}
+                className={panelStyles.documentItem}
+                style={{ position: "relative" }}
+              >
+                <div className={`${panelStyles.documentIcon} ${iconClass}`}>
                   {viewingDocId === doc.id ? (
                     <Eye size={20} style={{ opacity: 0.5 }} />
                   ) : (
                     <FileText size={20} />
                   )}
                 </div>
-                <div className={styles.documentInfo}>
-                  <div className={styles.documentName}>{doc.name}</div>
-                  <div className={styles.documentMeta}>
+                <div className={panelStyles.documentInfo}>
+                  <div className={panelStyles.documentName}>{doc.name}</div>
+                  <div className={panelStyles.documentMeta}>
                     <span>{formatFileSize(doc.sizeBytes)}</span>
                     <span>{formatDate(doc.createdAt)}</span>
                   </div>
                 </div>
-                <div className={styles.documentStatus}>
+                <div className={panelStyles.documentStatus}>
                   {doc.status === "parsed" ? (
-                    <span className={styles.statusParsed}>
-                      <span className={styles.statusDot}></span>
+                    <span className={panelStyles.statusParsed}>
+                      <span className={panelStyles.statusDot}></span>
                       PARSED
                     </span>
                   ) : (
-                    <span className={styles.statusProcessing}>
-                      <span className={styles.statusDotProcessing}></span>
+                    <span className={panelStyles.statusProcessing}>
+                      <span className={panelStyles.statusDotProcessing}></span>
                       PROCESSING
                     </span>
                   )}
                 </div>
 
-                {/* Eye — view document */}
                 <button
-                  className={styles.actionBtn}
+                  className={sharedStyles.actionBtn}
                   onClick={(e) => {
                     e.stopPropagation();
                     void handleViewDocument(doc);
@@ -149,9 +153,8 @@ export default function ClientDocumentsPanel({
                   <Eye size={18} />
                 </button>
 
-                {/* Delete */}
                 <button
-                  className={styles.actionBtn}
+                  className={sharedStyles.actionBtn}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteDocument(doc.id, doc.name);

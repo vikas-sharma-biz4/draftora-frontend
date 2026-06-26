@@ -5,7 +5,7 @@
  * Responses are transformed to camelCase before being returned to callers.
  */
 
-import { http, buildUrl } from "@/config/httpClient";
+import { http, buildUrl, HttpError } from "@/config/httpClient";
 import type {
   ArtifactGenerateRequest,
   ArtifactUpdateRequest,
@@ -213,8 +213,8 @@ export function getPaymentProofUrl(artifactId: number): string {
  */
 export async function fetchPaymentProofBlob(artifactId: number): Promise<Blob> {
   const url = buildUrl(`/artifacts/${artifactId}/payment-proof`);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await fetch(url); // S3 redirect: no custom headers allowed
+  if (!res.ok) throw new HttpError(res.status, `Payment proof fetch failed: ${res.status}`);
   return res.blob();
 }
 

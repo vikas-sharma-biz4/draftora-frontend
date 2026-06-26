@@ -11,7 +11,8 @@ import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
 
-import styles from "../ClientDetailPage.module.scss";
+import panelStyles from "./GeneratedDocumentsPanel.module.scss";
+import sharedStyles from "../ClientDetailPage.module.scss";
 
 const DeleteConfirmModal = dynamic(
   () => import("@/components/modals/DeleteConfirmModal/DeleteConfirmModal"),
@@ -77,19 +78,19 @@ export default function GeneratedDocumentsPanel({
 
   return (
     <>
-      <div className={styles.generatedDocs}>
-        <div className={styles.panelTopRow}>
+      <div className={panelStyles.generatedDocs}>
+        <div className={sharedStyles.panelTopRow}>
           <div>
-            <h2 className={styles.panelTitle}>Generated NDA and Podcast</h2>
-            <p className={styles.panelSubtitle}>
+            <h2 className={sharedStyles.panelTitle}>Generated NDA and Podcast</h2>
+            <p className={sharedStyles.panelSubtitle}>
               NDAs and podcast scripts generated for this client
             </p>
           </div>
         </div>
 
-        <div className={styles.panelSearchRow}>
-          <div className={styles.searchInputFull}>
-            <Search size={14} className={styles.searchIcon} />
+        <div className={sharedStyles.panelSearchRow}>
+          <div className={sharedStyles.searchInputFull}>
+            <Search size={14} className={sharedStyles.searchIcon} />
             <input
               type="text"
               placeholder="Search by title or type…"
@@ -100,25 +101,25 @@ export default function GeneratedDocumentsPanel({
         </div>
 
         {isLoading ? (
-          <div className={styles.emptyState}>
+          <div className={sharedStyles.emptyState}>
             <p>Loading documents…</p>
           </div>
         ) : displayed.length === 0 ? (
-          <div className={styles.emptyState}>
+          <div className={sharedStyles.emptyState}>
             <FileText size={48} />
             <p>No documents yet</p>
             <p>Generate an NDA or Podcast to get started</p>
           </div>
         ) : (
-          <div className={styles.tableWrapper}>
-            <table className={styles.proposalTable}>
+          <div className={sharedStyles.tableWrapper}>
+            <table className={sharedStyles.proposalTable}>
               <thead>
                 <tr>
                   <th style={{ width: 80 }}>Type</th>
                   <th>Title</th>
                   <th style={{ width: 120 }}>Date</th>
                   <th
-                    className={styles.actionsCol}
+                    className={sharedStyles.actionsCol}
                     style={{ width: 90, minWidth: 90, textAlign: "center" }}
                   >
                     Actions
@@ -127,22 +128,24 @@ export default function GeneratedDocumentsPanel({
               </thead>
               <tbody>
                 {displayed.map((doc) => (
-                  <tr key={doc.id} className={styles.proposalRow}>
+                  <tr key={doc.id} className={sharedStyles.proposalRow}>
                     <td>
-                      <span className={styles.docTypeBadge}>{doc.artifactType.toUpperCase()}</span>
+                      <span className={panelStyles.docTypeBadge}>
+                        {doc.artifactType.toUpperCase()}
+                      </span>
                     </td>
                     <td>
-                      <div className={styles.proposalName}>{doc.title}</div>
+                      <div className={sharedStyles.proposalName}>{doc.title}</div>
                     </td>
-                    <td className={styles.dateCell}>{formatDate(doc.createdAt)}</td>
+                    <td className={sharedStyles.dateCell}>{formatDate(doc.createdAt)}</td>
                     <td
-                      className={styles.actionsCol}
+                      className={sharedStyles.actionsCol}
                       style={{ width: 90, minWidth: 90, textAlign: "center" }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className={styles.invoiceActions}>
+                      <div className={sharedStyles.invoiceActions}>
                         <button
-                          className={styles.actionBtn}
+                          className={sharedStyles.actionBtn}
                           onClick={() => setViewerArtifact(doc)}
                           title="View document"
                           style={{ width: 40, height: 40, padding: 0, flexShrink: 0 }}
@@ -150,7 +153,7 @@ export default function GeneratedDocumentsPanel({
                           <Eye size={18} />
                         </button>
                         <button
-                          className={styles.actionBtn}
+                          className={sharedStyles.actionBtn}
                           onClick={() => setDocToDelete(doc)}
                           title="Delete document"
                           style={{
@@ -174,12 +177,12 @@ export default function GeneratedDocumentsPanel({
       </div>
 
       {viewerArtifact && (
-        <div className={styles.emailViewOverlay} onClick={() => setViewerArtifact(null)}>
-          <div className={styles.emailViewModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.emailViewHeader}>
-              <div className={styles.emailViewHeaderLeft}>
-                <span className={styles.emailViewSubject}>{viewerArtifact.title}</span>
-                <span className={styles.docTypeBadge} style={{ alignSelf: "flex-start" }}>
+        <div className={sharedStyles.emailViewOverlay} onClick={() => setViewerArtifact(null)}>
+          <div className={sharedStyles.emailViewModal} onClick={(e) => e.stopPropagation()}>
+            <div className={sharedStyles.emailViewHeader}>
+              <div className={sharedStyles.emailViewHeaderLeft}>
+                <span className={sharedStyles.emailViewSubject}>{viewerArtifact.title}</span>
+                <span className={panelStyles.docTypeBadge} style={{ alignSelf: "flex-start" }}>
                   {viewerArtifact.artifactType.toUpperCase()}
                 </span>
               </div>
@@ -198,7 +201,7 @@ export default function GeneratedDocumentsPanel({
                 <X size={20} />
               </button>
             </div>
-            <div className={styles.emailViewBody}>
+            <div className={sharedStyles.emailViewBody}>
               {viewerArtifact.artifactType === "podcast" ? (
                 <pre
                   style={{
