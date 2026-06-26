@@ -44,7 +44,7 @@ export function useClientProposalsQuery(clientId: number): UseClientProposalsQue
     queryFn: () => listProposals({ clientId }),
     staleTime: STALE_TIME_MS,
     gcTime: GC_TIME_MS,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     enabled: clientId > 0,
   });
 

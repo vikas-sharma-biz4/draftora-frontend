@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 
@@ -13,6 +14,8 @@ import FormField from "@/components/common/FormField";
 
 import { useClientStore } from "@/store/features/clients/clientSlice";
 import { useModalHistory } from "@/hooks/useModalHistory";
+import { clientProposalsQueryKey } from "@/hooks/useClientProposalsQuery";
+import { clientInvoicesQueryKey } from "@/hooks/useClientInvoicesQuery";
 import type { Client } from "@/services/client.service";
 
 interface EditClientModalProps {
@@ -27,6 +30,7 @@ export default function EditClientModal({
   onClientUpdated,
 }: EditClientModalProps): JSX.Element | null {
   const updateClientInStore = useClientStore((state) => state.updateClient);
+  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
@@ -68,6 +72,11 @@ export default function EditClientModal({
         name: formData.clientName.trim(),
         notes: formData.notes || undefined,
       });
+
+      // Invalidate TanStack Query caches so proposals and invoices
+      // show the updated client name without a hard refresh.
+      void queryClient.invalidateQueries({ queryKey: clientProposalsQueryKey(client.id) });
+      void queryClient.invalidateQueries({ queryKey: clientInvoicesQueryKey(client.id) });
 
       toast.success(`Client "${updatedClient.name}" updated`);
       onClientUpdated(updatedClient);

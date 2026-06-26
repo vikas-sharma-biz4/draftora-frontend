@@ -246,11 +246,18 @@ export default function GeneratePodcastModal({
 
   const content = (
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget}>
-      <div className={`${styles.modal} ${step === 2 ? styles.modalWide : ""}`}>
+      <div
+        className={`${styles.modal} ${step === 2 ? styles.modalWide : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="podcast-modal-title"
+      >
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={styles.title}>Generate Podcast Prompt</span>
+            <span id="podcast-modal-title" className={styles.title}>
+              Generate Podcast Prompt
+            </span>
             <nav className={styles.stepNav} aria-label="Steps">
               <button
                 className={`${styles.stepNavItem} ${step === 1 ? styles.stepNavItemActive : ""}`}

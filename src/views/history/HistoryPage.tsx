@@ -1,7 +1,8 @@
 ﻿"use client";
 
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { History, Download, Eye, Loader2 } from "lucide-react";
+import { History, Download, Eye, Loader2, Trash2 } from "lucide-react";
 import { useState, useEffect, useCallback, useMemo } from "react";
 
 import styles from "./HistoryPage.module.scss";
@@ -11,8 +12,10 @@ import { useInfiniteProposalHistory } from "@/hooks/useInfiniteProposalHistory";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useErrorToast } from "@/hooks/useErrorToast";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
+import { deleteProposal, bulkDeleteProposals } from "@/services/proposal";
 import { formatDate } from "@/utils/dateUtils";
 import { logger } from "@/utils/logger";
+import { toast } from "@/utils/toast";
 import PageLayout from "@/layouts/AppLayout";
 import Button from "@/components/common/Button";
 import EmptyState from "@/components/common/EmptyState";
@@ -21,6 +24,11 @@ import SearchBar from "@/components/common/SearchBar/SearchBar";
 import SkeletonGrid from "@/components/common/SkeletonGrid";
 import HistoryCardSkeleton from "@/components/common/Skeletons/HistoryCardSkeleton";
 import StatusBadge from "@/components/common/StatusBadge";
+
+const DeleteConfirmModal = dynamic(
+  () => import("@/components/modals/DeleteConfirmModal/DeleteConfirmModal"),
+  { ssr: false }
+);
 
 type StatusFilter = "all" | "approved" | "rejected";
 
@@ -51,6 +59,12 @@ export default function HistoryPage(): JSX.Element {
   // Tracks which version is selected per family card (keyed by rootId).
   // Defaults to the root proposal (V1) — user can switch via the in-card dropdown.
   const [selectedVersions, setSelectedVersions] = useState<Map<number, number>>(new Map());
+
+  const [familyToDelete, setFamilyToDelete] = useState<{
+    rootId: number;
+    items: ProposalListItem[];
+  } | null>(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState<boolean>(false);
 
   const selectVersion = useCallback((rootId: number, proposalId: number): void => {
     setSelectedVersions((prev) => new Map(prev).set(rootId, proposalId));
@@ -118,6 +132,37 @@ export default function HistoryPage(): JSX.Element {
 
   const hasActiveFilter = debouncedSearch || statusFilter !== "all";
 
+  async function confirmDeleteFamily(): Promise<void> {
+    if (!familyToDelete) return;
+    try {
+      const ids = familyToDelete.items.map((i) => i.id);
+      if (ids.length === 1) {
+        await deleteProposal(ids[0]);
+      } else {
+        await bulkDeleteProposals(ids);
+      }
+      await refetch();
+      toast.success("Proposal deleted");
+      setFamilyToDelete(null);
+    } catch (err) {
+      logger.error("[HistoryPage] Delete proposal failed:", err);
+      toast.error("Failed to delete proposal");
+    }
+  }
+
+  async function confirmDeleteAll(): Promise<void> {
+    try {
+      const ids = filteredItems.map((i) => i.id);
+      await bulkDeleteProposals(ids);
+      await refetch();
+      toast.success("All proposals deleted");
+      setShowDeleteAllModal(false);
+    } catch (err) {
+      logger.error("[HistoryPage] Delete all failed:", err);
+      toast.error("Failed to delete proposals");
+    }
+  }
+
   // Group filtered items into version families.
   // Key = rootProposalId (or item.id for root proposals themselves).
   // Each group is sorted by versionLabel so V1 always precedes V1.1.
@@ -160,7 +205,7 @@ export default function HistoryPage(): JSX.Element {
         subtitle="View all completed, approved, and rejected proposals."
       />
 
-      {/* Toolbar: search + status filter */}
+      {/* Toolbar: search + status filter + delete all */}
       {(!isLoading || historyItems.length > 0) && (
         <div className={styles.toolbar}>
           <SearchBar
@@ -181,6 +226,11 @@ export default function HistoryPage(): JSX.Element {
               </button>
             ))}
           </div>
+          {filteredItems.length > 0 && (
+            <button className={styles.deleteAllBtn} onClick={() => setShowDeleteAllModal(true)}>
+              Delete All
+            </button>
+          )}
         </div>
       )}
 
@@ -300,6 +350,15 @@ export default function HistoryPage(): JSX.Element {
                       )}{" "}
                       {downloadingPdfIds.has(item.id) ? "Downloading..." : "PDF"}
                     </Button>
+                    <button
+                      type="button"
+                      className={styles.deleteCardBtn}
+                      onClick={() => setFamilyToDelete({ rootId, items })}
+                      aria-label="Delete proposal"
+                      title="Delete proposal"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -324,6 +383,33 @@ export default function HistoryPage(): JSX.Element {
             </div>
           )}
         </>
+      )}
+
+      {familyToDelete && (
+        <DeleteConfirmModal
+          title="Delete Proposal"
+          itemName={
+            (familyToDelete.items.find((i) => !i.rootProposalId) ?? familyToDelete.items[0])
+              ?.title ?? "this proposal"
+          }
+          warningMessage={
+            familyToDelete.items.length > 1
+              ? `This will delete all ${familyToDelete.items.length} versions of this proposal. This action cannot be undone.`
+              : "This action cannot be undone."
+          }
+          onClose={() => setFamilyToDelete(null)}
+          onConfirm={confirmDeleteFamily}
+        />
+      )}
+
+      {showDeleteAllModal && (
+        <DeleteConfirmModal
+          title="Delete All Proposals"
+          itemName={`${filteredItems.length} proposal${filteredItems.length === 1 ? "" : "s"}`}
+          warningMessage="This will permanently delete all visible proposals. This action cannot be undone."
+          onClose={() => setShowDeleteAllModal(false)}
+          onConfirm={confirmDeleteAll}
+        />
       )}
     </PageLayout>
   );

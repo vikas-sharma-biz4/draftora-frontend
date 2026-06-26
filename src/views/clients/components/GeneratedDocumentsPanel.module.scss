@@ -1,0 +1,36 @@
+.generatedDocs {
+  min-width: 0;
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 30px rgba(19, 27, 46, 0.03);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  grid-column: 1 / -1;
+  grid-row: auto;
+  height: auto;
+  min-height: 260px;
+
+  .tableWrapper {
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
+.docTypeBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}

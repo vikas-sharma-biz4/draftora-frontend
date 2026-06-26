@@ -21,6 +21,7 @@ import ClientDocumentsPanel from "./components/ClientDocumentsPanel";
 import ClientProposalsList from "./components/ClientProposalsList";
 import InvoiceHistoryPanel from "./components/InvoiceHistoryPanel";
 import EmailHistoryPanel from "./components/EmailHistoryPanel";
+import GeneratedDocumentsPanel from "./components/GeneratedDocumentsPanel";
 
 import styles from "./ClientDetailPage.module.scss";
 
@@ -80,6 +81,8 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
   const [showGenerateEmailModal, setShowGenerateEmailModal] = useState<boolean>(false);
+  const [emailRefreshKey, setEmailRefreshKey] = useState<number>(0);
+  const [docsRefreshKey, setDocsRefreshKey] = useState<number>(0);
   const [showGenerateInvoiceModal, setShowGenerateInvoiceModal] = useState<boolean>(false);
   const [showGenerateNdaModal, setShowGenerateNdaModal] = useState<boolean>(false);
   const [showGeneratePodcastModal, setShowGeneratePodcastModal] = useState<boolean>(false);
@@ -168,7 +171,7 @@ export default function ClientWorkspacePage(): JSX.Element {
         </div>
       </div>
 
-      {/* 2×2 grid layout */}
+      {/* 2×2 grid + full-width generated documents panel */}
       <div className={styles.gridLayout}>
         <ClientDocumentsPanel documents={client.documents} docs={docs} />
         <ClientProposalsList proposals={proposals} onNewProposal={handleNewProposal} />
@@ -180,7 +183,9 @@ export default function ClientWorkspacePage(): JSX.Element {
           clientId={clientId}
           proposals={proposals.clientProposals}
           onGenerateEmail={() => setShowGenerateEmailModal(true)}
+          refreshKey={emailRefreshKey}
         />
+        <GeneratedDocumentsPanel clientId={clientId} refreshKey={docsRefreshKey} />
       </div>
 
       {showEditModal && (
@@ -237,6 +242,7 @@ export default function ClientWorkspacePage(): JSX.Element {
         <GenerateEmailModal
           client={client}
           initialProposalId={emailProposalId}
+          onEmailGenerated={() => setEmailRefreshKey((k) => k + 1)}
           onClose={() => {
             setShowGenerateEmailModal(false);
             setEmailProposalId(undefined);
@@ -256,7 +262,13 @@ export default function ClientWorkspacePage(): JSX.Element {
       )}
 
       {showGenerateNdaModal && (
-        <GenerateNdaModal client={client} onClose={() => setShowGenerateNdaModal(false)} />
+        <GenerateNdaModal
+          client={client}
+          onClose={() => {
+            setShowGenerateNdaModal(false);
+            setDocsRefreshKey((k) => k + 1);
+          }}
+        />
       )}
 
       {showGeneratePodcastModal && (
@@ -266,6 +278,7 @@ export default function ClientWorkspacePage(): JSX.Element {
           onClose={() => {
             setShowGeneratePodcastModal(false);
             setPodcastProposalId(undefined);
+            setDocsRefreshKey((k) => k + 1);
           }}
         />
       )}
