@@ -5,6 +5,7 @@ import type {
   SaveDraftPayload,
 } from "@/interfaces/draftInterfaces";
 import type { ProposalWizardData, WizardStep } from "@/interfaces/proposalInterfaces";
+import type { SectionRecommendation } from "@/services/proposal";
 
 /**
  * Builds a `ProposalWizardData` object from the fields that vary per save,
@@ -43,6 +44,7 @@ export interface BuildDraftPayloadOptions {
   generatedContent: Record<string, string>;
   uiState: DraftUIState;
   hasEdits?: boolean;
+  prefetchedRecommendations?: SectionRecommendation[] | null;
 }
 
 /**
@@ -66,6 +68,7 @@ export function buildDraftPayload(options: BuildDraftPayloadOptions): SaveDraftP
       currentStep: options.currentStep,
       maxStepReached: options.maxStepReached,
       completedSteps: options.completedSteps,
+      prefetchedRecommendations: options.prefetchedRecommendations ?? null,
     },
     generatedContent: options.generatedContent,
     uiState: options.uiState,

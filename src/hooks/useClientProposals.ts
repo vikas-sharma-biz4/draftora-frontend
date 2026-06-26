@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { listDrafts } from "@/services/draft.service";
-import { useProposalStore } from "@/store/features/proposals/proposalSlice";
+import { deleteDraft, listDrafts } from "@/services/draft.service";
+import { deleteProposal } from "@/services/proposal";
+import { clientProposalsQueryKey, useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
 import { logger } from "@/utils/logger";
 import type { DraftMetadata } from "@/interfaces/draftInterfaces";
@@ -21,37 +23,27 @@ interface UseClientProposalsReturn {
   filteredProposals: ProposalListItem[];
   filteredDraftRows: DraftMetadata[];
   handleDownloadProposal: (proposalId: number) => Promise<void>;
+  handleDeleteProposal: (proposalId: number) => Promise<void>;
+  handleDeleteDraft: (draftId: string) => Promise<void>;
 }
 
 /**
  * Loads and filters proposals and drafts for a specific client.
- * Uses useProposalStore for proposals (cache-aware, avoids redundant API calls
- * when navigating from Dashboard which already fetched all proposals).
+ * Uses useClientProposalsQuery (TanStack Query, client-scoped API call) so ALL
+ * proposals for this client are returned — not just the first page of the global list.
  * Drafts are fetched directly as there is no shared draft list store.
  */
 export function useClientProposals(clientId: number, clientName: string): UseClientProposalsReturn {
+  const queryClient = useQueryClient();
   const { downloadProposal, progress: docxProgress } = useProposalDownload();
 
-  const allProposals = useProposalStore((s) => s.proposals);
-  const isStoreLoading = useProposalStore((s) => s.isLoading);
+  const { proposals: clientProposals, isLoading: isLoadingProposalsQuery } =
+    useClientProposalsQuery(clientId);
 
   const [proposalSearchQuery, setProposalSearchQuery] = useState<string>("");
   const [drafts, setDrafts] = useState<DraftMetadata[]>([]);
   const [isLoadingDrafts, setIsLoadingDrafts] = useState<boolean>(true);
-  const [isLoadingProposalsLocal, setIsLoadingProposalsLocal] = useState<boolean>(true);
   const [downloadingProposalId, setDownloadingProposalId] = useState<number | null>(null);
-
-  // Reuse the proposal store cache; only fetch if stale
-  useEffect(() => {
-    const { isCacheValid, fetchProposals } = useProposalStore.getState();
-    if (isCacheValid()) {
-      setIsLoadingProposalsLocal(false);
-      return;
-    }
-    fetchProposals()
-      .catch((err) => logger.error("[useClientProposals] Failed to fetch proposals:", err))
-      .finally(() => setIsLoadingProposalsLocal(false));
-  }, [clientId]);
 
   useEffect(() => {
     setIsLoadingDrafts(true);
@@ -61,11 +53,6 @@ export function useClientProposals(clientId: number, clientName: string): UseCli
       .finally(() => setIsLoadingDrafts(false));
   }, [clientId]);
 
-  const clientProposals = useMemo(
-    () => allProposals.filter((p) => p.clientId === clientId),
-    [allProposals, clientId]
-  );
-
   const clientDrafts = useMemo(() => {
     const proposalIds = new Set(clientProposals.map((p) => p.id));
     const clientNameLower = clientName.toLowerCase();
@@ -74,6 +61,7 @@ export function useClientProposals(clientId: number, clientName: string): UseCli
         (d.proposalId != null && proposalIds.has(d.proposalId)) ||
         d.clientName.toLowerCase() === clientNameLower
     );
+    // Exclude drafts already promoted to a proposal for this client
     return byProposalOrName.filter((d) => d.proposalId == null || !proposalIds.has(d.proposalId));
   }, [drafts, clientProposals, clientName]);
 
@@ -88,6 +76,19 @@ export function useClientProposals(clientId: number, clientName: string): UseCli
     },
     [downloadProposal]
   );
+
+  const handleDeleteProposal = useCallback(
+    async (proposalId: number): Promise<void> => {
+      await deleteProposal(proposalId);
+      await queryClient.invalidateQueries({ queryKey: clientProposalsQueryKey(clientId) });
+    },
+    [queryClient, clientId]
+  );
+
+  const handleDeleteDraft = useCallback(async (draftId: string): Promise<void> => {
+    await deleteDraft(draftId);
+    setDrafts((prev) => prev.filter((d) => d.id !== draftId));
+  }, []);
 
   const filteredProposals = useMemo(() => {
     if (!proposalSearchQuery) return clientProposals;
@@ -114,11 +115,13 @@ export function useClientProposals(clientId: number, clientName: string): UseCli
     setProposalSearchQuery,
     clientProposals,
     clientDrafts,
-    isLoadingProposals: isLoadingProposalsLocal || isStoreLoading || isLoadingDrafts,
+    isLoadingProposals: isLoadingProposalsQuery || isLoadingDrafts,
     downloadingProposalId,
     docxProgress,
     filteredProposals,
     filteredDraftRows,
     handleDownloadProposal,
+    handleDeleteProposal,
+    handleDeleteDraft,
   };
 }

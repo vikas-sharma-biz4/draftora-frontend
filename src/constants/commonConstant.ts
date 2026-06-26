@@ -349,6 +349,14 @@ export const SPECIAL_CARDS = {
   },
 } as const;
 
+export const PAYMENT_PROOF_MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const PAYMENT_PROOF_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+] as const;
+
 export const INDUSTRIES = [
   "Financial Services",
   "Healthcare",

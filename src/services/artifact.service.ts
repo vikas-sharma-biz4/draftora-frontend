@@ -5,7 +5,12 @@
  * Responses are transformed to camelCase before being returned to callers.
  */
 
-import { http, buildUrl } from "@/config/httpClient";
+import { http, buildUrl, HttpError } from "@/config/httpClient";
+import {
+  PAYMENT_PROOF_ALLOWED_TYPES,
+  PAYMENT_PROOF_MAX_SIZE_BYTES,
+} from "@/constants/commonConstant";
+import { MESSAGES } from "@/constants/messages";
 import type {
   ArtifactGenerateRequest,
   ArtifactUpdateRequest,
@@ -83,14 +88,15 @@ export async function generateArtifact(data: ArtifactGenerateRequest): Promise<G
   };
 
   if (data.invoiceMetadata) {
-    const totalAmount = data.invoiceMetadata.milestoneCosts.reduce((sum, mc) => sum + mc.amount, 0);
+    const billableMilestones = data.invoiceMetadata.milestoneCosts.filter((mc) => mc.amount > 0);
+    const totalAmount = billableMilestones.reduce((sum, mc) => sum + mc.amount, 0);
     body.invoice_metadata = {
       invoice_number: data.invoiceMetadata.invoiceNumber,
       invoice_date: data.invoiceMetadata.invoiceDate,
       client_name: data.invoiceMetadata.clientName,
       company_name: data.invoiceMetadata.companyName || null,
       job_to_be_done: data.invoiceMetadata.jobToBeDone,
-      milestone_costs: data.invoiceMetadata.milestoneCosts.map((mc: MilestoneCost) => ({
+      milestone_costs: billableMilestones.map((mc: MilestoneCost) => ({
         milestone: mc.milestone,
         amount: mc.amount,
       })),
@@ -146,6 +152,13 @@ export async function updateArtifact(
 }
 
 /**
+ * Permanently delete an artifact by ID.
+ */
+export async function deleteArtifact(artifactId: number): Promise<void> {
+  await http.delete(`/artifacts/${artifactId}`);
+}
+
+/**
  * Return the DOCX download URL for an artifact.
  * Used by useArtifactDownload hook (raw fetch with streaming).
  */
@@ -188,6 +201,50 @@ export async function regenerateArtifactSelection(
     { requestTimeout: 45_000 }
   );
   return { regeneratedText: data.regenerated_text, format: data.format ?? null };
+}
+
+/**
+ * Return the URL to view/download the payment proof attached to an artifact.
+ */
+export function getPaymentProofUrl(artifactId: number): string {
+  return buildUrl(`/artifacts/${artifactId}/payment-proof`);
+}
+
+/**
+ * Fetch the payment proof binary and return a Blob.
+ * fetch() follows the backend's 307 redirect to the S3 presigned URL automatically.
+ * Custom headers must NOT be added here — they get forwarded on the cross-origin
+ * redirect to S3 and trigger a CORS preflight that S3 rejects.
+ */
+export async function fetchPaymentProofBlob(artifactId: number): Promise<Blob> {
+  const url = buildUrl(`/artifacts/${artifactId}/payment-proof`);
+  const res = await fetch(url); // S3 redirect: no custom headers allowed
+  if (!res.ok) throw new HttpError(res.status, `Payment proof fetch failed: ${res.status}`);
+  return res.blob();
+}
+
+/**
+ * Upload a payment proof file for a paid invoice artifact.
+ * Stores the file in S3 and links the key in metadata_json.
+ */
+export async function uploadPaymentProof(
+  artifactId: number,
+  file: File
+): Promise<GeneratedArtifact> {
+  if (!(PAYMENT_PROOF_ALLOWED_TYPES as readonly string[]).includes(file.type)) {
+    throw new Error(MESSAGES.UPLOAD_INVALID_TYPE);
+  }
+  if (file.size > PAYMENT_PROOF_MAX_SIZE_BYTES) {
+    throw new Error(MESSAGES.UPLOAD_TOO_LARGE);
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+  const result = await http.post<ArtifactApiShape>(
+    `/artifacts/${artifactId}/payment-proof`,
+    formData
+  );
+  return transformArtifact(result);
 }
 
 /**

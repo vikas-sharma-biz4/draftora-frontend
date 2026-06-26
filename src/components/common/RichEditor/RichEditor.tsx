@@ -9,10 +9,39 @@ import Highlight from "@tiptap/extension-highlight";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import Image from "@tiptap/extension-image";
+import { Paragraph } from "@tiptap/extension-paragraph";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
+
+// Preserve class attributes on block and table elements so invoice template
+// classes (inv-header, inv-logo, inv-footer-wrap, etc.) survive the parse/render cycle.
+const classAttr = {
+  class: {
+    default: null as string | null,
+    parseHTML: (el: HTMLElement) => el.getAttribute("class"),
+    renderHTML: (attrs: Record<string, string | null>) =>
+      attrs.class ? { class: attrs.class } : {},
+  },
+};
+// Paragraphs: Tiptap parses both <p> and <div> as Paragraph nodes. Without
+// class preservation, <div class="inv-footer-wrap"> loses its class entirely.
+const CustomParagraph = Paragraph.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...classAttr };
+  },
+});
+const CustomTable = Table.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...classAttr };
+  },
+});
+const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...classAttr };
+  },
+});
 import { createPortal } from "react-dom";
 import { toolbarManager } from "./FloatingToolbarManager";
 
@@ -123,18 +152,19 @@ export default function RichEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ paragraph: false }),
+      CustomParagraph,
       Underline,
       Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: "editor-link" },
+        openOnClick: true,
+        HTMLAttributes: { class: "editor-link", target: "_blank", rel: "noopener noreferrer" },
       }),
       Highlight.configure({ multicolor: true }),
       TextStyle,
       Color,
-      Table.configure({ resizable: true }),
+      CustomTable.configure({ resizable: true }),
       TableRow,
-      TableCell,
+      CustomTableCell,
       TableHeader,
       Image.configure({
         inline: false,

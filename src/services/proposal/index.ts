@@ -26,6 +26,8 @@ export {
   cancelProposal,
   updateApprovalStatus,
   estimateProposalHours,
+  deleteProposal,
+  bulkDeleteProposals,
 } from "./proposalCrud.service";
 
 export type {
