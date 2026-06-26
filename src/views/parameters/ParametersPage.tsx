@@ -28,6 +28,9 @@ import {
   useApprovalStatus,
   useProposalTitle,
   useClientName,
+  useLoadedFromDraft,
+  usePrefetchedRecommendations,
+  useHydrated,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/hooks";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
@@ -116,6 +119,9 @@ export default function ParametersPage(): JSX.Element {
   const editMode = useEditMode();
   const maxStepReached = useMaxStepReached();
   const approvalStatus = useApprovalStatus();
+  const loadedFromDraft = useLoadedFromDraft();
+  const prefetchedRecommendations = usePrefetchedRecommendations();
+  const hydrated = useHydrated();
   const {
     updateProposalData,
     setCurrentStep,
@@ -124,6 +130,8 @@ export default function ParametersPage(): JSX.Element {
     setEditMode,
     setMaxStepReached,
     setCurrentProposalId,
+    setLoadedFromDraft,
+    setPrefetchedRecommendations,
   } = useWizardActions();
   const { visitedPipelineSteps, syncVisitedStepsFromBackend, markStepVisitedOnBackend } =
     usePipelineSteps();
@@ -349,6 +357,23 @@ export default function ParametersPage(): JSX.Element {
       cancelRecommendationsFetch();
     };
   }, []);
+
+  // Auto-fetch AI recommendations on mount.
+  // - From drafts: skip fetch; stored recommendations are passed as initialRecommendations.
+  //   Reset the flag so subsequent navigations to this page behave normally.
+  // - All other flows: trigger auto-fetch once the store is hydrated and sections are ready.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (loadedFromDraft) {
+      setLoadedFromDraft(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      sectionRecommendationsRef.current?.triggerAutoFetch();
+    }, 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
 
   // Mark step 1 as visited when this page loads
   useEffect(() => {
@@ -576,6 +601,8 @@ export default function ParametersPage(): JSX.Element {
               documentContext={filesMeta?.map((f) => f.name).join(", ") ?? ""}
               onAddSection={addSectionToProposal}
               proposalId={currentProposalId}
+              initialRecommendations={loadedFromDraft ? prefetchedRecommendations : null}
+              onRecommendationsFetched={setPrefetchedRecommendations}
             />
           </div>
         </div>

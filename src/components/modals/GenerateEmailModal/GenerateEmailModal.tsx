@@ -7,7 +7,6 @@ import { useSteppedModal } from "@/hooks/useSteppedModal";
 import { X, Search, ChevronDown, Copy, FileDown, RefreshCw, Wand2 } from "lucide-react";
 
 import { MESSAGES } from "@/constants/messages";
-import { EMAIL_TEMPLATES } from "@/constants/artifactTemplates";
 import { generateArtifact, listArtifacts, updateArtifact } from "@/services/artifact.service";
 import { useArtifactDownload } from "@/hooks/useArtifactDownload";
 import { useClientProposalsQuery } from "@/hooks/useClientProposalsQuery";
@@ -17,7 +16,7 @@ import { sanitizeHtml } from "@/utils/sanitizeHtml";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
 import type { ClientWithDocuments } from "@/interfaces/clientInterfaces";
-import type { ArtifactOptions, GeneratedArtifact } from "@/interfaces/artifactInterfaces";
+import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
 
 import styles from "./GenerateEmailModal.module.scss";
 
@@ -28,19 +27,14 @@ interface GenerateEmailModalProps {
   client: ClientWithDocuments;
   onClose: () => void;
   initialProposalId?: number;
+  onEmailGenerated?: () => void;
 }
-
-const DEFAULT_OPTIONS: ArtifactOptions = {
-  includeSummary: true,
-  includeScope: true,
-  includeStrengths: true,
-  includePodcast: true,
-};
 
 export default function GenerateEmailModal({
   client,
   onClose,
   initialProposalId,
+  onEmailGenerated,
 }: GenerateEmailModalProps): JSX.Element | null {
   const {
     mounted,
@@ -64,9 +58,8 @@ export default function GenerateEmailModal({
   const [selectedProposalId, setSelectedProposalId] = useState<number | null>(
     initialProposalId ?? null
   );
-  const [selectedTemplateId, setSelectedTemplateId] = useState("enterprise_partnership");
+  const [selectedTemplateId] = useState("professional_outreach");
   const [additionalInstructions, setAdditionalInstructions] = useState("");
-  const [options, setOptions] = useState<ArtifactOptions>(DEFAULT_OPTIONS);
 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
@@ -139,7 +132,6 @@ export default function GenerateEmailModal({
         artifactType: "email",
         title: buildTitle(),
         additionalInstructions: combinedInstructions,
-        options,
         clientName: client.name,
       });
       setArtifacts((prev) => [artifact, ...prev]);
@@ -150,6 +142,7 @@ export default function GenerateEmailModal({
           ? fixProposalLinks(generatedHtml, artifact.proposalId)
           : generatedHtml
       );
+      if (isInitial) onEmailGenerated?.();
       if (!isInitial) toast.success(`Email v${artifact.version} generated`);
     } catch (err) {
       logger.error("[GenerateEmailModal] Generation failed:", err);
@@ -178,9 +171,36 @@ export default function GenerateEmailModal({
 
   async function handleCopyContent(): Promise<void> {
     try {
-      const plainText =
-        new DOMParser().parseFromString(editorContent, "text/html").body.textContent ?? "";
-      await navigator.clipboard.writeText(plainText);
+      const doc = new DOMParser().parseFromString(editorContent, "text/html");
+
+      // Strip <a> tags that have no genuine absolute URL — they appear colored but
+      // are not navigable when pasted into email clients.
+      doc.querySelectorAll("a").forEach((a) => {
+        const href = (a.getAttribute("href") ?? "").trim();
+        const isAbsolute =
+          (href.startsWith("http://") || href.startsWith("https://")) &&
+          !href.includes("[") &&
+          !href.includes("]");
+        if (!isAbsolute) {
+          const frag = document.createDocumentFragment();
+          while (a.firstChild) frag.appendChild(a.firstChild);
+          a.replaceWith(frag);
+        }
+      });
+
+      const htmlForClipboard = doc.body.innerHTML;
+      const plainText = doc.body.textContent ?? "";
+
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([htmlForClipboard], { type: "text/html" }),
+            "text/plain": new Blob([plainText], { type: "text/plain" }),
+          }),
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
       toast.success(MESSAGES.ARTIFACT_COPIED);
     } catch {
       toast.error("Failed to copy content.");
@@ -196,10 +216,6 @@ export default function GenerateEmailModal({
         : versionHtml
     );
     setShowVersionDropdown(false);
-  }
-
-  function toggleOption(key: keyof ArtifactOptions): void {
-    setOptions((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   const subjectLine = (currentArtifact?.metadataJson?.subject as string | undefined) ?? "";
@@ -336,28 +352,9 @@ export default function GenerateEmailModal({
                 )}
               </div>
 
-              {/* Template selection */}
-              <div className={styles.section}>
-                <span className={styles.sectionLabel}>2. Email Template</span>
-                <div className={styles.templateGrid}>
-                  {EMAIL_TEMPLATES.map((t) => (
-                    <div
-                      key={t.id}
-                      className={`${styles.templateCard} ${
-                        selectedTemplateId === t.id ? styles.selected : ""
-                      }`}
-                      onClick={() => setSelectedTemplateId(t.id)}
-                    >
-                      <div className={styles.templateCardName}>{t.displayName}</div>
-                      <div className={styles.templateCardDesc}>{t.description}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Additional instructions */}
               <div className={styles.section}>
-                <span className={styles.sectionLabel}>3. Additional Instructions (Optional)</span>
+                <span className={styles.sectionLabel}>2. Additional Instructions (Optional)</span>
                 <textarea
                   className={styles.textarea}
                   placeholder="e.g. Focus on AI capabilities, mention phased delivery…"
@@ -365,30 +362,6 @@ export default function GenerateEmailModal({
                   onChange={(e) => setAdditionalInstructions(e.target.value)}
                   rows={3}
                 />
-              </div>
-
-              {/* Content options */}
-              <div className={styles.section}>
-                <span className={styles.sectionLabel}>4. Content Options</span>
-                <div className={styles.checkboxRow}>
-                  {(
-                    [
-                      { key: "includeSummary", label: "Include Proposal Summary" },
-                      { key: "includeScope", label: "Include High-Level Scope" },
-                      { key: "includeStrengths", label: "Include Company Strengths" },
-                      { key: "includePodcast", label: "Include Podcast Reference" },
-                    ] as const
-                  ).map(({ key, label }) => (
-                    <label key={key} className={styles.checkboxLabel}>
-                      <input
-                        type="checkbox"
-                        checked={options[key]}
-                        onChange={() => toggleOption(key)}
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
 

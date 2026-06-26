@@ -38,6 +38,7 @@ export function useSaveDraft(): () => Promise<void> {
       maxStepReached,
       currentProposalId,
       generatedProposalId,
+      prefetchedRecommendations,
       resetProposal,
     } = wizardState;
     const {
@@ -174,6 +175,7 @@ export function useSaveDraft(): () => Promise<void> {
         completedSteps,
         generatedContent: existingGeneratedContent,
         uiState,
+        prefetchedRecommendations: prefetchedRecommendations ?? null,
       });
 
       logger.info("[useSaveDraft] Saving draft", {

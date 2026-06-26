@@ -93,10 +93,11 @@ function getBaseHeaders(includeContentType: boolean = true): Record<string, stri
     headers["Content-Type"] = "application/json";
   }
 
-  // ngrok free tier shows an HTML interstitial page for browser fetch requests.
-  // This header bypasses it so API calls get JSON responses instead of HTML.
+  // Bypass tunnel interstitial pages in development so API calls get JSON, not HTML.
+  // ngrok shows a warning page; loca.lt (localtunnel) shows a 511 reminder page.
   if (process.env.NODE_ENV === "development") {
     headers["ngrok-skip-browser-warning"] = "1";
+    headers["bypass-tunnel-reminder"] = "1";
   }
 
   return headers;
@@ -316,6 +317,19 @@ export const http = {
 
   delete: <T>(path: string, config?: FetchConfig): Promise<T> =>
     request<T>("DELETE", path, undefined, config),
+
+  /**
+   * GET that returns the raw response body as a Blob.
+   * Use for binary endpoints (images, PDFs) where the standard JSON handler
+   * would fail. Reuses the same auth headers, retry logic, and timeout.
+   */
+  getBlob: (path: string, config?: FetchConfig): Promise<Blob> =>
+    request<Blob>("GET", path, undefined, config, 0, async (res) => {
+      if (!res.ok) {
+        throw new HttpError(res.status, `Request failed with status ${res.status}`);
+      }
+      return res.blob();
+    }),
 };
 
 /**
