@@ -1,11 +1,11 @@
 /**
  * Replaces any "View Proposal" occurrences in the email HTML with a correct
- * hyperlink to the proposal page. Handles two cases:
+ * hyperlink to the proposal page. Handles three cases:
  *
- * 1. Plain-text "[View Proposal]" — LLM placeholder stored as-is in the DB
- *    for emails generated before the backend post-processing fix was deployed.
+ * 1. Plain-text "[View Proposal]" — LLM placeholder stored as-is in the DB.
  * 2. Anchor tags whose href is still the LLM placeholder value, or whose
  *    text content is "view proposal" — catches hallucinated hrefs.
+ * 3. Duplicate View Proposal links — keeps only the first occurrence.
  *
  * Skip when proposalId is null (no proposal to link to).
  */
@@ -33,5 +33,16 @@ export function fixProposalLinks(html: string, proposalId: number): string {
       a.setAttribute("href", `/proposal/${proposalId}`);
     }
   });
+
+  // Step 3: Deduplicate — keep only the first View Proposal link; remove extras.
+  const proposalLinks = doc.querySelectorAll(`a[href="/proposal/${proposalId}"]`);
+  if (proposalLinks.length > 1) {
+    proposalLinks.forEach((link, index) => {
+      if (index > 0) {
+        link.parentNode?.removeChild(link);
+      }
+    });
+  }
+
   return doc.body.innerHTML;
 }

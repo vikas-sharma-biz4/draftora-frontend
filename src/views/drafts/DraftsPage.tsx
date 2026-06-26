@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { FileText } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
@@ -18,7 +18,10 @@ import { DRAFT_UI_STATE_STORAGE_KEY } from "@/constants/storageKeys";
 import DraftCard from "@/components/common/DraftCard";
 import { useProposalStore } from "@/store/features/proposals/proposalSlice";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
-import { useWizardActions } from "@/store/features/wizard/proposalWizardSlice";
+import {
+  useProposalWizardStore,
+  useWizardActions,
+} from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { useDrafts } from "@/hooks/useDrafts";
 import { useErrorToast } from "@/hooks/useErrorToast";
@@ -55,6 +58,7 @@ export default function DraftsPage(): JSX.Element {
     setMaxStepReached,
     setGeneratedProposalId,
     setCurrentProposalId,
+    setLoadedFromDraft,
   } = useWizardActions();
   const setDraftStage = useDraftSessionStore((s) => s.setDraftStage);
   const setCompletedSteps = useDraftSessionStore((s) => s.setCompletedSteps);
@@ -250,6 +254,15 @@ export default function DraftsPage(): JSX.Element {
           setCurrentProposalId(fullDraft.proposalId);
         }
 
+        // Restore prefetched recommendations from draft and signal parameters page
+        // to skip auto-fetch and use these stored results instead.
+        if (fullDraft.wizardState.prefetchedRecommendations) {
+          useProposalWizardStore
+            .getState()
+            .setPrefetchedRecommendations(fullDraft.wizardState.prefetchedRecommendations);
+        }
+        setLoadedFromDraft(true);
+
         const uiState = fullDraft.uiState || {
           scrollPosition: 0,
           activeSection: null,
@@ -295,6 +308,7 @@ export default function DraftsPage(): JSX.Element {
       setCurrentDraftId,
       setGeneratedProposalId,
       setFromHistory,
+      setLoadedFromDraft,
       router,
     ]
   );
@@ -343,9 +357,10 @@ export default function DraftsPage(): JSX.Element {
         subtitle="Resume work on proposals that are in progress or pending completion."
         action={
           !isLoading && drafts.length > 0 ? (
-            <button className={styles.deleteAllBtn} onClick={() => setShowDeleteAllModal(true)}>
+            <Button variant="danger" size="sm" onClick={() => setShowDeleteAllModal(true)}>
+              <Trash2 size={14} />
               Delete All
-            </button>
+            </Button>
           ) : undefined
         }
       />

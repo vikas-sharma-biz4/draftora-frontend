@@ -1,6 +1,6 @@
 "use client";
 
-import { Upload, FileText, Eye, X } from "lucide-react";
+import { Upload, FileText, Eye, Trash2 } from "lucide-react";
 import { formatDate } from "@/utils/dateUtils";
 import type { ClientDocument } from "@/interfaces/clientInterfaces";
 import type { useClientDocuments } from "@/hooks/useClientDocuments";
@@ -151,14 +151,21 @@ export default function ClientDocumentsPanel({
 
                 {/* Delete */}
                 <button
-                  className={styles.deleteDocBtn}
+                  className={styles.actionBtn}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteDocument(doc.id, doc.name);
                   }}
                   title="Delete document"
+                  style={{
+                    width: 40,
+                    height: 40,
+                    padding: 0,
+                    flexShrink: 0,
+                    color: "var(--color-danger, #e53e3e)",
+                  }}
                 >
-                  <X size={16} />
+                  <Trash2 size={16} />
                 </button>
               </div>
             );

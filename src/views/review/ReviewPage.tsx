@@ -225,7 +225,8 @@ export default function ReviewPage(): JSX.Element {
     }
   }, [searchParams, currentProposalId, setCurrentProposalId]);
 
-  // Fetch proposal data when viewing from History to get approvalStatus
+  // Fetch full proposal data when viewing from History so the review page
+  // reflects the selected proposal rather than stale store state.
   useEffect(() => {
     const urlProposalId = searchParams.get("proposalId");
     if (urlProposalId || currentProposalId) {
@@ -233,12 +234,27 @@ export default function ReviewPage(): JSX.Element {
       if (proposalIdToFetch) {
         getProposal(proposalIdToFetch)
           .then((data: ProposalData) => {
-            if (data?.approvalStatus) {
-              updateProposalData({ approvalStatus: data.approvalStatus });
-            }
+            updateProposalData({
+              title: data.title,
+              clientName: data.clientName,
+              clientId: data.clientId,
+              description: data.description,
+              tone: data.tone,
+              lengthPreference: data.lengthPreference,
+              language: data.language,
+              aiModel: data.aiModel,
+              selectedSections: data.selectedSections,
+              sectionDisplayNames: data.sectionDisplayNames,
+              contextualInstructions: data.contextualInstructions,
+              webReferences: data.webReferences,
+              selectedDocumentIds: data.selectedDocumentIds,
+              templateType: data.templateType,
+              ...(data.approvalStatus ? { approvalStatus: data.approvalStatus } : {}),
+              ...(data.sections ? { sections: data.sections } : {}),
+            });
           })
           .catch((error: unknown) => {
-            logger.warn("[ReviewPage] Failed to fetch proposal for approvalStatus", error);
+            logger.warn("[ReviewPage] Failed to fetch proposal data", error);
           });
       }
     }

@@ -210,13 +210,15 @@ export default function SectionsSelectorModal({
       return;
     }
 
-    const newCustomSections: CustomSection[] = Object.entries(customSectionNames)
-      .filter(([key]) => finalSelected.has(key))
-      .map(([key, label]) => ({
+    // Preserve ALL custom sections (not just selected ones) so deselected custom
+    // sections remain visible in the list when the modal is reopened.
+    const newCustomSections: CustomSection[] = Object.entries(customSectionNames).map(
+      ([key, label]) => ({
         key,
         label,
         description: customSectionInstructions[key] ?? "",
-      }));
+      })
+    );
 
     const allSelected = Array.from(finalSelected);
     const nonStaticSelected = allSelected.filter((s) => !STATIC_SECTIONS_GROUP.includes(s));
