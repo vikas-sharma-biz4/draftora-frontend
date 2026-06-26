@@ -6,6 +6,11 @@
  */
 
 import { http, buildUrl, HttpError } from "@/config/httpClient";
+import {
+  PAYMENT_PROOF_ALLOWED_TYPES,
+  PAYMENT_PROOF_MAX_SIZE_BYTES,
+} from "@/constants/commonConstant";
+import { MESSAGES } from "@/constants/messages";
 import type {
   ArtifactGenerateRequest,
   ArtifactUpdateRequest,
@@ -226,6 +231,13 @@ export async function uploadPaymentProof(
   artifactId: number,
   file: File
 ): Promise<GeneratedArtifact> {
+  if (!(PAYMENT_PROOF_ALLOWED_TYPES as readonly string[]).includes(file.type)) {
+    throw new Error(MESSAGES.UPLOAD_INVALID_TYPE);
+  }
+  if (file.size > PAYMENT_PROOF_MAX_SIZE_BYTES) {
+    throw new Error(MESSAGES.UPLOAD_TOO_LARGE);
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   const result = await http.post<ArtifactApiShape>(

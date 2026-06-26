@@ -108,10 +108,17 @@ function EmailViewerModal({
       className={styles.emailViewOverlay}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className={styles.emailViewModal}>
+      <div
+        className={styles.emailViewModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="email-viewer-title"
+      >
         <div className={styles.emailViewHeader}>
           <div className={styles.emailViewHeaderLeft}>
-            <div className={styles.emailViewSubject}>{subject}</div>
+            <div id="email-viewer-title" className={styles.emailViewSubject}>
+              {subject}
+            </div>
             <div className={styles.emailViewMeta}>
               {proposalTitle && <span>Re: {proposalTitle}</span>}
               <span>{formatDate(artifact.createdAt)}</span>
