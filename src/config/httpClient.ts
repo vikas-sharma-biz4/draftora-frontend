@@ -14,11 +14,12 @@
  */
 
 import { getAccessToken } from "@/utils/auth";
+import { logger } from "@/utils/logger";
 
 const _apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 if (!process.env.NEXT_PUBLIC_API_URL) {
-  console.error(
+  logger.error(
     "[FATAL] NEXT_PUBLIC_API_URL is not set. Every API call will fail. Add it to your .env file."
   );
 }
