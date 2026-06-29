@@ -181,3 +181,40 @@ describe("useProposals — store state pass-through", () => {
     expect(result.current.hasMore).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// usePageVisibility callback — branch coverage (lines 58-63)
+// ---------------------------------------------------------------------------
+
+import { usePageVisibility } from "@/hooks/usePageVisibility";
+
+const mockUsePageVisibility = usePageVisibility as jest.Mock;
+
+describe("useProposals — usePageVisibility callback branches", () => {
+  it("calls fetchProposalHistory when callback fires with filter='history'", () => {
+    renderHook(() => useProposals({ autoFetch: true, filter: "history" }));
+    const cb: () => void = mockUsePageVisibility.mock.calls[0][0];
+    jest.clearAllMocks();
+    act(() => cb());
+    expect(mockFetchProposalHistory).toHaveBeenCalledTimes(1);
+    expect(mockFetchProposals).not.toHaveBeenCalled();
+  });
+
+  it("calls fetchProposals when callback fires with filter='all'", () => {
+    renderHook(() => useProposals({ autoFetch: true, filter: "all" }));
+    const cb: () => void = mockUsePageVisibility.mock.calls[0][0];
+    jest.clearAllMocks();
+    act(() => cb());
+    expect(mockFetchProposals).toHaveBeenCalledTimes(1);
+    expect(mockFetchProposalHistory).not.toHaveBeenCalled();
+  });
+
+  it("returns early when autoFetch=false and callback fires", () => {
+    renderHook(() => useProposals({ autoFetch: false, filter: "history" }));
+    const cb: () => void = mockUsePageVisibility.mock.calls[0][0];
+    jest.clearAllMocks();
+    act(() => cb());
+    expect(mockFetchProposalHistory).not.toHaveBeenCalled();
+    expect(mockFetchProposals).not.toHaveBeenCalled();
+  });
+});

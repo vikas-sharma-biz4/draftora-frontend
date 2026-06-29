@@ -96,6 +96,14 @@ describe("formatInitials", () => {
   it("uppercases initials", () => {
     expect(formatInitials("john doe")).toBe("JD");
   });
+
+  it("returns empty string when input is empty (w[0]?.toUpperCase() ?? '' branch)", () => {
+    expect(formatInitials("")).toBe("");
+  });
+
+  it("returns empty string for whitespace-only input", () => {
+    expect(formatInitials("   ")).toBe("");
+  });
 });
 
 // ---------------------------------------------------------------------------

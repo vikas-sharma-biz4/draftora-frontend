@@ -219,6 +219,36 @@ describe("useInfiniteProposalHistory — loadMore", () => {
     expect(result.current.error).toBe("Load more failed");
     expect(result.current.isLoadingMore).toBe(false);
   });
+
+  it("uses generic message when loadMore throws a non-Error (line 99 false branch)", async () => {
+    mockListProposalHistory
+      .mockResolvedValueOnce(makePage(1, 25))
+      .mockRejectedValueOnce("non-error string");
+
+    const { result } = renderHook(() => useInfiniteProposalHistory());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadMore();
+    });
+
+    expect(result.current.error).toBe("Failed to load more proposals");
+  });
+});
+
+describe("useInfiniteProposalHistory — observerRef null branch (line 135)", () => {
+  it("does not call observe when observerRef is called with null", async () => {
+    mockListProposalHistory.mockResolvedValue(makePage(1, 25));
+    const { result } = renderHook(() => useInfiniteProposalHistory());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // Call observerRef with null — covers the if(node) false branch
+    act(() => {
+      result.current.observerRef(null);
+    });
+
+    expect(mockObserve).not.toHaveBeenCalled();
+  });
 });
 
 describe("useInfiniteProposalHistory — refetch", () => {
