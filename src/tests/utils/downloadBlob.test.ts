@@ -1,4 +1,4 @@
-import { downloadBlob } from "@/utils/downloadBlob";
+import { downloadBlob, extractContentDispositionFilename } from "@/utils/downloadBlob";
 
 const mockCreateObjectURL = jest.fn().mockReturnValue("blob:fake-url");
 const mockRevokeObjectURL = jest.fn();
@@ -80,5 +80,39 @@ describe("downloadBlob", () => {
     jest.advanceTimersByTime(500);
     expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
     removeSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractContentDispositionFilename
+// ---------------------------------------------------------------------------
+
+describe("extractContentDispositionFilename", () => {
+  it("returns fallback when contentDisposition is null", () => {
+    expect(extractContentDispositionFilename(null, "default.docx")).toBe("default.docx");
+  });
+
+  it("returns fallback when contentDisposition is empty string", () => {
+    expect(extractContentDispositionFilename("", "default.docx")).toBe("default.docx");
+  });
+
+  it("returns RFC 5987 decoded filename when present", () => {
+    const cd = "attachment; filename*=UTF-8''My%20Proposal%202024.docx";
+    expect(extractContentDispositionFilename(cd, "fallback.docx")).toBe("My Proposal 2024.docx");
+  });
+
+  it("returns quoted classic filename (classicMatch[1] branch)", () => {
+    const cd = 'attachment; filename="proposal-classic.docx"';
+    expect(extractContentDispositionFilename(cd, "fallback.docx")).toBe("proposal-classic.docx");
+  });
+
+  it("returns unquoted classic filename (classicMatch[2] branch)", () => {
+    const cd = "attachment; filename=unquoted-proposal.docx";
+    expect(extractContentDispositionFilename(cd, "fallback.docx")).toBe("unquoted-proposal.docx");
+  });
+
+  it("returns fallback when no filename pattern matches", () => {
+    const cd = "attachment";
+    expect(extractContentDispositionFilename(cd, "fallback.docx")).toBe("fallback.docx");
   });
 });

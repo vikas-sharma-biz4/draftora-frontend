@@ -475,3 +475,228 @@ describe("useWizardAutoSave — timeout clearing", () => {
     clearTimeoutSpy.mockRestore();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Same data hash — skip save (lines 221-223)
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — same data hash skips duplicate save", () => {
+  it("skips second save when data hash has not changed (lines 221-223)", async () => {
+    mockSaveDraftToStore.mockResolvedValue({ id: "draft-hash-test" });
+
+    const { rerender } = renderHook(() => useWizardAutoSave({ enabled: true, debounceMs: 100 }));
+
+    // First save — sets lastSavedDataRef.current
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSaveDraftToStore).toHaveBeenCalledTimes(1);
+    jest.clearAllMocks();
+
+    // Change currentStep (in effect deps list) without changing the data hash
+    // (currentStep is NOT included in currentDataHash computation in the hook)
+    wizardState.currentStep = 2;
+    rerender();
+
+    // Second debounce fires with same title/clientName/etc. → hash matches → skip
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSaveDraftToStore).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// currentProposalId fetch path (lines 233-243)
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — fetch existing draft content when currentProposalId set", () => {
+  it("calls getDraftByProposalId and getDraft when currentProposalId is set (lines 233-243)", async () => {
+    wizardState.currentProposalId = 10;
+    const mockDraftService = jest.requireMock("@/services/draft.service") as {
+      getDraftByProposalId: jest.Mock;
+      getDraft: jest.Mock;
+    };
+    mockDraftService.getDraftByProposalId.mockResolvedValueOnce({ id: "content-draft" });
+    mockDraftService.getDraft.mockResolvedValueOnce({ generatedContent: { intro: "Hello" } });
+
+    renderHook(() =>
+      useWizardAutoSave({ enabled: true, approvalStatus: "pending", debounceMs: 100 })
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockDraftService.getDraftByProposalId).toHaveBeenCalledWith(10);
+    expect(mockDraftService.getDraft).toHaveBeenCalledWith("content-draft");
+  });
+
+  it("logs warning and continues when getDraftByProposalId throws (inner catch, lines 242-247)", async () => {
+    wizardState.currentProposalId = 10;
+    const mockDraftService = jest.requireMock("@/services/draft.service") as {
+      getDraftByProposalId: jest.Mock;
+    };
+    mockDraftService.getDraftByProposalId.mockRejectedValueOnce(new Error("Fetch failed"));
+    const { logger } = jest.requireMock("@/utils/logger") as { logger: { warn: jest.Mock } };
+
+    renderHook(() =>
+      useWizardAutoSave({ enabled: true, approvalStatus: "pending", debounceMs: 100 })
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(logger.warn).toHaveBeenCalled();
+    // Save still proceeds despite inner error
+    expect(mockSaveDraftToStore).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 404 handling (lines 299-312)
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — 404 draft recreation", () => {
+  it("creates new draft when updateDraft throws 404 (lines 299-312)", async () => {
+    draftSessionState.currentDraftId = "stale-draft-id";
+    const { HttpError } = jest.requireMock("@/config/httpClient") as {
+      HttpError: new (msg: string, statusCode: number) => Error & { statusCode: number };
+    };
+    mockUpdateDraftInStore.mockRejectedValueOnce(new HttpError("Not Found", 404));
+    mockSaveDraftToStore.mockResolvedValueOnce({ id: "replacement-draft" });
+
+    renderHook(() => useWizardAutoSave({ enabled: true, debounceMs: 100 }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSaveDraftToStore).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Outer catch — non-404 update error (line 339)
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — outer catch on non-404 update error (line 339)", () => {
+  it("logs error when updateDraft throws non-404 (re-thrown, caught by outer catch)", async () => {
+    draftSessionState.currentDraftId = "existing-draft";
+    // Non-404 error re-throws from inner catch → caught by outer catch at line 338
+    mockUpdateDraftInStore.mockRejectedValueOnce(new Error("Internal Server Error 500"));
+    const { logger } = jest.requireMock("@/utils/logger") as { logger: { error: jest.Mock } };
+
+    renderHook(() => useWizardAutoSave({ enabled: true, debounceMs: 100 }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(logger.error).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fallback save fails (line 457) — localStorage.setItem throws in beforeunload
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — fallback save fails on localStorage error (line 457)", () => {
+  it("logs error when localStorage.setItem throws during beforeunload", () => {
+    const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("QuotaExceededError");
+    });
+    const { logger } = jest.requireMock("@/utils/logger") as { logger: { error: jest.Mock } };
+
+    renderHook(() => useWizardAutoSave({ enabled: true }));
+    window.dispatchEvent(new Event("beforeunload"));
+
+    expect(logger.error).toHaveBeenCalled();
+    setItemSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isSavingRef concurrent guard (lines 136-137) — enabled=true but ref=true
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — isSavingRef concurrent save guard (lines 136-137)", () => {
+  it("blocks a second save while the first is still in progress", async () => {
+    let resolveFirst!: () => void;
+    mockSaveDraftToStore.mockReturnValueOnce(
+      new Promise<{ id: string }>((resolve) => {
+        resolveFirst = () => resolve({ id: "draft-1" });
+      })
+    );
+
+    renderHook(() => useWizardAutoSave({ enabled: true, debounceMs: 100 }));
+
+    // Trigger the first save — isSavingRef becomes true
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
+    expect(mockSaveDraftToStore).toHaveBeenCalledTimes(1);
+
+    // Attempt a second save before the first resolves
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
+
+    // Second call is blocked by isSavingRef.current === true
+    expect(mockSaveDraftToStore).toHaveBeenCalledTimes(1);
+
+    // Clean up — resolve first save
+    resolveFirst();
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// !hasData() guard (lines 195-197) — no meaningful data to save
+// ---------------------------------------------------------------------------
+
+describe("useWizardAutoSave — hasData() false guard (lines 195-197)", () => {
+  it("skips save when all data fields are empty", async () => {
+    wizardState = {
+      ...wizardState,
+      title: "",
+      clientName: "",
+      description: "",
+      selectedSections: [],
+      clientId: undefined,
+    };
+
+    renderHook(() => useWizardAutoSave({ enabled: true, debounceMs: 100 }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockSaveDraftToStore).not.toHaveBeenCalled();
+  });
+});

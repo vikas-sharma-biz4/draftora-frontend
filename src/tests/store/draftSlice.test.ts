@@ -194,6 +194,16 @@ describe("draftSlice — fetchDrafts", () => {
     expect(state.isLoading).toBe(false);
     expect(state.error).toBe("Network error");
   });
+
+  it("uses generic error message when non-Error is thrown (line 111 false branch)", async () => {
+    mockListDrafts.mockRejectedValueOnce("unexpected string rejection");
+
+    await expect(useDraftStore.getState().fetchDrafts()).rejects.toBe(
+      "unexpected string rejection"
+    );
+
+    expect(useDraftStore.getState().error).toBe("Failed to fetch drafts");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -219,6 +229,13 @@ describe("draftSlice — basic list actions", () => {
     useDraftStore.setState({ drafts: [makeDraftMeta("a")] });
     useDraftStore.getState().updateDraft("a", { title: "Updated Title" });
     expect(useDraftStore.getState().drafts[0].title).toBe("Updated Title");
+  });
+
+  it("updateDraft leaves non-matching drafts unchanged (line 137 false branch)", () => {
+    useDraftStore.setState({ drafts: [makeDraftMeta("a"), makeDraftMeta("b")] });
+    useDraftStore.getState().updateDraft("a", { title: "Changed" });
+    expect(useDraftStore.getState().drafts[0].title).toBe("Changed");
+    expect(useDraftStore.getState().drafts[1].id).toBe("b"); // unchanged
   });
 
   it("removeDraft filters out matching draft", () => {

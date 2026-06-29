@@ -141,6 +141,21 @@ describe("proposalSections.service — regenerateSelection", () => {
 
     expect(result).toMatchObject({ regeneratedText: "Improved", format: "bullets" });
   });
+
+  it("passes selectionContext and instructions when provided (truthy ?? branches)", async () => {
+    mockHttpPost.mockResolvedValue({ regenerated_text: "Result", format: "paragraph" });
+    await regenerateSelection(7, "scope", "text", "surrounding context", "be concise");
+
+    const body = mockHttpPost.mock.calls[0][1];
+    expect(body.selection_context).toBe("surrounding context");
+    expect(body.instructions).toBe("be concise");
+  });
+
+  it("returns format=null when response has no format field (null ?? branch)", async () => {
+    mockHttpPost.mockResolvedValue({ regenerated_text: "No format" });
+    const result = await regenerateSelection(7, "scope", "text");
+    expect(result.format).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

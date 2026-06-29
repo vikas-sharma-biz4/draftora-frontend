@@ -100,10 +100,23 @@ import DashboardPage from "@/views/dashboard/DashboardPage";
 // IntersectionObserver stub
 // ---------------------------------------------------------------------------
 
+type IOCallback = (entries: IntersectionObserverEntry[]) => void;
+
+let lastIOCallback: IOCallback | null = null;
+let lastIOInstance: MockIntersectionObserver | null = null;
+
 class MockIntersectionObserver {
+  callback: IOCallback;
   observe = jest.fn();
   disconnect = jest.fn();
   unobserve = jest.fn();
+
+  constructor(cb: IOCallback) {
+    this.callback = cb;
+    lastIOCallback = cb;
+
+    lastIOInstance = this;
+  }
 }
 
 Object.defineProperty(window, "IntersectionObserver", {
@@ -340,5 +353,126 @@ describe("DashboardPage — infinite scroll sentinel", () => {
     await screen.findAllByTestId("proposal-card");
 
     expect(screen.queryByTestId("loader-icon")).not.toBeInTheDocument();
+  });
+
+  it("calls fetchMore when sentinel intersects and hasMore=true (covers lines 69-72)", async () => {
+    lastIOCallback = null;
+    lastIOInstance = null;
+
+    const mockFetchMore = jest.fn().mockResolvedValue(undefined);
+    mockUseProposals.mockReturnValue({
+      ...defaultHookReturn,
+      hasMore: true,
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: mockFetchMore,
+    });
+
+    render(<DashboardPage />);
+
+    // Wait for the proposals to render so the sentinel div (and its ref callback) is mounted
+    await screen.findAllByTestId("proposal-card");
+
+    // The sentinelRef callback runs synchronously when the node is attached,
+    // creating an IntersectionObserver. Verify it was created.
+    expect(lastIOCallback).not.toBeNull();
+
+    // Simulate the sentinel entering the viewport (isIntersecting = true)
+    await waitFor(() => {
+      lastIOCallback!([{ isIntersecting: true } as IntersectionObserverEntry]);
+    });
+
+    // fetchMore must have been called (covers line 70-71)
+    await waitFor(() => {
+      expect(mockFetchMore).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("does not call fetchMore when sentinel intersects but isIntersecting=false", async () => {
+    lastIOCallback = null;
+
+    const mockFetchMore = jest.fn().mockResolvedValue(undefined);
+    mockUseProposals.mockReturnValue({
+      ...defaultHookReturn,
+      hasMore: true,
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: mockFetchMore,
+    });
+
+    render(<DashboardPage />);
+    await screen.findAllByTestId("proposal-card");
+
+    expect(lastIOCallback).not.toBeNull();
+
+    // Fire callback with isIntersecting=false — branch at line 69 is false, fetchMore must NOT be called
+    lastIOCallback!([{ isIntersecting: false } as IntersectionObserverEntry]);
+
+    expect(mockFetchMore).not.toHaveBeenCalled();
+  });
+
+  it("does not call fetchMore when sentinel intersects but hasMore=false", async () => {
+    lastIOCallback = null;
+
+    const mockFetchMore = jest.fn().mockResolvedValue(undefined);
+    mockUseProposals.mockReturnValue({
+      ...defaultHookReturn,
+      hasMore: false,
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: mockFetchMore,
+    });
+
+    render(<DashboardPage />);
+    await screen.findAllByTestId("proposal-card");
+
+    // With hasMore=false the sentinel div is not rendered at all,
+    // so no IntersectionObserver is created — fetchMore must not be called.
+    if (lastIOCallback) {
+      lastIOCallback([{ isIntersecting: true } as IntersectionObserverEntry]);
+    }
+
+    expect(mockFetchMore).not.toHaveBeenCalled();
+  });
+
+  it("resets loadingRef after fetchMore resolves (covers line 72)", async () => {
+    lastIOCallback = null;
+
+    let resolveFetchMore!: () => void;
+    const fetchMorePromise = new Promise<void>((resolve) => {
+      resolveFetchMore = resolve;
+    });
+    const mockFetchMore = jest.fn().mockReturnValue(fetchMorePromise);
+
+    mockUseProposals.mockReturnValue({
+      ...defaultHookReturn,
+      hasMore: true,
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: mockFetchMore,
+    });
+
+    render(<DashboardPage />);
+    await screen.findAllByTestId("proposal-card");
+
+    expect(lastIOCallback).not.toBeNull();
+
+    // First intersection — fetchMore is called, loadingRef becomes true
+    lastIOCallback!([{ isIntersecting: true } as IntersectionObserverEntry]);
+    expect(mockFetchMore).toHaveBeenCalledTimes(1);
+
+    // While the promise is still pending a second intersection must NOT call fetchMore again
+    lastIOCallback!([{ isIntersecting: true } as IntersectionObserverEntry]);
+    expect(mockFetchMore).toHaveBeenCalledTimes(1);
+
+    // Resolve the promise — this exercises the .finally() at line 72 (loadingRef = false)
+    resolveFetchMore();
+    await waitFor(() => Promise.resolve()); // flush microtasks
+
+    // After reset a new intersection should be able to call fetchMore again
+    lastIOCallback!([{ isIntersecting: true } as IntersectionObserverEntry]);
+    await waitFor(() => {
+      expect(mockFetchMore).toHaveBeenCalledTimes(2);
+    });
   });
 });

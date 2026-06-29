@@ -524,6 +524,14 @@ describe("plainTextToHtml — inline markdown", () => {
     expect(result).toContain('alt="diagram"');
   });
 
+  it("does not produce an img tag when image URL is whitespace-only (if(url && url.trim()) false branch)", () => {
+    // url=" " satisfies [^)]+ but url.trim() === "" → falsy → returns match unchanged.
+    // The link regex then processes [alt]( ) further, but no <img> is ever created.
+    const input = "See ![alt]( ) here.";
+    const result = plainTextToHtml(input);
+    expect(result).not.toContain("<img");
+  });
+
   it("converts ~~strikethrough~~ to <s>", () => {
     const result = plainTextToHtml("This is ~~old~~ outdated.");
     expect(result).toContain("<s>old</s>");
