@@ -2,8 +2,7 @@
  * ProposalApprovalBar component
  *
  * Renders the action bar for proposal approval workflow:
- * - Download DOCX button
- * - Download PDF button
+ * - Download dropdown (DOCX / PDF)
  * - Save Draft button
  * - Approve / Reject buttons with confirmation modal
  * - Approval status badges
@@ -11,8 +10,8 @@
 
 "use client";
 
-import React from "react";
-import { Download } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Download, ChevronDown } from "lucide-react";
 import Button from "@/components/common/Button";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { useProposalDownload } from "@/hooks/useProposalDownload";
@@ -49,55 +48,79 @@ export default function ProposalApprovalBar({
   const isPending = !approvalStatus || approvalStatus === "pending";
   const isAnyDownloading = isDownloading || isPdfDownloading;
 
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent): void {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDownloadOpen(false);
+      }
+    }
+    if (isDownloadOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDownloadOpen]);
+
+  function handleDocx(): void {
+    setIsDownloadOpen(false);
+    downloadProposal(proposalId);
+  }
+
+  function handlePdf(): void {
+    setIsDownloadOpen(false);
+    downloadProposalPdf(proposalId);
+  }
+
   return (
     <>
       <div className="proposal-actions-bar">
         {estimateHoursContent}
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => downloadProposal(proposalId)}
-          disabled={isAnyDownloading}
-          className={isDownloading ? "downloading-btn" : ""}
-        >
-          {isDownloading ? (
-            <div className="flex items-center gap-2">
-              <span className="downloading-text">Downloading</span>
-              <span className="downloading-dots">
-                <span className="dot"></span>
-                <span className="dot"></span>
-                <span className="dot"></span>
-              </span>
-            </div>
-          ) : (
-            <>
-              <Download size={14} /> Download DOCX
-            </>
-          )}
-        </Button>
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => downloadProposalPdf(proposalId)}
-          disabled={isAnyDownloading}
-          className={isPdfDownloading ? "downloading-btn" : ""}
-        >
-          {isPdfDownloading ? (
-            <div className="flex items-center gap-2">
-              <span className="downloading-text">Downloading</span>
-              <span className="downloading-dots">
-                <span className="dot"></span>
-                <span className="dot"></span>
-                <span className="dot"></span>
-              </span>
+        {/* Download dropdown */}
+        <div className="download-dropdown" ref={dropdownRef}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsDownloadOpen((o) => !o)}
+            disabled={isAnyDownloading}
+            className={`download-dropdown-trigger${isAnyDownloading ? " downloading-btn" : ""}`}
+          >
+            {isAnyDownloading ? (
+              <div className="flex items-center gap-2">
+                <span className="downloading-text">Downloading</span>
+                <span className="downloading-dots">
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                  <span className="dot"></span>
+                </span>
+              </div>
+            ) : (
+              <>
+                <Download size={14} />
+                Download
+                <ChevronDown
+                  size={13}
+                  className={`download-chevron${isDownloadOpen ? " open" : ""}`}
+                />
+              </>
+            )}
+          </Button>
+
+          {isDownloadOpen && (
+            <div className="download-dropdown-menu">
+              <button className="download-dropdown-item" onClick={handleDocx}>
+                <Download size={13} />
+                Download DOCX
+              </button>
+              <button className="download-dropdown-item" onClick={handlePdf}>
+                <Download size={13} />
+                Download PDF
+              </button>
             </div>
-          ) : (
-            <>
-              <Download size={14} /> Download PDF
-            </>
           )}
-        </Button>
+        </div>
 
         {isPending && onSaveDraft && (
           <Button variant="secondary" size="sm" onClick={onSaveDraft} disabled={isAnyDownloading}>
