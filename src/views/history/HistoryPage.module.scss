@@ -114,18 +114,22 @@
 
 .historyCard {
   background: white;
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
   border-radius: 12px;
   padding: 20px;
-  transition: all 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .historyCard:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-primary-light);
+  box-shadow: 0 8px 24px rgba(12, 42, 211, 0.12);
+  border-color: var(--color-border-dark);
+  transform: translateY(-3px);
 }
 
 .cardHeader {
@@ -194,6 +198,14 @@
   margin-top: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
+  overflow: hidden;
+
+  // Prevent download buttons from growing when label changes
+  button {
+    flex-shrink: 0;
+    min-width: 0;
+    white-space: nowrap;
+  }
 }
 
 .deleteCardBtn {

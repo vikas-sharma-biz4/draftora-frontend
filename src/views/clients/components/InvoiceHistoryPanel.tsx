@@ -21,11 +21,11 @@ import {
   deleteArtifact,
   uploadPaymentProof,
   getPaymentProofUrl,
+  getPaymentProofDownloadUrl,
 } from "@/services/artifact.service";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "@/utils/toast";
 import { logger } from "@/utils/logger";
-import { MESSAGES } from "@/constants/messages";
 import type { GeneratedArtifact } from "@/interfaces/artifactInterfaces";
 import InvoicePreviewModal from "@/components/modals/InvoicePreviewModal/InvoicePreviewModal";
 import { useClientInvoicesQuery, clientInvoicesQueryKey } from "@/hooks/useClientInvoicesQuery";
@@ -79,7 +79,12 @@ function PaymentProofViewerModal({
   const proofUrl = getPaymentProofUrl(artifactId);
 
   function handleDownload(): void {
-    window.open(proofUrl, "_blank", "noopener,noreferrer");
+    const a = document.createElement("a");
+    a.href = getPaymentProofDownloadUrl(artifactId);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   return createPortal(
@@ -94,7 +99,7 @@ function PaymentProofViewerModal({
             <button
               className={panelStyles.proofDownloadBtn}
               onClick={handleDownload}
-              title="Download proof"
+              title="Open in new tab"
             >
               <Download size={15} />
             </button>
@@ -162,7 +167,7 @@ function PaymentProofViewerModal({
 interface MarkPaidModalProps {
   invoice: GeneratedArtifact;
   onClose: () => void;
-  onConfirm: (file: File | null) => Promise<void>;
+  onConfirm: (file: File) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -197,7 +202,7 @@ function MarkPaidModal({
             Mark <strong>{invoiceNumber}</strong> as paid?
           </p>
           <p className={panelStyles.modalSubtext}>
-            Optionally attach payment proof (image, PDF, or DOCX).
+            Attach payment proof (image, PDF, or DOCX) to confirm payment.
           </p>
 
           <div className={panelStyles.fileUploadArea}>
@@ -239,8 +244,8 @@ function MarkPaidModal({
           </button>
           <button
             className={panelStyles.confirmBtn}
-            onClick={() => void onConfirm(file)}
-            disabled={isSubmitting}
+            onClick={() => file && void onConfirm(file)}
+            disabled={isSubmitting || !file}
           >
             {isSubmitting ? "Saving…" : "Confirm Paid"}
           </button>
@@ -358,7 +363,7 @@ export default function InvoiceHistoryPanel({
 }: InvoiceHistoryPanelProps): JSX.Element {
   const queryClient = useQueryClient();
   const { invoices, isLoading } = useClientInvoicesQuery(clientId);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [togglingId] = useState<number | null>(null);
   const [previewArtifact, setPreviewArtifact] = useState<GeneratedArtifact | null>(null);
   const [invoiceToDelete, setInvoiceToDelete] = useState<GeneratedArtifact | null>(null);
   const [downloadingDocxId, setDownloadingDocxId] = useState<number | null>(null);
@@ -381,42 +386,17 @@ export default function InvoiceHistoryPanel({
   async function handleToggleStatus(artifact: GeneratedArtifact): Promise<void> {
     const currentStatus = (artifact.metadataJson?.payment_status as string | undefined) ?? "Unpaid";
 
-    if (currentStatus === "Unpaid") {
-      // Intercept: show confirmation modal instead of immediately toggling
-      setMarkPaidInvoice(artifact);
-      return;
-    }
+    if (currentStatus === "Paid") return;
 
-    // Paid → Unpaid: toggle directly without modal
-    setTogglingId(artifact.id);
-    try {
-      const updated = await updateArtifact(artifact.id, {
-        content: artifact.content,
-        metadataJson: { ...(artifact.metadataJson ?? {}), payment_status: "Unpaid" },
-      });
-      queryClient.setQueryData(
-        clientInvoicesQueryKey(clientId),
-        (old: GeneratedArtifact[] | undefined) =>
-          (old ?? []).map((inv) => (inv.id === updated.id ? updated : inv))
-      );
-    } catch (err) {
-      logger.error("[InvoiceHistoryPanel] Status toggle failed:", err);
-      toast.error(MESSAGES.INVOICE_STATUS_UPDATE_FAILED);
-    } finally {
-      setTogglingId(null);
-    }
+    // Unpaid → show confirmation modal (requires payment proof upload)
+    setMarkPaidInvoice(artifact);
   }
 
-  async function handleConfirmMarkPaid(file: File | null): Promise<void> {
-    if (!markPaidInvoice) return;
+  async function handleConfirmMarkPaid(file: File): Promise<void> {
+    if (!markPaidInvoice || !file) return;
     setIsMarkingPaid(true);
     try {
-      let latestArtifact = markPaidInvoice;
-
-      // Upload proof first if provided
-      if (file) {
-        latestArtifact = await uploadPaymentProof(markPaidInvoice.id, file);
-      }
+      const latestArtifact = await uploadPaymentProof(markPaidInvoice.id, file);
 
       // Update payment status to Paid in both metadataJson (drives the UI badge)
       // and the content HTML (drives DOCX/PDF downloads which use stored content).

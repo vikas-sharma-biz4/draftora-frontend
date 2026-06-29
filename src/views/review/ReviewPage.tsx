@@ -39,6 +39,7 @@ import {
   useWebReferences,
   useSelectedDocumentIds,
   useApprovalStatus,
+  useProposalWizardStore,
 } from "@/store/features/wizard/proposalWizardSlice";
 import { useDraftSessionStore } from "@/store/features/drafts/draftSessionSlice";
 import { usePipelineSteps } from "@/hooks/usePipelineSteps";
@@ -225,40 +226,54 @@ export default function ReviewPage(): JSX.Element {
     }
   }, [searchParams, currentProposalId, setCurrentProposalId]);
 
-  // Fetch full proposal data when viewing from History so the review page
-  // reflects the selected proposal rather than stale store state.
+  // Fetch proposal metadata when a proposalId is in the URL.
+  // This covers: History proposals viewed via pipeline navigation, and proposals
+  // loaded fresh with no local state.
+  // IMPORTANT: selectedSections and sectionDisplayNames are only overwritten when
+  // the proposal is a History record (approved/rejected) or the store has no sections
+  // yet. During active wizard flow, local edits (e.g. deleted sections) are preserved.
   useEffect(() => {
     const urlProposalId = searchParams.get("proposalId");
-    if (urlProposalId || currentProposalId) {
-      const proposalIdToFetch = Number(urlProposalId) || currentProposalId;
-      if (proposalIdToFetch) {
-        getProposal(proposalIdToFetch)
-          .then((data: ProposalData) => {
-            updateProposalData({
-              title: data.title,
-              clientName: data.clientName,
-              clientId: data.clientId,
-              description: data.description,
-              tone: data.tone,
-              lengthPreference: data.lengthPreference,
-              language: data.language,
-              aiModel: data.aiModel,
-              selectedSections: data.selectedSections,
-              sectionDisplayNames: data.sectionDisplayNames,
-              contextualInstructions: data.contextualInstructions,
-              webReferences: data.webReferences,
-              selectedDocumentIds: data.selectedDocumentIds,
-              templateType: data.templateType,
-              ...(data.approvalStatus ? { approvalStatus: data.approvalStatus } : {}),
-              ...(data.sections ? { sections: data.sections } : {}),
-            });
-          })
-          .catch((error: unknown) => {
-            logger.warn("[ReviewPage] Failed to fetch proposal data", error);
-          });
-      }
-    }
-  }, [searchParams, currentProposalId, updateProposalData]);
+    if (!urlProposalId) return;
+    const proposalIdToFetch = Number(urlProposalId);
+    if (!proposalIdToFetch) return;
+    getProposal(proposalIdToFetch)
+      .then((data: ProposalData) => {
+        // A History proposal has a terminal approval status (approved or rejected).
+        const isHistoryRecord = Boolean(data.approvalStatus && data.approvalStatus !== "pending");
+        // Read sections fresh from the store to avoid stale closure.
+        const localSections = useProposalWizardStore.getState().proposalData.selectedSections ?? [];
+        const hasLocalSections = localSections.length > 0;
+
+        updateProposalData({
+          title: data.title,
+          clientName: data.clientName,
+          clientId: data.clientId,
+          description: data.description,
+          tone: data.tone,
+          lengthPreference: data.lengthPreference,
+          language: data.language,
+          aiModel: data.aiModel,
+          // Preserve local section edits during wizard flow.
+          // Only sync from backend for History proposals or on fresh load.
+          ...(isHistoryRecord || !hasLocalSections
+            ? {
+                selectedSections: data.selectedSections,
+                sectionDisplayNames: data.sectionDisplayNames,
+              }
+            : {}),
+          contextualInstructions: data.contextualInstructions,
+          webReferences: data.webReferences,
+          selectedDocumentIds: data.selectedDocumentIds,
+          templateType: data.templateType,
+          ...(data.approvalStatus ? { approvalStatus: data.approvalStatus } : {}),
+          ...(data.sections ? { sections: data.sections } : {}),
+        });
+      })
+      .catch((error: unknown) => {
+        logger.warn("[ReviewPage] Failed to fetch proposal data", error);
+      });
+  }, [searchParams, updateProposalData]);
 
   // Sync visited steps from backend on mount
   useEffect(() => {
@@ -314,9 +329,6 @@ export default function ReviewPage(): JSX.Element {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showScopeModal, setShowScopeModal] = useState<boolean>(false);
   const [showKnowledgeBaseModal, setShowKnowledgeBaseModal] = useState<boolean>(false);
-  // Tracks only what the user explicitly selected in THIS review session.
-  // Initialized to [] so stale selections from prior drafts/proposals never pre-populate the modal.
-  const [sessionSelectedDocIds, setSessionSelectedDocIds] = useState<string[]>([]);
   const [showStyleVoiceModal, setShowStyleVoiceModal] = useState<boolean>(false);
   const [showSectionsModal, setShowSectionsModal] = useState<boolean>(false);
   const [showTemplateModal, setShowTemplateModal] = useState<boolean>(false);
@@ -443,7 +455,6 @@ export default function ReviewPage(): JSX.Element {
           }))
       : filesMeta; // Preserve existing filesMeta when the client is not in the store
 
-    setSessionSelectedDocIds(selectedIds);
     updateProposalData({
       selectedDocumentIds: selectedIds.map(Number),
       filesMeta: newFilesMeta,
@@ -574,6 +585,11 @@ export default function ReviewPage(): JSX.Element {
       // Mark review step completed and set stage to generated
       markStepCompleted(2);
       setDraftStage("review_complete");
+
+      // Persist the new proposal ID immediately so any subsequent draft save
+      // (e.g. on the proposal page) can link the draft to this proposal.
+      setCurrentProposalId(response.id);
+      setGeneratedProposalId(response.id);
 
       // Update maxStepReached to allow returning to Step 3 from earlier steps
       if (maxStepReached < 3) {
@@ -717,7 +733,7 @@ export default function ReviewPage(): JSX.Element {
 
             <div className="review-card">
               <div className="review-card-header">
-                <span className="review-card-title">STYLE & VOICE</span>
+                <span className="review-card-title">STYLE</span>
                 <button
                   className="link-plain"
                   onClick={
@@ -864,7 +880,7 @@ export default function ReviewPage(): JSX.Element {
       {showKnowledgeBaseModal && (
         <KnowledgeBaseSelectorModal
           availableDocuments={clientDocuments}
-          selectedDocumentIds={sessionSelectedDocIds}
+          selectedDocumentIds={selectedDocumentIdsMemoized}
           onClose={() => setShowKnowledgeBaseModal(false)}
           onSave={handleSaveKnowledgeBase}
           clientId={proposalData.clientId}
