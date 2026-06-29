@@ -289,3 +289,109 @@ describe("useClientProposals — filteredDraftRows search", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Line 50 — fetchProposals error branch
+// ---------------------------------------------------------------------------
+
+describe("useClientProposals — fetchProposals error handling (line 50)", () => {
+  it("logs an error and still clears the local loading flag when fetchProposals rejects", async () => {
+    const { logger } = require("@/utils/logger");
+    mockIsCacheValid.mockReturnValue(false);
+    mockFetchProposals.mockRejectedValue(new Error("network failure"));
+
+    const { result } = renderHook(() => useClientProposals(1, "Acme Corp"));
+
+    await waitFor(() => {
+      expect(logger.error).toHaveBeenCalledWith(
+        "[useClientProposals] Failed to fetch proposals:",
+        expect.any(Error)
+      );
+    });
+
+    // isLoadingProposals should eventually become false (finally ran)
+    await waitFor(() => {
+      expect(result.current.isLoadingProposals).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Line 58 — listDrafts error branch
+// ---------------------------------------------------------------------------
+
+describe("useClientProposals — listDrafts error handling (line 58)", () => {
+  it("logs an error and still clears the draft loading flag when listDrafts rejects", async () => {
+    const { logger } = require("@/utils/logger");
+    mockIsCacheValid.mockReturnValue(true); // skip proposal fetch so only drafts matter
+    mockListDrafts.mockRejectedValue(new Error("drafts unavailable"));
+
+    const { result } = renderHook(() => useClientProposals(1, "Acme Corp"));
+
+    await waitFor(() => {
+      expect(logger.error).toHaveBeenCalledWith(
+        "[useClientProposals] Failed to load drafts:",
+        expect.any(Error)
+      );
+    });
+
+    // isLoadingProposals should eventually become false (finally ran)
+    await waitFor(() => {
+      expect(result.current.isLoadingProposals).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lines 80-84 — handleDownloadProposal try/finally branch
+// ---------------------------------------------------------------------------
+
+describe("useClientProposals — handleDownloadProposal (lines 80-84)", () => {
+  it("sets downloadingProposalId during the download and resets it to null on success", async () => {
+    mockIsCacheValid.mockReturnValue(true);
+
+    let resolveDownload!: () => void;
+    mockDownloadProposal.mockReturnValue(
+      new Promise<void>((res) => {
+        resolveDownload = res;
+      })
+    );
+
+    const { result } = renderHook(() => useClientProposals(1, "Acme Corp"));
+    await waitFor(() => expect(result.current.isLoadingProposals).toBe(false));
+
+    // Start the download — do not await so we can inspect intermediate state
+    let downloadPromise: Promise<void>;
+
+    downloadPromise = result.current.handleDownloadProposal(42);
+
+    await waitFor(() => {
+      expect(result.current.downloadingProposalId).toBe(42);
+    });
+
+    // Resolve the underlying download
+    resolveDownload();
+    await downloadPromise;
+
+    await waitFor(() => {
+      expect(result.current.downloadingProposalId).toBeNull();
+    });
+
+    expect(mockDownloadProposal).toHaveBeenCalledWith(42);
+  });
+
+  it("resets downloadingProposalId to null even when downloadProposal throws", async () => {
+    mockIsCacheValid.mockReturnValue(true);
+    mockDownloadProposal.mockRejectedValue(new Error("download failed"));
+
+    const { result } = renderHook(() => useClientProposals(1, "Acme Corp"));
+    await waitFor(() => expect(result.current.isLoadingProposals).toBe(false));
+
+    // The error re-throws through the finally block — catch it so the test doesn't fail
+    await result.current.handleDownloadProposal(7).catch(() => {});
+
+    await waitFor(() => {
+      expect(result.current.downloadingProposalId).toBeNull();
+    });
+  });
+});

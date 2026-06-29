@@ -312,12 +312,95 @@ describe("draftSessionSlice — reset", () => {
 describe("draftSessionSlice — readCompletedStepsFromSession JSON parse fallback", () => {
   it("returns empty array when sessionStorage has corrupted JSON for completed steps", () => {
     sessionStorage.setItem("draftora_completed_steps", "not-valid-json");
-    // Re-read by calling setCompletedSteps which calls writeCompletedStepsToSession,
-    // but the read function is tested indirectly via initial state reads.
-    // The parse-error path is guarded with /* istanbul ignore next */ in source.
-    // This test validates the "raw is falsy => empty array" branch of readCompletedStepsFromSession.
     sessionStorage.removeItem("draftora_completed_steps");
-    // Now the store has empty completedSteps from reset
     expect(useDraftSessionStore.getState().completedSteps).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Module init reads — truthy branches (use isolateModules to re-init)
+// ---------------------------------------------------------------------------
+
+describe("draftSessionSlice — module init reads truthy sessionStorage values", () => {
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("restores draftStage from sessionStorage on module init (truthy || branch)", () => {
+    sessionStorage.setItem("draftora_draft_stage", "parameters_complete");
+
+    let freshStore: typeof import("@/store/features/drafts/draftSessionSlice") | undefined;
+    jest.isolateModules(() => {
+      freshStore = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    expect(freshStore!.useDraftSessionStore.getState().draftStage).toBe("parameters_complete");
+  });
+
+  it("restores completedSteps from sessionStorage on module init (raw truthy branch)", () => {
+    sessionStorage.setItem("draftora_completed_steps", JSON.stringify([1, 2, 3]));
+
+    let freshStore: typeof import("@/store/features/drafts/draftSessionSlice") | undefined;
+    jest.isolateModules(() => {
+      freshStore = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    expect(freshStore!.useDraftSessionStore.getState().completedSteps).toEqual([1, 2, 3]);
+  });
+
+  it("restores currentDraftId from sessionStorage on module init", () => {
+    sessionStorage.setItem("draftora_current_draft_id", "restored-id");
+
+    let freshStore: typeof import("@/store/features/drafts/draftSessionSlice") | undefined;
+    jest.isolateModules(() => {
+      freshStore = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    expect(freshStore!.useDraftSessionStore.getState().currentDraftId).toBe("restored-id");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Module initialization — reads from sessionStorage when values are present
+// These tests use jest.isolateModules to re-import the store after pre-populating
+// sessionStorage so that the module-level read functions hit their truthy branches.
+// ---------------------------------------------------------------------------
+
+describe("draftSessionSlice — module init reads non-empty sessionStorage (truthy branches)", () => {
+  it("restores draftStage from sessionStorage on module init (|| truthy branch)", () => {
+    sessionStorage.setItem("draftora_draft_stage", "parameters_complete");
+
+    let store: typeof import("@/store/features/drafts/draftSessionSlice");
+    jest.isolateModules(() => {
+      store = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    // After module init the store should reflect the sessionStorage value
+    expect(store!.useDraftSessionStore.getState().draftStage).toBe("parameters_complete");
+    sessionStorage.removeItem("draftora_draft_stage");
+  });
+
+  it("restores completedSteps from sessionStorage on module init (raw truthy branch)", () => {
+    sessionStorage.setItem("draftora_completed_steps", JSON.stringify([1, 2, 3]));
+
+    let store: typeof import("@/store/features/drafts/draftSessionSlice");
+    jest.isolateModules(() => {
+      store = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    expect(store!.useDraftSessionStore.getState().completedSteps).toEqual([1, 2, 3]);
+    sessionStorage.removeItem("draftora_completed_steps");
+  });
+
+  it("restores currentDraftId from sessionStorage on module init", () => {
+    sessionStorage.setItem("draftora_current_draft_id", "restored-draft-id");
+
+    let store: typeof import("@/store/features/drafts/draftSessionSlice");
+    jest.isolateModules(() => {
+      store = require("@/store/features/drafts/draftSessionSlice");
+    });
+
+    expect(store!.useDraftSessionStore.getState().currentDraftId).toBe("restored-draft-id");
+    sessionStorage.removeItem("draftora_current_draft_id");
   });
 });

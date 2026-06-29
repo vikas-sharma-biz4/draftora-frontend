@@ -15,6 +15,7 @@
  */
 
 import { useClientStore, INITIAL_CLIENT_STATE } from "@/store/features/clients/clientSlice";
+import { act } from "@testing-library/react";
 import * as clientApi from "@/services/client.service";
 import { HttpError } from "@/config/httpClient";
 import type { ClientWithDocuments, ClientDocument } from "@/services/client.service";
@@ -482,5 +483,108 @@ describe("clientSlice — deleteDocument", () => {
     const updated = useClientStore.getState().clients.find((c) => c.id === 1);
     expect(updated?.documents).toHaveLength(1);
     expect(updated?.documents[0].id).toBe(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onRehydrateStorage — sets isInitialized when clients present (line 314)
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — onRehydrateStorage sets isInitialized when clients exist", () => {
+  it("sets isInitialized=true when rehydrated state has clients", async () => {
+    act(() => {
+      useClientStore.setState({ clients: [makeClient(1)], isInitialized: false });
+    });
+    expect(useClientStore.getState().isInitialized).toBe(false);
+
+    await act(async () => {
+      await useClientStore.persist.rehydrate();
+    });
+
+    expect(useClientStore.getState().isInitialized).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchClients — non-Error catch (line 112 false branch)
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — fetchClients non-Error rejection", () => {
+  it("uses generic error message when thrown value is not an Error", async () => {
+    mockListClientsFullData.mockRejectedValueOnce("string rejection");
+
+    await expect(useClientStore.getState().fetchClients()).rejects.toBe("string rejection");
+
+    expect(useClientStore.getState().error).toBe("Failed to fetch clients");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateClientLocally — false branch (c.id !== id, line 141)
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — updateClientLocally false branch", () => {
+  it("leaves non-matching clients unchanged", () => {
+    useClientStore.setState({ clients: [makeClient(1), makeClient(2)] });
+    useClientStore.getState().updateClientLocally(1, { name: "Renamed" });
+    expect(useClientStore.getState().clients[1].name).toBe("Client 2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addDocument — documents || [] false branch (line 179)
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — addDocument with undefined documents", () => {
+  it("uses [] fallback when client documents is undefined", () => {
+    const clientNoDoc = { ...makeClient(1), documents: undefined as unknown as ClientDocument[] };
+    useClientStore.setState({ clients: [clientNoDoc] });
+
+    useClientStore.getState().addDocument(1, makeDoc(5, 1));
+
+    const updated = useClientStore.getState().clients.find((c) => c.id === 1);
+    expect(updated?.documents).toHaveLength(1);
+    expect(updated?.documents[0].id).toBe(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// removeDocument — outer map false branch (c.id !== clientId)
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — removeDocument false branch", () => {
+  it("leaves non-matching clients untouched", () => {
+    const c1 = makeClient(1, [makeDoc(10, 1)]);
+    const c2 = makeClient(2, [makeDoc(20, 2)]);
+    useClientStore.setState({ clients: [c1, c2] });
+
+    useClientStore.getState().removeDocument(1, 10);
+
+    const c2Updated = useClientStore.getState().clients.find((c) => c.id === 2);
+    expect(c2Updated?.documents).toHaveLength(1);
+    expect(c2Updated?.documents[0].id).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateDocument — outer and inner map false branches
+// ---------------------------------------------------------------------------
+
+describe("clientSlice — updateDocument false branches", () => {
+  it("leaves non-matching clients and non-matching docs unchanged", () => {
+    const c1 = makeClient(1, [makeDoc(10, 1), makeDoc(11, 1)]);
+    const c2 = makeClient(2, [makeDoc(20, 2)]);
+    useClientStore.setState({ clients: [c1, c2] });
+
+    useClientStore.getState().updateDocument(1, 10, { status: "processing" });
+
+    const c2State = useClientStore.getState().clients.find((c) => c.id === 2);
+    expect(c2State?.documents[0].status).toBe("parsed");
+
+    const doc11 = useClientStore
+      .getState()
+      .clients.find((c) => c.id === 1)
+      ?.documents.find((d) => d.id === 11);
+    expect(doc11?.status).toBe("parsed");
   });
 });

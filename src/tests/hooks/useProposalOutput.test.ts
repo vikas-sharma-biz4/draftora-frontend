@@ -202,3 +202,54 @@ describe("useProposalOutput — refetch", () => {
     expect(mockGetProposal.mock.calls.length).toBeGreaterThan(callCount);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Additional branch coverage
+// ---------------------------------------------------------------------------
+
+describe("useProposalOutput — selectedSections null-coalescing", () => {
+  it("handles undefined selectedSections via ?? [] (produces empty sections)", async () => {
+    const proposal = makeProposal("completed");
+    // Force selectedSections to undefined to hit the ?? [] branch
+    (proposal as unknown as Record<string, unknown>).selectedSections = undefined;
+    mockGetProposal.mockResolvedValue(proposal);
+
+    const { result } = renderHook(() => useProposalOutput({ proposalId: 1 }));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    // sections.length === 0 → setActiveSection not called → stays ""
+    expect(result.current.activeSection).toBe("");
+  });
+
+  it("does not set activeSection when selectedSections is empty array", async () => {
+    const proposal = makeProposal("completed");
+    proposal.selectedSections = [];
+    mockGetProposal.mockResolvedValue(proposal);
+
+    const { result } = renderHook(() => useProposalOutput({ proposalId: 1 }));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.activeSection).toBe("");
+  });
+
+  it("does not override activeSection on refetch when already set", async () => {
+    mockGetProposal.mockResolvedValue(makeProposal("completed"));
+
+    const { result } = renderHook(() => useProposalOutput({ proposalId: 1 }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    // First fetch sets activeSection to "executive_summary"
+    expect(result.current.activeSection).toBe("executive_summary");
+
+    // User changes active section
+    act(() => {
+      result.current.setActiveSection("scope");
+    });
+    expect(result.current.activeSection).toBe("scope");
+
+    // Refetch — activeSection is "scope" (truthy), so !activeSection is false → no override
+    await act(async () => {
+      await result.current.refetch();
+    });
+    expect(result.current.activeSection).toBe("scope");
+  });
+});
