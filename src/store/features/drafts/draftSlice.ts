@@ -197,6 +197,7 @@ export const useDraftStore = create<DraftState>((set, get) => ({
 
     // Update in store
     const draftMetadata: Partial<DraftMetadata> = {
+      proposalId: updatedDraft.proposalId,
       title: updatedDraft.title,
       clientName: updatedDraft.clientName,
       status: updatedDraft.status,

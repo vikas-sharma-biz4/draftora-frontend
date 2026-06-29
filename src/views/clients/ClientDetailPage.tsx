@@ -21,8 +21,6 @@ import ClientDocumentsPanel from "./components/ClientDocumentsPanel";
 import ClientProposalsList from "./components/ClientProposalsList";
 import InvoiceHistoryPanel from "./components/InvoiceHistoryPanel";
 import EmailHistoryPanel from "./components/EmailHistoryPanel";
-import GeneratedDocumentsPanel from "./components/GeneratedDocumentsPanel";
-
 import styles from "./ClientDetailPage.module.scss";
 
 const EditClientModal = dynamic(() => import("@/components/modals/EditClientModal"), {
@@ -82,7 +80,6 @@ export default function ClientWorkspacePage(): JSX.Element {
   const [deleteClientModalOpen, setDeleteClientModalOpen] = useState<boolean>(false);
   const [showGenerateEmailModal, setShowGenerateEmailModal] = useState<boolean>(false);
   const [emailRefreshKey, setEmailRefreshKey] = useState<number>(0);
-  const [docsRefreshKey, setDocsRefreshKey] = useState<number>(0);
   const [showGenerateInvoiceModal, setShowGenerateInvoiceModal] = useState<boolean>(false);
   const [showGenerateNdaModal, setShowGenerateNdaModal] = useState<boolean>(false);
   const [showGeneratePodcastModal, setShowGeneratePodcastModal] = useState<boolean>(false);
@@ -185,7 +182,6 @@ export default function ClientWorkspacePage(): JSX.Element {
           onGenerateEmail={() => setShowGenerateEmailModal(true)}
           refreshKey={emailRefreshKey}
         />
-        <GeneratedDocumentsPanel clientId={clientId} refreshKey={docsRefreshKey} />
       </div>
 
       {showEditModal && (
@@ -262,13 +258,7 @@ export default function ClientWorkspacePage(): JSX.Element {
       )}
 
       {showGenerateNdaModal && (
-        <GenerateNdaModal
-          client={client}
-          onClose={() => {
-            setShowGenerateNdaModal(false);
-            setDocsRefreshKey((k) => k + 1);
-          }}
-        />
+        <GenerateNdaModal client={client} onClose={() => setShowGenerateNdaModal(false)} />
       )}
 
       {showGeneratePodcastModal && (
@@ -278,7 +268,6 @@ export default function ClientWorkspacePage(): JSX.Element {
           onClose={() => {
             setShowGeneratePodcastModal(false);
             setPodcastProposalId(undefined);
-            setDocsRefreshKey((k) => k + 1);
           }}
         />
       )}

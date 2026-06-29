@@ -72,6 +72,60 @@
   margin-left: auto;
 }
 
+// ─── Download dropdown ────────────────────────────────────────────────────────
+.download-dropdown {
+  position: relative;
+}
+
+.download-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.download-chevron {
+  transition: transform 0.18s ease;
+  &.open {
+    transform: rotate(180deg);
+  }
+}
+
+.download-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.download-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.55rem 0.875rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-text, #1a202c);
+  text-align: left;
+  transition: background 0.12s ease;
+
+  &:hover {
+    background: var(--color-surface-raised, #f7f8fa);
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+  }
+}
+
 .proposal-actions-left,
 .proposal-actions-right {
   display: flex;
