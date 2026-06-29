@@ -572,3 +572,233 @@ describe("proposalSlice — invalidateCache", () => {
     expect(useProposalStore.getState().historyInitialized).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// fetchVersionDrafts — all branch paths
+// ---------------------------------------------------------------------------
+
+describe("proposalSlice — fetchVersionDrafts", () => {
+  it("returns early when versionDrafts cache is fresh and force=false", async () => {
+    useProposalStore.setState({
+      versionDrafts: [mockProposals[2]],
+      versionDraftsLastFetched: Date.now(), // fresh
+    });
+
+    await useProposalStore.getState().fetchVersionDrafts(false);
+
+    expect(mockListProposals).not.toHaveBeenCalled();
+  });
+
+  it("derives version drafts in-memory when main proposals cache is warm", async () => {
+    const versionDraft: ProposalListItem = {
+      ...mockProposals[2],
+      id: 500,
+      approvalStatus: "pending",
+      parentProposalId: 1,
+    };
+    useProposalStore.setState({
+      proposals: [mockProposals[0], versionDraft],
+      isInitialized: true,
+      lastFetched: Date.now(), // warm proposals cache
+    });
+
+    await useProposalStore.getState().fetchVersionDrafts(true);
+
+    expect(mockListProposals).not.toHaveBeenCalled();
+    expect(useProposalStore.getState().versionDrafts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 500 })])
+    );
+  });
+
+  it("excludes proposals without parentProposalId from in-memory derivation", async () => {
+    useProposalStore.setState({
+      proposals: mockProposals, // none have parentProposalId
+      isInitialized: true,
+      lastFetched: Date.now(),
+    });
+
+    await useProposalStore.getState().fetchVersionDrafts(true);
+
+    expect(useProposalStore.getState().versionDrafts).toHaveLength(0);
+  });
+
+  it("calls listProposals API when main proposals cache is stale/empty", async () => {
+    const versionDraft: ProposalListItem = {
+      ...mockProposals[2],
+      id: 600,
+      approvalStatus: "pending",
+      parentProposalId: 2,
+    };
+    mockListProposals.mockResolvedValue([mockProposals[0], versionDraft]);
+
+    // proposals not initialized → API call path
+    await useProposalStore.getState().fetchVersionDrafts(true);
+
+    expect(mockListProposals).toHaveBeenCalledTimes(1);
+    expect(useProposalStore.getState().versionDrafts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 600 })])
+    );
+  });
+
+  it("does not include proposals with pending status but null parentProposalId from API", async () => {
+    mockListProposals.mockResolvedValue([mockProposals[2]]); // pending but no parentProposalId
+
+    await useProposalStore.getState().fetchVersionDrafts(true);
+
+    expect(useProposalStore.getState().versionDrafts).toHaveLength(0);
+  });
+
+  it("catches API errors silently (non-fatal — versionDrafts not cleared)", async () => {
+    mockListProposals.mockRejectedValue(new Error("Network error"));
+
+    // Should NOT throw
+    await expect(useProposalStore.getState().fetchVersionDrafts(true)).resolves.toBeUndefined();
+  });
+
+  it("skips in-memory derivation when lastFetched is null (stale proposals)", async () => {
+    useProposalStore.setState({
+      proposals: mockProposals,
+      isInitialized: true,
+      lastFetched: null, // invalidated → must NOT use stale in-memory data
+    });
+    mockListProposals.mockResolvedValue([]);
+
+    await useProposalStore.getState().fetchVersionDrafts(true);
+
+    expect(mockListProposals).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addVersionDraft / removeVersionDraft
+// ---------------------------------------------------------------------------
+
+describe("proposalSlice — addVersionDraft", () => {
+  it("prepends a version draft and sets versionDraftsLastFetched", () => {
+    const draft: ProposalListItem = { ...mockProposals[0], id: 700 };
+
+    useProposalStore.getState().addVersionDraft(draft);
+
+    const { versionDrafts, versionDraftsLastFetched } = useProposalStore.getState();
+    expect(versionDrafts[0].id).toBe(700);
+    expect(versionDraftsLastFetched).not.toBeNull();
+  });
+
+  it("prepends to existing list (keeps prior drafts)", () => {
+    useProposalStore.setState({ versionDrafts: [{ ...mockProposals[0], id: 800 }] });
+    const newDraft: ProposalListItem = { ...mockProposals[0], id: 801 };
+
+    useProposalStore.getState().addVersionDraft(newDraft);
+
+    const { versionDrafts } = useProposalStore.getState();
+    expect(versionDrafts).toHaveLength(2);
+    expect(versionDrafts[0].id).toBe(801); // newest first
+  });
+});
+
+describe("proposalSlice — removeVersionDraft", () => {
+  it("removes the version draft matching the given id", () => {
+    useProposalStore.setState({
+      versionDrafts: [
+        { ...mockProposals[0], id: 901 },
+        { ...mockProposals[0], id: 902 },
+      ],
+    });
+
+    useProposalStore.getState().removeVersionDraft(901);
+
+    const { versionDrafts } = useProposalStore.getState();
+    expect(versionDrafts).toHaveLength(1);
+    expect(versionDrafts[0].id).toBe(902);
+  });
+
+  it("leaves list unchanged when id is not found", () => {
+    useProposalStore.setState({
+      versionDrafts: [{ ...mockProposals[0], id: 999 }],
+    });
+
+    useProposalStore.getState().removeVersionDraft(0);
+
+    expect(useProposalStore.getState().versionDrafts).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchProposalHistory — error branch
+// ---------------------------------------------------------------------------
+
+describe("proposalSlice — fetchProposalHistory error handling", () => {
+  it("sets error message and rethrows on API failure", async () => {
+    mockListProposalHistory.mockRejectedValue(new Error("History fetch failed"));
+
+    await expect(useProposalStore.getState().fetchProposalHistory(true)).rejects.toThrow(
+      "History fetch failed"
+    );
+
+    expect(useProposalStore.getState().error).toBe("History fetch failed");
+    expect(useProposalStore.getState().isLoading).toBe(false);
+  });
+
+  it("uses generic error message for non-Error thrown value", async () => {
+    mockListProposalHistory.mockRejectedValue("string error");
+
+    await expect(useProposalStore.getState().fetchProposalHistory(true)).rejects.toBe(
+      "string error"
+    );
+
+    expect(useProposalStore.getState().error).toBe("Failed to fetch proposal history");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchMoreProposals — error branch
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// fetchProposalHistory — isLoading guard (line 216) and reset (line 334)
+// ---------------------------------------------------------------------------
+
+describe("proposalSlice — fetchProposalHistory isLoading guard (line 216)", () => {
+  it("returns early without fetching when isLoading is already true", async () => {
+    useProposalStore.setState({ isLoading: true });
+    await useProposalStore.getState().fetchProposalHistory(true);
+    expect(mockListProposalHistory).not.toHaveBeenCalled();
+  });
+});
+
+describe("proposalSlice — reset (line 334)", () => {
+  it("resets all state to initial values", () => {
+    useProposalStore.setState({
+      proposals: [{ id: 1 } as import("@/interfaces/proposalInterfaces").ProposalListItem],
+      isLoading: true,
+      isInitialized: true,
+    });
+    useProposalStore.getState().reset();
+    expect(useProposalStore.getState().proposals).toEqual([]);
+    expect(useProposalStore.getState().isLoading).toBe(false);
+    expect(useProposalStore.getState().isInitialized).toBe(false);
+  });
+});
+
+describe("proposalSlice — fetchMoreProposals error handling", () => {
+  it("sets error message and rethrows on API failure", async () => {
+    useProposalStore.setState({ hasMore: true, page: 1, pageSize: 20 });
+    mockListProposals.mockRejectedValue(new Error("Load more failed"));
+
+    await expect(useProposalStore.getState().fetchMoreProposals()).rejects.toThrow(
+      "Load more failed"
+    );
+
+    expect(useProposalStore.getState().error).toBe("Load more failed");
+    expect(useProposalStore.getState().isLoadingMore).toBe(false);
+  });
+
+  it("uses generic error message when non-Error is thrown in fetchMoreProposals", async () => {
+    useProposalStore.setState({ hasMore: true, page: 1, pageSize: 20 });
+    mockListProposals.mockRejectedValue("network down");
+
+    await expect(useProposalStore.getState().fetchMoreProposals()).rejects.toBe("network down");
+
+    expect(useProposalStore.getState().error).toBe("Failed to load more proposals");
+  });
+});

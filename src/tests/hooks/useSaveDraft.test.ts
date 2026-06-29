@@ -32,11 +32,13 @@ import { HttpError } from "@/config/httpClient";
 // via jest.requireMock.
 // ---------------------------------------------------------------------------
 
+let mockPathnameValue = "/parameters";
+
 jest.mock("next/navigation", () => {
   const pushFn = jest.fn();
   return {
     useRouter: () => ({ push: pushFn }),
-    usePathname: () => "/parameters",
+    usePathname: () => mockPathnameValue,
   };
 });
 
@@ -204,6 +206,7 @@ beforeEach(() => {
   };
   mockPush = navModule.useRouter().push;
 
+  mockPathnameValue = "/parameters";
   mockCurrentDraftId = null;
   mockGeneratedContent = {};
   wizardState.title = "Test Proposal";
@@ -519,5 +522,59 @@ describe("useSaveDraft — generatedContent cache (M3)", () => {
     // Save should still complete successfully despite the fetch failure
     expect(mockSaveDraftToStore).toHaveBeenCalledTimes(1);
     expect(mockToastSuccess).toHaveBeenCalledWith("Draft saved successfully.");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lastLocation computation — pathname branches (lines 111-113)
+// ---------------------------------------------------------------------------
+
+describe("useSaveDraft — lastLocation based on pathname", () => {
+  it("sets lastLocation=wizard_review when pathname is /review", async () => {
+    mockPathnameValue = "/review";
+    wizardState.approvalStatus = undefined; // no proposalId guard
+    wizardState.currentProposalId = null;
+
+    const { result } = renderHook(() => useSaveDraft());
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mockSaveDraftToStore).toHaveBeenCalledWith(
+      expect.objectContaining({ lastLocation: "wizard_review" })
+    );
+  });
+
+  it("sets lastLocation=web_view when pathname starts with /proposal/", async () => {
+    mockPathnameValue = "/proposal/99";
+    wizardState.approvalStatus = undefined;
+    wizardState.currentProposalId = null;
+
+    const { result } = renderHook(() => useSaveDraft());
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mockSaveDraftToStore).toHaveBeenCalledWith(
+      expect.objectContaining({ lastLocation: "web_view" })
+    );
+  });
+
+  it("defaults lastLocation=wizard_parameters for unknown pathname", async () => {
+    mockPathnameValue = "/unknown-page";
+    wizardState.approvalStatus = undefined;
+    wizardState.currentProposalId = null;
+
+    const { result } = renderHook(() => useSaveDraft());
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mockSaveDraftToStore).toHaveBeenCalledWith(
+      expect.objectContaining({ lastLocation: "wizard_parameters" })
+    );
   });
 });

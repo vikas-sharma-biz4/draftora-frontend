@@ -114,7 +114,7 @@ describe("sanitizeHtml — safe HTML passthrough", () => {
   });
 
   it("preserves colspan and rowspan on table cells", () => {
-    const input = "<table><tr><td colspan=\"2\" rowspan=\"1\">Cell</td></tr></table>";
+    const input = '<table><tr><td colspan="2" rowspan="1">Cell</td></tr></table>';
     const result = sanitizeHtml(input);
     expect(result).toContain("colspan");
   });
@@ -207,8 +207,7 @@ describe("sanitizeHtml — XSS stripping", () => {
   });
 
   it("handles deeply nested script injection", () => {
-    const malicious =
-      '<div><p><span><script>alert("nested")</script></span></p></div>';
+    const malicious = '<div><p><span><script>alert("nested")</script></span></p></div>';
     const result = sanitizeHtml(malicious);
     expect(result).not.toContain("<script>");
     expect(result).not.toContain("alert");
@@ -281,4 +280,7 @@ describe("sanitizeHtml — SSR guard", () => {
   it("sanitizes plain text without modification in browser environment", () => {
     expect(sanitizeHtml("plain text")).toBe("plain text");
   });
+
+  // Line 105 (isServerEnvironment() true branch) is SSR-only dead code in jsdom —
+  // the direct internal call cannot be intercepted by a module spy in CommonJS.
 });

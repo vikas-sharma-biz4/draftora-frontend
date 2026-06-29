@@ -110,3 +110,68 @@ describe("useVisitedPipelineSteps", () => {
     expect(result.current).toEqual([1, 2, 3]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// loadFromStorage — branch coverage via jest.isolateModules
+// ---------------------------------------------------------------------------
+
+describe("pipelineSlice — loadFromStorage with populated localStorage", () => {
+  afterEach(() => {
+    localStorage.clear();
+    usePipelineStore.setState({ visitedSteps: [] });
+  });
+
+  it("loads a valid array from localStorage when data is present (if(stored) true branch)", () => {
+    localStorage.setItem("draftora_pipeline_steps", JSON.stringify([3, 4, 5]));
+
+    let visitedSteps: number[] = [];
+    jest.isolateModules(() => {
+      const mod = require("@/store/features/pipeline/pipelineSlice");
+      visitedSteps = mod.INITIAL_PIPELINE_STATE.visitedSteps;
+    });
+
+    expect(visitedSteps).toEqual([3, 4, 5]);
+  });
+
+  it("returns [] when localStorage has invalid JSON (catch branch)", () => {
+    localStorage.setItem("draftora_pipeline_steps", "{{not valid json}}");
+
+    let visitedSteps: number[] = [];
+    jest.isolateModules(() => {
+      const mod = require("@/store/features/pipeline/pipelineSlice");
+      visitedSteps = mod.INITIAL_PIPELINE_STATE.visitedSteps;
+    });
+
+    expect(visitedSteps).toEqual([]);
+  });
+
+  it("returns [] when parsed value is a non-array object (Array.isArray false branch)", () => {
+    localStorage.setItem("draftora_pipeline_steps", JSON.stringify({ a: 1, b: 2 }));
+
+    let visitedSteps: number[] = [];
+    jest.isolateModules(() => {
+      const mod = require("@/store/features/pipeline/pipelineSlice");
+      visitedSteps = mod.INITIAL_PIPELINE_STATE.visitedSteps;
+    });
+
+    expect(visitedSteps).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// saveToStorage — catch branch (localStorage.setItem throws)
+// ---------------------------------------------------------------------------
+
+describe("pipelineSlice — saveToStorage catch branch", () => {
+  it("does not throw when localStorage.setItem throws (QuotaExceededError)", () => {
+    const setItemSpy = jest.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new Error("QuotaExceededError: storage is full");
+    });
+
+    expect(() => {
+      usePipelineStore.getState().markStepAsVisited(42);
+    }).not.toThrow();
+
+    setItemSpy.mockRestore();
+  });
+});

@@ -169,6 +169,19 @@ describe("useDraftRecovery — load available drafts", () => {
     expect(result.current.recoveryError).not.toBeNull();
     expect(result.current.recoveryError?.message).toBe("Network error");
   });
+
+  it("wraps non-Error fetchDrafts rejection in Error (line 42 false branch)", async () => {
+    mockListDrafts.mockRejectedValue("string rejection");
+
+    const { result } = renderHook(() => useDraftRecovery());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.recoveryError).toBeInstanceOf(Error);
+    expect(result.current.recoveryError?.message).toBe("Failed to load drafts");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -249,6 +262,31 @@ describe("useDraftRecovery — recoverDraft state restoration", () => {
     });
 
     expect(mockSetGeneratedProposalId).not.toHaveBeenCalled();
+  });
+
+  it("uses empty object when generatedContent is null (lines 57/67 false branch)", async () => {
+    mockGetDraft.mockResolvedValue({ ...savedDraft, generatedContent: null });
+
+    const { result } = renderHook(() => useDraftRecovery());
+
+    await act(async () => {
+      await result.current.recoverDraft("draft-1");
+    });
+
+    expect(mockUpdateProposalData).toHaveBeenCalledWith(expect.objectContaining({ sections: {} }));
+  });
+
+  it("wraps non-Error recoverDraft rejection in Error (catch false branch)", async () => {
+    mockGetDraft.mockRejectedValue("non-error string");
+
+    const { result } = renderHook(() => useDraftRecovery());
+
+    await act(async () => {
+      await result.current.recoverDraft("draft-1");
+    });
+
+    expect(result.current.recoveryError).toBeInstanceOf(Error);
+    expect(result.current.recoveryError?.message).toBe("Failed to recover draft");
   });
 });
 
