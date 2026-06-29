@@ -335,7 +335,7 @@ export default function HistoryPage(): JSX.Element {
                       ) : (
                         <Download size={14} />
                       )}{" "}
-                      {downloadingIds.has(item.id) ? "Downloading..." : "DOCX"}
+                      {downloadingIds.has(item.id) ? "..." : "DOCX"}
                     </Button>
                     <Button
                       variant="secondary"
@@ -348,7 +348,7 @@ export default function HistoryPage(): JSX.Element {
                       ) : (
                         <Download size={14} />
                       )}{" "}
-                      {downloadingPdfIds.has(item.id) ? "Downloading..." : "PDF"}
+                      {downloadingPdfIds.has(item.id) ? "..." : "PDF"}
                     </Button>
                     <button
                       type="button"

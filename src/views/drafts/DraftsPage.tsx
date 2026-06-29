@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText } from "lucide-react";
 import { logger } from "@/utils/logger";
 import { toast } from "@/utils/toast";
 import { MESSAGES } from "@/constants/messages";
@@ -98,26 +98,11 @@ export default function DraftsPage(): JSX.Element {
   const versionDrafts = useProposalStore((s) => s.versionDrafts);
   const fetchVersionDrafts = useProposalStore((s) => s.fetchVersionDrafts);
   const removeVersionDraft = useProposalStore((s) => s.removeVersionDraft);
-  const mainProposals = useProposalStore((s) => s.proposals);
 
   // Populate version drafts on mount
   useEffect(() => {
     void fetchVersionDrafts();
   }, [fetchVersionDrafts]);
-
-  // Returns the hierarchical versionLabel ("1.1", "1.2", …) for a draft that
-  // is linked to a version-draft proposal, or null for plain wizard drafts.
-  const getProposalVersionLabel = useCallback(
-    (proposalId: number | null | undefined): string | null => {
-      if (!proposalId) return null;
-      const fromMain = mainProposals.find((p) => p.id === proposalId);
-      if (fromMain?.versionLabel && fromMain.parentProposalId != null) return fromMain.versionLabel;
-      const fromVersionDrafts = versionDrafts.find((p) => p.id === proposalId);
-      if (fromVersionDrafts?.versionLabel) return fromVersionDrafts.versionLabel;
-      return null;
-    },
-    [mainProposals, versionDrafts]
-  );
 
   // Combined + filtered list: version drafts mapped to DraftMetadata shape and merged
   // with wizard drafts, then sorted newest-updated-first and filtered by search query.
@@ -271,30 +256,39 @@ export default function DraftsPage(): JSX.Element {
         };
         sessionStorage.setItem(DRAFT_UI_STATE_STORAGE_KEY, JSON.stringify(uiState));
 
-        switch (fullDraft.lastLocation) {
-          case "wizard_parameters":
-            router.push("/parameters");
-            break;
-          case "wizard_review":
-            router.push("/review");
-            break;
-          case "web_view":
-            if (fullDraft.proposalId) {
-              router.push(`/proposal/${fullDraft.proposalId}`);
-            } else {
+        // Clear loading state BEFORE navigation so React doesn't attempt a
+        // state update on a partially-unmounted tree (prevents removeChild error).
+        setLoadingDraftId(null);
+
+        // Stage-aware navigation: if the proposal was already generated,
+        // always go to the proposal page regardless of lastLocation.
+        if (fullDraft.stage === "generated" && fullDraft.proposalId) {
+          router.push(`/proposal/${fullDraft.proposalId}`);
+        } else {
+          switch (fullDraft.lastLocation) {
+            case "wizard_parameters":
               router.push("/parameters");
-            }
-            break;
-          case "ai_sections":
-            router.push("/generating");
-            break;
-          default:
-            router.push("/parameters");
+              break;
+            case "wizard_review":
+              router.push("/review");
+              break;
+            case "web_view":
+              if (fullDraft.proposalId) {
+                router.push(`/proposal/${fullDraft.proposalId}`);
+              } else {
+                router.push("/parameters");
+              }
+              break;
+            case "ai_sections":
+              router.push("/generating");
+              break;
+            default:
+              router.push("/parameters");
+          }
         }
       } catch (loadError) {
         logger.error("[DraftsPage] Failed to load draft:", loadError);
         toast.error(MESSAGES.DRAFT_LOAD_FAILED);
-      } finally {
         setLoadingDraftId(null);
       }
     },
@@ -355,14 +349,6 @@ export default function DraftsPage(): JSX.Element {
       <PageHeader
         title="Drafts"
         subtitle="Resume work on proposals that are in progress or pending completion."
-        action={
-          !isLoading && drafts.length > 0 ? (
-            <Button variant="danger" size="sm" onClick={() => setShowDeleteAllModal(true)}>
-              <Trash2 size={14} />
-              Delete All
-            </Button>
-          ) : undefined
-        }
       />
 
       {!mounted || isLoading ? (
@@ -384,6 +370,14 @@ export default function DraftsPage(): JSX.Element {
               placeholder="Search by title or client..."
               className={styles.searchBar}
             />
+            <Button
+              variant="danger-outline"
+              size="sm"
+              onClick={() => setShowDeleteAllModal(true)}
+              style={{ marginLeft: "auto" }}
+            >
+              Delete All
+            </Button>
           </div>
 
           {combinedDrafts.length === 0 ? (
@@ -401,7 +395,6 @@ export default function DraftsPage(): JSX.Element {
                   loadingDraftId={loadingDraftId}
                   onLoad={(id) => void handleLoadDraft(id)}
                   onDelete={handleDeleteDraft}
-                  proposalVersionLabel={getProposalVersionLabel(draft.proposalId)}
                   isDownloadingDocx={
                     draft.proposalId !== null && downloadingDocxIds.has(draft.proposalId)
                   }
