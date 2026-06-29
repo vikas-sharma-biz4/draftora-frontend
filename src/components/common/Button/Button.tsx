@@ -8,6 +8,7 @@ export type ButtonVariant =
   | "secondary"
   | "ghost"
   | "danger"
+  | "danger-outline"
   | "success"
   | "dark"
   | "outline";
@@ -27,13 +28,14 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
-  primary:   "btn-primary",
+  primary: "btn-primary",
   secondary: "btn-secondary",
-  ghost:     "btn-ghost",
-  danger:    "btn-danger",
-  success:   "btn-success",
-  dark:      "btn-dark",
-  outline:   "btn-secondary",
+  ghost: "btn-ghost",
+  danger: "btn-danger",
+  "danger-outline": "btn-danger-outline",
+  success: "btn-success",
+  dark: "btn-dark",
+  outline: "btn-secondary",
 };
 
 const SIZE_CLASS: Record<ButtonSize, string> = {

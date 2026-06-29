@@ -17,9 +17,6 @@ interface DraftCardProps {
   loadingDraftId: string | null;
   onLoad: (id: string) => void;
   onDelete: (id: string, title: string, e: React.MouseEvent) => void;
-  /** Hierarchical version label from the proposals versioning system (e.g. "1.1").
-   *  When provided, shown as "V1.1" instead of the generic "v1" / "v2" heuristic. */
-  proposalVersionLabel?: string | null;
   isDownloadingDocx?: boolean;
   isDownloadingPdf?: boolean;
   onDownloadDocx?: () => void;
@@ -53,7 +50,6 @@ export default function DraftCard({
   loadingDraftId,
   onLoad,
   onDelete,
-  proposalVersionLabel,
   isDownloadingDocx = false,
   isDownloadingPdf = false,
   onDownloadDocx,
@@ -76,31 +72,10 @@ export default function DraftCard({
   })();
 
   const isGenerated = draft.stage === "generated";
-  const hasEdits = draft.hasEdits ?? false;
   const canDownload = draft.proposalId !== null;
-  // Use the hierarchical version label (e.g. "V1.1") when the draft is linked to a
-  // versioned proposal; fall back to the generic "v1" / "v2" heuristic otherwise.
-  const versionLabel = proposalVersionLabel
-    ? `V${proposalVersionLabel}`
-    : isGenerated
-      ? hasEdits
-        ? "v2"
-        : "v1"
-      : null;
 
   return (
-    <article
-      className={styles.card}
-      data-testid="draft-card"
-      onClick={() => {
-        if (!loadingDraftId) onLoad(draft.id);
-      }}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" && !loadingDraftId) onLoad(draft.id);
-      }}
-    >
+    <article className={styles.card} data-testid="draft-card">
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.icon}>
@@ -109,7 +84,6 @@ export default function DraftCard({
           <div className={styles.title}>{draft.title || "Untitled Proposal"}</div>
         </div>
         <div className={styles.headerRight}>
-          {versionLabel && <span className={styles.versionBadge}>{versionLabel}</span>}
           <Button
             variant="ghost"
             iconOnly

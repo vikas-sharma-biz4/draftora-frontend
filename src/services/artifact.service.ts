@@ -204,10 +204,19 @@ export async function regenerateArtifactSelection(
 }
 
 /**
- * Return the URL to view/download the payment proof attached to an artifact.
+ * Return the URL to view/display the payment proof attached to an artifact.
+ * This URL 307-redirects to a presigned S3 URL — suitable for <img> / <iframe> display.
  */
 export function getPaymentProofUrl(artifactId: number): string {
   return buildUrl(`/artifacts/${artifactId}/payment-proof`);
+}
+
+/**
+ * Return the URL that streams the payment proof with Content-Disposition: attachment.
+ * Use this for download — the backend proxies the file so no CORS or redirect issues.
+ */
+export function getPaymentProofDownloadUrl(artifactId: number): string {
+  return buildUrl(`/artifacts/${artifactId}/payment-proof/download`);
 }
 
 /**

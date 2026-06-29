@@ -34,7 +34,7 @@ export default function StyleVoiceEditorModal({
     <BaseModal isOpen={true} onClose={onClose} size="md" labelId="style-modal-title">
       <div className={styles.modalHeader}>
         <h2 id="style-modal-title" className={styles.modalTitle}>
-          Edit Style &amp; Voice
+          Edit Style
         </h2>
         <Button
           variant="ghost"

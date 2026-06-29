@@ -11,7 +11,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Check, X, Plus, Lock } from "lucide-react";
 import { toast } from "@/utils/toast";
 import Button from "@/components/common/Button";
@@ -61,6 +61,11 @@ export default function SectionManager({
 }: SectionManagerProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<string>("");
+
+  const editableSections = useMemo(
+    () => sections.filter((s) => !(STATIC_SECTION_KEYS as readonly string[]).includes(s.key)),
+    [sections]
+  );
 
   // Add section modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
@@ -204,19 +209,19 @@ export default function SectionManager({
         <div className="flex-between mb-14">
           <div className="flex-center gap-10">
             <span className="form-label mb-0">Table of Contents</span>
-            <span className="badge badge-primary">{sections.length} sections</span>
+            <span className="badge badge-primary">{editableSections.length} sections</span>
           </div>
         </div>
 
         <div onDrop={handleDrop} onDragOver={handleDragOver} className="section-drop-zone">
-          {sections.length === 0 ? (
+          {editableSections.length === 0 ? (
             <div className="ai-loading-hint">
               <div className="font-24 mb-8">✦</div>
               No sections yet. Add one manually below or drag from recommendations.
             </div>
           ) : (
             <SortableSectionList
-              sections={sections}
+              sections={editableSections}
               editingKey={editingKey}
               editLabel={editLabel}
               onSectionsChange={onSectionsChange}
@@ -240,7 +245,7 @@ export default function SectionManager({
           <ul className="static-sections-list">
             {STATIC_SECTION_KEYS.map((key, i) => (
               <li key={key} className="static-sections-item">
-                <span className="static-sections-num">{sections.length + i + 1}</span>
+                <span className="static-sections-num">{editableSections.length + i + 1}</span>
                 <span className="static-sections-name">{STATIC_SECTION_DISPLAY_NAMES[key]}</span>
                 <Lock size={10} className="static-sections-lock" />
               </li>
