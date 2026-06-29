@@ -276,6 +276,16 @@ describe("useProposalPageData — sessionStorage UI state restore", () => {
   });
 });
 
+describe("useProposalPageData — null data from getProposal (line 122)", () => {
+  it("sets errorMessage when getProposal resolves with null", async () => {
+    mockGetProposal.mockResolvedValue(null);
+    const { result } = renderHook(() => useProposalPageData(1, makeSearchParams()));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.errorMessage).toBe("Proposal data is null or undefined");
+  });
+});
+
 describe("useProposalPageData — fetchProposal", () => {
   it("refetch re-runs getProposal", async () => {
     mockGetProposal.mockResolvedValue(makeProposal("completed"));

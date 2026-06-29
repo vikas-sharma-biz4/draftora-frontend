@@ -253,4 +253,36 @@ describe("useProposalDownload", () => {
 
     expect(toast.error).toHaveBeenCalledWith("Network down");
   });
+
+  it("uses failureMessage when a non-Error is thrown (error instanceof Error false branch)", async () => {
+    // Throw a plain string — not an Error instance
+    global.fetch = jest.fn().mockRejectedValue("non-error string");
+    const { toast } = jest.requireMock("@/utils/toast") as { toast: { error: jest.Mock } };
+
+    const { result } = renderHook(() => useProposalDownload());
+
+    await act(async () => {
+      await result.current.downloadProposal(1);
+    });
+
+    // useFileDownload falls back to configRef.current.failureMessage
+    expect(toast.error).toHaveBeenCalledWith("Failed to download proposal");
+  });
+
+  it("succeeds with unquoted classic filename in Content-Disposition (classicMatch[2] branch)", async () => {
+    // Unquoted filename — extractContentDispositionFilename reads classicMatch[2]
+    const cd = "attachment; filename=unquoted-proposal.docx";
+    global.fetch = jest.fn().mockResolvedValue(makeFetchResponse(true, mockBlob, cd));
+    const { toast } = jest.requireMock("@/utils/toast") as { toast: { success: jest.Mock } };
+
+    const { result } = renderHook(() => useProposalDownload());
+
+    await act(async () => {
+      await result.current.downloadProposal(1);
+    });
+
+    // Download completed — anchor was clicked and success toast was shown
+    expect(mockAnchorClick).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+  });
 });

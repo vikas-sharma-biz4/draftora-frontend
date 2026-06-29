@@ -628,3 +628,369 @@ describe("getDownloadUrl", () => {
     expect(url).toContain("proposals/42/download");
   });
 });
+
+// ---------------------------------------------------------------------------
+// generateProposal — slow API warning branch (line 137: requestDuration > 1000)
+// ---------------------------------------------------------------------------
+
+describe("generateProposal — slow API warning (line 137)", () => {
+  it("logs a warning when request takes longer than 1000ms", async () => {
+    const { logger } = jest.requireMock("@/utils/logger") as { logger: { warn: jest.Mock } };
+    mockPost.mockResolvedValue({ id: 1, status: "generating", jobId: "job-slow" });
+
+    // Date.now calls in generateProposal:
+    //   1st: startTime = 0
+    //   2nd: requestStartTime = 0
+    //   3rd: Date.now() - requestStartTime → 2000 - 0 = 2000ms > 1000 → warn fires
+    //   4th: Date.now() - startTime → 2000 - 0 = 2000ms
+    const nowValues = [0, 0, 2000, 2000];
+    let nowIdx = 0;
+    jest.spyOn(Date, "now").mockImplementation(() => nowValues[nowIdx++] ?? 2000);
+
+    await generateProposal(baseWizardData);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("longer than 1 second"),
+      expect.any(Number),
+      expect.any(String)
+    );
+
+    jest.restoreAllMocks();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listProposals — clientId branch (lines 397-401)
+// ---------------------------------------------------------------------------
+
+describe("listProposals — clientId branch (lines 397-401)", () => {
+  const rawListItem = {
+    id: 1,
+    title: "Client Proposal",
+    client_id: 7,
+    client_name: "Widget Co",
+    status: "completed",
+    approval_status: "pending" as const,
+    tone: "professional",
+    length_preference: "balanced",
+    template_type: "scratch" as const,
+    created_at: "2025-01-01T00:00:00Z",
+    updated_at: "2025-01-02T00:00:00Z",
+  };
+
+  it("fetches with client_id query param when clientId provided", async () => {
+    mockGet.mockResolvedValue([rawListItem]);
+    const result = await listProposals({ clientId: 7 });
+    expect(mockGet).toHaveBeenCalledWith(expect.stringContaining("client_id=7"), expect.anything());
+    expect(result[0].clientId).toBe(7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateProposal — contextualInstructions null/undefined (line 74)
+// ---------------------------------------------------------------------------
+
+describe("generateProposal — contextualInstructions nullish (line 74)", () => {
+  it("treats null contextualInstructions as empty string", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      contextualInstructions: null as unknown as string,
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    // contextual is "" which becomes null in the payload
+    expect(payload.contextual_instructions).toBeNull();
+  });
+
+  it("treats undefined contextualInstructions as empty string", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      contextualInstructions: undefined as unknown as string,
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    expect(payload.contextual_instructions).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateProposal — separator branch (line 79): non-empty contextual + custom sections
+// ---------------------------------------------------------------------------
+
+describe("generateProposal — custom sections separator (line 79)", () => {
+  it("uses \\n\\n separator when contextualInstructions is non-empty and custom sections exist", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      contextualInstructions: "Existing instructions",
+      customSections: [{ key: "custom_sec", label: "My Section", description: "Does stuff" }],
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    // Should contain both the original instructions and the custom block separated by \n\n
+    expect(payload.contextual_instructions).toContain("Existing instructions");
+    expect(payload.contextual_instructions).toContain("\n\n");
+    expect(payload.contextual_instructions).toContain("My Section");
+  });
+
+  it("uses no separator when contextualInstructions is nullish and custom sections exist", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      contextualInstructions: null as unknown as string,
+      customSections: [{ key: "custom_sec", label: "My Section", description: "Does stuff" }],
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    // Should NOT start with \n\n since contextual was empty
+    expect(payload.contextual_instructions).not.toMatch(/^\n\n/);
+    expect(payload.contextual_instructions).toContain("My Section");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateProposal — templateType || "scratch" and aiModel || DEFAULT_AI_MODEL (lines 99-100)
+// ---------------------------------------------------------------------------
+
+describe("generateProposal — falsy templateType and aiModel fallbacks (lines 99-100)", () => {
+  it("falls back to 'scratch' when templateType is falsy", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      templateType: "" as unknown as "scratch",
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    expect(payload.template_type).toBe("scratch");
+  });
+
+  it("falls back to DEFAULT_AI_MODEL when aiModel is falsy", async () => {
+    mockPost.mockResolvedValue({ id: 1, status: "generating" });
+    const wizardData = {
+      ...baseWizardData,
+      aiModel: "" as unknown as string,
+    };
+    await generateProposal(wizardData);
+    const formData: FormData = mockPost.mock.calls[0][1];
+    const payload = JSON.parse(formData.get("proposal_data") as string);
+    expect(payload.ai_model).toBe("gpt-4o");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateProposal — file with no extension (line 111): ?? "" fallback
+// ---------------------------------------------------------------------------
+
+describe("generateProposal — file with no extension (line 111)", () => {
+  it("throws unsupported file type error for file with no extension", async () => {
+    // A file named just "README" has no extension — split('.').pop() returns "README" itself
+    // but a file with name "." would give pop() undefined. Use a hidden-file-style name.
+    // Actually: "nodotfile".split(".") = ["nodotfile"], pop() = "nodotfile" which is not in ALLOWED
+    const noExtFile = new File(["content"], "nodotfile");
+    const wizardData = { ...baseWizardData, files: [noExtFile] };
+    await expect(generateProposal(wizardData)).rejects.toThrow("Unsupported file type");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getProposalStatus — missing optional fields (lines 179, 200-201, 204)
+// ---------------------------------------------------------------------------
+
+describe("getProposalStatus — missing optional API fields", () => {
+  it("defaults completed_sections to [] when absent from response (line 179, 201)", async () => {
+    mockGet.mockResolvedValue({
+      id: 1,
+      status: "pending",
+      // completed_sections intentionally omitted
+      selected_sections: ["sec1"],
+    });
+    const result = await getProposalStatus(1);
+    expect(result.completedSections).toEqual([]);
+  });
+
+  it("defaults visited_pipeline_steps to [] when absent (line 204)", async () => {
+    mockGet.mockResolvedValue({
+      id: 1,
+      status: "pending",
+      completed_sections: [],
+      // visited_pipeline_steps intentionally omitted
+    });
+    const result = await getProposalStatus(1);
+    expect(result.visitedPipelineSteps).toEqual([]);
+  });
+
+  it("defaults generating_section to null when absent (line 200)", async () => {
+    mockGet.mockResolvedValue({
+      id: 1,
+      status: "pending",
+      completed_sections: [],
+      // generating_section intentionally omitted
+    });
+    const result = await getProposalStatus(1);
+    expect(result.generatingSection).toBeNull();
+  });
+
+  it("defaults both progress_percent and progress to 0 when both absent (line 184)", async () => {
+    mockGet.mockResolvedValue({
+      id: 1,
+      status: "completed",
+      completed_sections: [],
+      selected_sections: null,
+      total_sections: null,
+      // progress_percent and progress both absent
+    });
+    const result = await getProposalStatus(1);
+    expect(result.progressPercent).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapProposal — estimatedHoursData.customPromptUsed with a real string (line 282)
+// and versioning fields with actual values (lines 287-289)
+// ---------------------------------------------------------------------------
+
+describe("mapProposal — estimatedHoursData.customPromptUsed string value (line 282)", () => {
+  it("maps customPromptUsed when it has a real string value", async () => {
+    mockGet.mockResolvedValue({
+      ...baseRawProposal,
+      estimated_hours_data: {
+        total_estimated_hours: { hours: 50, description: "Total" },
+        team_breakdown: [],
+        feature_list_used: "Feature X",
+        custom_prompt_used: "Focus on security",
+      },
+    });
+    const result = await getProposal(1);
+    expect(result.estimatedHoursData?.customPromptUsed).toBe("Focus on security");
+  });
+});
+
+describe("mapProposal — versioning hierarchy fields with real values (lines 287-289)", () => {
+  it("maps versionLabel, parentProposalId, rootProposalId when present", async () => {
+    mockGet.mockResolvedValue({
+      ...baseRawProposal,
+      version_label: "v2",
+      parent_proposal_id: 10,
+      root_proposal_id: 5,
+    });
+    const result = await getProposal(1);
+    expect(result.versionLabel).toBe("v2");
+    expect(result.parentProposalId).toBe(10);
+    expect(result.rootProposalId).toBe(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// estimateProposalHours — customPromptUsed with a real string (line 316)
+// ---------------------------------------------------------------------------
+
+describe("estimateProposalHours — customPromptUsed string value (line 316)", () => {
+  it("maps customPromptUsed when custom_prompt_used has a real string", async () => {
+    mockPost.mockResolvedValue({
+      proposal_id: 1,
+      estimated_hours_data: {
+        total_estimated_hours: { hours: 100, description: "Total" },
+        team_breakdown: [],
+        feature_list_used: "Feature A",
+        custom_prompt_used: "Prioritize mobile",
+      },
+    });
+    const result = await estimateProposalHours(1);
+    expect(result.customPromptUsed).toBe("Prioritize mobile");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapProposalListItem — version fields with real values (lines 377-380)
+// ---------------------------------------------------------------------------
+
+describe("mapProposalListItem — versioning fields with real values (lines 377-380)", () => {
+  const rawListItemWithVersions = {
+    id: 2,
+    title: "Versioned Proposal",
+    client_id: 3,
+    client_name: "Tech Corp",
+    status: "completed",
+    approval_status: "approved" as const,
+    tone: "professional",
+    length_preference: "balanced",
+    template_type: "scratch" as const,
+    created_at: "2025-01-01T00:00:00Z",
+    updated_at: "2025-01-02T00:00:00Z",
+    version: 3,
+    version_label: "v3",
+    parent_proposal_id: 1,
+    root_proposal_id: 1,
+  };
+
+  it("maps version, versionLabel, parentProposalId, rootProposalId when present", async () => {
+    mockGet.mockResolvedValue([rawListItemWithVersions]);
+    const result = await listProposals();
+    expect(result[0].version).toBe(3);
+    expect(result[0].versionLabel).toBe("v3");
+    expect(result[0].parentProposalId).toBe(1);
+    expect(result[0].rootProposalId).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listProposals — offset path without limit (lines 388-389): no per_page set
+// ---------------------------------------------------------------------------
+
+describe("listProposals — offset path without limit (lines 388-389)", () => {
+  const rawListItem = {
+    id: 1,
+    title: "Proposal",
+    client_id: 1,
+    client_name: "Client",
+    status: "completed",
+    approval_status: "pending" as const,
+    tone: "professional",
+    length_preference: "balanced",
+    template_type: "scratch" as const,
+    created_at: "2025-01-01T00:00:00Z",
+    updated_at: "2025-01-02T00:00:00Z",
+  };
+
+  it("does not set per_page query param when limit is omitted", async () => {
+    mockGet.mockResolvedValue([rawListItem]);
+    await listProposals({ offset: 0 });
+    const calledUrl: string = mockGet.mock.calls[0][0];
+    expect(calledUrl).not.toContain("per_page");
+    // page should be 1 because floor(0/10)+1 = 1
+    expect(calledUrl).toContain("page=1");
+  });
+
+  it("computes correct page number from offset and default limit of 10", async () => {
+    mockGet.mockResolvedValue([rawListItem]);
+    await listProposals({ offset: 20 });
+    const calledUrl: string = mockGet.mock.calls[0][0];
+    // floor(20/10)+1 = 3
+    expect(calledUrl).toContain("page=3");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateApprovalStatus — with AbortSignal (line 485)
+// ---------------------------------------------------------------------------
+
+describe("updateApprovalStatus — with AbortSignal (line 485)", () => {
+  it("passes signal to http.patch when signal is provided", async () => {
+    mockPatch.mockResolvedValue({ ...baseRawProposal, approval_status: "approved" });
+    const signal = new AbortController().signal;
+    const result = await updateApprovalStatus(1, "approved", signal);
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/proposals/1/approval-status",
+      { approval_status: "approved" },
+      { signal }
+    );
+    expect(result.approvalStatus).toBe("approved");
+  });
+});

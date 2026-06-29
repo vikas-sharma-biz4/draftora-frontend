@@ -26,6 +26,7 @@ import {
   useContextualInstructions,
   useSelectedSections,
   useSectionDisplayNames,
+  useCustomSections,
   useTone,
   useLengthPreference,
   useLanguage,
@@ -338,6 +339,23 @@ describe("proposalWizardSlice — prefetchRecommendations", () => {
     expect(prefetchedRecommendations).toEqual(fakeRecs);
   });
 
+  it("covers selectedDocumentIds?.length null branch when selectedDocumentIds is undefined (line 160)", async () => {
+    // Set selectedDocumentIds to undefined to trigger the ?. null branch
+    act(() => {
+      useProposalWizardStore.setState({
+        proposalData: {
+          ...useProposalWizardStore.getState().proposalData,
+          selectedDocumentIds: undefined as unknown as number[],
+        },
+      });
+    });
+    mockGetSectionRecommendations.mockResolvedValue([]);
+    await act(async () => {
+      await useProposalWizardStore.getState().prefetchRecommendations();
+    });
+    expect(mockGetSectionRecommendations).toHaveBeenCalled();
+  });
+
   it("transitions status to 'error' and stores the error message on failure", async () => {
     mockGetSectionRecommendations.mockRejectedValue(new Error("API unavailable"));
 
@@ -554,11 +572,9 @@ describe("proposalWizardSlice — granular selector hooks", () => {
 
   it("useFilesMeta returns filesMeta array", () => {
     act(() => {
-      useProposalWizardStore
-        .getState()
-        .updateProposalData({
-          filesMeta: [{ name: "doc.pdf", size: 1024, type: "application/pdf" }],
-        });
+      useProposalWizardStore.getState().updateProposalData({
+        filesMeta: [{ name: "doc.pdf", size: 1024, type: "application/pdf" }],
+      });
     });
     const { result } = renderHook(() => useFilesMeta());
     expect(result.current).toHaveLength(1);
@@ -689,5 +705,38 @@ describe("proposalWizardSlice — prefetchRecommendations with unknown section k
         ]),
       })
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useCustomSections selector (line 317)
+// ---------------------------------------------------------------------------
+
+describe("proposalWizardSlice — useCustomSections selector", () => {
+  it("returns customSections from proposalData", () => {
+    act(() => {
+      useProposalWizardStore.getState().updateProposalData({ customSections: ["intro", "extras"] });
+    });
+    const { result } = renderHook(() => useCustomSections());
+    expect(result.current).toEqual(["intro", "extras"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onRehydrateStorage callback (line 247)
+// ---------------------------------------------------------------------------
+
+describe("proposalWizardSlice — persist onRehydrateStorage sets hydrated=true", () => {
+  it("sets hydrated to true after persist.rehydrate()", async () => {
+    act(() => {
+      useProposalWizardStore.setState({ hydrated: false });
+    });
+    expect(useProposalWizardStore.getState().hydrated).toBe(false);
+
+    await act(async () => {
+      await useProposalWizardStore.persist.rehydrate();
+    });
+
+    expect(useProposalWizardStore.getState().hydrated).toBe(true);
   });
 });
